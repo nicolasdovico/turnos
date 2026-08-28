@@ -130,7 +130,26 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Tests ejecutados:
   * tests/Feature/ConfirmarReservaTest.php: 5 tests pasados, 19 aserciones exitosas validando confirmación transaccional y liberación de lock en Redis, rechazo de reservas duplicadas (409 Conflict), generación periódica de turnos fijos (es_fijo = true), rollback completo en caso de conflicto intermedio y restricción 403 Forbidden cuando el tenant no posee el módulo 'turnos_fijos'.
   * php artisan test: 39 tests pasados en total (173 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 3.1: PUNTO DE VENTA (POS) & INVENTARIO DE BUFFET
+-------------------------------------------------------------------------------
+- Módulo de Punto de Venta (POS) y control de stock implementados:
+  * Modelos y migraciones creadas:
+    - productos: Tabla y Modelo App\Models\Producto con campos (nombre, codigo_barra, categoria, precio_costo, precio_venta, stock_actual, stock_minimo, estado), clave foránea complejo_id e integración con BelongsToTenant.
+    - ventas: Tabla y Modelo App\Models\Venta con campos (turno_id, usuario_id, cliente_id, numero_comprobante, tipo_pago, subtotal, descuento, total, estado), clave foránea complejo_id e integración con BelongsToTenant.
+    - venta_items: Tabla y Modelo App\Models\VentaItem vinculando cada línea de venta a su producto, cantidad, precio unitario y subtotal.
+  * App\Services\POSService: Servicio de operaciones POS con transacciones ACID (DB::transaction() y SELECT FOR UPDATE) que descuenta inventario automáticamente, valida stock suficiente y permite vinculación opcional a turnos/canchas para comandas abiertas.
+  * App\Http\Controllers\Api\POSController: Controlador que expone endpoints protegidos por middleware tenant.has_module:pos_buffet:
+    - GET /api/pos/productos (Catálogo de buffet con stock en vivo)
+    - POST /api/pos/productos (Alta de productos)
+    - POST /api/pos/ventas (Venta directa en mostrador)
+    - POST /api/turnos/{id}/consumos (Carga de comandas y consumos a turno)
+  * Registro de rutas en routes/api.php.
+- Tests ejecutados:
+  * tests/Feature/POSTest.php: 5 tests pasados, 19 aserciones exitosas validando venta directa con descuento de stock, comanda asociada a turno, rechazo por stock insuficiente (422), aislamiento multi-tenant de catálogo y respuesta 403 Forbidden en planes sin el módulo 'pos_buffet'.
+  * php artisan test: 44 tests pasados en total (192 aserciones).
 ===============================================================================
+
 
 
 

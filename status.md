@@ -1,11 +1,11 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 3.1: Punto de Venta (POS) & Inventario de Buffet`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 3.2: Arqueo y Control de Caja Diaria`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 8 / 19
+- **Tareas Completadas:** 9 / 19
 - **Fase Actual:** Bloque 3 - ERP de Club, POS / Buffet & Caja
 - **Última Actualización:** 2026-08-28
 
@@ -28,8 +28,8 @@
 ---
 
 ## 🍔 Bloque 3: ERP de Club, POS / Buffet & Caja (Semanas 6-7)
-- [ ] **Tarea 3.1:** Punto de Venta (POS) & Inventario de Buffet *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 3.2:** Arqueo y Control de Caja Diaria
+- [x] **Tarea 3.1:** Punto de Venta (POS) & Inventario de Buffet *(Completado)*
+- [ ] **Tarea 3.2:** Arqueo y Control de Caja Diaria *(⏳ SIGUIENTE A EJECUTAR)*
 
 ---
 

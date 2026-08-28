@@ -59,6 +59,17 @@ class Complejo extends Model
         return $this->hasMany(Turno::class, 'complejo_id');
     }
 
+    public function productos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Producto::class, 'complejo_id');
+    }
+
+    public function ventas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Venta::class, 'complejo_id');
+    }
+
+
     /**
      * Check if a specific module is enabled for this complejo,
      * considering individual add-on overrides and base plan assignment.
