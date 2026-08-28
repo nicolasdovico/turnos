@@ -164,7 +164,30 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Tests ejecutados:
   * tests/Feature/CajaSessionTest.php: 5 tests pasados, 31 aserciones exitosas validando apertura de caja, prevención de cajas múltiples abiertas simultáneamente (409 Conflict), ciclo completo de cobros POS/turnos con cálculo de diferencias en arqueo ciego, reporte consolidado diario y aislamiento multi-tenant.
   * php artisan test: 49 tests pasados en total (223 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 4.1: SETUP DE NEXT.JS Y MIDDLEWARE DE SUBDOMINIOS
+-------------------------------------------------------------------------------
+- Inicialización y configuración de frontend Next.js 14+ con App Router, TypeScript, Tailwind CSS y Vitest:
+  * package.json configurado con Next.js 14.2+, React 18, Tailwind CSS, TypeScript, Lucide React y Vitest.
+  * tsconfig.json, tailwind.config.ts, postcss.config.mjs, next.config.mjs y vitest.config.ts estructurados y vinculados.
+  * middleware.ts: Middleware de captura del header Host y reescritura de URLs en el borde (Edge Runtime):
+    - Dominios principales (localhost:3000, turnos.com, www.turnos.com, app.turnos.com) reescritos a /portal (Portal Global / Marketplace).
+    - Subdominios locales (*.localhost:3000), subdominios de producción (*.turnos.com) y dominios propios personalizados reescritos automáticamente a /tenants/[subdomain] con inyección del header x-tenant.
+    - Exclusión automática de rutas internas (_next/static, _next/image, favicon.ico, api y archivos estáticos).
+  * Páginas App Router creadas:
+    - app/layout.tsx: Layout global con estilos Tailwind (app/globals.css) y fuentes del sistema.
+    - app/page.tsx: Redirección / render del portal central.
+    - app/portal/page.tsx: Landing page del Marketplace global de complejos y buscador.
+    - app/tenants/[subdomain]/page.tsx: Página dinámica del club según subdominio/dominio personalizado.
+    - app/not-found.tsx: Página 404 personalizada.
+- Tests ejecutados:
+  * tests/middleware.test.ts con Vitest: 6 tests pasados (100% éxito) validando reescritura de dominio principal a /portal, subrutas del portal, paso directo de /portal, subdominios locales (*.localhost), subdominios de producción (*.turnos.com) y dominios personalizados (miclub.com).
+  * Build de producción (next build) verificado exitosamente.
+  * Verificación HTTP en vivo vía curl en servidor de desarrollo:
+    - GET http://localhost:3000/ -> 200 OK con contenido del Portal Central.
+    - GET http://padelpro.localhost:3000/ -> 200 OK con contenido oficial del Complejo padelpro.
 ===============================================================================
+
 
 
 
