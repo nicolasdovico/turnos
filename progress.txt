@@ -94,7 +94,22 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Tests ejecutados:
   * tests/Feature/CanchaTenantIsolationTest.php: 3 tests pasados, 24 aserciones exitosas verificando autoasignación de complejo_id, aislamiento estricto de canchas, horarios y turnos entre complejos deportivos, y navegación de relaciones Eloquent.
   * php artisan test: 21 tests pasados en total (85 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 2.2: ALGORITMO DE CÁLCULO DE DISPONIBILIDAD
+-------------------------------------------------------------------------------
+- Servicio y endpoint de disponibilidad implementados:
+  * App\Services\DisponibilidadService: Servicio que calcula slots libres mediante el método obtenerSlotsDisponibles(canchaId, fecha), cruzando:
+    1. Horarios de atención configurados para el día de la semana (hora_apertura, hora_cierre, duracion_turno_minutos).
+    2. Turnos ocupados en la base de datos (estado 'reservado' o 'bloqueado').
+    3. Bloqueos temporales en Redis (lock:cancha:{cancha_id}:{fecha}:{hora_inicio}) con TTL para prevención de doble reserva.
+    4. Validación de estado operativo de la cancha ('activo').
+  * App\Http\Controllers\Api\DisponibilidadController: Controlador que expone GET /api/canchas/{id}/disponibilidad?fecha=YYYY-MM-DD, protegido por middleware tenant.has_module:reservas.
+  * Registro de ruta en routes/api.php.
+- Tests ejecutados:
+  * tests/Unit/DisponibilidadServiceTest.php: 8 tests pasados, 47 aserciones exitosas validando cálculo de slots completos, exclusión por reservas en base de datos, exclusión por candados en Redis, turnos cancelados, canchas inactivas, días cerrados y respuesta HTTP del endpoint.
+  * php artisan test: 29 tests pasados en total (132 aserciones).
 ===============================================================================
+
 
 
 
