@@ -204,7 +204,25 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * frontend/tests/revalidate.test.ts con Vitest: 4 tests pasados validando rechazo por token inválido (401), validación de parámetros (400) y ejecución exitosa de revalidación por POST y GET (200).
   * Suite Frontend completa: 10 tests pasados (100% éxito).
   * Suite Backend completa: 53 tests pasados (243 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 4.3: GRILLA DE TURNOS INTERACTIVA EN NEXT.JS (ADMIN & PÚBLICO)
+-------------------------------------------------------------------------------
+- Componente de Grilla Horaria y Reserva en Tiempo Real implementado:
+  * components/GrillaHoraria.tsx:
+    - Consumo reactivo de slots de disponibilidad por cancha y fecha (GET /api/canchas/{id}/disponibilidad).
+    - Bloqueo optimista atómico en Redis al hacer click en un slot libre (POST /api/turnos/bloquear-temporal).
+    - Banner de checkout activo con contador visual de 10 minutos (600 segundos) en formato MM:SS sincronizado con el TTL de Redis.
+    - Sistema de alertas Toast flotantes y accesibles con soporte para error 409 Conflict (doble reserva / slot retenido), confirmación y advertencias de expiración.
+    - Estados visuales diferenciados: Disponible (libre/clickeable), Retenido por usuario actual (activo con ping animado), Ocupado (deshabilitado) y Loading.
+    - Selector dinámico de fecha con auto-recarga de disponibilidad.
+  * Integración en app/tenants/[subdomain]/page.tsx para reservas interactivas en vivo en cada subdominio de club.
+- Tests ejecutados:
+  * frontend/tests/GrillaHoraria.test.tsx con React Testing Library y Vitest: 3 tests pasados validando renderizado de slots y deshabilitado de ocupados, simulación de bloqueo exitoso con llamada API y arranque de countdown de 10:00, y despliegue de alertas Toast ante 409 Conflict.
+  * Build de producción (next build) validado con éxito.
+  * Suite Frontend global: 13 tests pasados (100% éxito).
+  * Suite Backend global: 53 tests pasados (243 aserciones).
 ===============================================================================
+
 
 
 

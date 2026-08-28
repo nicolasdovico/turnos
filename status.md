@@ -1,12 +1,12 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 4.3: Grilla de Turnos Interactiva en Next.js (Admin & Público)`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 5.1: Partidos Abiertos (Matchmaking) y Pago Dividido (Split Payment)`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 12 / 19
-- **Fase Actual:** Bloque 4 - Frontend Web Next.js & CMS Multitenant
+- **Tareas Completadas:** 13 / 19
+- **Fase Actual:** Bloque 5 - Comunidad, Split Payment & Torneos
 - **Última Actualización:** 2026-08-28
 
 ---
@@ -36,13 +36,13 @@
 ## 🌐 Bloque 4: Frontend Web Next.js & CMS Multitenant (Semanas 8-9)
 - [x] **Tarea 4.1:** Setup de Next.js y Middleware de Subdominios *(Completado)*
 - [x] **Tarea 4.2:** CMS Multitenant con ISR y Sanitización XSS *(Completado)*
-- [ ] **Tarea 4.3:** Grilla de Turnos Interactiva en Next.js (Admin & Público) *(⏳ SIGUIENTE A EJECUTAR)*
-
+- [x] **Tarea 4.3:** Grilla de Turnos Interactiva en Next.js (Admin & Público) *(Completado)*
 
 ---
 
 ## 🏆 Bloque 5: Comunidad, Split Payment & Torneos (Semanas 10-11)
-- [ ] **Tarea 5.1:** Partidos Abiertos (Matchmaking) y Pago Dividido (Split Payment)
+- [ ] **Tarea 5.1:** Partidos Abiertos (Matchmaking) y Pago Dividido (Split Payment) *(⏳ SIGUIENTE A EJECUTAR)*
+
 - [ ] **Tarea 5.2:** Gestor de Torneos, Fixtures y Tablas de Posiciones
 
 ---
