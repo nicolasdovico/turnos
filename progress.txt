@@ -1,0 +1,21 @@
+===============================================================================
+PROYECTO: SaaS Integral de Gestión Deportiva, CMS Multitenant & Marketplace
+FECHA DE INICIO: 2026-08-28
+STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), PostgreSQL 16, Redis 7, Caddy
+===============================================================================
+
+-------------------------------------------------------------------------------
+[2026-08-28] - INICIALIZACIÓN DE CONTEXTO Y MEMORIA DEL PROYECTO
+-------------------------------------------------------------------------------
+- Creación de RULES.md con directivas inmutables:
+  * Backend: Laravel 11 (PHP 8.3) en modo API Rest desacoplada.
+  * Frontend: Next.js 14+ (Node 22) con Tailwind CSS, SSR/ISR y Middleware de subdominios.
+  * Mobile: React Native (Expo) con TypeScript y Tailwind (NativeWind).
+  * Multi-tenancy: Todo modelo tenant-aware debe implementar TenantScope inyectando WHERE complejo_id = ?.
+  * Permisos: Control modular mediante middleware tenant.has_module:slug y roles RBAC.
+  * Concurrencia: Locks atómicos en Redis (TTL 10 min) y transacciones ACID con SELECT FOR UPDATE.
+  * TDD Obligatorio: Ninguna tarea se considera terminada sin su test automatizado en verde.
+- Creación de status.md con checklist completo de tareas (Bloques 1 al 8) en estado pendiente [ ].
+- Tarea 1.1 (Docker Compose Multi-contenedor) configurada como la siguiente a ejecutar.
+- Creación de progress.txt para bitácora cronológica de ejecuciones y decisiones técnicas.
+===============================================================================
