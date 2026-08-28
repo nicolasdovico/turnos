@@ -120,7 +120,18 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Tests ejecutados:
   * tests/Feature/AtomicLockTest.php: 5 tests pasados, 22 aserciones exitosas validando bloqueo atómico bajo concurrencia, TTL y formato de clave Redis, desbloqueo seguro para adquisiciones posteriores, conflicto con reservas en BD y exclusión en cálculo de disponibilidad.
   * php artisan test: 34 tests pasados en total (154 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 2.4: CONFIRMACIÓN TRANSACCIONAL Y TURNOS RECURRENTES (FIJOS)
+-------------------------------------------------------------------------------
+- Confirmación ACID y motor de turnos recurrentes implementados:
+  * App\Http\Controllers\Api\TurnoConfirmarController: Controlador que expone POST /api/turnos/confirmar ejecutando DB::transaction() y SELECT FOR UPDATE para reservar el slot de forma atómica y segura, actualizando el estado a 'reservado' y liberando el candado correspondiente en Redis.
+  * App\Http\Controllers\Api\TurnoFijoController: Controlador que expone POST /api/turnos/fijos para la generación en lote de turnos recurrentes para N semanas en un día y horario específico, con verificación de conflictos con SELECT FOR UPDATE y rollback total ante colisiones. Protegido por middleware tenant.has_module:turnos_fijos.
+  * Registro de rutas en routes/api.php.
+- Tests ejecutados:
+  * tests/Feature/ConfirmarReservaTest.php: 5 tests pasados, 19 aserciones exitosas validando confirmación transaccional y liberación de lock en Redis, rechazo de reservas duplicadas (409 Conflict), generación periódica de turnos fijos (es_fijo = true), rollback completo en caso de conflicto intermedio y restricción 403 Forbidden cuando el tenant no posee el módulo 'turnos_fijos'.
+  * php artisan test: 39 tests pasados en total (173 aserciones).
 ===============================================================================
+
 
 
 

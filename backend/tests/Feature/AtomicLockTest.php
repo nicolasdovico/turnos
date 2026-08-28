@@ -30,6 +30,7 @@ class AtomicLockTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Redis::flushdb();
 
         $this->seed([
             ModuloSeeder::class,
@@ -72,15 +73,7 @@ class AtomicLockTest extends TestCase
 
     protected function tearDown(): void
     {
-        // Clean up any test Redis keys
-        $pattern = "turno:{$this->cancha->id}:*";
-        $keys = Redis::keys($pattern);
-        if (!empty($keys)) {
-            foreach ($keys as $key) {
-                Redis::del($key);
-            }
-        }
-
+        Redis::flushdb();
         parent::tearDown();
     }
 

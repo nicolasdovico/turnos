@@ -14,6 +14,13 @@ Route::get('/canchas/{id}/disponibilidad', DisponibilidadController::class)
 Route::post('/turnos/bloquear-temporal', TurnoBloqueoController::class)
     ->middleware('tenant.has_module:reservas');
 
+Route::post('/turnos/confirmar', \App\Http\Controllers\Api\TurnoConfirmarController::class)
+    ->middleware('tenant.has_module:reservas');
+
+Route::post('/turnos/fijos', \App\Http\Controllers\Api\TurnoFijoController::class)
+    ->middleware(['tenant.has_module:reservas', 'tenant.has_module:turnos_fijos']);
+
+
 
 Route::get('/user', function (Request $request) {
     return $request->user();

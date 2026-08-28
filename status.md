@@ -1,12 +1,12 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 2.4: Confirmación Transaccional y Turnos Recurrentes (Fijos)`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 3.1: Punto de Venta (POS) & Inventario de Buffet`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 7 / 19
-- **Fase Actual:** Bloque 2 - Motor de Reservas, Concurrencia & Agenda
+- **Tareas Completadas:** 8 / 19
+- **Fase Actual:** Bloque 3 - ERP de Club, POS / Buffet & Caja
 - **Última Actualización:** 2026-08-28
 
 ---
@@ -23,12 +23,12 @@
 - [x] **Tarea 2.1:** Modelos de Canchas, Horarios y Turnos *(Completado)*
 - [x] **Tarea 2.2:** Algoritmo de Cálculo de Disponibilidad *(Completado)*
 - [x] **Tarea 2.3:** Bloqueo Temporal Atómico con Redis (Anti Doble Reserva) *(Completado)*
-- [ ] **Tarea 2.4:** Confirmación Transaccional y Turnos Recurrentes (Fijos) *(⏳ SIGUIENTE A EJECUTAR)*
+- [x] **Tarea 2.4:** Confirmación Transaccional y Turnos Recurrentes (Fijos) *(Completado)*
 
 ---
 
 ## 🍔 Bloque 3: ERP de Club, POS / Buffet & Caja (Semanas 6-7)
-- [ ] **Tarea 3.1:** Punto de Venta (POS) & Inventario de Buffet
+- [ ] **Tarea 3.1:** Punto de Venta (POS) & Inventario de Buffet *(⏳ SIGUIENTE A EJECUTAR)*
 - [ ] **Tarea 3.2:** Arqueo y Control de Caja Diaria
 
 ---

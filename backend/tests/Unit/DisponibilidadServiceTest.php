@@ -27,6 +27,7 @@ class DisponibilidadServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Redis::flushdb();
 
         $this->seed([
             ModuloSeeder::class,
@@ -62,6 +63,12 @@ class DisponibilidadServiceTest extends TestCase
             'hora_cierre' => '12:00',
             'duracion_turno_minutos' => 60,
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        Redis::flushdb();
+        parent::tearDown();
     }
 
     /**
