@@ -31,6 +31,17 @@ Route::post('/caja/apertura', [\App\Http\Controllers\Api\CajaController::class, 
 Route::post('/caja/cierre', [\App\Http\Controllers\Api\CajaController::class, 'cierre']);
 Route::get('/caja/resumen-diario', [\App\Http\Controllers\Api\CajaController::class, 'resumenDiario']);
 
+Route::middleware('tenant.has_module:cms_web')->group(function () {
+    Route::get('/cms/paginas', [\App\Http\Controllers\Api\PaginaController::class, 'index']);
+    Route::get('/cms/paginas/{slug}', [\App\Http\Controllers\Api\PaginaController::class, 'show']);
+    Route::post('/cms/paginas', [\App\Http\Controllers\Api\PaginaController::class, 'store']);
+    Route::put('/cms/paginas/{id}', [\App\Http\Controllers\Api\PaginaController::class, 'update']);
+    Route::delete('/cms/paginas/{id}', [\App\Http\Controllers\Api\PaginaController::class, 'destroy']);
+});
+
+Route::post('/tenants/revalidate', [\App\Http\Controllers\Api\PaginaController::class, 'triggerRevalidate']);
+
+
 
 
 

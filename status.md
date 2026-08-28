@@ -1,11 +1,11 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 4.2: CMS Multitenant con ISR y Sanitización XSS`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 4.3: Grilla de Turnos Interactiva en Next.js (Admin & Público)`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 11 / 19
+- **Tareas Completadas:** 12 / 19
 - **Fase Actual:** Bloque 4 - Frontend Web Next.js & CMS Multitenant
 - **Última Actualización:** 2026-08-28
 
@@ -35,8 +35,9 @@
 
 ## 🌐 Bloque 4: Frontend Web Next.js & CMS Multitenant (Semanas 8-9)
 - [x] **Tarea 4.1:** Setup de Next.js y Middleware de Subdominios *(Completado)*
-- [ ] **Tarea 4.2:** CMS Multitenant con ISR y Sanitización XSS *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 4.3:** Grilla de Turnos Interactiva en Next.js (Admin & Público)
+- [x] **Tarea 4.2:** CMS Multitenant con ISR y Sanitización XSS *(Completado)*
+- [ ] **Tarea 4.3:** Grilla de Turnos Interactiva en Next.js (Admin & Público) *(⏳ SIGUIENTE A EJECUTAR)*
+
 
 ---
 

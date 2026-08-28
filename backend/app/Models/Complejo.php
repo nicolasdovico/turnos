@@ -74,6 +74,12 @@ class Complejo extends Model
         return $this->hasMany(CajaSesion::class, 'complejo_id');
     }
 
+    public function paginas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Pagina::class, 'complejo_id');
+    }
+
+
 
 
     /**

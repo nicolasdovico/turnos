@@ -186,7 +186,26 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Verificación HTTP en vivo vía curl en servidor de desarrollo:
     - GET http://localhost:3000/ -> 200 OK con contenido del Portal Central.
     - GET http://padelpro.localhost:3000/ -> 200 OK con contenido oficial del Complejo padelpro.
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 4.2: CMS MULTITENANT CON ISR Y SANITIZACIÓN XSS
+-------------------------------------------------------------------------------
+- Módulo de CMS y Constructor de Páginas Informativas implementado:
+  * Backend (Laravel 11):
+    - paginas: Tabla y Modelo App\Models\Pagina con campos (titulo, slug, contenido_html, esta_publicada), clave foránea complejo_id, restricción de unicidad compuesta [complejo_id, slug] e integración con BelongsToTenant.
+    - Relación hasMany paginas añadida al modelo Complejo.
+    - App\Services\HtmlSanitizerService: Servicio de sanitización estricta que remueve tags peligrosos (script, iframe, style, object, embed, etc.), elimina event listeners inline (onload, onerror, onclick, on*) y purga esquemas de pseudo-protocolo (javascript:, vbscript:, data:).
+    - App\Services\RevalidationService: Servicio que despacha peticiones HTTP POST al endpoint /api/revalidate de Next.js ante creaciones, modificaciones y eliminaciones de páginas para purga perimetral de caché ISR.
+    - App\Http\Controllers\Api\PaginaController: Controlador con CRUD completo de páginas protegido por middleware tenant.has_module:cms_web y endpoint POST /api/tenants/revalidate.
+  * Frontend (Next.js 14):
+    - app/tenants/[subdomain]/paginas/[slug]/page.tsx: Página dinámica renderizada mediante Incremental Static Regeneration (export const revalidate = 3600) con SSR/ISR y renderizado seguro de HTML sanitizado.
+    - app/api/revalidate/route.ts: Route Handler (POST/GET) que valida el secret token y ejecuta revalidatePath(path) de forma atómica.
+- Tests ejecutados:
+  * tests/Feature/CMSSanitizationAndRevalidationTest.php: 4 tests pasados, 20 aserciones exitosas validando sanitización de vectores XSS, aislamiento de páginas por tenant y unicidad de slug, disparo de webhook de revalidación on-demand y restricción 403 Forbidden cuando el módulo 'cms_web' está inactivo.
+  * frontend/tests/revalidate.test.ts con Vitest: 4 tests pasados validando rechazo por token inválido (401), validación de parámetros (400) y ejecución exitosa de revalidación por POST y GET (200).
+  * Suite Frontend completa: 10 tests pasados (100% éxito).
+  * Suite Backend completa: 53 tests pasados (243 aserciones).
 ===============================================================================
+
 
 
 
