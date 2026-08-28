@@ -126,6 +126,16 @@ El sistema utiliza detección y reescritura de subdominios en el Edge mediante N
 - `GET /api/partidos-abiertos` — Listado de convocatorias abiertas para matchmaking.
 - `POST /api/partidos-abiertos/{id}/unirse` — Permite a un jugador sumarse a un partido abierto tomando una cuota pendiente.
 
+### 🏆 Torneos & Fixtures (`modulo: torneos`)
+- `GET /api/torneos` — Listado de torneos del complejo.
+- `POST /api/torneos` — Creación de nuevo torneo (eliminación directa, round-robin, categorías).
+- `GET /api/torneos/{id}` — Detalle del torneo con equipos inscriptos.
+- `POST /api/torneos/{id}/equipos` — Inscripción de equipos/parejas en el torneo.
+- `POST /api/torneos/{id}/generar-fixture` — Generación de llaves y cuadro de eliminación directa.
+- `GET /api/torneos/{id}/bracket` — Estructura visual del cuadro de llaves por rondas.
+- `GET /api/torneos/{id}/tabla-posiciones` — Tabla de posiciones clasificada.
+- `POST /api/torneos/partidos/{partidoId}/resultado` — Carga de scores con avance automático del ganador a la siguiente ronda.
+
 ### 🍔 POS Buffet & Inventario (`modulo: pos_buffet`)
 - `GET /api/pos/productos` — Catálogo de productos con stock en tiempo real.
 - `POST /api/pos/productos` — Alta de producto en inventario.

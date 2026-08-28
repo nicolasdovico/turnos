@@ -258,6 +258,35 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Tests ejecutados:
   * tests/Feature/SplitPaymentTest.php: 5 tests pasados, 35 aserciones exitosas validando fraccionamiento con links de checkout, pago individual sin confirmación prematura, auto-confirmación transaccional al 100% de los pagos, matchmaking y unión de jugadores, y restricción 403 Forbidden cuando el módulo 'split_payment' está inactivo.
   * php artisan test: 58 tests pasados en total (278 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 5.2: GESTOR DE TORNEOS, FIXTURES Y TABLAS DE POSICIONES
+-------------------------------------------------------------------------------
+- Motor de Torneos, Fixtures y Cuadros de Eliminación Directa implementado:
+  * Modelos y migraciones creadas:
+    - torneos: Tabla y Modelo App\Models\Torneo con campos (complejo_id, nombre, slug, deporte, formato ['eliminacion_directa', 'todos_contra_todos'], categoria, max_equipos, fecha_inicio, fecha_fin, precio_inscripcion, estado ['inscripciones_abiertas', 'en_progreso', 'finalizado'], reglas) e integración con BelongsToTenant.
+    - equipos_torneo: Tabla y Modelo App\Models\EquipoTorneo con campos (complejo_id, torneo_id, capitan_id, nombre, jugador_1_nombre, jugador_2_nombre, semilla, puntos, partidos_jugados, partidos_ganados, partidos_empatados, partidos_perdidos, sets_favor, sets_contra, diferencia_sets, estado ['confirmado', 'eliminado', 'campeon']) e integración con BelongsToTenant.
+    - partidos_torneo: Tabla y Modelo App\Models\PartidoTorneo con campos (complejo_id, torneo_id, turno_id, cancha_id, fase ['cuartos', 'semifinal', 'final'], ronda, posicion_llave, siguiente_partido_id, equipo_local_id, equipo_visitante_id, ganador_id, score_local, score_visitante, resultado_local, resultado_visitante, estado ['pendiente', 'finalizado']) e integración con BelongsToTenant.
+    - Actualización de relaciones Eloquent en Complejo (torneos).
+  * App\Services\TorneoFixtureService:
+    - generarLlavesEliminacionDirecta(Torneo): Construye el árbol completo de llaves (bracket) desde la Final hacia la Ronda 1 calculando potencias de 2 (2, 4, 8, 16), emparejamientos por sembrado tradicional (1 vs N, 2 vs N-1) y avance automático por BYE ante cupos incompletos.
+    - registrarResultadoPartido(PartidoTorneo, datos): Transacción ACID pesimista (SELECT FOR UPDATE) que guarda scores, calcula el ganador, propaga automáticamente al equipo clasificado a la posición local/visitante del siguiente partido (`siguiente_partido_id`) y proclama al campeón en la Final.
+    - calcularTablaPosiciones(Torneo): Ordena la clasificación general por puntos, diferencia de sets, sets a favor y partidos ganados.
+    - obtenerEstructuraBracket(Torneo): Retorna el cuadro visual ordenado por fases y partidos.
+  * App\Http\Controllers\Api\TorneoController:
+    - GET /api/torneos (Listado de torneos)
+    - POST /api/torneos (Creación de torneo)
+    - GET /api/torneos/{id} (Detalle con equipos y fixture)
+    - POST /api/torneos/{id}/equipos (Inscripción de equipos con validación de cupo máximo)
+    - POST /api/torneos/{id}/generar-fixture (Generación de cuadro y llaves)
+    - GET /api/torneos/{id}/bracket (Visualización del árbol de llaves)
+    - GET /api/torneos/{id}/tabla-posiciones (Tabla de clasificación clasificada)
+    - POST /api/torneos/partidos/{partidoId}/resultado (Carga de resultados y avance automático)
+  * Registro de rutas en routes/api.php protegidas por middleware tenant.has_module:torneos.
+  * Recursos Filament creados para Super Admin: TorneoResource, EquipoTorneoResource y PartidoTorneoResource.
+- Tests ejecutados:
+  * tests/Unit/FixtureGeneratorTest.php: 5 tests pasados, 39 aserciones exitosas validando bracket de 4 equipos, bracket de 8 equipos, avance de ganadores a la Final, resolución de BYEs y cálculo de tablas de clasificación.
+  * tests/Feature/TorneoModuleTest.php: 2 tests pasados, 15 aserciones exitosas validando ciclo completo vía API REST y protección 403 Forbidden cuando el módulo 'torneos' no está contratado.
+  * php artisan test: 65 tests pasados en total (332 aserciones).
 ===============================================================================
 
 

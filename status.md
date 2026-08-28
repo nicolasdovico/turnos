@@ -1,12 +1,12 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 5.2: Gestor de Torneos, Fixtures y Tablas de Posiciones`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 6.1: Setup de React Native Expo & Autenticación Segura`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 14 / 19
-- **Fase Actual:** Bloque 5 - Comunidad, Split Payment & Torneos
+- **Tareas Completadas:** 15 / 19
+- **Fase Actual:** Bloque 6 - Frontend Mobile con React Native
 - **Última Actualización:** 2026-08-28
 
 ---
@@ -42,13 +42,12 @@
 
 ## 🏆 Bloque 5: Comunidad, Split Payment & Torneos (Semanas 10-11)
 - [x] **Tarea 5.1:** Partidos Abiertos (Matchmaking) y Pago Dividido (Split Payment) *(Completado)*
-
-- [ ] **Tarea 5.2:** Gestor de Torneos, Fixtures y Tablas de Posiciones *(⏳ SIGUIENTE A EJECUTAR)*
+- [x] **Tarea 5.2:** Gestor de Torneos, Fixtures y Tablas de Posiciones *(Completado)*
 
 ---
 
 ## 📱 Bloque 6: Frontend Mobile con React Native (Semanas 12-13)
-- [ ] **Tarea 6.1:** Setup de React Native Expo & Autenticación Segura
+- [ ] **Tarea 6.1:** Setup de React Native Expo & Autenticación Segura *(⏳ SIGUIENTE A EJECUTAR)*
 - [ ] **Tarea 6.2:** Buscador por Geolocalización y Notificaciones Push
 
 ---

@@ -19,6 +19,7 @@ Route::get('/', function () {
             'turnos_fijos' => '/api/turnos/fijos',
             'split_payment' => '/api/turnos/{id}/split',
             'partidos_abiertos' => '/api/partidos-abiertos',
+            'torneos' => '/api/torneos',
             'pos_productos' => '/api/pos/productos',
             'caja_resumen' => '/api/caja/resumen-diario',
             'cms_paginas' => '/api/cms/paginas',
@@ -67,6 +68,17 @@ Route::middleware('tenant.has_module:split_payment')->group(function () {
     Route::get('/split-pagos/{token}', [\App\Http\Controllers\Api\SplitPaymentController::class, 'showCuota']);
     Route::get('/partidos-abiertos', [\App\Http\Controllers\Api\SplitPaymentController::class, 'indexPartidos']);
     Route::post('/partidos-abiertos/{id}/unirse', [\App\Http\Controllers\Api\SplitPaymentController::class, 'unirsePartido']);
+});
+
+Route::middleware('tenant.has_module:torneos')->group(function () {
+    Route::get('/torneos', [\App\Http\Controllers\Api\TorneoController::class, 'index']);
+    Route::post('/torneos', [\App\Http\Controllers\Api\TorneoController::class, 'store']);
+    Route::get('/torneos/{id}', [\App\Http\Controllers\Api\TorneoController::class, 'show']);
+    Route::post('/torneos/{id}/equipos', [\App\Http\Controllers\Api\TorneoController::class, 'inscribirEquipo']);
+    Route::post('/torneos/{id}/generar-fixture', [\App\Http\Controllers\Api\TorneoController::class, 'generarFixture']);
+    Route::get('/torneos/{id}/bracket', [\App\Http\Controllers\Api\TorneoController::class, 'getBracket']);
+    Route::get('/torneos/{id}/tabla-posiciones', [\App\Http\Controllers\Api\TorneoController::class, 'getTablaPosiciones']);
+    Route::post('/torneos/partidos/{partidoId}/resultado', [\App\Http\Controllers\Api\TorneoController::class, 'registrarResultado']);
 });
 
 
