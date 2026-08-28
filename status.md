@@ -1,11 +1,11 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 2.3: Bloqueo Temporal Atómico con Redis (Anti Doble Reserva)`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 2.4: Confirmación Transaccional y Turnos Recurrentes (Fijos)`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 6 / 19
+- **Tareas Completadas:** 7 / 19
 - **Fase Actual:** Bloque 2 - Motor de Reservas, Concurrencia & Agenda
 - **Última Actualización:** 2026-08-28
 
@@ -22,8 +22,8 @@
 ## ⚽ Bloque 2: Motor de Reservas, Concurrencia & Agenda (Semanas 3-5)
 - [x] **Tarea 2.1:** Modelos de Canchas, Horarios y Turnos *(Completado)*
 - [x] **Tarea 2.2:** Algoritmo de Cálculo de Disponibilidad *(Completado)*
-- [ ] **Tarea 2.3:** Bloqueo Temporal Atómico con Redis (Anti Doble Reserva) *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 2.4:** Confirmación Transaccional y Turnos Recurrentes (Fijos)
+- [x] **Tarea 2.3:** Bloqueo Temporal Atómico con Redis (Anti Doble Reserva) *(Completado)*
+- [ ] **Tarea 2.4:** Confirmación Transaccional y Turnos Recurrentes (Fijos) *(⏳ SIGUIENTE A EJECUTAR)*
 
 ---
 

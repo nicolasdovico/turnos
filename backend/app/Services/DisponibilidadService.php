@@ -63,8 +63,9 @@ class DisponibilidadService
             $estaOcupadoEnDb = $turnosOcupados->has($horaInicioFormatted);
 
             // 2. Check if locked in Redis (atomic lock with TTL during checkout)
-            $lockKey = self::getLockKey($canchaId, $fechaCarbon->format('Y-m-d'), $horaInicioFormatted);
-            $estaBloqueadoEnRedis = (bool) Redis::get($lockKey);
+            $lockKeyLegacy = self::getLockKey($canchaId, $fechaCarbon->format('Y-m-d'), $horaInicioFormatted);
+            $lockKeyStandard = ReservaLockService::getLockKey($canchaId, $fechaCarbon->format('Y-m-d'), $horaInicioFormatted);
+            $estaBloqueadoEnRedis = (bool) Redis::get($lockKeyLegacy) || (bool) Redis::get($lockKeyStandard);
 
             if (!$estaOcupadoEnDb && !$estaBloqueadoEnRedis) {
                 $slotsDisponibles[] = [

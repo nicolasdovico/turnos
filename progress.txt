@@ -108,7 +108,20 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Tests ejecutados:
   * tests/Unit/DisponibilidadServiceTest.php: 8 tests pasados, 47 aserciones exitosas validando cálculo de slots completos, exclusión por reservas en base de datos, exclusión por candados en Redis, turnos cancelados, canchas inactivas, días cerrados y respuesta HTTP del endpoint.
   * php artisan test: 29 tests pasados en total (132 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 2.3: BLOQUEO TEMPORAL ATÓMICO CON REDIS (ANTI DOBLE RESERVA)
+-------------------------------------------------------------------------------
+- Mecanismo de candado distribuido atómico con Redis implementado:
+  * App\Services\ReservaLockService: Servicio de retención de slots con operaciones atómicas SET turno:{cancha_id}:{fecha}:{hora} {token} EX 600 NX (TTL 10 minutos) que previene condiciones de carrera durante el checkout.
+    - Método adquirirBloqueo(canchaId, fecha, horaInicio, userId, ttl): Valida ausencia de reservas previas en PostgreSQL y solicita candado atómico en Redis retornando token_reserva UUID.
+    - Método liberarBloqueo(canchaId, fecha, horaInicio, token): Liberación segura mediante script Lua que verifica propiedad del token antes de eliminar la clave.
+  * App\Http\Controllers\Api\TurnoBloqueoController: Controlador que expone POST /api/turnos/bloquear-temporal, retornando 200 OK con token_reserva y TTL o 409 Conflict con código TURNO_ALREADY_LOCKED si el turno ya fue retenido o reservado.
+  * Integración en routes/api.php con middleware tenant.has_module:reservas y sincronización con DisponibilidadService.
+- Tests ejecutados:
+  * tests/Feature/AtomicLockTest.php: 5 tests pasados, 22 aserciones exitosas validando bloqueo atómico bajo concurrencia, TTL y formato de clave Redis, desbloqueo seguro para adquisiciones posteriores, conflicto con reservas en BD y exclusión en cálculo de disponibilidad.
+  * php artisan test: 34 tests pasados en total (154 aserciones).
 ===============================================================================
+
 
 
 
