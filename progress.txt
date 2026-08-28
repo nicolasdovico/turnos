@@ -40,4 +40,19 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Extensiones PHP 8.3 verificadas (pdo_pgsql, redis, gd, bcmath, OPcache).
     - Conexión PostgreSQL y Redis PING [OK].
     - Respuestas HTTP en frontend (:3000), caddy (:80/health) y fastcgi (:80/api/index.php) [OK].
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 1.2: INICIALIZACIÓN Y SETUP DE LARAVEL 11 BACKEND
+-------------------------------------------------------------------------------
+- Inicialización y configuración de Laravel 11 en /backend:
+  * Instalación de proyecto base Laravel 11.x en modo API REST desacoplada.
+  * Configuración de .env y .env.example con conexión a PostgreSQL 16 (saas_db) y Redis 7 (cache) sobre la red saas_network.
+  * Instalación y configuración de laravel/sanctum para autenticación por Bearer tokens.
+  * Incorporación del trait HasApiTokens en App\Models\User.
+  * Creación de App\Http\Controllers\Api\HealthCheckController y registro de ruta GET /api/health.
+  * Creación de test automatizado en PHPUnit (tests/Feature/HealthCheckTest.php) que verifica conectividad a base de datos PostgreSQL y Redis, así como manejo de degradación de servicios.
+- Tests ejecutados:
+  * php artisan test --filter=HealthCheckTest: 3 tests pasados, 13 aserciones exitosas.
+  * php artisan test: 5 tests pasados en total.
+  * Verificación HTTP en vivo vía Caddy proxy: GET http://localhost/api/health -> 200 OK con JSON {"status":"ok","services":{"database":"connected","redis":"connected"},"timestamp":"..."}.
 ===============================================================================
+
