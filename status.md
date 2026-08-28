@@ -1,19 +1,19 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 1.1: Docker Compose Multi-contenedor`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 1.2: Inicialización y Setup de Laravel 11 Backend`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 0 / 19
+- **Tareas Completadas:** 1 / 19
 - **Fase Actual:** Bloque 1 - Infraestructura, Base & Multi-tenancy
 - **Última Actualización:** 2026-08-28
 
 ---
 
 ## 🧱 Bloque 1: Infraestructura, Base & Multi-tenancy (Semanas 1-2)
-- [ ] **Tarea 1.1:** Docker Compose Multi-contenedor *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 1.2:** Inicialización y Setup de Laravel 11 Backend
+- [x] **Tarea 1.1:** Docker Compose Multi-contenedor *(Completado)*
+- [ ] **Tarea 1.2:** Inicialización y Setup de Laravel 11 Backend *(⏳ SIGUIENTE A EJECUTAR)*
 - [ ] **Tarea 1.3:** Esquema de Base de Datos para Multi-tenancy & Feature Flags
 - [ ] **Tarea 1.4:** TenantScope Global y Middleware de Feature Flags
 

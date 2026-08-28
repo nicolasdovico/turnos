@@ -1,0 +1,113 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: saas_backend
+    restart: unless-stopped
+    volumes:
+      - ./backend:/var/www/html
+    networks:
+      - saas_network
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - DB_CONNECTION=pgsql
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_DATABASE=saas_db
+      - DB_USERNAME=saas_user
+      - DB_PASSWORD=saas_pass
+      - REDIS_HOST=cache
+      - REDIS_PORT=6379
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: saas_frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - saas_network
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost/api
+    depends_on:
+      - backend
+
+  webserver:
+    image: caddy:2-alpine
+    container_name: saas_webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./backend:/var/www/html:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - saas_network
+    depends_on:
+      - backend
+      - frontend
+
+  database:
+    image: postgres:16-alpine
+    container_name: saas_database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: saas_db
+      POSTGRES_USER: saas_user
+      POSTGRES_PASSWORD: saas_pass
+      DB_DATABASE: saas_db
+      DB_USER: saas_user
+      DB_PASSWORD: saas_pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saas_user -d saas_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  cache:
+    image: redis:7-alpine
+    container_name: saas_cache
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    networks:
+      - saas_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+networks:
+  saas_network:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local

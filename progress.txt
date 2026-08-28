@@ -18,4 +18,26 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Creación de status.md con checklist completo de tareas (Bloques 1 al 8) en estado pendiente [ ].
 - Tarea 1.1 (Docker Compose Multi-contenedor) configurada como la siguiente a ejecutar.
 - Creación de progress.txt para bitácora cronológica de ejecuciones y decisiones técnicas.
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 1.1: SETUP DOCKER COMPOSE MULTI-CONTENEDOR
+-------------------------------------------------------------------------------
+- Archivos creados:
+  * docker-compose.yml: Orquestación de 5 servicios sobre la red saas_network.
+    - saas_backend: php:8.3-fpm-alpine con extensiones pdo_pgsql, redis, gd, bcmath, opcache y Composer.
+    - saas_frontend: node:22-alpine con soporte hot reload y puerto 3000 expuesto.
+    - saas_webserver: caddy:2-alpine con proxy inverso a Next.js y FastCGI a PHP-FPM en /api/*.
+    - saas_database: postgres:16-alpine con base saas_db y volumen persistente pgdata.
+    - saas_cache: redis:7-alpine con volumen persistente redisdata.
+  * backend/Dockerfile: Configuración PHP 8.3 FPM con mlocati/php-extension-installer.
+  * backend/public/index.php: Endpoint inicial de verificación FastCGI.
+  * frontend/Dockerfile: Entorno Node 22 Alpine con soporte para desarrollo Next.js.
+  * frontend/package.json & frontend/server.js: Servidor de prueba para hot reload en puerto 3000.
+  * caddy/Caddyfile: Ruteo reverso para frontend (:3000) y backend fastcgi (:9000).
+  * test-env.sh: Script automatizado de verificación de estado y puertos de todos los servicios.
+- Tests ejecutados:
+  * ./test-env.sh ejecutado exitosamente:
+    - 5 contenedores en estado RUNNING.
+    - Extensiones PHP 8.3 verificadas (pdo_pgsql, redis, gd, bcmath, OPcache).
+    - Conexión PostgreSQL y Redis PING [OK].
+    - Respuestas HTTP en frontend (:3000), caddy (:80/health) y fastcgi (:80/api/index.php) [OK].
 ===============================================================================

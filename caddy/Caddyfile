@@ -1,0 +1,23 @@
+{
+    admin off
+    auto_https off
+}
+
+:80 {
+    # Health check endpoint
+    handle /health {
+        respond "OK" 200
+    }
+
+    # Laravel Backend API reverse proxy / fastcgi
+    handle /api/* {
+        root * /var/www/html/public
+        php_fastcgi backend:9000
+        file_server
+    }
+
+    # Next.js Frontend reverse proxy
+    handle {
+        reverse_proxy frontend:3000
+    }
+}
