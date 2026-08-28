@@ -44,6 +44,21 @@ class Complejo extends Model
             ->withTimestamps();
     }
 
+    public function canchas(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Cancha::class, 'complejo_id');
+    }
+
+    public function horariosAtencion(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(HorarioAtencion::class, 'complejo_id');
+    }
+
+    public function turnos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Turno::class, 'complejo_id');
+    }
+
     /**
      * Check if a specific module is enabled for this complejo,
      * considering individual add-on overrides and base plan assignment.

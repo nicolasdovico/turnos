@@ -83,7 +83,19 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Tests ejecutados:
   * tests/Feature/TenantModuleSecurityTest.php: 7 tests pasados, 26 aserciones exitosas verificando resolución por header/host, aislamiento de datos con TenantScope, acceso permitido a módulos por plan y add-on, y respuestas 403 en módulos no habilitados o expirados.
   * php artisan test: 18 tests pasados en total (61 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 2.1: MODELOS DE CANCHAS, HORARIOS Y TURNOS
+-------------------------------------------------------------------------------
+- Modelos y migraciones del motor de reservas creadas:
+  * canchas: Tabla y Modelo App\Models\Cancha con campos (nombre, deporte, superficie, techada, precio_base, estado), clave foránea complejo_id, integración con BelongsToTenant y relación hasMany Turno.
+  * horarios_atencion: Tabla y Modelo App\Models\HorarioAtencion con campos (dia_semana, hora_apertura, hora_cierre, duracion_turno_minutos), clave foránea complejo_id e integración con BelongsToTenant.
+  * turnos: Tabla y Modelo App\Models\Turno con campos (cancha_id, cliente_id, fecha, hora_inicio, hora_fin, precio, estado [disponible, bloqueado, reservado, cancelado], es_fijo), clave foránea complejo_id, integración con BelongsToTenant y relaciones belongsTo Cancha / User (cliente) / Complejo.
+  * Actualización de App\Models\Complejo con relaciones hasMany (canchas, horariosAtencion, turnos).
+- Tests ejecutados:
+  * tests/Feature/CanchaTenantIsolationTest.php: 3 tests pasados, 24 aserciones exitosas verificando autoasignación de complejo_id, aislamiento estricto de canchas, horarios y turnos entre complejos deportivos, y navegación de relaciones Eloquent.
+  * php artisan test: 21 tests pasados en total (85 aserciones).
 ===============================================================================
+
 
 
 

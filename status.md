@@ -1,11 +1,11 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 2.1: Modelos de Canchas, Horarios y Turnos`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 2.2: Algoritmo de Cálculo de Disponibilidad`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 4 / 19
+- **Tareas Completadas:** 5 / 19
 - **Fase Actual:** Bloque 2 - Motor de Reservas, Concurrencia & Agenda
 - **Última Actualización:** 2026-08-28
 
@@ -20,8 +20,8 @@
 ---
 
 ## ⚽ Bloque 2: Motor de Reservas, Concurrencia & Agenda (Semanas 3-5)
-- [ ] **Tarea 2.1:** Modelos de Canchas, Horarios y Turnos *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 2.2:** Algoritmo de Cálculo de Disponibilidad
+- [x] **Tarea 2.1:** Modelos de Canchas, Horarios y Turnos *(Completado)*
+- [ ] **Tarea 2.2:** Algoritmo de Cálculo de Disponibilidad *(⏳ SIGUIENTE A EJECUTAR)*
 - [ ] **Tarea 2.3:** Bloqueo Temporal Atómico con Redis (Anti Doble Reserva)
 - [ ] **Tarea 2.4:** Confirmación Transaccional y Turnos Recurrentes (Fijos)
 
