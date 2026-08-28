@@ -12,7 +12,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        $middleware->api(prepend: [
+            \App\Http\Middleware\TenantContextMiddleware::class,
+        ]);
+
+        $middleware->alias([
+            'tenant.context' => \App\Http\Middleware\TenantContextMiddleware::class,
+            'tenant.has_module' => \App\Http\Middleware\CheckTenantModule::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

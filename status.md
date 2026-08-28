@@ -1,12 +1,12 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 1.4: TenantScope Global y Middleware de Feature Flags`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 2.1: Modelos de Canchas, Horarios y Turnos`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 3 / 19
-- **Fase Actual:** Bloque 1 - Infraestructura, Base & Multi-tenancy
+- **Tareas Completadas:** 4 / 19
+- **Fase Actual:** Bloque 2 - Motor de Reservas, Concurrencia & Agenda
 - **Última Actualización:** 2026-08-28
 
 ---
@@ -15,12 +15,12 @@
 - [x] **Tarea 1.1:** Docker Compose Multi-contenedor *(Completado)*
 - [x] **Tarea 1.2:** Inicialización y Setup de Laravel 11 Backend *(Completado)*
 - [x] **Tarea 1.3:** Esquema de Base de Datos para Multi-tenancy & Feature Flags *(Completado)*
-- [ ] **Tarea 1.4:** TenantScope Global y Middleware de Feature Flags *(⏳ SIGUIENTE A EJECUTAR)*
+- [x] **Tarea 1.4:** TenantScope Global y Middleware de Feature Flags *(Completado)*
 
 ---
 
 ## ⚽ Bloque 2: Motor de Reservas, Concurrencia & Agenda (Semanas 3-5)
-- [ ] **Tarea 2.1:** Modelos de Canchas, Horarios y Turnos
+- [ ] **Tarea 2.1:** Modelos de Canchas, Horarios y Turnos *(⏳ SIGUIENTE A EJECUTAR)*
 - [ ] **Tarea 2.2:** Algoritmo de Cálculo de Disponibilidad
 - [ ] **Tarea 2.3:** Bloqueo Temporal Atómico con Redis (Anti Doble Reserva)
 - [ ] **Tarea 2.4:** Confirmación Transaccional y Turnos Recurrentes (Fijos)

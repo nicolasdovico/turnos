@@ -71,6 +71,19 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * php artisan migrate:fresh --seed ejecutado exitosamente en PostgreSQL 16.
   * tests/Unit/TenancyModuleTest.php: 6 tests pasados, 20 aserciones exitosas verificando asignación por plan, add-ons granulares, estados inactivos y expiración temporal.
   * php artisan test: 11 tests pasados en total (35 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 1.4: TENANTSCOPE GLOBAL Y MIDDLEWARE DE FEATURE FLAGS
+-------------------------------------------------------------------------------
+- Arquitectura de aislamiento y seguridad multi-tenant implementada:
+  * TenantScope (App\Models\Scopes\TenantScope): Global Scope de Eloquent que intercepta consultas e inyecta WHERE complejo_id = ? cuando existe un inquilino activo en el contenedor de servicios (app('currentTenant')).
+  * BelongsToTenant (App\Traits\BelongsToTenant): Trait reutilizable para modelos tenant-aware que aplica TenantScope y asigna automáticamente complejo_id en el evento creating.
+  * TenantContextMiddleware (App\Http\Middleware\TenantContextMiddleware): Middleware que resuelve el inquilino activo a partir del header X-Tenant-ID (por ID numérico, UUID o subdominio) o mediante el header Host (dominio personalizado o subdominio), registrándolo en app('currentTenant') y en los atributos del request.
+  * CheckTenantModule (App\Http\Middleware\CheckTenantModule - alias 'tenant.has_module:slug'): Middleware que verifica si el inquilino activo tiene el módulo habilitado (vía plan o add-on granular en complejo_modulo), retornando 403 Forbidden con payload { "error": "MODULE_NOT_ENABLED", "module": "slug" } en caso de denegación.
+  * Registro de middlewares y alias en bootstrap/app.php.
+- Tests ejecutados:
+  * tests/Feature/TenantModuleSecurityTest.php: 7 tests pasados, 26 aserciones exitosas verificando resolución por header/host, aislamiento de datos con TenantScope, acceso permitido a módulos por plan y add-on, y respuestas 403 en módulos no habilitados o expirados.
+  * php artisan test: 18 tests pasados en total (61 aserciones).
 ===============================================================================
+
 
 
