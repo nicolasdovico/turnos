@@ -8,6 +8,7 @@ Este documento contiene las reglas arquitectónicas y técnicas inmutables para 
 
 - **Backend:**
   - Laravel 11 sobre PHP 8.3 en modo API REST desacoplada (Headless).
+  - Panel Administrativo Super Admin con Filament v3 (Livewire 3 / Blade) en `/admin`.
   - Autenticación mediante tokens Bearer con Laravel Sanctum.
   - Base de datos relacional (PostgreSQL 16) y transacciones ACID.
   - Caché, locks distribuidos y mensajería en Redis 7.

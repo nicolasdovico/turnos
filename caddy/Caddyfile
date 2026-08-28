@@ -9,8 +9,11 @@
         respond "OK" 200
     }
 
-    # Laravel Backend API reverse proxy / fastcgi
-    handle /api/* {
+    # Laravel Backend (API, Filament Admin Panel & Livewire)
+    @backend {
+        path /api* /admin* /livewire* /filament* /css/filament* /js/filament*
+    }
+    handle @backend {
         root * /var/www/html/public
         php_fastcgi backend:9000
         file_server

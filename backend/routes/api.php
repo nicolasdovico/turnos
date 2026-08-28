@@ -6,6 +6,26 @@ use App\Http\Controllers\Api\TurnoBloqueoController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/', function () {
+    return response()->json([
+        'name' => 'SaaS Deportivo & Turnos API',
+        'version' => '1.0.0',
+        'status' => 'online',
+        'endpoints' => [
+            'health' => '/api/health',
+            'disponibilidad' => '/api/canchas/{id}/disponibilidad',
+            'bloqueo_temporal' => '/api/turnos/bloquear-temporal',
+            'confirmar_reserva' => '/api/turnos/confirmar',
+            'turnos_fijos' => '/api/turnos/fijos',
+            'split_payment' => '/api/turnos/{id}/split',
+            'partidos_abiertos' => '/api/partidos-abiertos',
+            'pos_productos' => '/api/pos/productos',
+            'caja_resumen' => '/api/caja/resumen-diario',
+            'cms_paginas' => '/api/cms/paginas',
+        ],
+    ]);
+});
+
 Route::get('/health', HealthCheckController::class);
 
 Route::get('/canchas/{id}/disponibilidad', DisponibilidadController::class)
@@ -40,6 +60,14 @@ Route::middleware('tenant.has_module:cms_web')->group(function () {
 });
 
 Route::post('/tenants/revalidate', [\App\Http\Controllers\Api\PaginaController::class, 'triggerRevalidate']);
+
+Route::middleware('tenant.has_module:split_payment')->group(function () {
+    Route::post('/turnos/{id}/split', [\App\Http\Controllers\Api\SplitPaymentController::class, 'splitTurno']);
+    Route::post('/split-pagos/{token}/pagar', [\App\Http\Controllers\Api\SplitPaymentController::class, 'pagarCuota']);
+    Route::get('/split-pagos/{token}', [\App\Http\Controllers\Api\SplitPaymentController::class, 'showCuota']);
+    Route::get('/partidos-abiertos', [\App\Http\Controllers\Api\SplitPaymentController::class, 'indexPartidos']);
+    Route::post('/partidos-abiertos/{id}/unirse', [\App\Http\Controllers\Api\SplitPaymentController::class, 'unirsePartido']);
+});
 
 
 

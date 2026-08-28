@@ -49,5 +49,15 @@ class Turno extends Model
     {
         return $this->hasMany(Venta::class);
     }
+
+    public function pagosDivididos(): HasMany
+    {
+        return $this->hasMany(TurnoPagoDividido::class, 'turno_id');
+    }
+
+    public function partidoAbierto(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(PartidoAbierto::class, 'turno_id');
+    }
 }
 

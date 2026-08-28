@@ -221,6 +221,43 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Build de producción (next build) validado con éxito.
   * Suite Frontend global: 13 tests pasados (100% éxito).
   * Suite Backend global: 53 tests pasados (243 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - INSTALACIÓN DE FILAMENT V3 (PANEL SUPER ADMIN)
+-------------------------------------------------------------------------------
+- Panel de Administración Global de Laravel configurado con Filament v3.3+:
+  * Instalación de extensión PHP intl y dependencias composer (filament/filament, livewire/livewire).
+  * Creación y registro de App\Providers\Filament\AdminPanelProvider montado en ruta /admin.
+  * Implementación de FilamentUser en App\Models\User.
+  * Creación de recursos administrativos CRUD: ComplejoResource, PlanResource, ModuloResource y UserResource.
+  * Actualización de caddy/Caddyfile para ruteo FastCGI de /admin*, /livewire*, /filament*, /css/filament* y /js/filament*.
+  * Creación de usuario Super Admin: admin@turnos.test (password: password).
+  * Documentación añadida a README.md y RULES.md.
+- Tests ejecutados:
+  * php artisan test: 53 tests pasados en total (243 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 5.1: PARTIDOS ABIERTOS (MATCHMAKING) Y PAGO DIVIDIDO (SPLIT PAYMENT)
+-------------------------------------------------------------------------------
+- Módulo de Split Payment y Convocatoria de Partidos Abiertos implementado:
+  * Modelos y migraciones creadas:
+    - partidos_abiertos: Tabla y Modelo App\Models\PartidoAbierto con campos (complejo_id, turno_id, organizador_id, nivel_min, nivel_max, jugadores_requeridos, jugadores_actuales, estado ['buscando', 'completo', 'cancelado'], tipo_partido) e integración con BelongsToTenant.
+    - turno_pagos_divididos: Tabla y Modelo App\Models\TurnoPagoDividido con campos (complejo_id, turno_id, partido_abierto_id, user_id, nombre_jugador, email_jugador, monto, cuota_numero, total_cuotas, token_pago [UUID], estado ['pendiente', 'pagado', 'cancelado'], metodo_pago, pagado_en) e integración con BelongsToTenant.
+    - Actualización de relaciones Eloquent en Turno y Complejo (pagosDivididos, partidosAbiertos).
+  * App\Services\SplitPaymentService:
+    - crearSplit(Turno, cuotas, params): Divide el total del turno en N cuotas exactas con compensación de centavos por redondeo, genera tokens únicos UUID y URLs de checkout, y crea opcionalmente la convocatoria de Partido Abierto en base de datos.
+    - procesarPagoCuota(tokenPago, datosPago): Registra el pago individual bajo transacción pesimista (SELECT FOR UPDATE). Valida si todas las cuotas del turno fueron saldadas; de ser así, confirma atómicamente el turno (estado = 'reservado') y completa el partido abierto.
+    - unirseAPartidoAbierto(partido, datosJugador): Permite a un jugador sumarse a un partido abierto tomando una cuota pendiente y reservando su lugar.
+    - listarPartidosAbiertos(filtros): Retorna los partidos abiertos con estado 'buscando' y filtros por nivel y deporte.
+  * App\Http\Controllers\Api\SplitPaymentController:
+    - POST /api/turnos/{id}/split (Fraccionamiento en cuotas con links de checkout)
+    - POST /api/split-pagos/{token}/pagar (Pago de cuota y auto-confirmación al completar)
+    - GET /api/split-pagos/{token} (Consulta de cuota y checkout)
+    - GET /api/partidos-abiertos (Listado de partidos abiertos en búsqueda de jugadores)
+    - POST /api/partidos-abiertos/{id}/unirse (Unión a partido abierto)
+  * Registro de rutas en routes/api.php protegidas por middleware tenant.has_module:split_payment.
+  * Recursos Filament creados para gestión Super Admin: PartidoAbiertoResource y TurnoPagoDivididoResource.
+- Tests ejecutados:
+  * tests/Feature/SplitPaymentTest.php: 5 tests pasados, 35 aserciones exitosas validando fraccionamiento con links de checkout, pago individual sin confirmación prematura, auto-confirmación transaccional al 100% de los pagos, matchmaking y unión de jugadores, y restricción 403 Forbidden cuando el módulo 'split_payment' está inactivo.
+  * php artisan test: 58 tests pasados en total (278 aserciones).
 ===============================================================================
 
 

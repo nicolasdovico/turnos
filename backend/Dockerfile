@@ -5,7 +5,7 @@ COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr
 
 # Install system utilities and required PHP extensions
 RUN apk add --no-cache bash git curl \
-    && install-php-extensions pdo_pgsql redis gd bcmath opcache zip
+    && install-php-extensions pdo_pgsql redis gd bcmath opcache zip intl
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

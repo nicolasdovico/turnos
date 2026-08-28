@@ -79,6 +79,16 @@ class Complejo extends Model
         return $this->hasMany(Pagina::class, 'complejo_id');
     }
 
+    public function partidosAbiertos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PartidoAbierto::class, 'complejo_id');
+    }
+
+    public function pagosDivididos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(TurnoPagoDividido::class, 'complejo_id');
+    }
+
 
 
 
