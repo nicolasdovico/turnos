@@ -54,5 +54,23 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * php artisan test --filter=HealthCheckTest: 3 tests pasados, 13 aserciones exitosas.
   * php artisan test: 5 tests pasados en total.
   * Verificación HTTP en vivo vía Caddy proxy: GET http://localhost/api/health -> 200 OK con JSON {"status":"ok","services":{"database":"connected","redis":"connected"},"timestamp":"..."}.
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 1.3: ESQUEMA DE BASE DE DATOS PARA MULTI-TENANCY & FEATURE FLAGS
+-------------------------------------------------------------------------------
+- Modelos y migraciones creadas:
+  * planes: Modelo App\Models\Plan con relación belongsToMany Modulo (plan_modulo) y hasMany Complejo.
+  * modulos: Modelo App\Models\Modulo con relación belongsToMany Plan y belongsToMany Complejo (complejo_modulo con pivot esta_activo, valido_hasta).
+  * plan_modulo: Tabla pivote con claves foráneas en cascada y unicidad [plan_id, modulo_id].
+  * complejos: Modelo App\Models\Complejo con auto-generación de UUID, subdominio único, dominio personalizado opcional, plan_id foráneo y método hasModule(slug).
+  * complejo_modulo: Tabla pivote granular para asignación y anulación de add-ons con timestamps de validez (valido_hasta) y flag esta_activo.
+- Seeders:
+  * ModuloSeeder: Registro de los 7 módulos core ('reservas', 'pos_buffet', 'torneos', 'cms_web', 'domotica', 'split_payment', 'turnos_fijos').
+  * PlanSeeder: Configuración de tiers base (Bronce, Plata, Oro) y asignación modular por defecto.
+  * DatabaseSeeder: Integración de ModuloSeeder, PlanSeeder y usuario administrador.
+- Tests ejecutados:
+  * php artisan migrate:fresh --seed ejecutado exitosamente en PostgreSQL 16.
+  * tests/Unit/TenancyModuleTest.php: 6 tests pasados, 20 aserciones exitosas verificando asignación por plan, add-ons granulares, estados inactivos y expiración temporal.
+  * php artisan test: 11 tests pasados en total (35 aserciones).
 ===============================================================================
+
 
