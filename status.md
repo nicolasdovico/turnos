@@ -1,12 +1,12 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 3.2: Arqueo y Control de Caja Diaria`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 4.1: Setup de Next.js y Middleware de Subdominios`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 9 / 19
-- **Fase Actual:** Bloque 3 - ERP de Club, POS / Buffet & Caja
+- **Tareas Completadas:** 10 / 19
+- **Fase Actual:** Bloque 4 - Frontend Web Next.js & CMS Multitenant
 - **Última Actualización:** 2026-08-28
 
 ---
@@ -29,12 +29,12 @@
 
 ## 🍔 Bloque 3: ERP de Club, POS / Buffet & Caja (Semanas 6-7)
 - [x] **Tarea 3.1:** Punto de Venta (POS) & Inventario de Buffet *(Completado)*
-- [ ] **Tarea 3.2:** Arqueo y Control de Caja Diaria *(⏳ SIGUIENTE A EJECUTAR)*
+- [x] **Tarea 3.2:** Arqueo y Control de Caja Diaria *(Completado)*
 
 ---
 
 ## 🌐 Bloque 4: Frontend Web Next.js & CMS Multitenant (Semanas 8-9)
-- [ ] **Tarea 4.1:** Setup de Next.js y Middleware de Subdominios
+- [ ] **Tarea 4.1:** Setup de Next.js y Middleware de Subdominios *(⏳ SIGUIENTE A EJECUTAR)*
 - [ ] **Tarea 4.2:** CMS Multitenant con ISR y Sanitización XSS
 - [ ] **Tarea 4.3:** Grilla de Turnos Interactiva en Next.js (Admin & Público)
 

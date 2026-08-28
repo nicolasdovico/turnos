@@ -69,6 +69,12 @@ class Complejo extends Model
         return $this->hasMany(Venta::class, 'complejo_id');
     }
 
+    public function cajasSesiones(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CajaSesion::class, 'complejo_id');
+    }
+
+
 
     /**
      * Check if a specific module is enabled for this complejo,

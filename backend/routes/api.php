@@ -27,6 +27,11 @@ Route::middleware('tenant.has_module:pos_buffet')->group(function () {
     Route::post('/turnos/{id}/consumos', [\App\Http\Controllers\Api\POSController::class, 'storeConsumoTurno']);
 });
 
+Route::post('/caja/apertura', [\App\Http\Controllers\Api\CajaController::class, 'apertura']);
+Route::post('/caja/cierre', [\App\Http\Controllers\Api\CajaController::class, 'cierre']);
+Route::get('/caja/resumen-diario', [\App\Http\Controllers\Api\CajaController::class, 'resumenDiario']);
+
+
 
 
 

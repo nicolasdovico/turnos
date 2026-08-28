@@ -148,7 +148,24 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Tests ejecutados:
   * tests/Feature/POSTest.php: 5 tests pasados, 19 aserciones exitosas validando venta directa con descuento de stock, comanda asociada a turno, rechazo por stock insuficiente (422), aislamiento multi-tenant de catálogo y respuesta 403 Forbidden en planes sin el módulo 'pos_buffet'.
   * php artisan test: 44 tests pasados en total (192 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-28] - TAREA 3.2: ARQUEO Y CONTROL DE CAJA DIARIA
+-------------------------------------------------------------------------------
+- Módulo de Control de Caja Diaria y Arqueo Ciego implementados:
+  * Modelos y migraciones creadas:
+    - cajas_sesiones: Tabla y Modelo App\Models\CajaSesion con campos (usuario_id, monto_apertura, fecha_apertura, monto_cierre_declarado, fecha_cierre, total_ventas_efectivo, total_ventas_digitales, total_ingresos_turnos, total_esperado_efectivo, diferencia, notas_cierre, estado ['abierta', 'cerrada']), clave foránea complejo_id e integración con BelongsToTenant.
+    - Actualización de App\Models\Complejo con relación hasMany CajaSesion.
+  * App\Services\CajaService: Servicio de gestión de turnos de caja que permite abrir sesión (validando unicidad de caja abierta por complejo), cerrar sesión mediante arqueo ciego computando totales de ventas POS (efectivo y digital), cobros de turnos, efectivo esperado en gaveta y cálculo de diferencias (sobrantes/faltantes). Generación de resumen diario consolidado.
+  * App\Http\Controllers\Api\CajaController: Controlador que expone:
+    - POST /api/caja/apertura (Apertura de turno de caja)
+    - POST /api/caja/cierre (Cierre de caja con conteo ciego)
+    - GET /api/caja/resumen-diario (Resumen diario consolidado de caja e ingresos)
+  * Registro de rutas en routes/api.php.
+- Tests ejecutados:
+  * tests/Feature/CajaSessionTest.php: 5 tests pasados, 31 aserciones exitosas validando apertura de caja, prevención de cajas múltiples abiertas simultáneamente (409 Conflict), ciclo completo de cobros POS/turnos con cálculo de diferencias en arqueo ciego, reporte consolidado diario y aislamiento multi-tenant.
+  * php artisan test: 49 tests pasados en total (223 aserciones).
 ===============================================================================
+
 
 
 
