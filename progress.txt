@@ -512,4 +512,62 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Pantalla `frontend/app/verificar-email/page.tsx` con temporizador de reenvío y enlace directo al Web UI de Mailpit (`http://localhost:8025`).
   * Redirección tras registro de usuario hacia `/verificar-email`.
   * Suite de tests: `frontend/tests/authAndOnboarding.test.tsx` (6 tests pasados). Total frontend: 20 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-08-29] - PÁGINA DEDICADA DE PLANES & PRECIOS Y NAVEGACIÓN MULTI-DOMINIO
+-------------------------------------------------------------------------------
+- Frontend Web (Next.js 14 App Router):
+  * `frontend/app/planes/page.tsx`:
+    - Tarjetas interactivas de precios para planes Bronce ($29/mes), Plata ($59/mes) y Oro ($99/mes).
+    - Matriz comparativa detallada de módulos y funcionalidades (Reservas, POS, Torneos, Domótica, etc.).
+    - Sección de Preguntas Frecuentes (FAQ) con acordeones.
+    - Botones de "Comenzar Prueba Gratis" con pase de query param `?plan=slug` hacia el wizard de registro.
+  * Resolución Multi-Dominio en `frontend/components/Navbar.tsx`:
+    - Detección reactiva de subdominios (`*.localhost:8080` / `*.turnos.com`).
+    - Enrutamiento absoluto `getGlobalLink()` para permitir volver al portal central y páginas globales desde cualquier subdominio.
+  * Middleware de Redirección (`frontend/middleware.ts`):
+    - Redirección `307` automática de rutas globales (`/registro-club`, `/planes`, `/registro`, `/login`, `/verificar-email`) hacia el dominio raíz cuando son accedidas dentro de un subdominio.
+-------------------------------------------------------------------------------
+[2026-08-29] - VISIBILIDAD DE CONTRASEÑAS ("OJITO" TOGGLE) EN FORMULARIOS DE AUTH
+-------------------------------------------------------------------------------
+- Frontend Web (Next.js 14 App Router):
+  * `frontend/components/PasswordInput.tsx`:
+    - Componente interactivo que alterna entre `type="password"` y `type="text"`.
+    - Botón de toggle con accesibilidad (`aria-label`, `tabIndex={-1}`) e iconos vectoriales SVG limpios.
+  * Integración en todas las vistas de autenticación:
+    - `frontend/app/login/page.tsx`: Campo de contraseña de inicio de sesión.
+    - `frontend/app/registro/page.tsx`: Campos de Contraseña y Confirmar Contraseña.
+    - `frontend/app/registro-club/page.tsx`: Contraseña de administrador y contraseña de login rápido.
+  * Tests automatizados en `frontend/tests/authAndOnboarding.test.tsx` verificando el comportamiento del toggle de visibilidad.
+-------------------------------------------------------------------------------
+[2026-08-29] - RESOLUCIÓN DINÁMICA DE PUERTOS EN SUBDOMINIOS DE CLUBES
+-------------------------------------------------------------------------------
+- Corrección de Enrutamiento & Configuración de Entorno:
+  * Actualización de `APP_URL=http://localhost:8080` en `backend/.env`.
+  * `backend/app/Http/Controllers/Api/ClubOnboardingController.php`:
+    - Extracción dinámica del puerto a partir de cabeceras `Host` / `X-Forwarded-Host` y `APP_URL`.
+    - Generación precisa de `subdomain_url` (ej. `http://nico-padel.localhost:8080/`) evitando caídas hacia el puerto 80 por defecto.
+  * `frontend/app/registro-club/page.tsx`:
+    - Cálculo dinámico del origen en el navegador (`window.location.port`) en la pantalla de éxito y sufijo del campo de subdominio.
+-------------------------------------------------------------------------------
+[2026-08-29] - PANEL DE ADMINISTRACIÓN DEL CLUB (DASHBOARD) & PROTECCIÓN DE ACCESO
+-------------------------------------------------------------------------------
+- Backend (Laravel 11):
+  * `backend/app/Http/Controllers/Api/ClubDashboardController.php`:
+    - `GET /api/clubs/{subdomain}/dashboard`: Retorna datos del club, métricas, plan contratado, canchas y horarios de atención.
+    - `POST /api/clubs/{subdomain}/canchas`: Alta de canchas adicionales en tiempo real asociadas al complejo.
+    - `GET /api/clubs/{subdomain}/is-admin`: Validación de propiedad (`complejo.user_id === user.id`) y rol administrativo vía Sanctum.
+  * Registro de rutas en `backend/routes/api.php` bajo el prefijo `clubs`.
+  * Suite de tests `backend/tests/Feature/ClubDashboardTest.php`: 3 tests pasados (21 aserciones) verificando acceso por rol, obtención de métricas y creación de canchas. Total backend: 103 tests (497 aserciones).
+- Frontend Web (Next.js 14 App Router):
+  * `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+    - Dashboard de administración para dueños de clubes con métricas de canchas, módulos activos y prueba gratuita de 14 días.
+    - Pestaña de Canchas: listado y formulario interactivo "+ Agregar Cancha".
+    - Pestaña de Módulos: accesos rápidos a Grilla de Reservas, POS & Buffet, Torneos, Domótica IoT, Split Payment y CMS.
+    - Pestaña de Horarios: grilla semanal de atención y duración de turnos.
+    - Pestaña de Datos: información del club y enlace directo a Filament Super Admin (`http://localhost:8080/admin`).
+    - Protección de seguridad: Pantalla de "🔒 Acceso Restringido" ante usuarios no autenticados o clientes regulares.
+  * `frontend/components/Navbar.tsx`:
+    - Ocultamiento estricto de las opciones de administración para visitantes y clientes que solo desean reservar turnos.
+    - Renderizado condicional del botón "⚙️ Panel de Administrador" y "⚙️ Panel Club" únicamente cuando `isClubAdmin === true`.
+  * Suite de tests en `frontend/tests/authAndOnboarding.test.tsx`: 7 tests pasados en Vitest (21 tests totales en frontend pasados al 100%).
 ===============================================================================
