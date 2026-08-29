@@ -27,7 +27,7 @@ export default function Navbar() {
           <a href="http://padelpro.localhost:3000" className="hover:text-emerald-600 transition">
             Demo Club
           </a>
-          <Link href="/registro-club" className="hover:text-emerald-600 transition">
+          <Link href="/planes" className="hover:text-emerald-600 transition">
             Planes & Precios
           </Link>
         </nav>

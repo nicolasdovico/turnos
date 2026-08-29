@@ -16,6 +16,8 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+import PlanesPage from "../app/planes/page";
+
 describe("Frontend Auth & Club Onboarding Suite", () => {
   it("renders Navbar with guest navigation buttons", () => {
     render(
@@ -26,7 +28,19 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
 
     expect(screen.getByText(/Turnos/i)).toBeDefined();
     expect(screen.getByText(/Iniciar Sesión/i)).toBeDefined();
+    expect(screen.getByText(/Planes & Precios/i)).toBeDefined();
     expect(screen.getByText(/Registrar mi Club/i)).toBeDefined();
+  });
+
+  it("renders Planes & Precios page with pricing cards, comparison matrix and FAQ", () => {
+    render(<PlanesPage />);
+
+    expect(screen.getByText("Planes diseñados para potenciar tu Club")).toBeDefined();
+    expect(screen.getAllByText("Bronce").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Plata").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Oro").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Comparativa Detallada de Funcionalidades")).toBeDefined();
+    expect(screen.getByText("Preguntas Frecuentes")).toBeDefined();
   });
 
   it("renders Login page with email, password fields and link to register club", () => {

@@ -84,7 +84,16 @@ export default function RegistroClubPage() {
       .catch((e) => console.log("Usando planes por defecto:", e));
   }, []);
 
-  // Helper: Slugify string
+  // Read plan query parameter (e.g. ?plan=plata)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const planParam = params.get("plan");
+      if (planParam && ["bronce", "plata", "oro"].includes(planParam.toLowerCase())) {
+        setSelectedPlan(planParam.toLowerCase());
+      }
+    }
+  }, []);
   const slugify = (text: string) => {
     return text
       .toString()
