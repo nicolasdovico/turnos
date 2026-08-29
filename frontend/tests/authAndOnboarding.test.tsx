@@ -51,8 +51,17 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
       </AuthProvider>
     );
 
-    expect(screen.getByPlaceholderText("ejemplo@correo.com")).toBeDefined();
-    expect(screen.getByPlaceholderText("••••••••")).toBeDefined();
+    const passInput = screen.getByPlaceholderText("••••••••") as HTMLInputElement;
+    expect(passInput.type).toBe("password");
+
+    const toggleBtn = screen.getByLabelText("Ver contraseña");
+    fireEvent.click(toggleBtn);
+    expect(passInput.type).toBe("text");
+
+    const hideBtn = screen.getByLabelText("Ocultar contraseña");
+    fireEvent.click(hideBtn);
+    expect(passInput.type).toBe("password");
+
     expect(screen.getByText("Ingresar a mi cuenta")).toBeDefined();
     expect(screen.getByText(/Registrar mi Club/i)).toBeDefined();
   });

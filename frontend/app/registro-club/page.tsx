@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../../context/AuthContext";
+import PasswordInput from "../../components/PasswordInput";
 
 interface PlanItem {
   id: number;
@@ -560,12 +561,11 @@ export default function RegistroClubPage() {
                       onChange={(e) => setLoginEmail(e.target.value)}
                       className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-white"
                     />
-                    <input
-                      type="password"
+                    <PasswordInput
                       placeholder="Contraseña"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-white"
+                      className="!py-2.5 bg-white"
                     />
                   </div>
                   <button
@@ -607,16 +607,12 @@ export default function RegistroClubPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                      Contraseña *
-                    </label>
-                    <input
-                      type="password"
+                    <PasswordInput
+                      label="Contraseña *"
                       required={!user}
                       value={passwordAdmin}
                       onChange={(e) => setPasswordAdmin(e.target.value)}
                       placeholder="Mínimo 8 caracteres"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
                     />
                   </div>
                 </div>
