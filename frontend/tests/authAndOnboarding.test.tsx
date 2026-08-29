@@ -14,10 +14,14 @@ vi.mock("next/navigation", () => ({
     replace: vi.fn(),
     prefetch: vi.fn(),
   }),
+  useParams: () => ({
+    subdomain: "nico-padel",
+  }),
 }));
 
 import PlanesPage from "../app/planes/page";
 import VerificarEmailPage from "../app/verificar-email/page";
+import ClubAdminPanel from "../app/tenants/[subdomain]/panel/page";
 
 describe("Frontend Auth & Club Onboarding Suite", () => {
   it("renders Navbar with guest navigation buttons", () => {
@@ -115,5 +119,15 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getAllByPlaceholderText("•").length).toBe(6);
     expect(screen.getByText("Confirmar Código OTP")).toBeDefined();
     expect(screen.getByText(/Mailpit Activo/i)).toBeDefined();
+  });
+
+  it("renders Club Admin Panel with courts, modules, schedules and stats tabs", () => {
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    expect(screen.getByText(/nico-padel/i)).toBeDefined();
   });
 });

@@ -86,6 +86,9 @@ export default function Navbar() {
               <Link href="/" className="hover:text-emerald-600 transition font-semibold text-slate-900">
                 Reservar Canchas
               </Link>
+              <Link href="/panel" className="hover:text-emerald-600 transition font-semibold text-slate-700">
+                ⚙️ Panel de Administrador
+              </Link>
               <a href={getGlobalLink("/")} className="hover:text-emerald-600 transition text-slate-500">
                 🌐 Portal Central
               </a>
@@ -104,12 +107,24 @@ export default function Navbar() {
               <Link href="/planes" className="hover:text-emerald-600 transition">
                 Planes & Precios
               </Link>
+              <a href="http://localhost:8080/admin" target="_blank" rel="noreferrer" className="hover:text-emerald-600 transition text-slate-500 text-xs">
+                Super Admin ↗
+              </a>
             </>
           )}
         </nav>
 
         {/* Right Auth & CTA Actions */}
         <div className="flex items-center gap-3">
+          {isSubdomain && (
+            <Link
+              href="/panel"
+              className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 px-3.5 py-2 text-xs font-extrabold border border-slate-800 shadow-sm transition"
+            >
+              <span>⚙️ Panel Club</span>
+            </Link>
+          )}
+
           {isLoading ? (
             <div className="h-9 w-24 animate-pulse rounded-lg bg-slate-100" />
           ) : user ? (

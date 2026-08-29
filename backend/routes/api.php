@@ -90,6 +90,8 @@ Route::get('/planes', function () {
 Route::prefix('clubs')->group(function () {
     Route::get('/check-subdomain', [\App\Http\Controllers\Api\ClubOnboardingController::class, 'checkSubdomain']);
     Route::post('/registro', [\App\Http\Controllers\Api\ClubOnboardingController::class, 'registrarClub']);
+    Route::get('/{subdomain}/dashboard', [\App\Http\Controllers\Api\ClubDashboardController::class, 'show']);
+    Route::post('/{subdomain}/canchas', [\App\Http\Controllers\Api\ClubDashboardController::class, 'storeCancha']);
 });
 
 Route::get('/complejos/cercanos', [\App\Http\Controllers\Api\ComplejoController::class, 'cercanos']);
