@@ -634,6 +634,11 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Modal de Confirmación de Eliminación Personalizado: diseño con backdrop blur, badge de advertencia suave, detalle de la cancha, mensajes de seguridad y botones con el estilo visual global del SaaS.
     - Modal de Confirmación de Mantenimiento / Reactivación: diálogo interactivo con ícono `⏸️` / `▶️`, advertencia de bloqueo de turnos públicos, preservación de reservas previas y botones de acción contextuales.
     - Ordenamiento Alfabético Natural: Las canchas se devuelven y renderizan ordenadas alfabéticamente por `nombre` tanto en el backend (`orderBy('nombre', 'asc')`) como en el frontend (`localeCompare` con orden numérico natural).
-  * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (24 tests pasados al 100%).
+  * Portal Público del Establecimiento (`frontend/app/tenants/[subdomain]/page.tsx`):
+    - Reemplazada la vista estática por una página 100% dinámica conectada al backend.
+    - Muestra la denominación real del negocio (`complejo.tipo_negocio.nombre`), nombre exacto del club, deporte, dirección y teléfono.
+    - Selector interactivo de canchas activas con atributos específicos por deporte (Tenis, Pádel, Fútbol, etc.).
+    - Grilla horaria conectada dinámicamente al `canchaId` y deporte de la cancha seleccionada con bloqueos atómicos en Redis.
+  * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (25 tests pasados al 100%).
 ===============================================================================
 

@@ -22,6 +22,7 @@ vi.mock("next/navigation", () => ({
 import PlanesPage from "../app/planes/page";
 import VerificarEmailPage from "../app/verificar-email/page";
 import ClubAdminPanel from "../app/tenants/[subdomain]/panel/page";
+import TenantPage from "../app/tenants/[subdomain]/page";
 import PortalPage from "../app/portal/page";
 
 describe("Frontend Auth & Club Onboarding Suite", () => {
@@ -316,6 +317,83 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Al activar el modo mantenimiento/i)).toBeDefined();
     expect(screen.getByText("Sí, Pausar Cancha")).toBeDefined();
     expect(screen.getByText("Cancelar")).toBeDefined();
+  });
+
+  it("renders dynamic TenantPage with real club name, business type and real courts", async () => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: false, is_authenticated: false }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 115,
+                nombre: "Nico Tenis",
+                subdominio: "nico-tenis",
+                deporte_principal: "tenis",
+                tipo_negocio: { id: 2, nombre: "Complejo", slug: "complejo" },
+                direccion: "Ruta 5",
+                ciudad: "Lujan",
+                telefono: "+5491149790220",
+              },
+              plan: { id: 189, nombre: "Bronce", slug: "bronce", modulos: [] },
+              canchas: [
+                {
+                  id: 63,
+                  nombre: "Cancha 1 (Polvo)",
+                  deporte: "tenis",
+                  superficie: "polvo_ladrillo",
+                  precio_base: 8000,
+                  techada: false,
+                  estado: "activo",
+                },
+                {
+                  id: 64,
+                  nombre: "Cancha 2 (Rápida)",
+                  deporte: "tenis",
+                  superficie: "cemento_rapida",
+                  precio_base: 10000,
+                  techada: false,
+                  estado: "activo",
+                },
+              ],
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({ data: { slots: [] } }) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <TenantPage params={{ subdomain: "nico-tenis" }} />
+      </AuthProvider>
+    );
+
+    // Verify real name and business type are displayed
+    expect(await screen.findByText("Nico Tenis")).toBeDefined();
+    expect(screen.getByText(/Complejo Oficial/i)).toBeDefined();
+    expect(screen.getByText(/🏆 tenis/i)).toBeDefined();
+    expect(screen.getByText(/Ruta 5, Lujan/i)).toBeDefined();
+
+    // Verify real courts are displayed and sport is Tennis (NOT padel)
+    expect(screen.getAllByText("Cancha 1 (Polvo)").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Cancha 2 (Rápida)").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/tenis •/i).length).toBeGreaterThanOrEqual(1);
+
+    // Switch court
+    const court2Btn = screen.getByText("Cancha 2 (Rápida)");
+    fireEvent.click(court2Btn);
+
+    expect(await screen.findByText(/2\. Elige tu Turno en/i)).toBeDefined();
   });
 
   it("renders Portal Global page with features and marketplace banner", () => {
