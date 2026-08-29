@@ -17,10 +17,5 @@ class DatabaseSeeder extends Seeder
             ModuloSeeder::class,
             PlanSeeder::class,
         ]);
-
-        User::factory()->create([
-            'name' => 'Super Admin',
-            'email' => 'admin@turnos.test',
-        ]);
     }
 }

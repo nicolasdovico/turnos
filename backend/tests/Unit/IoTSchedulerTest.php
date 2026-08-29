@@ -28,18 +28,17 @@ class IoTSchedulerTest extends TestCase
     {
         parent::setUp();
 
-        // Crear módulo domótica
-        $moduloDomotica = Modulo::create([
-            'nombre' => 'Domótica IoT & Luces',
-            'slug' => 'domotica',
-        ]);
+        // Obtener o crear módulo domótica
+        $moduloDomotica = Modulo::firstOrCreate(
+            ['slug' => 'domotica'],
+            ['nombre' => 'Domótica IoT & Luces']
+        );
 
-        $plan = Plan::create([
-            'nombre' => 'Plan Pro IoT',
-            'slug' => 'pro_iot',
-            'precio_mensual' => 20000,
-        ]);
-        $plan->modulos()->attach($moduloDomotica->id);
+        $plan = Plan::firstOrCreate(
+            ['slug' => 'pro_iot'],
+            ['nombre' => 'Plan Pro IoT', 'precio_mensual' => 20000]
+        );
+        $plan->modulos()->syncWithoutDetaching([$moduloDomotica->id]);
 
         $this->complejo = Complejo::create([
             'nombre' => 'Club Pádel Domótica',
@@ -156,11 +155,10 @@ class IoTSchedulerTest extends TestCase
 
     public function test_complejo_sin_modulo_domotica_no_emite_ordenes(): void
     {
-        $planBasico = Plan::create([
-            'nombre' => 'Plan Sin IoT',
-            'slug' => 'sin_iot',
-            'precio_mensual' => 10000,
-        ]);
+        $planBasico = Plan::firstOrCreate(
+            ['slug' => 'sin_iot'],
+            ['nombre' => 'Plan Sin IoT', 'precio_mensual' => 10000]
+        );
 
         $this->complejo->update(['plan_id' => $planBasico->id]);
 

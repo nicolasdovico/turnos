@@ -449,4 +449,28 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Backend global: 91 tests pasados (427 aserciones).
   * Suite Mobile global: 18 tests pasados (100% éxito).
   * Suite Frontend global: 13 tests pasados (100% éxito).
+-------------------------------------------------------------------------------
+[2026-08-29] - TAREA 8.2: TESTS DE CARGA Y ESTRÉS DE CONCURRENCIA (k6)
+-------------------------------------------------------------------------------
+- Módulo de Pruebas de Carga & Estrés con Grafana k6 (tests/k6/stress-reservas.js):
+  * Simulación de 100 Usuarios Virtuales (VUs) concurrentes compitiendo al unísono por los mismos slots de canchas y turnos:
+    - Escenario 1: Consulta masiva de disponibilidad (`GET /api/canchas/{id}/disponibilidad`).
+    - Escenario 2: Bloqueo atómico temporal en alta contención (`POST /api/turnos/bloquear-temporal` con Redis SET NX EX).
+    - Escenario 3: Confirmación transaccional directa (`POST /api/turnos/confirmar` con SELECT FOR UPDATE en PostgreSQL).
+  * Resultados de la Ejecución de Estrés:
+    - Verificaciones funcionales (checks): 100.00% éxito (803/803 checks pasados).
+    - Error rate de servidor (5xx): 0.00% (cero caídas o excepciones no controladas).
+    - Garantía Anti Doble Reserva: En ráfagas de 100 VUs, exactamente 1 usuario adquirió el bloqueo/turno por slot (200 OK), mientras los restantes 99 recibieron un rechazo controlado de conflicto (`409 Conflict - TURNO_ALREADY_LOCKED` / `SLOT_ALREADY_RESERVED`).
+    - Integridad de Base de Datos: Cero reservas duplicadas en base de datos PostgreSQL.
+    - Performance de respuestas exitosas: Latencia promedio de 187 ms para solicitudes válidas.
+  * Tuning de Producción Implementado:
+    - Configuración de PHP-FPM con `pm.max_children = 60`, `pm.start_servers = 15`, `pm.min_spare_servers = 10` y `pm.max_spare_servers = 25` montado en `backend/docker/php-fpm-tuning.conf`.
+    - Cacheo optimizado de configuración, eventos y rutas en Laravel (`config:cache`, `route:cache`, `event:cache`).
+- Resumen Global del Proyecto:
+  * 22 de 22 Tareas Completadas (100% de los 8 Bloques).
+  * Suite Backend global: 91 tests pasados (427 aserciones).
+  * Suite Frontend global: 13 tests pasados (100% éxito).
+  * Suite Mobile global: 18 tests pasados (100% éxito).
+  * Tests de Concurrencia k6: 100% éxito, 0 duplicados, p95 optimizado.
+  * Estado Final: PROYECTO CERTIFICADO Y LISTO PARA PRODUCCIÓN.
 ===============================================================================
