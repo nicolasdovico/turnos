@@ -29,6 +29,11 @@ class Cancha extends Model
         'tipo_cubierta',
         'tipo_pared',
         'formato',
+        'duracion_minutos',
+        'permite_duracion_flexible',
+        'duraciones_permitidas',
+        'precio_90_min',
+        'precio_120_min',
         'estado',
     ];
 
@@ -40,8 +45,13 @@ class Cancha extends Model
             'camara_grabacion' => 'boolean',
             'marcador_digital' => 'boolean',
             'climatizada' => 'boolean',
+            'duracion_minutos' => 'integer',
+            'permite_duracion_flexible' => 'boolean',
+            'duraciones_permitidas' => 'array',
             'precio_base' => 'decimal:2',
             'precio_con_luz' => 'decimal:2',
+            'precio_90_min' => 'decimal:2',
+            'precio_120_min' => 'decimal:2',
         ];
     }
 

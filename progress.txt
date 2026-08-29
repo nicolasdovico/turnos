@@ -634,10 +634,11 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Modal de Confirmación de Eliminación Personalizado: diseño con backdrop blur, badge de advertencia suave, detalle de la cancha, mensajes de seguridad y botones con el estilo visual global del SaaS.
     - Modal de Confirmación de Mantenimiento / Reactivación: diálogo interactivo con ícono `⏸️` / `▶️`, advertencia de bloqueo de turnos públicos, preservación de reservas previas y botones de acción contextuales.
     - Ordenamiento Alfabético Natural: Las canchas se devuelven y renderizan ordenadas alfabéticamente por `nombre` tanto en el backend (`orderBy('nombre', 'asc')`) como en el frontend (`localeCompare` con orden numérico natural).
-  * Portal Público del Establecimiento & Grilla Horaria (`frontend/components/GrillaHoraria.tsx`):
-    - Corregido el mapeo de disponibilidad para consumir tanto `slots_disponibles` como `data.slots`.
-    - Modal interactivo de Confirmación de Turno (Checkout): permite ingresar datos del cliente, método de pago (Mostrador, Transferencia o Mercado Pago), con contador regresivo de retención atómica en Redis y confirmación instantánea en base de datos.
-    - Al confirmar, el turno pasa inmediatamente a "Ocupado" en la grilla y se libera el bloqueo temporal.
-  * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (25 tests pasados al 100%) y PHPUnit suite (114 tests pasados al 100%).
+  * Modalidad de Duración & Alquileres de 90 min (1h 30m / 2h):
+    - Migración `2026_08_29_230001_add_duration_and_pricing_options_to_canchas_table`: nuevos campos `duracion_minutos`, `permite_duracion_flexible`, `duraciones_permitidas`, `precio_90_min`, `precio_120_min`.
+    - `DisponibilidadService.php`: Soporte para duraciones personalizadas (`?duracion=90` o fija de 90m), cálculo proporcional/personalizado de precios y prevención de solapamientos con turnos existentes en base de datos y locks en Redis.
+    - Panel de Administración (`panel/page.tsx`): Sección "3. Duración de Turno & Modalidad" en el modal de alta y edición de canchas, permitiendo elegir entre **Duración Fija** (60 min, 90 min, 120 min) o **Duración Flexible** (con tarifas configurables para 90 min y 120 min).
+    - Portal Público & Grilla Horaria (`GrillaHoraria.tsx`): Selector interactivo de duración para clientes cuando la cancha es flexible (`[ ⏱️ 60 min ] [ ⏱️ 90 min (1h 30m) ] [ ⏱️ 120 min (2 hrs) ]`), o badge de duración fija con regeneración instantánea de los bloques horarios disponibles.
+  * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` y `tests/GrillaHoraria.test.tsx` (26 tests pasados al 100%) y PHPUnit suite (115 tests pasados al 100%).
 ===============================================================================
 

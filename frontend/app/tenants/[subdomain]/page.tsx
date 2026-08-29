@@ -35,6 +35,11 @@ interface CanchaItem {
   tipo_cubierta?: string | null;
   tipo_pared?: string | null;
   formato?: string | null;
+  duracion_minutos?: number;
+  permite_duracion_flexible?: boolean;
+  duraciones_permitidas?: number[];
+  precio_90_min?: string | number | null;
+  precio_120_min?: string | number | null;
   estado: string;
 }
 
@@ -285,6 +290,11 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
 
                       {/* Attribute Chips */}
                       <div className="flex flex-wrap gap-1 mt-3">
+                        <span className="rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold">
+                          {c.permite_duracion_flexible
+                            ? "⏱️ Flexible (60/90/120m)"
+                            : `⏱️ ${c.duracion_minutos || 60}m ${(c.duracion_minutos || 60) === 90 ? "(1h 30m)" : (c.duracion_minutos || 60) === 120 ? "(2h)" : "(1h)"}`}
+                        </span>
                         <span className="rounded-md bg-slate-950 border border-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
                           {c.techada ? "🏠 Techada" : "☀️ Descubierta"}
                         </span>
@@ -311,7 +321,9 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
                       </div>
 
                       <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                        <span className="text-slate-400">Tarifa por turno:</span>
+                        <span className="text-slate-400">
+                          Tarifa {c.permite_duracion_flexible ? "desde (60m):" : `(${c.duracion_minutos || 60}m):`}
+                        </span>
                         <span className="font-extrabold text-emerald-400">${c.precio_base}</span>
                       </div>
                     </button>
@@ -334,11 +346,17 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
 
                 <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 sm:p-6 shadow-xl">
                   <GrillaHoraria
-                    key={selectedCancha.id}
+                    key={`${selectedCancha.id}-${selectedCancha.duracion_minutos}-${selectedCancha.permite_duracion_flexible}`}
                     canchaId={selectedCancha.id}
                     canchaNombre={selectedCancha.nombre}
                     deporte={selectedCancha.deporte}
                     subdomain={subdomain}
+                    duracionInicial={selectedCancha.duracion_minutos}
+                    permiteDuracionFlexible={selectedCancha.permite_duracion_flexible}
+                    duracionesPermitidas={selectedCancha.duraciones_permitidas}
+                    precioBase={Number(selectedCancha.precio_base)}
+                    precio90Min={selectedCancha.precio_90_min ? Number(selectedCancha.precio_90_min) : undefined}
+                    precio120Min={selectedCancha.precio_120_min ? Number(selectedCancha.precio_120_min) : undefined}
                   />
                 </div>
               </div>

@@ -156,6 +156,11 @@ class ClubDashboardController extends Controller
             'tipo_cubierta' => 'nullable|string|max:50',
             'tipo_pared' => 'nullable|string|max:50',
             'formato' => 'nullable|string|max:50',
+            'duracion_minutos' => 'nullable|integer|in:30,60,90,120',
+            'permite_duracion_flexible' => 'boolean',
+            'duraciones_permitidas' => 'nullable|array',
+            'precio_90_min' => 'nullable|numeric|min:0',
+            'precio_120_min' => 'nullable|numeric|min:0',
             'estado' => 'nullable|string|in:activo,mantenimiento,inactivo',
         ]);
 
@@ -179,6 +184,11 @@ class ClubDashboardController extends Controller
             'tipo_cubierta' => $validated['tipo_cubierta'] ?? ($validated['techada'] ?? false ? 'indoor' : 'outdoor'),
             'tipo_pared' => $tipoPared,
             'formato' => $validated['formato'] ?? null,
+            'duracion_minutos' => $validated['duracion_minutos'] ?? ($deporte === 'padel' ? 90 : 60),
+            'permite_duracion_flexible' => $validated['permite_duracion_flexible'] ?? false,
+            'duraciones_permitidas' => $validated['duraciones_permitidas'] ?? [60, 90, 120],
+            'precio_90_min' => $validated['precio_90_min'] ?? null,
+            'precio_120_min' => $validated['precio_120_min'] ?? null,
             'estado' => $validated['estado'] ?? 'activo',
         ]);
 
@@ -234,6 +244,11 @@ class ClubDashboardController extends Controller
             'tipo_cubierta' => 'nullable|string|max:50',
             'tipo_pared' => 'nullable|string|max:50',
             'formato' => 'nullable|string|max:50',
+            'duracion_minutos' => 'nullable|integer|in:30,60,90,120',
+            'permite_duracion_flexible' => 'boolean',
+            'duraciones_permitidas' => 'nullable|array',
+            'precio_90_min' => 'nullable|numeric|min:0',
+            'precio_120_min' => 'nullable|numeric|min:0',
             'estado' => 'nullable|string|in:activo,mantenimiento,inactivo',
         ]);
 
@@ -256,6 +271,11 @@ class ClubDashboardController extends Controller
             'tipo_cubierta' => $validated['tipo_cubierta'] ?? ($validated['techada'] ?? $cancha->techada ? 'indoor' : 'outdoor'),
             'tipo_pared' => $tipoPared,
             'formato' => $validated['formato'] ?? $cancha->formato,
+            'duracion_minutos' => $validated['duracion_minutos'] ?? $cancha->duracion_minutos,
+            'permite_duracion_flexible' => array_key_exists('permite_duracion_flexible', $validated) ? $validated['permite_duracion_flexible'] : $cancha->permite_duracion_flexible,
+            'duraciones_permitidas' => $validated['duraciones_permitidas'] ?? $cancha->duraciones_permitidas,
+            'precio_90_min' => array_key_exists('precio_90_min', $validated) ? $validated['precio_90_min'] : $cancha->precio_90_min,
+            'precio_120_min' => array_key_exists('precio_120_min', $validated) ? $validated['precio_120_min'] : $cancha->precio_120_min,
             'estado' => $validated['estado'] ?? $cancha->estado,
         ]);
 

@@ -149,4 +149,53 @@ describe("Componente Reactivo GrillaHoraria", () => {
     // Active lock banner should not exist
     expect(screen.queryByTestId("active-lock-banner")).toBeNull();
   });
+
+  it("renderiza el selector de duración flexible y permite consultar turnos de 90 minutos", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            cancha_id: 1,
+            duracion_minutos: url.includes("duracion=90") ? 90 : 60,
+            permite_duracion_flexible: true,
+            slots_disponibles: [
+              { hora_inicio: "08:00", hora_fin: "09:30", disponible: true, precio: 12000, duracion_minutos: 90 },
+              { hora_inicio: "09:30", hora_fin: "11:00", disponible: true, precio: 12000, duracion_minutos: 90 },
+            ],
+          }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        fechaInicial="2026-09-01"
+        permiteDuracionFlexible={true}
+        duracionInicial={60}
+      />
+    );
+
+    expect(await screen.findByText(/Elige la duración que deseas jugar/i)).toBeDefined();
+    expect(screen.getByText(/90 min/i)).toBeDefined();
+
+    // Click on 90 min button
+    const btn90 = screen.getByText(/90 min/i);
+    fireEvent.click(btn90);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("duracion=90"),
+        expect.anything()
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 08:00 a 09:30 Disponible")).toBeDefined();
+      expect(screen.getByLabelText("Turno 09:30 a 11:00 Disponible")).toBeDefined();
+    });
+  });
 });

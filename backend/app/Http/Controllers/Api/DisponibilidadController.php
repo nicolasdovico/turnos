@@ -21,6 +21,7 @@ class DisponibilidadController extends Controller
     {
         $validated = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d'],
+            'duracion' => ['nullable', 'integer', 'in:30,60,90,120'],
         ]);
 
         $cancha = Cancha::find($id);
@@ -31,15 +32,24 @@ class DisponibilidadController extends Controller
             ], 404);
         }
 
-        $slots = $this->disponibilidadService->obtenerSlotsDisponibles($id, $validated['fecha']);
+        $duracion = isset($validated['duracion']) ? (int) $validated['duracion'] : null;
+        $slots = $this->disponibilidadService->obtenerSlotsDisponibles($id, $validated['fecha'], $duracion);
 
         return response()->json([
             'cancha_id' => $id,
             'cancha_nombre' => $cancha->nombre,
             'fecha' => $validated['fecha'],
+            'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),
+            'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
+            'duraciones_permitidas' => $cancha->duraciones_permitidas ?: [60, 90, 120],
+            'precio_base' => (float) $cancha->precio_base,
+            'precio_90_min' => $cancha->precio_90_min !== null ? (float) $cancha->precio_90_min : round((float) $cancha->precio_base * 1.5, 2),
+            'precio_120_min' => $cancha->precio_120_min !== null ? (float) $cancha->precio_120_min : round((float) $cancha->precio_base * 2.0, 2),
             'slots_disponibles' => $slots,
             'data' => [
                 'slots' => $slots,
+                'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),
+                'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
             ],
         ]);
     }

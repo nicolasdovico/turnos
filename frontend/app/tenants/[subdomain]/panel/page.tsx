@@ -43,6 +43,11 @@ interface CanchaItem {
   tipo_cubierta?: string | null;
   tipo_pared?: string | null;
   formato?: string | null;
+  duracion_minutos?: number;
+  permite_duracion_flexible?: boolean;
+  duraciones_permitidas?: number[];
+  precio_90_min?: string | number | null;
+  precio_120_min?: string | number | null;
   estado: string;
 }
 
@@ -253,6 +258,10 @@ export default function ClubAdminPanel() {
   const [canchaCamaraGrabacion, setCanchaCamaraGrabacion] = useState(false);
   const [canchaMarcadorDigital, setCanchaMarcadorDigital] = useState(false);
   const [canchaClimatizada, setCanchaClimatizada] = useState(false);
+  const [canchaDuracionMinutos, setCanchaDuracionMinutos] = useState(60);
+  const [canchaPermiteDuracionFlexible, setCanchaPermiteDuracionFlexible] = useState(false);
+  const [canchaPrecio90Min, setCanchaPrecio90Min] = useState("");
+  const [canchaPrecio120Min, setCanchaPrecio120Min] = useState("");
   const [canchaEstado, setCanchaEstado] = useState("activo");
 
   const [isSavingCancha, setIsSavingCancha] = useState(false);
@@ -286,6 +295,10 @@ export default function ClubAdminPanel() {
     setCanchaTipoPared(depConfig.paredes ? depConfig.paredes[0]?.id : "");
     setCanchaPrecioBase("8000");
     setCanchaPrecioConLuz("");
+    setCanchaDuracionMinutos(dep === "padel" ? 90 : 60);
+    setCanchaPermiteDuracionFlexible(false);
+    setCanchaPrecio90Min("");
+    setCanchaPrecio120Min("");
     setCanchaTechada(false);
     setCanchaTipoCubierta("outdoor");
     setCanchaIluminacion(true);
@@ -310,6 +323,10 @@ export default function ClubAdminPanel() {
     setCanchaTipoPared(c.tipo_pared || (depConfig.paredes ? depConfig.paredes[0]?.id : ""));
     setCanchaPrecioBase(String(c.precio_base || "8000"));
     setCanchaPrecioConLuz(c.precio_con_luz ? String(c.precio_con_luz) : "");
+    setCanchaDuracionMinutos(c.duracion_minutos || (dep === "padel" ? 90 : 60));
+    setCanchaPermiteDuracionFlexible(Boolean(c.permite_duracion_flexible));
+    setCanchaPrecio90Min(c.precio_90_min ? String(c.precio_90_min) : "");
+    setCanchaPrecio120Min(c.precio_120_min ? String(c.precio_120_min) : "");
     setCanchaTechada(Boolean(c.techada));
     setCanchaTipoCubierta(c.tipo_cubierta || (c.techada ? "indoor" : "outdoor"));
     setCanchaIluminacion(c.iluminacion !== undefined ? Boolean(c.iluminacion) : true);
@@ -327,6 +344,9 @@ export default function ClubAdminPanel() {
     const depConfig = DEPORTES_CONFIG[newDeporte] || DEPORTES_CONFIG.padel;
     setCanchaSuperficie(depConfig.superficies[0]?.id || "sintetico");
     setCanchaFormato(depConfig.formatos[0]?.id || "");
+    if (newDeporte === "padel") {
+      setCanchaDuracionMinutos(90);
+    }
     if (depConfig.tieneParedes && depConfig.paredes) {
       setCanchaTipoPared(depConfig.paredes[0]?.id || "cristal_estandar");
     } else {
@@ -414,6 +434,11 @@ export default function ClubAdminPanel() {
       camara_grabacion: canchaCamaraGrabacion,
       marcador_digital: canchaMarcadorDigital,
       climatizada: canchaClimatizada,
+      duracion_minutos: Number(canchaDuracionMinutos) || 60,
+      permite_duracion_flexible: canchaPermiteDuracionFlexible,
+      duraciones_permitidas: [60, 90, 120],
+      precio_90_min: canchaPrecio90Min ? parseFloat(canchaPrecio90Min) : null,
+      precio_120_min: canchaPrecio120Min ? parseFloat(canchaPrecio120Min) : null,
       estado: canchaEstado,
     };
 
@@ -868,10 +893,136 @@ export default function ClubAdminPanel() {
                       </div>
                     </div>
 
-                    {/* SECCIÓN 3: EQUIPAMIENTO & SERVICIOS */}
+                    {/* SECCIÓN 3: MODALIDAD DE DURACIÓN & TARIFAS EXTENDIDAS */}
+                    <div className="space-y-4 pt-4 border-t border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                          3. Duración de Turno & Modalidad
+                        </h4>
+                        <span className="text-[11px] text-slate-400">
+                          {canchaPermiteDuracionFlexible ? "Modalidad Flexible" : "Duración Fija"}
+                        </span>
+                      </div>
+
+                      {/* Modalidad Selector */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setCanchaPermiteDuracionFlexible(false)}
+                          className={`p-3 rounded-2xl border text-left transition ${
+                            !canchaPermiteDuracionFlexible
+                              ? "bg-slate-900 border-emerald-500 ring-2 ring-emerald-500/20"
+                              : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                          }`}
+                        >
+                          <div className="font-bold text-xs text-white flex items-center justify-between">
+                            <span>⏱️ Duración Fija de Turno</span>
+                            {!canchaPermiteDuracionFlexible && (
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                                Activo
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            Todos los turnos de esta cancha tienen la misma duración fija predeterminada.
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setCanchaPermiteDuracionFlexible(true)}
+                          className={`p-3 rounded-2xl border text-left transition ${
+                            canchaPermiteDuracionFlexible
+                              ? "bg-slate-900 border-emerald-500 ring-2 ring-emerald-500/20"
+                              : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                          }`}
+                        >
+                          <div className="font-bold text-xs text-white flex items-center justify-between">
+                            <span>🎛️ Duración Flexible</span>
+                            {canchaPermiteDuracionFlexible && (
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                                Activo
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            El cliente puede elegir si alquilar 60 min, 90 min o 120 min al reservar.
+                          </p>
+                        </button>
+                      </div>
+
+                      {/* Duración Base Buttons */}
+                      {!canchaPermiteDuracionFlexible ? (
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-slate-400 mb-2">
+                            Duración Predeterminada del Turno *
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { mins: 60, label: "60 min (1 hr)" },
+                              { mins: 90, label: "90 min (1h 30m)" },
+                              { mins: 120, label: "120 min (2 hrs)" },
+                            ].map((d) => (
+                              <button
+                                key={d.mins}
+                                type="button"
+                                onClick={() => setCanchaDuracionMinutos(d.mins)}
+                                className={`py-2 px-3 rounded-xl border text-xs font-bold transition text-center ${
+                                  canchaDuracionMinutos === d.mins
+                                    ? "bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/20"
+                                    : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-900"
+                                }`}
+                              >
+                                {d.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-950 border border-slate-800/80">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-300 mb-1">
+                              Tarifa 90 minutos (1h 30m) ($)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="100"
+                              placeholder={`Sugerido $${Math.round((parseFloat(canchaPrecioBase) || 8000) * 1.5)}`}
+                              value={canchaPrecio90Min}
+                              onChange={(e) => setCanchaPrecio90Min(e.target.value)}
+                              className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3.5 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none"
+                            />
+                            <span className="text-[10px] text-slate-500 mt-0.5 block">
+                              Si se deja vacío, calcula 1.5x automáticamente.
+                            </span>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-300 mb-1">
+                              Tarifa 120 minutos (2 hrs) ($)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="100"
+                              placeholder={`Sugerido $${Math.round((parseFloat(canchaPrecioBase) || 8000) * 2)}`}
+                              value={canchaPrecio120Min}
+                              onChange={(e) => setCanchaPrecio120Min(e.target.value)}
+                              className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3.5 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none"
+                            />
+                            <span className="text-[10px] text-slate-500 mt-0.5 block">
+                              Si se deja vacío, calcula 2.0x automáticamente.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECCIÓN 4: EQUIPAMIENTO & SERVICIOS */}
                     <div className="space-y-4 pt-4 border-t border-slate-800">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                        3. Equipamiento
+                        4. Equipamiento
                       </h4>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1178,6 +1329,12 @@ export default function ClubAdminPanel() {
 
                       {/* Attributes Badges / Chips */}
                       <div className="flex flex-wrap gap-1.5 my-3">
+                        <span className="rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold">
+                          {c.permite_duracion_flexible
+                            ? "⏱️ Flexible (60/90/120m)"
+                            : `⏱️ Turnos de ${c.duracion_minutos || 60}m ${(c.duracion_minutos || 60) === 90 ? "(1h 30m)" : (c.duracion_minutos || 60) === 120 ? "(2h)" : "(1h)"}`}
+                        </span>
+
                         <span className="rounded-lg bg-slate-950/80 border border-slate-800 px-2 py-0.5 text-[11px] text-slate-300 font-medium">
                           👟 {c.superficie}
                         </span>
@@ -1220,11 +1377,25 @@ export default function ClubAdminPanel() {
                       {/* Pricing Details */}
                       <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-baseline justify-between">
                         <div>
-                          <span className="text-[10px] uppercase font-bold text-slate-500">Tarifa Turno:</span>
+                          <span className="text-[10px] uppercase font-bold text-slate-500">
+                            Tarifa {c.permite_duracion_flexible ? "Base (60 min)" : `(${c.duracion_minutos || 60} min)`}:
+                          </span>
                           <div className="text-xl font-black text-emerald-400">
-                            ${c.precio_base} <span className="text-xs font-normal text-slate-400">/ hora</span>
+                            ${c.precio_base}{" "}
+                            <span className="text-xs font-normal text-slate-400">
+                              / {c.duracion_minutos === 90 ? "1h 30m" : c.duracion_minutos === 120 ? "2 hrs" : "turno"}
+                            </span>
                           </div>
                         </div>
+
+                        {c.precio_90_min && (
+                          <div className="text-right">
+                            <span className="text-[10px] uppercase font-bold text-slate-500">90 min:</span>
+                            <div className="text-sm font-bold text-slate-200">
+                              ${c.precio_90_min}
+                            </div>
+                          </div>
+                        )}
 
                         {c.precio_con_luz && (
                           <div className="text-right">

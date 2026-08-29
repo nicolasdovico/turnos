@@ -252,4 +252,59 @@ class ClubCanchaManagementTest extends TestCase
         $this->assertEquals('Beta Court', $canchas[1]['nombre']);
         $this->assertEquals('Zeta Court', $canchas[2]['nombre']);
     }
+
+    public function test_store_and_update_cancha_with_duration_and_flexible_pricing(): void
+    {
+        $payload = [
+            'nombre' => 'Cancha Pádel 90 min & Flexible',
+            'deporte' => 'padel',
+            'superficie' => 'sintetico_wpt',
+            'precio_base' => 8000,
+            'precio_90_min' => 12000,
+            'precio_120_min' => 16000,
+            'duracion_minutos' => 90,
+            'permite_duracion_flexible' => true,
+            'duraciones_permitidas' => [60, 90, 120],
+            'estado' => 'activo',
+        ];
+
+        $response = $this->postJson('/api/clubs/padel-tenis-pro/canchas', $payload);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('cancha.duracion_minutos', 90)
+            ->assertJsonPath('cancha.permite_duracion_flexible', true)
+            ->assertJsonPath('cancha.precio_90_min', '12000.00')
+            ->assertJsonPath('cancha.precio_120_min', '16000.00');
+
+        $canchaId = $response->json('cancha.id');
+
+        // Create HorarioAtencion for the complex
+        \App\Models\HorarioAtencion::create([
+            'complejo_id' => $this->complejo->id,
+            'dia_semana' => 1, // Lunes
+            'hora_apertura' => '08:00:00',
+            'hora_cierre' => '12:30:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        // Test disponibilidad with 90 min query param
+        $dispResponse = $this->getJson(
+            "/api/canchas/{$canchaId}/disponibilidad?fecha=2026-08-31&duracion=90",
+            ['X-Tenant-ID' => 'padel-tenis-pro']
+        ); // 2026-08-31 is Monday
+
+        $dispResponse->assertStatus(200)
+            ->assertJsonPath('cancha_id', $canchaId)
+            ->assertJsonPath('duracion_minutos', 90)
+            ->assertJsonPath('permite_duracion_flexible', true)
+            ->assertJsonPath('precio_90_min', 12000);
+
+        $slots = $dispResponse->json('slots_disponibles');
+        $this->assertNotEmpty($slots);
+        $this->assertEquals('08:00', $slots[0]['hora_inicio']);
+        $this->assertEquals('09:30', $slots[0]['hora_fin']);
+        $this->assertEquals(90, $slots[0]['duracion_minutos']);
+        $this->assertEquals(12000, $slots[0]['precio']);
+    }
 }

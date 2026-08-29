@@ -17,6 +17,12 @@ export interface GrillaHorariaProps {
   deporte?: string;
   subdomain?: string;
   fechaInicial?: string;
+  duracionInicial?: number;
+  permiteDuracionFlexible?: boolean;
+  duracionesPermitidas?: number[];
+  precioBase?: number;
+  precio90Min?: number;
+  precio120Min?: number;
   apiUrl?: string;
   initialSlots?: Slot[];
   onConfirmSuccess?: (data: any) => void;
@@ -27,6 +33,7 @@ export interface ActiveLock {
   fecha: string;
   horaInicio: string;
   horaFin: string;
+  duracionMinutos?: number;
   tokenReserva: string;
   ttlSeconds: number;
   expiresAt: number;
@@ -45,12 +52,20 @@ export default function GrillaHoraria({
   deporte = "padel",
   subdomain,
   fechaInicial,
+  duracionInicial = 60,
+  permiteDuracionFlexible = false,
+  duracionesPermitidas = [60, 90, 120],
+  precioBase,
+  precio90Min,
+  precio120Min,
   apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api",
   initialSlots,
   onConfirmSuccess,
 }: GrillaHorariaProps) {
   const getTodayString = () => new Date().toISOString().split("T")[0];
   const [fecha, setFecha] = useState<string>(fechaInicial || getTodayString());
+  const [duracion, setDuracion] = useState<number>(duracionInicial || (deporte?.toLowerCase() === "padel" ? 90 : 60));
+  const [isFlexible, setIsFlexible] = useState<boolean>(Boolean(permiteDuracionFlexible));
   const [slots, setSlots] = useState<Slot[]>(initialSlots || []);
   const [loading, setLoading] = useState<boolean>(false);
   const [lockingSlot, setLockingSlot] = useState<string | null>(null);
@@ -65,6 +80,15 @@ export default function GrillaHoraria({
   const [clienteTelefono, setClienteTelefono] = useState<string>("");
   const [metodoPago, setMetodoPago] = useState<string>("mostrador");
 
+  useEffect(() => {
+    if (duracionInicial) {
+      setDuracion(duracionInicial);
+    }
+    if (permiteDuracionFlexible !== undefined) {
+      setIsFlexible(permiteDuracionFlexible);
+    }
+  }, [canchaId, duracionInicial, permiteDuracionFlexible]);
+
   const addToast = (type: "error" | "success" | "warning", text: string) => {
     const newToast: ToastMessage = { id: Date.now() + Math.random(), type, text };
     setToasts((prev) => [...prev, newToast]);
@@ -78,22 +102,29 @@ export default function GrillaHoraria({
   };
 
   // Fetch slots availability
-  const fetchDisponibilidad = async (targetFecha: string) => {
-    if (initialSlots && targetFecha === fechaInicial && slots.length > 0) return;
+  const fetchDisponibilidad = async (targetFecha: string, targetDuracion: number = duracion) => {
+    if (initialSlots && targetFecha === fechaInicial && slots.length > 0 && !targetDuracion) return;
     setLoading(true);
     try {
       const headers: Record<string, string> = { Accept: "application/json" };
       if (subdomain) headers["X-Tenant-ID"] = subdomain;
 
-      const res = await fetch(`${apiUrl}/canchas/${canchaId}/disponibilidad?fecha=${targetFecha}`, {
-        headers,
-      });
+      const durParam = targetDuracion ? `&duracion=${targetDuracion}` : "";
+      const res = await fetch(
+        `${apiUrl}/canchas/${canchaId}/disponibilidad?fecha=${targetFecha}${durParam}`,
+        {
+          headers,
+        }
+      );
 
       if (!res.ok) {
         throw new Error("No se pudo obtener la disponibilidad.");
       }
 
       const data = await res.json();
+      if (data.permite_duracion_flexible !== undefined) {
+        setIsFlexible(Boolean(data.permite_duracion_flexible));
+      }
       const rawSlots =
         data.slots_disponibles ||
         data.data?.slots ||
@@ -123,9 +154,9 @@ export default function GrillaHoraria({
 
   useEffect(() => {
     if (!initialSlots || fecha !== fechaInicial) {
-      fetchDisponibilidad(fecha);
+      fetchDisponibilidad(fecha, duracion);
     }
-  }, [fecha, canchaId]);
+  }, [fecha, canchaId, duracion]);
 
   // Visual countdown timer for Redis atomic lock
   useEffect(() => {
@@ -334,6 +365,57 @@ export default function GrillaHoraria({
             className="bg-slate-900 text-white text-sm font-semibold rounded-xl px-3 py-1.5 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
+      </div>
+
+      {/* Duration Bar: Fixed Badge or Flexible Selector */}
+      <div className="pt-4 pb-4 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {isFlexible ? (
+          <>
+            <div className="text-xs">
+              <span className="font-bold text-white flex items-center gap-1.5">
+                <span>⏱️</span> Elige la duración que deseas jugar:
+              </span>
+              <span className="text-slate-400 text-[11px]">
+                La grilla mostrará los turnos disponibles para ese bloque
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { mins: 60, label: "60 min", sub: "1 hora" },
+                { mins: 90, label: "90 min", sub: "1h 30m" },
+                { mins: 120, label: "120 min", sub: "2 horas" },
+              ].map((opt) => (
+                <button
+                  key={opt.mins}
+                  type="button"
+                  onClick={() => {
+                    setDuracion(opt.mins);
+                    setActiveLock(null);
+                    fetchDisponibilidad(fecha, opt.mins);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 ${
+                    duracion === opt.mins
+                      ? "bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-500/20"
+                      : "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  <span>⏱️ {opt.label}</span>
+                  <span className={`text-[10px] ${duracion === opt.mins ? "text-emerald-200" : "text-slate-400"}`}>
+                    ({opt.sub})
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold flex items-center gap-1.5">
+              <span>⏱️</span> Turnos de {duracion} minutos {duracion === 90 ? "(1 hora y media)" : duracion === 120 ? "(2 horas)" : "(1 hora)"}
+            </span>
+            <span className="text-slate-400 text-[11px]">Duración estándar predeterminada</span>
+          </div>
+        )}
       </div>
 
       {/* Active Lock Checkout Banner with 10-minute Visual Timer */}
