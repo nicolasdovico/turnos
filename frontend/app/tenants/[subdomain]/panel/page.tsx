@@ -263,6 +263,10 @@ export default function ClubAdminPanel() {
   const [canchaToDelete, setCanchaToDelete] = useState<CanchaItem | null>(null);
   const [isDeletingCancha, setIsDeletingCancha] = useState(false);
 
+  // Modal Confirmación de Mantenimiento / Reactivación
+  const [canchaToToggleStatus, setCanchaToToggleStatus] = useState<CanchaItem | null>(null);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+
   // Ordenamiento alfabético natural por Nombre de Cancha
   const sortedCanchas = useMemo(() => {
     return [...canchas].sort((a, b) =>
@@ -450,10 +454,20 @@ export default function ClubAdminPanel() {
     }
   };
 
-  const handleToggleEstado = async (c: CanchaItem) => {
-    const nuevoEstado = c.estado === "activo" ? "mantenimiento" : "activo";
+  const confirmToggleStatus = (c: CanchaItem) => {
+    setCanchaErrorMsg(null);
+    setCanchaToToggleStatus(c);
+  };
+
+  const executeToggleStatus = async () => {
+    if (!canchaToToggleStatus) return;
+
+    setIsTogglingStatus(true);
+    setCanchaErrorMsg(null);
+
+    const nuevoEstado = canchaToToggleStatus.estado === "activo" ? "mantenimiento" : "activo";
     try {
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/canchas/${c.id}`, {
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/canchas/${canchaToToggleStatus.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -461,16 +475,28 @@ export default function ClubAdminPanel() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          nombre: c.nombre,
-          precio_base: c.precio_base,
+          nombre: canchaToToggleStatus.nombre,
+          precio_base: canchaToToggleStatus.precio_base,
           estado: nuevoEstado,
         }),
       });
+
+      const data = await res.json();
       if (res.ok) {
+        setCanchaSuccessMsg(
+          nuevoEstado === "mantenimiento"
+            ? `La cancha "${canchaToToggleStatus.nombre}" fue puesta en mantenimiento.`
+            : `La cancha "${canchaToToggleStatus.nombre}" fue reactivada con éxito.`
+        );
+        setCanchaToToggleStatus(null);
         fetchDashboardData();
+      } else {
+        setCanchaErrorMsg(data.message || "Error al actualizar el estado de la cancha.");
       }
-    } catch (e) {
-      console.error("Error al alternar estado:", e);
+    } catch (e: any) {
+      setCanchaErrorMsg(e.message || "Error de conexión con el servidor.");
+    } finally {
+      setIsTogglingStatus(false);
     }
   };
 
@@ -1029,6 +1055,83 @@ export default function ClubAdminPanel() {
               </div>
             )}
 
+            {/* Modal de Confirmación de Mantenimiento / Reactivación con Estilo del Sistema */}
+            {canchaToToggleStatus && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+                <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 text-center animate-in zoom-in-95 duration-150">
+                  {/* Warning / Status Icon Badge */}
+                  {canchaToToggleStatus.estado === "activo" ? (
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 text-3xl border border-amber-500/20 shadow-inner">
+                      ⏸️
+                    </div>
+                  ) : (
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 text-3xl border border-emerald-500/20 shadow-inner">
+                      ▶️
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-xl font-bold text-white">
+                      {canchaToToggleStatus.estado === "activo"
+                        ? `¿Poner ${canchaToToggleStatus.nombre} en Mantenimiento?`
+                        : `¿Reactivar ${canchaToToggleStatus.nombre}?`}
+                    </h3>
+                    <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                      {canchaToToggleStatus.estado === "activo"
+                        ? "Al activar el modo mantenimiento, esta cancha quedará temporalmente pausada y no estará disponible para nuevas reservas públicas ni turnos online. Las reservas ya confirmadas permanecerán intactas."
+                        : "La cancha saldrá del modo mantenimiento y volverá a estar habilitada inmediatamente para reservas públicas y agenda de turnos."}
+                    </p>
+                  </div>
+
+                  {/* Court summary pill */}
+                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3 text-xs text-slate-300 space-y-1">
+                    <div className="font-bold text-white flex items-center justify-center gap-2">
+                      <span className="capitalize">{canchaToToggleStatus.deporte}</span> • <span>{canchaToToggleStatus.superficie}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Estado actual: <strong className="uppercase text-amber-400">{canchaToToggleStatus.estado}</strong> • Tarifa: <strong className="text-emerald-400">${canchaToToggleStatus.precio_base} / turno</strong>
+                    </div>
+                  </div>
+
+                  {canchaErrorMsg && (
+                    <div className="rounded-xl bg-rose-950/60 border border-rose-500/30 p-3 text-xs font-bold text-rose-300">
+                      {canchaErrorMsg}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={isTogglingStatus}
+                      onClick={() => {
+                        setCanchaToToggleStatus(null);
+                        setCanchaErrorMsg(null);
+                      }}
+                      className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isTogglingStatus}
+                      onClick={executeToggleStatus}
+                      className={`flex-1 rounded-xl py-2.5 text-xs font-bold text-white shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+                        canchaToToggleStatus.estado === "activo"
+                          ? "bg-amber-600 hover:bg-amber-500 shadow-amber-600/30"
+                          : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30"
+                      }`}
+                    >
+                      {isTogglingStatus
+                        ? "Guardando..."
+                        : canchaToToggleStatus.estado === "activo"
+                        ? "Sí, Pausar Cancha"
+                        : "Sí, Reactivar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Listado Enriquecido de Canchas (Orden Alfabético) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sortedCanchas.map((c) => {
@@ -1143,7 +1246,7 @@ export default function ClubAdminPanel() {
                           ✏️ Editar
                         </button>
                         <button
-                          onClick={() => handleToggleEstado(c)}
+                          onClick={() => confirmToggleStatus(c)}
                           className="rounded-xl bg-slate-950 hover:bg-slate-800 px-2.5 py-1.5 text-xs font-bold text-slate-400 hover:text-amber-300 border border-slate-800 transition"
                           title={c.estado === "activo" ? "Poner en mantenimiento" : "Reactivar"}
                         >

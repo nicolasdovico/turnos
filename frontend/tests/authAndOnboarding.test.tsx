@@ -266,6 +266,58 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(courtNames).toEqual(["Cancha Alpha", "Cancha Beta", "Cancha Zeta"]);
   });
 
+  it("opens custom styled confirmation modal when putting a court into maintenance", async () => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Nico Padel",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+                tipo_negocio: { id: 1, nombre: "Club", slug: "club" },
+              },
+              plan: { id: 1, nombre: "Oro", slug: "oro", modulos: [] },
+              canchas: [
+                { id: 1, nombre: "Cancha Central", deporte: "padel", superficie: "sintetico_wpt", precio_base: 8000, techada: true, estado: "activo" },
+              ],
+              stats: { total_canchas: 1, total_turnos: 0, modulos_count: 7 },
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({ data: [] }) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    expect(await screen.findByText("Cancha Central")).toBeDefined();
+
+    // Click on pause button
+    const pauseBtn = screen.getByTitle("Poner en mantenimiento");
+    fireEvent.click(pauseBtn);
+
+    expect(await screen.findByText("¿Poner Cancha Central en Mantenimiento?")).toBeDefined();
+    expect(screen.getByText(/Al activar el modo mantenimiento/i)).toBeDefined();
+    expect(screen.getByText("Sí, Pausar Cancha")).toBeDefined();
+    expect(screen.getByText("Cancelar")).toBeDefined();
+  });
+
   it("renders Portal Global page with features and marketplace banner", () => {
     render(
       <AuthProvider>

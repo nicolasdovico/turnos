@@ -632,7 +632,8 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Switches de equipamiento: Iluminación LED/Halógena, Techo Indoor/Outdoor, Cámara de Video/Grabación, Marcador Digital y Climatización.
     - Tarjetas de canchas enriquecidas con insignias (badges) de características, precios dobles, botón de edición directa (`✏️ Editar`), alternar estado (`⏸️ Pausar / Reactivar`) y eliminación (`🗑️`).
     - Modal de Confirmación de Eliminación Personalizado: diseño con backdrop blur, badge de advertencia suave, detalle de la cancha, mensajes de seguridad y botones con el estilo visual global del SaaS.
+    - Modal de Confirmación de Mantenimiento / Reactivación: diálogo interactivo con ícono `⏸️` / `▶️`, advertencia de bloqueo de turnos públicos, preservación de reservas previas y botones de acción contextuales.
     - Ordenamiento Alfabético Natural: Las canchas se devuelven y renderizan ordenadas alfabéticamente por `nombre` tanto en el backend (`orderBy('nombre', 'asc')`) como en el frontend (`localeCompare` con orden numérico natural).
-  * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (23 tests pasados al 100%).
+  * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (24 tests pasados al 100%).
 ===============================================================================
 
