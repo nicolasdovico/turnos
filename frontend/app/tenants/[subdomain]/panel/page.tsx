@@ -241,12 +241,42 @@ export default function ClubAdminPanel() {
             </div>
 
             {/* Header Actions */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {user?.complejos && user.complejos.length > 1 && (
+                <div className="relative">
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const targetSub = e.target.value;
+                        const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
+                        const tokenQuery = activeToken ? `?auth_token=${encodeURIComponent(activeToken)}` : "";
+                        const protocol = window.location.protocol;
+                        const port = window.location.port ? `:${window.location.port}` : "";
+                        const hostname = window.location.hostname;
+                        let baseHost = "localhost";
+                        if (hostname.endsWith("turnos.com")) {
+                          baseHost = "turnos.com";
+                        }
+                        window.location.href = `${protocol}//${targetSub}.${baseHost}${port}/panel${tokenQuery}`;
+                      }
+                    }}
+                    value={subdomain as string}
+                    className="rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2.5 text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  >
+                    {user.complejos.map((c: any) => (
+                      <option key={c.id} value={c.subdominio}>
+                        🏢 Cambiar a: {c.nombre} ({c.tipo_negocio?.nombre || "Club"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <Link
                 href="/"
                 className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5"
               >
-                <span>🎾 Ver Sitio Público de Reservas</span>
+                <span>🎾 Ver Sitio Público</span>
               </Link>
             </div>
           </div>

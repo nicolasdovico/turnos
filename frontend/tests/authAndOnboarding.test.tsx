@@ -22,6 +22,7 @@ vi.mock("next/navigation", () => ({
 import PlanesPage from "../app/planes/page";
 import VerificarEmailPage from "../app/verificar-email/page";
 import ClubAdminPanel from "../app/tenants/[subdomain]/panel/page";
+import PortalPage from "../app/portal/page";
 
 describe("Frontend Auth & Club Onboarding Suite", () => {
   it("renders Navbar with guest navigation buttons", () => {
@@ -143,5 +144,19 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     );
 
     expect(screen.getByText(/nico-padel/i)).toBeDefined();
+  });
+
+  it("renders Portal Global page with features and marketplace banner", () => {
+    render(
+      <AuthProvider>
+        <PortalPage />
+      </AuthProvider>
+    );
+
+    expect(screen.getByText("Portal Global de Complejos Deportivos")).toBeDefined();
+    expect(screen.getByText(/Registrar mi Negocio/i)).toBeDefined();
+    expect(screen.getByText("Reservas & Agenda")).toBeDefined();
+    expect(screen.getByText("POS & Buffet")).toBeDefined();
+    expect(screen.getByText("Domótica IoT")).toBeDefined();
   });
 });
