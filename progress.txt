@@ -493,4 +493,23 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * `frontend/app/registro/page.tsx`: Vista de registro de usuario individual (jugadores/clientes).
   * `frontend/app/registro-club/page.tsx`: Wizard de Onboarding Unificado en 4 pasos con validación en tiempo real de subdominios, selector de planes y creación de canchas iniciales.
   * `frontend/tests/authAndOnboarding.test.tsx`: Suite de 4 tests en Vitest (17 tests totales en frontend pasados al 100%).
+-------------------------------------------------------------------------------
+[2026-08-29] - SISTEMA DE VALIDACIÓN DE EMAIL CON CÓDIGOS OTP (6 DÍGITOS) & MAILPIT
+-------------------------------------------------------------------------------
+- Infraestructura:
+  * Contenedor Docker `saas_mailpit` (`axllent/mailpit:latest`) montado en puerto SMTP `1025` y Web UI `8025`.
+  * Configuración de Laravel SMTP apuntando a `mailpit:1025` con remitente `soporte@turnos-saas.com`.
+- Backend (Laravel 11):
+  * Migración `create_email_verifications_table` y modelo `EmailVerification` con expiración a 10 min y conteo de intentos fallidos.
+  * Mailable `EmailVerificationOtpMail` con diseño HTML responsivo y código de 6 dígitos.
+  * Controlador `OtpVerificationController`:
+    - `POST /api/auth/verify-otp`: Valida código, bloquea tras 5 intentos fallidos, marca `email_verified_at = now()` y limpia tokens.
+    - `POST /api/auth/resend-otp`: Reenvío con cooldown de 60 segundos por IP/Email.
+    - Disparo automático de OTP en `AuthController@register` y `ClubOnboardingController@registrarClub`.
+  * Suite de tests: `tests/Feature/EmailOtpVerificationTest.php` (5 tests pasados / 18 aserciones). Total backend: 101 tests (486 aserciones).
+- Frontend Web (Next.js 14):
+  * Componente interactivo `frontend/components/OtpInput.tsx` con 6 casilleros, auto-avance, soporte de retroceso y pegado automático (paste).
+  * Pantalla `frontend/app/verificar-email/page.tsx` con temporizador de reenvío y enlace directo al Web UI de Mailpit (`http://localhost:8025`).
+  * Redirección tras registro de usuario hacia `/verificar-email`.
+  * Suite de tests: `frontend/tests/authAndOnboarding.test.tsx` (6 tests pasados). Total frontend: 20 tests pasados al 100%.
 ===============================================================================
