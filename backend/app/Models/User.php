@@ -53,4 +53,9 @@ class User extends Authenticatable implements FilamentUser
     {
         return true;
     }
+
+    public function complejos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Complejo::class, 'user_id');
+    }
 }

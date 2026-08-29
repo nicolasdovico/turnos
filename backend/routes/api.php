@@ -81,10 +81,16 @@ Route::middleware('tenant.has_module:torneos')->group(function () {
     Route::post('/torneos/partidos/{partidoId}/resultado', [\App\Http\Controllers\Api\TorneoController::class, 'registrarResultado']);
 });
 
+Route::get('/planes', function () {
+    return response()->json([
+        'data' => \App\Models\Plan::with('modulos')->where('estado', 'activo')->orderBy('precio_mensual', 'asc')->get(),
+    ]);
+});
 
-
-
-
+Route::prefix('clubs')->group(function () {
+    Route::get('/check-subdomain', [\App\Http\Controllers\Api\ClubOnboardingController::class, 'checkSubdomain']);
+    Route::post('/registro', [\App\Http\Controllers\Api\ClubOnboardingController::class, 'registrarClub']);
+});
 
 Route::get('/complejos/cercanos', [\App\Http\Controllers\Api\ComplejoController::class, 'cercanos']);
 

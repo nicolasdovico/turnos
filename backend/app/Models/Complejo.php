@@ -16,6 +16,7 @@ class Complejo extends Model
 
     protected $fillable = [
         'uuid',
+        'user_id',
         'nombre',
         'subdominio',
         'dominio_personalizado',
@@ -26,6 +27,7 @@ class Complejo extends Model
         'direccion',
         'ciudad',
         'telefono',
+        'deporte_principal',
     ];
 
     protected function casts(): array
@@ -43,6 +45,11 @@ class Complejo extends Model
                 $complejo->uuid = (string) Str::uuid();
             }
         });
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function plan(): BelongsTo
