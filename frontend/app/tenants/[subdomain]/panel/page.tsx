@@ -48,6 +48,79 @@ interface HorarioItem {
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
+const ALL_MODULOS = [
+  {
+    slug: "reservas",
+    nombre: "Reservas & Agenda",
+    icon: "📅",
+    descripcion: "Grilla interactiva con bloqueos atómicos en Redis para evitar doble reserva.",
+    actionLabel: "Abrir Grilla en Vivo →",
+    actionHref: "/",
+    isExternal: false,
+    planMinimo: "Bronce",
+  },
+  {
+    slug: "cms_web",
+    nombre: "CMS Web & Landing Page",
+    icon: "🌐",
+    descripcion: "Páginas institucionales con renderizado dinámico y sanitización de contenido.",
+    actionLabel: "Ver Página CMS Demo →",
+    actionHref: "/paginas/tarifas",
+    isExternal: false,
+    planMinimo: "Bronce",
+  },
+  {
+    slug: "pos_buffet",
+    nombre: "Punto de Venta (POS) & Buffet",
+    icon: "🍔",
+    descripcion: "Control de stock, comandas asignadas a turnos y arqueo de caja diaria.",
+    actionLabel: "Gestionar Productos en POS ↗",
+    actionHref: "http://localhost:8080/admin",
+    isExternal: true,
+    planMinimo: "Plata",
+  },
+  {
+    slug: "turnos_fijos",
+    nombre: "Turnos Fijos Recurrentes",
+    icon: "🔁",
+    descripcion: "Generación automática periódica de turnos semanales y mensuales para socios y clientes fijos.",
+    actionLabel: "Ver Turnos Fijos ↗",
+    actionHref: "http://localhost:8080/admin",
+    isExternal: true,
+    planMinimo: "Plata",
+  },
+  {
+    slug: "split_payment",
+    nombre: "Split Payment & Partidos Abiertos",
+    icon: "💳",
+    descripcion: "Cobro fraccionado por jugador y convocatorias automáticas de partidos abiertos con matchmaking.",
+    actionLabel: "Ver Pagos Divididos ↗",
+    actionHref: "http://localhost:8080/admin",
+    isExternal: true,
+    planMinimo: "Plata",
+  },
+  {
+    slug: "torneos",
+    nombre: "Torneos & Fixtures",
+    icon: "🏆",
+    descripcion: "Generador automático de llaves eliminatorias, carga de scores y tablas de posiciones.",
+    actionLabel: "Ver Torneos & Brackets ↗",
+    actionHref: "http://localhost:8080/admin",
+    isExternal: true,
+    planMinimo: "Oro",
+  },
+  {
+    slug: "domotica",
+    nombre: "Domótica IoT & Luces",
+    icon: "💡",
+    descripcion: "Encendido y apagado sincronizado de iluminación de canchas según horarios de reservas activas.",
+    actionLabel: "Ver Dispositivos IoT ↗",
+    actionHref: "http://localhost:8080/admin",
+    isExternal: true,
+    planMinimo: "Oro",
+  },
+];
+
 export default function ClubAdminPanel() {
   const params = useParams();
   const subdomain = (params?.subdomain as string) || "demo";
@@ -86,7 +159,7 @@ export default function ClubAdminPanel() {
       }
 
       // Check admin status for current user
-      const adminRes = await fetch(`/api/clubs/${subdomain}/is-admin`, {
+      const adminRes = await fetch(`${API_BASE}/clubs/${subdomain}/is-admin`, {
         headers: {
           Accept: "application/json",
           ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
@@ -255,15 +328,19 @@ export default function ClubAdminPanel() {
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
               <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Canchas Activas</span>
-              <div className="mt-1 text-2xl font-black text-white">{stats.total_canchas}</div>
+              <div className="mt-1 text-2xl font-black text-white">{canchas.length || stats.total_canchas}</div>
             </div>
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
               <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Plan Contratado</span>
-              <div className="mt-1 text-2xl font-black text-emerald-400 capitalize">{plan?.nombre || "Oro"}</div>
+              <div className="mt-1 text-2xl font-black text-emerald-400 capitalize">
+                {plan?.nombre || (loading ? "Cargando..." : "Bronce")}
+              </div>
             </div>
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
               <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Módulos Activos</span>
-              <div className="mt-1 text-2xl font-black text-white">{plan?.modulos?.length || 7}</div>
+              <div className="mt-1 text-2xl font-black text-white">
+                {plan?.modulos ? plan.modulos.length : (loading ? "..." : stats.modulos_count || 0)}
+              </div>
             </div>
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
               <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Prueba Gratuita</span>
@@ -438,110 +515,86 @@ export default function ClubAdminPanel() {
         {/* ========================================================================= */}
         {activeTab === "modulos" && (
           <div className="mt-8 space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">Módulos Activos de tu Plan {plan?.nombre}</h2>
-              <p className="text-xs text-slate-400">Accede directamente a todas las herramientas incluidas en tu suscripción</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">
+                  Módulos de tu Plan {plan?.nombre || "Bronce"}
+                </h2>
+                <p className="text-xs text-slate-400">
+                  {plan?.modulos?.length || 0} módulos activos incluidos en tu suscripción
+                </p>
+              </div>
+              <a
+                href="http://localhost:8080/planes"
+                className="self-start sm:self-auto rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-bold text-emerald-400 border border-slate-700 transition"
+              >
+                ⚡ Ver Comparativa de Planes
+              </a>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex flex-col justify-between">
-                <div>
-                  <div className="text-3xl mb-3">📅</div>
-                  <h3 className="font-bold text-lg text-white">Reservas & Agenda</h3>
-                  <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                    Grilla interactiva con bloqueos atómicos en Redis para evitar doble reserva.
-                  </p>
-                </div>
-                <Link
-                  href="/"
-                  className="mt-6 block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
-                >
-                  Abrir Grilla en Vivo →
-                </Link>
-              </div>
+              {ALL_MODULOS.map((mod) => {
+                const isActivo = plan?.modulos?.some((m) => m.slug === mod.slug) ?? false;
 
-              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex flex-col justify-between">
-                <div>
-                  <div className="text-3xl mb-3">🍔</div>
-                  <h3 className="font-bold text-lg text-white">Punto de Venta (POS) & Buffet</h3>
-                  <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                    Control de stock, comandas asignadas a turnos y arqueo de caja diaria.
-                  </p>
-                </div>
-                <a
-                  href="http://localhost:8080/admin"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-6 block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
-                >
-                  Gestionar Productos en POS ↗
-                </a>
-              </div>
+                return (
+                  <div
+                    key={mod.slug}
+                    className={`rounded-3xl p-6 flex flex-col justify-between transition border ${
+                      isActivo
+                        ? "bg-slate-900 border-slate-800 hover:border-emerald-500/50"
+                        : "bg-slate-950/40 border-slate-900/80 opacity-70"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="text-3xl">{mod.icon}</span>
+                        {isActivo ? (
+                          <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold px-2.5 py-0.5">
+                            ✓ Activo
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-slate-800/80 text-slate-400 border border-slate-700 text-[10px] font-bold px-2.5 py-0.5">
+                            🔒 Requiere Plan {mod.planMinimo}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-bold text-lg text-white">{mod.nombre}</h3>
+                      <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                        {mod.descripcion}
+                      </p>
+                    </div>
 
-              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex flex-col justify-between">
-                <div>
-                  <div className="text-3xl mb-3">🏆</div>
-                  <h3 className="font-bold text-lg text-white">Torneos & Fixtures</h3>
-                  <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                    Generador automático de llaves eliminatorias, carga de scores y tablas de posiciones.
-                  </p>
-                </div>
-                <a
-                  href="http://localhost:8080/admin"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-6 block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
-                >
-                  Ver Torneos & Brackets ↗
-                </a>
-              </div>
-
-              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex flex-col justify-between">
-                <div>
-                  <div className="text-3xl mb-3">💡</div>
-                  <h3 className="font-bold text-lg text-white">Domótica IoT</h3>
-                  <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                    Encendido y apagado sincronizado de iluminación según horarios de reservas activas.
-                  </p>
-                </div>
-                <div className="mt-6 rounded-xl bg-emerald-950/40 border border-emerald-500/30 p-2.5 text-center text-xs font-bold text-emerald-300">
-                  ✓ Sincronización Automática Activa
-                </div>
-              </div>
-
-              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex flex-col justify-between">
-                <div>
-                  <div className="text-3xl mb-3">💳</div>
-                  <h3 className="font-bold text-lg text-white">Split Payment & Partidos</h3>
-                  <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                    Cobro fraccionado por jugador y convocatorias automáticas de partidos abiertos.
-                  </p>
-                </div>
-                <a
-                  href="http://localhost:8080/admin"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-6 block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
-                >
-                  Ver Pagos Divididos ↗
-                </a>
-              </div>
-
-              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex flex-col justify-between">
-                <div>
-                  <div className="text-3xl mb-3">🌐</div>
-                  <h3 className="font-bold text-lg text-white">CMS Web & Landing Page</h3>
-                  <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                    Páginas institucionales con renderizado estático y sanitización de contenido.
-                  </p>
-                </div>
-                <Link
-                  href="/paginas/tarifas"
-                  className="mt-6 block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
-                >
-                  Ver Página CMS Demo →
-                </Link>
-              </div>
+                    <div className="mt-6 pt-4 border-t border-slate-800/60">
+                      {isActivo ? (
+                        mod.isExternal ? (
+                          <a
+                            href={mod.actionHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
+                          >
+                            {mod.actionLabel}
+                          </a>
+                        ) : (
+                          <Link
+                            href={mod.actionHref}
+                            className="block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
+                          >
+                            {mod.actionLabel}
+                          </Link>
+                        )
+                      ) : (
+                        <a
+                          href="http://localhost:8080/planes"
+                          className="block w-full text-center rounded-xl bg-slate-900/60 hover:bg-slate-800/80 py-2.5 text-xs font-semibold text-slate-400 border border-slate-800 transition"
+                        >
+                          Actualizar a Plan {mod.planMinimo} ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
