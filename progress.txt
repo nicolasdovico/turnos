@@ -631,6 +631,7 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Configuración de tarifas dobles: precio base diurno y precio nocturno con luz.
     - Switches de equipamiento: Iluminación LED/Halógena, Techo Indoor/Outdoor, Cámara de Video/Grabación, Marcador Digital y Climatización.
     - Tarjetas de canchas enriquecidas con insignias (badges) de características, precios dobles, botón de edición directa (`✏️ Editar`), alternar estado (`⏸️ Pausar / Reactivar`) y eliminación (`🗑️`).
+    - Modal de Confirmación de Eliminación Personalizado: diseño con backdrop blur, badge de advertencia suave, detalle de la cancha, mensajes de seguridad y botones con el estilo visual global del SaaS.
   * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (22 tests pasados al 100%).
 ===============================================================================
 

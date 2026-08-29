@@ -257,6 +257,11 @@ export default function ClubAdminPanel() {
 
   const [isSavingCancha, setIsSavingCancha] = useState(false);
   const [canchaSuccessMsg, setCanchaSuccessMsg] = useState<string | null>(null);
+  const [canchaErrorMsg, setCanchaErrorMsg] = useState<string | null>(null);
+
+  // Modal Confirmación de Eliminación
+  const [canchaToDelete, setCanchaToDelete] = useState<CanchaItem | null>(null);
+  const [isDeletingCancha, setIsDeletingCancha] = useState(false);
 
   const openCreateModal = () => {
     setEditingCancha(null);
@@ -417,7 +422,7 @@ export default function ClubAdminPanel() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.message || "Error al guardar la cancha.");
+        setCanchaErrorMsg(data.message || "Error al guardar la cancha.");
         return;
       }
 
@@ -428,7 +433,7 @@ export default function ClubAdminPanel() {
       setEditingCancha(null);
       fetchDashboardData();
     } catch (e: any) {
-      alert(e.message || "Error de conexión con el servidor.");
+      setCanchaErrorMsg(e.message || "Error de conexión con el servidor.");
     } finally {
       setIsSavingCancha(false);
     }
@@ -458,13 +463,19 @@ export default function ClubAdminPanel() {
     }
   };
 
-  const handleDeleteCancha = async (c: CanchaItem) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar o pausar la "${c.nombre}"?`)) {
-      return;
-    }
+  const confirmDeleteCancha = (c: CanchaItem) => {
+    setCanchaErrorMsg(null);
+    setCanchaToDelete(c);
+  };
+
+  const executeDeleteCancha = async () => {
+    if (!canchaToDelete) return;
+
+    setIsDeletingCancha(true);
+    setCanchaErrorMsg(null);
 
     try {
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/canchas/${c.id}`, {
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/canchas/${canchaToDelete.id}`, {
         method: "DELETE",
         headers: {
           "Accept": "application/json",
@@ -475,12 +486,15 @@ export default function ClubAdminPanel() {
       const data = await res.json();
       if (res.ok) {
         setCanchaSuccessMsg(data.message || "Cancha procesada con éxito.");
+        setCanchaToDelete(null);
         fetchDashboardData();
       } else {
-        alert(data.message || "Error al eliminar la cancha.");
+        setCanchaErrorMsg(data.message || "Error al eliminar la cancha.");
       }
     } catch (e: any) {
-      alert(e.message || "Error de conexión.");
+      setCanchaErrorMsg(e.message || "Error de conexión con el servidor.");
+    } finally {
+      setIsDeletingCancha(false);
     }
   };
 
@@ -945,6 +959,65 @@ export default function ClubAdminPanel() {
               </div>
             )}
 
+            {/* Modal de Confirmación de Eliminación / Inactivación de Cancha con Estilo del Sistema */}
+            {canchaToDelete && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+                <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 text-center animate-in zoom-in-95 duration-150">
+                  {/* Warning Icon Badge */}
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500 text-3xl border border-rose-500/20 shadow-inner">
+                    🗑️
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-white">
+                      ¿Eliminar {canchaToDelete.nombre}?
+                    </h3>
+                    <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                      Esta acción retirará la cancha de las reservas públicas. Si la cancha posee reservas históricas, el sistema la marcará automáticamente como <strong>inactiva</strong> para preservar la integridad de tu agenda.
+                    </p>
+                  </div>
+
+                  {/* Court summary pill */}
+                  <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3 text-xs text-slate-300 space-y-1">
+                    <div className="font-bold text-white flex items-center justify-center gap-2">
+                      <span className="capitalize">{canchaToDelete.deporte}</span> • <span>{canchaToDelete.superficie}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Tarifa: <strong className="text-emerald-400">${canchaToDelete.precio_base} / turno</strong>
+                    </div>
+                  </div>
+
+                  {canchaErrorMsg && (
+                    <div className="rounded-xl bg-rose-950/60 border border-rose-500/30 p-3 text-xs font-bold text-rose-300">
+                      {canchaErrorMsg}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={isDeletingCancha}
+                      onClick={() => {
+                        setCanchaToDelete(null);
+                        setCanchaErrorMsg(null);
+                      }}
+                      className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDeletingCancha}
+                      onClick={executeDeleteCancha}
+                      className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {isDeletingCancha ? "Eliminando..." : "Sí, Eliminar"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Listado Enriquecido de Canchas */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {canchas.map((c) => {
@@ -1066,7 +1139,7 @@ export default function ClubAdminPanel() {
                           {c.estado === "activo" ? "⏸️" : "▶️"}
                         </button>
                         <button
-                          onClick={() => handleDeleteCancha(c)}
+                          onClick={() => confirmDeleteCancha(c)}
                           className="rounded-xl bg-slate-950 hover:bg-rose-950/60 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-rose-400 border border-slate-800 hover:border-rose-800 transition"
                           title="Eliminar o inactivar"
                         >
