@@ -78,6 +78,7 @@ services:
       DB_PASSWORD: saas_pass
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./database/init-testing-db.sh:/docker-entrypoint-initdb.d/init-testing-db.sh:ro
     networks:
       - saas_network
     healthcheck:
