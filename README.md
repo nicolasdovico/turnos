@@ -11,6 +11,7 @@ Plataforma integral multitenant para la administración de complejos deportivos 
 - **Caché y Concurrencia:** **Redis 7** para candados distribuidos atómicos (anti doble reserva) y caché.
 - **Frontend Web:** [Next.js 14+](https://nextjs.org) (App Router, Node 22, TypeScript, Tailwind CSS) con middleware Edge para reescritura de subdominios y renderizado híbrido SSR/ISR.
 - **Web Server & Proxy Inverso:** **Caddy 2** con ruteo directo FastCGI a PHP-FPM y proxy reverso al servidor Node.js.
+- **Servidor de Correo (Desarrollo):** **Mailpit** para captura local de correos y visualización de códigos OTP (SMTP `1025`, Web UI `8025`).
 - **Testing:** PHPUnit para Backend y Vitest + React Testing Library para Frontend.
 
 ---
@@ -64,9 +65,14 @@ El sistema utiliza detección y reescritura de subdominios en el Edge mediante N
 | Entorno / Vista | URL Local | Descripción |
 | :--- | :--- | :--- |
 | **Panel Super Admin (Filament v3)** | `http://localhost:8080/admin` | Panel de control administrativo global para gestionar Complejos, Planes, Módulos y Usuarios. |
-| **Marketplace Global** | `http://localhost:3000/` o `http://localhost:8080/` | Landing page principal para explorar complejos deportivos y registrar clubes. |
-| **Club Demo (Home & Reservas)** | `http://padelpro.localhost:3000/` o `http://padelpro.localhost:8080/` | Web oficial del club `padelpro` con la grilla horaria interactiva en vivo. |
-| **Páginas CMS del Club** | `http://padelpro.localhost:3000/paginas/tarifas` | Páginas informativas personalizadas con renderizado ISR y sanitización XSS. |
+| **Marketplace Global** | `http://localhost:8080/` | Landing page principal para explorar complejos deportivos y reservar turnos. |
+| **Club Demo (Home & Reservas)** | `http://padelpro.localhost:8080/` | Web oficial del club `padelpro` con la grilla horaria interactiva en vivo. |
+| **Páginas CMS del Club** | `http://padelpro.localhost:8080/paginas/tarifas` | Páginas informativas personalizadas con renderizado ISR y sanitización XSS. |
+| **Bandeja de Entrada de Correos (Mailpit)** | `http://localhost:8025/` | Web UI de Mailpit para visualizar y capturar en tiempo real los correos salientes y códigos OTP de 6 dígitos. |
+| **Planes & Precios** | `http://localhost:8080/planes` | Comparativa detallada de planes (Bronce, Plata, Oro) y preguntas frecuentes. |
+| **Onboarding de Clubes** | `http://localhost:8080/registro-club` | Wizard de registro unificado para dar de alta un complejo deportivo con subdominio personalizado. |
+| **Verificación OTP de Email** | `http://localhost:8080/verificar-email` | Pantalla de validación de código de verificación de 6 dígitos. |
+| **Iniciar Sesión / Registro** | `http://localhost:8080/login` / `/registro` | Portal de autenticación y registro de jugadores. |
 
 ---
 
