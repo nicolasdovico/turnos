@@ -23,6 +23,7 @@ export interface GrillaHorariaProps {
   precioBase?: number;
   precio90Min?: number;
   precio120Min?: number;
+  isAdmin?: boolean;
   apiUrl?: string;
   initialSlots?: Slot[];
   onConfirmSuccess?: (data: any) => void;
@@ -46,6 +47,17 @@ export interface ToastMessage {
   text: string;
 }
 
+export interface AntiBachesInfo {
+  activa: boolean;
+  total_horarios_protegidos: number;
+  horarios_protegidos: Array<{
+    hora_inicio: string;
+    hora_fin: string;
+    duracion_minutos: number;
+    motivo: string;
+  }>;
+}
+
 export default function GrillaHoraria({
   canchaId,
   canchaNombre = "Cancha 1",
@@ -58,6 +70,7 @@ export default function GrillaHoraria({
   precioBase,
   precio90Min,
   precio120Min,
+  isAdmin = false,
   apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api",
   initialSlots,
   onConfirmSuccess,
@@ -66,6 +79,7 @@ export default function GrillaHoraria({
   const [fecha, setFecha] = useState<string>(fechaInicial || getTodayString());
   const [duracion, setDuracion] = useState<number>(duracionInicial || (deporte?.toLowerCase() === "padel" ? 90 : 60));
   const [isFlexible, setIsFlexible] = useState<boolean>(Boolean(permiteDuracionFlexible));
+  const [antiBachesInfo, setAntiBachesInfo] = useState<AntiBachesInfo | null>(null);
   const [slots, setSlots] = useState<Slot[]>(initialSlots || []);
   const [loading, setLoading] = useState<boolean>(false);
   const [lockingSlot, setLockingSlot] = useState<string | null>(null);
@@ -124,6 +138,9 @@ export default function GrillaHoraria({
       const data = await res.json();
       if (data.permite_duracion_flexible !== undefined) {
         setIsFlexible(Boolean(data.permite_duracion_flexible));
+      }
+      if (data.optimizacion_anti_baches) {
+        setAntiBachesInfo(data.optimizacion_anti_baches);
       }
       const rawSlots =
         data.slots_disponibles ||
@@ -417,6 +434,37 @@ export default function GrillaHoraria({
           </div>
         )}
       </div>
+
+      {/* Admin-Only Anti-Baches Intelligence Callout */}
+      {isAdmin && antiBachesInfo && antiBachesInfo.total_horarios_protegidos > 0 && (
+        <div
+          data-testid="admin-anti-baches-banner"
+          className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3 animate-in fade-in duration-200"
+        >
+          <span className="text-xl shrink-0">🛡️</span>
+          <div className="space-y-1.5 flex-1">
+            <div className="font-bold flex items-center gap-2 text-amber-300">
+              <span>Modo Administrador</span> • <span>Regla Anti-Baches en Acción</span>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                {antiBachesInfo.total_horarios_protegidos} {antiBachesInfo.total_horarios_protegidos === 1 ? "horario protegido" : "horarios protegidos"}
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-200/90 leading-relaxed">
+              El algoritmo inteligente de ocupación ha ocultado de la venta pública {antiBachesInfo.total_horarios_protegidos === 1 ? "este horario" : "estos horarios"} para <strong>evitar que queden huecos huérfanos de 30 minutos invendibles</strong> contra turnos existentes. Los clientes solo ven combinaciones continuas.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {antiBachesInfo.horarios_protegidos.map((p, idx) => (
+                <span
+                  key={idx}
+                  className="rounded-lg bg-slate-950/80 border border-amber-500/30 px-2.5 py-1 text-[10px] font-mono text-amber-300"
+                >
+                  🚫 {p.hora_inicio} a {p.hora_fin}: <span className="text-slate-300 font-sans">{p.motivo}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Active Lock Checkout Banner with 10-minute Visual Timer */}
       {activeLock && (

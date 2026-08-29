@@ -33,7 +33,9 @@ class DisponibilidadController extends Controller
         }
 
         $duracion = isset($validated['duracion']) ? (int) $validated['duracion'] : null;
-        $slots = $this->disponibilidadService->obtenerSlotsDisponibles($id, $validated['fecha'], $duracion);
+        $disponibilidad = $this->disponibilidadService->obtenerDisponibilidadCompleta($id, $validated['fecha'], $duracion);
+        $slots = $disponibilidad['slots'];
+        $antiBaches = $disponibilidad['optimizacion_anti_baches'];
 
         return response()->json([
             'cancha_id' => $id,
@@ -41,15 +43,18 @@ class DisponibilidadController extends Controller
             'fecha' => $validated['fecha'],
             'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),
             'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
+            'anti_baches_activo' => (bool) ($cancha->anti_baches_activo ?? true),
             'duraciones_permitidas' => $cancha->duraciones_permitidas ?: [60, 90, 120],
             'precio_base' => (float) $cancha->precio_base,
             'precio_90_min' => $cancha->precio_90_min !== null ? (float) $cancha->precio_90_min : round((float) $cancha->precio_base * 1.5, 2),
             'precio_120_min' => $cancha->precio_120_min !== null ? (float) $cancha->precio_120_min : round((float) $cancha->precio_base * 2.0, 2),
             'slots_disponibles' => $slots,
+            'optimizacion_anti_baches' => $antiBaches,
             'data' => [
                 'slots' => $slots,
                 'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),
                 'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
+                'optimizacion_anti_baches' => $antiBaches,
             ],
         ]);
     }

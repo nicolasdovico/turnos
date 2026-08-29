@@ -45,6 +45,7 @@ interface CanchaItem {
   formato?: string | null;
   duracion_minutos?: number;
   permite_duracion_flexible?: boolean;
+  anti_baches_activo?: boolean;
   duraciones_permitidas?: number[];
   precio_90_min?: string | number | null;
   precio_120_min?: string | number | null;
@@ -260,6 +261,7 @@ export default function ClubAdminPanel() {
   const [canchaClimatizada, setCanchaClimatizada] = useState(false);
   const [canchaDuracionMinutos, setCanchaDuracionMinutos] = useState(60);
   const [canchaPermiteDuracionFlexible, setCanchaPermiteDuracionFlexible] = useState(false);
+  const [canchaAntiBachesActivo, setCanchaAntiBachesActivo] = useState(true);
   const [canchaPrecio90Min, setCanchaPrecio90Min] = useState("");
   const [canchaPrecio120Min, setCanchaPrecio120Min] = useState("");
   const [canchaEstado, setCanchaEstado] = useState("activo");
@@ -297,6 +299,7 @@ export default function ClubAdminPanel() {
     setCanchaPrecioConLuz("");
     setCanchaDuracionMinutos(dep === "padel" ? 90 : 60);
     setCanchaPermiteDuracionFlexible(false);
+    setCanchaAntiBachesActivo(true);
     setCanchaPrecio90Min("");
     setCanchaPrecio120Min("");
     setCanchaTechada(false);
@@ -325,6 +328,7 @@ export default function ClubAdminPanel() {
     setCanchaPrecioConLuz(c.precio_con_luz ? String(c.precio_con_luz) : "");
     setCanchaDuracionMinutos(c.duracion_minutos || (dep === "padel" ? 90 : 60));
     setCanchaPermiteDuracionFlexible(Boolean(c.permite_duracion_flexible));
+    setCanchaAntiBachesActivo(c.anti_baches_activo !== undefined ? Boolean(c.anti_baches_activo) : true);
     setCanchaPrecio90Min(c.precio_90_min ? String(c.precio_90_min) : "");
     setCanchaPrecio120Min(c.precio_120_min ? String(c.precio_120_min) : "");
     setCanchaTechada(Boolean(c.techada));
@@ -436,6 +440,7 @@ export default function ClubAdminPanel() {
       climatizada: canchaClimatizada,
       duracion_minutos: Number(canchaDuracionMinutos) || 60,
       permite_duracion_flexible: canchaPermiteDuracionFlexible,
+      anti_baches_activo: canchaAntiBachesActivo,
       duraciones_permitidas: [60, 90, 120],
       precio_90_min: canchaPrecio90Min ? parseFloat(canchaPrecio90Min) : null,
       precio_120_min: canchaPrecio120Min ? parseFloat(canchaPrecio120Min) : null,
@@ -1014,6 +1019,24 @@ export default function ClubAdminPanel() {
                             <span className="text-[10px] text-slate-500 mt-0.5 block">
                               Si se deja vacío, calcula 2.0x automáticamente.
                             </span>
+                          </div>
+
+                          {/* Anti-Baches Switch */}
+                          <div className="sm:col-span-2 p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                            <div className="text-xs">
+                              <div className="font-bold text-white flex items-center gap-1.5">
+                                <span>🛡️</span> Algoritmo Anti-Baches (Yield Management)
+                              </div>
+                              <div className="text-slate-400 text-[11px]">
+                                Evita automáticamente turnos públicos que dejen huecos huérfanos de 30 min entre reservas.
+                              </div>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={canchaAntiBachesActivo}
+                              onChange={(e) => setCanchaAntiBachesActivo(e.target.checked)}
+                              className="h-4 w-4 rounded bg-slate-950 border-slate-700 text-emerald-500 focus:ring-0"
+                            />
                           </div>
                         </div>
                       )}

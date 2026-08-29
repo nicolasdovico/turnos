@@ -20,13 +20,28 @@ class DisponibilidadService
     }
 
     /**
-     * Calculate available slots for a given cancha and date, taking into account court duration and pricing.
+     * Calculate available slots for a given cancha and date, taking into account court duration, pricing and anti-bache optimization.
      */
     public function obtenerSlotsDisponibles(int $canchaId, string $fecha, ?int $duracionSolicitada = null): array
     {
+        return $this->obtenerDisponibilidadCompleta($canchaId, $fecha, $duracionSolicitada)['slots'];
+    }
+
+    /**
+     * Calculate full availability along with anti-bache audit details for club administrators.
+     */
+    public function obtenerDisponibilidadCompleta(int $canchaId, string $fecha, ?int $duracionSolicitada = null): array
+    {
         $cancha = Cancha::find($canchaId);
         if (!$cancha || $cancha->estado !== 'activo') {
-            return [];
+            return [
+                'slots' => [],
+                'optimizacion_anti_baches' => [
+                    'activa' => false,
+                    'total_horarios_protegidos' => 0,
+                    'horarios_protegidos' => [],
+                ],
+            ];
         }
 
         $fechaCarbon = Carbon::parse($fecha);
@@ -37,7 +52,14 @@ class DisponibilidadService
             ->first();
 
         if (!$horario) {
-            return [];
+            return [
+                'slots' => [],
+                'optimizacion_anti_baches' => [
+                    'activa' => false,
+                    'total_horarios_protegidos' => 0,
+                    'horarios_protegidos' => [],
+                ],
+            ];
         }
 
         // Determine effective duration
@@ -65,17 +87,19 @@ class DisponibilidadService
         $horaApertura = Carbon::parse($fecha . ' ' . $horario->hora_apertura);
         $horaCierre = Carbon::parse($fecha . ' ' . $horario->hora_cierre);
 
-        // Fetch non-available turnos in database (reservado, bloqueado)
+        // Fetch non-available turnos in database (reservado, bloqueado, confirmado, etc.)
         $turnosOcupados = Turno::where('cancha_id', $canchaId)
             ->where('fecha', $fechaCarbon->format('Y-m-d'))
-            ->whereIn('estado', ['reservado', 'bloqueado'])
+            ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
             ->get();
 
         $slotsDisponibles = [];
+        $horariosProtegidos = [];
         $currentSlotStart = $horaApertura->copy();
 
         // Step size: if flexible, step by 30 min (for 90 min) or 60 min; if fixed, step by exact duration
-        $stepMinutos = $cancha->permite_duracion_flexible ? 60 : $duracionMinutos;
+        $stepMinutos = $cancha->permite_duracion_flexible ? 30 : $duracionMinutos;
+        $antiBachesActivo = $cancha->anti_baches_activo ?? true;
 
         while ($currentSlotStart->copy()->addMinutes($duracionMinutos)->lessThanOrEqualTo($horaCierre)) {
             $slotEnd = $currentSlotStart->copy()->addMinutes($duracionMinutos);
@@ -98,20 +122,72 @@ class DisponibilidadService
             $estaBloqueadoEnRedis = (bool) Redis::get($lockKeyLegacy) || (bool) Redis::get($lockKeyStandard);
 
             if (!$estaOcupadoEnDb && !$estaBloqueadoEnRedis) {
-                $slotsDisponibles[] = [
-                    'cancha_id' => $canchaId,
-                    'fecha' => $fechaCarbon->format('Y-m-d'),
-                    'hora_inicio' => $horaInicioFormatted,
-                    'hora_fin' => $horaFinFormatted,
-                    'duracion_minutos' => $duracionMinutos,
-                    'precio' => $precio,
-                    'estado' => 'disponible',
-                ];
+                // 3. Regla Anti-Baches (Gap Prevention): Verificar si este turno deja un hueco huérfano < 60 min
+                $dejaBache = false;
+                $motivoBache = null;
+
+                if ($cancha->permite_duracion_flexible && $antiBachesActivo && $turnosOcupados->isNotEmpty()) {
+                    // Espacio hacia el próximo turno ocupado o cierre
+                    $proximoTurnoTs = $horaCierre->timestamp;
+                    foreach ($turnosOcupados as $t) {
+                        $tInicio = Carbon::parse($fecha . ' ' . $t->hora_inicio)->timestamp;
+                        if ($tInicio >= $endTs && $tInicio < $proximoTurnoTs) {
+                            $proximoTurnoTs = $tInicio;
+                        }
+                    }
+                    $gapAfterMinutos = (int) (($proximoTurnoTs - $endTs) / 60);
+
+                    // Espacio desde el turno ocupado anterior o apertura
+                    $anteriorTurnoFinTs = $horaApertura->timestamp;
+                    foreach ($turnosOcupados as $t) {
+                        $tFin = Carbon::parse($fecha . ' ' . $t->hora_fin)->timestamp;
+                        if ($tFin <= $startTs && $tFin > $anteriorTurnoFinTs) {
+                            $anteriorTurnoFinTs = $tFin;
+                        }
+                    }
+                    $gapBeforeMinutos = (int) (($startTs - $anteriorTurnoFinTs) / 60);
+
+                    if ($gapAfterMinutos > 0 && $gapAfterMinutos < 60) {
+                        $dejaBache = true;
+                        $horaProxima = Carbon::createFromTimestamp($proximoTurnoTs)->format('H:i');
+                        $motivoBache = "Dejaría un hueco muerto de {$gapAfterMinutos} min ({$horaFinFormatted} a {$horaProxima})";
+                    } elseif ($gapBeforeMinutos > 0 && $gapBeforeMinutos < 60) {
+                        $dejaBache = true;
+                        $horaAnterior = Carbon::createFromTimestamp($anteriorTurnoFinTs)->format('H:i');
+                        $motivoBache = "Dejaría un hueco muerto de {$gapBeforeMinutos} min ({$horaAnterior} a {$horaInicioFormatted})";
+                    }
+                }
+
+                if ($dejaBache) {
+                    $horariosProtegidos[] = [
+                        'hora_inicio' => $horaInicioFormatted,
+                        'hora_fin' => $horaFinFormatted,
+                        'duracion_minutos' => $duracionMinutos,
+                        'motivo' => $motivoBache,
+                    ];
+                } else {
+                    $slotsDisponibles[] = [
+                        'cancha_id' => $canchaId,
+                        'fecha' => $fechaCarbon->format('Y-m-d'),
+                        'hora_inicio' => $horaInicioFormatted,
+                        'hora_fin' => $horaFinFormatted,
+                        'duracion_minutos' => $duracionMinutos,
+                        'precio' => $precio,
+                        'estado' => 'disponible',
+                    ];
+                }
             }
 
             $currentSlotStart->addMinutes($stepMinutos);
         }
 
-        return $slotsDisponibles;
+        return [
+            'slots' => $slotsDisponibles,
+            'optimizacion_anti_baches' => [
+                'activa' => $antiBachesActivo,
+                'total_horarios_protegidos' => count($horariosProtegidos),
+                'horarios_protegidos' => $horariosProtegidos,
+            ],
+        ];
     }
 }

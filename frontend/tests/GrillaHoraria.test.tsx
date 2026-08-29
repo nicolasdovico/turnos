@@ -198,4 +198,71 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(screen.getByLabelText("Turno 09:30 a 11:00 Disponible")).toBeDefined();
     });
   });
+
+  it("muestra banner explicativo de optimización anti-baches exclusivamente al administrador", async () => {
+    global.fetch = vi.fn().mockImplementation(() => {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            cancha_id: 1,
+            slots_disponibles: [
+              { hora_inicio: "18:30", hora_fin: "20:00", disponible: true, precio: 12000, duracion_minutos: 90 },
+            ],
+            optimizacion_anti_baches: {
+              activa: true,
+              total_horarios_protegidos: 1,
+              horarios_protegidos: [
+                {
+                  hora_inicio: "18:00",
+                  hora_fin: "19:30",
+                  duracion_minutos: 90,
+                  motivo: "Dejaría un hueco muerto de 30 min (19:30 a 20:00)",
+                },
+              ],
+            },
+          }),
+      });
+    });
+
+    // 1. Render as normal client (isAdmin = false)
+    const { unmount } = render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        fechaInicial="2026-09-01"
+        isAdmin={false}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 18:30 a 20:00 Disponible")).toBeDefined();
+    });
+
+    // Client should NOT see the admin banner
+    expect(screen.queryByTestId("admin-anti-baches-banner")).toBeNull();
+
+    unmount();
+
+    // 2. Render as Club Admin (isAdmin = true)
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    // Admin SHOULD see the informative callout explaining why 18:00 was hidden
+    await waitFor(() => {
+      const adminBanner = screen.getByTestId("admin-anti-baches-banner");
+      expect(adminBanner).toBeDefined();
+      expect(adminBanner.textContent).toContain("Regla Anti-Baches en Acción");
+      expect(adminBanner.textContent).toContain("Dejaría un hueco muerto de 30 min");
+    });
+  });
 });

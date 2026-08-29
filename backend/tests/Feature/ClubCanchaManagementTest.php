@@ -307,4 +307,68 @@ class ClubCanchaManagementTest extends TestCase
         $this->assertEquals(90, $slots[0]['duracion_minutos']);
         $this->assertEquals(12000, $slots[0]['precio']);
     }
+
+    public function test_anti_baches_rule_prevents_orphan_30min_gaps(): void
+    {
+        $user = User::factory()->create();
+
+        $cancha = Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha Pádel Flexible Anti-Baches',
+            'deporte' => 'padel',
+            'superficie' => 'sintetico_wpt',
+            'precio_base' => 8000,
+            'duracion_minutos' => 60,
+            'permite_duracion_flexible' => true,
+            'anti_baches_activo' => true,
+            'estado' => 'activo',
+        ]);
+
+        \App\Models\HorarioAtencion::create([
+            'complejo_id' => $this->complejo->id,
+            'dia_semana' => 2, // Martes
+            'hora_apertura' => '16:00:00',
+            'hora_cierre' => '22:00:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        // Create an existing reservation at 20:00 to 21:00
+        Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $cancha->id,
+            'user_id' => $user->id,
+            'fecha' => '2026-09-01', // Tuesday
+            'hora_inicio' => '20:00:00',
+            'hora_fin' => '21:00:00',
+            'precio' => 8000,
+            'estado' => 'confirmado',
+        ]);
+
+        // Request 90-minute slots
+        $response = $this->getJson(
+            "/api/canchas/{$cancha->id}/disponibilidad?fecha=2026-09-01&duracion=90",
+            ['X-Tenant-ID' => 'padel-tenis-pro']
+        );
+
+        $response->assertStatus(200)
+            ->assertJsonPath('anti_baches_activo', true);
+
+        $slots = $response->json('slots_disponibles');
+        $antiBaches = $response->json('optimizacion_anti_baches');
+
+        // 18:00 to 19:30 should be BLOCKED because it leaves a 30-min gap (19:30 to 20:00)
+        $has1800Slot = collect($slots)->contains(fn ($s) => $s['hora_inicio'] === '18:00' && $s['hora_fin'] === '19:30');
+        $this->assertFalse($has1800Slot, 'El horario 18:00-19:30 debió ser bloqueado por dejar 30 min de bache');
+
+        // 18:30 to 20:00 should be AVAILABLE because it finishes exactly at 20:00 (gap = 0 min)
+        $has1830Slot = collect($slots)->contains(fn ($s) => $s['hora_inicio'] === '18:30' && $s['hora_fin'] === '20:00');
+        $this->assertTrue($has1830Slot, 'El horario 18:30-20:00 debe estar disponible');
+
+        // Anti-baches report should contain the protected slot with reason
+        $this->assertGreaterThanOrEqual(1, $antiBaches['total_horarios_protegidos']);
+        $hasProtected1800 = collect($antiBaches['horarios_protegidos'])->contains(
+            fn ($p) => $p['hora_inicio'] === '18:00' && str_contains($p['motivo'], '30 min')
+        );
+        $this->assertTrue($hasProtected1800, 'El reporte anti-baches debe informar el motivo del horario 18:00');
+    }
 }
