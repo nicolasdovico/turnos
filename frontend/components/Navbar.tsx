@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 
@@ -12,6 +12,21 @@ export default function Navbar() {
   const [mainDomainUrl, setMainDomainUrl] = useState("");
   const [demoClubUrl, setDemoClubUrl] = useState("http://padelpro.localhost:3000");
   const [isClubAdmin, setIsClubAdmin] = useState(false);
+  const [showClubsDropdown, setShowClubsDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowClubsDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -115,8 +130,6 @@ export default function Navbar() {
     return path;
   };
 
-  const [showClubsDropdown, setShowClubsDropdown] = useState(false);
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
@@ -185,7 +198,7 @@ export default function Navbar() {
               </Link>
 
               {userClubs.length > 1 && (
-                <div className="relative">
+                <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setShowClubsDropdown(!showClubsDropdown)}
                     className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-2 text-xs font-bold border border-slate-200 transition"
@@ -248,7 +261,7 @@ export default function Navbar() {
           )}
 
           {!isSubdomain && userClubs.length > 1 && (
-            <div className="relative">
+            <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowClubsDropdown(!showClubsDropdown)}
                 className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-bold shadow-md shadow-emerald-600/20 transition"

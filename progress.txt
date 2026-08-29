@@ -597,18 +597,19 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Badge con el tipo de establecimiento en el encabezado.
     - Detalle en la pestaña institucional (Tipo de Establecimiento).
 -------------------------------------------------------------------------------
-[2026-08-29] - SELECTOR MULTI-NEGOCIO (DUEÑO CON MÚLTIPLES CLUBES/COMPLEJOS)
+[2026-08-29] - SELECTOR MULTI-NEGOCIO UNIFICADO (MENÚ SUPERIOR)
 -------------------------------------------------------------------------------
 - Frontend Web & SSO:
   * `frontend/components/Navbar.tsx`:
     - Detección reactiva de múltiples complejos (`user.complejos.length > 1`).
-    - Desplegable interactivo `🏢 Mis Negocios (N) ▾` con badge de tipo (🏆 Club / 🏟️ Complejo / 💪 Gimnasio), nombre, subdominio y enlace de acceso directo con SSO.
-    - Selector rápido en barra de subdominio (`🏢 Cambiar Negocio ▾`) para saltar de un club a otro sin cerrar sesión.
+    - Desplegable interactivo único `🏢 Mis Negocios (N) ▾` ubicado exclusivamente en la barra de navegación superior.
+    - Incluye badge de tipo (🏆 Club / 🏟️ Complejo / 💪 Gimnasio), nombre, subdominio y enlace de acceso directo con SSO.
+    - Soporte para cierre automático al hacer clic fuera del menú (`useRef` y evento `mousedown`).
   * `frontend/app/portal/page.tsx`:
     - Sección destacada para dueños logueados: "Tus Paneles de Administración" mostrando tarjetas independientes para cada negocio.
     - Acciones por complejo: "⚙️ Administrar [Tipo]" (con transferencia SSO) y "🎾 Ver Reservas Públicas".
     - Botón de "+ Registrar Otro Negocio".
   * `frontend/app/tenants/[subdomain]/panel/page.tsx`:
-    - Selector directo en el header del panel para cambiar de negocio activo con transferencia atómica de autenticación.
+    - Limpieza de selectores secundarios para mantener el selector centralizado únicamente en la barra superior.
   * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (22 tests pasados al 100%).
 ===============================================================================
