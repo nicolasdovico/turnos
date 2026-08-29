@@ -99,9 +99,15 @@ Route::prefix('auth')->group(function () {
     });
 });
 
+Route::prefix('webhooks')->group(function () {
+    Route::post('/mercadopago', [\App\Http\Controllers\Api\PaymentWebhookController::class, 'handleMercadoPago']);
+    Route::post('/stripe', [\App\Http\Controllers\Api\PaymentWebhookController::class, 'handleStripe']);
+});
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
 
 
 

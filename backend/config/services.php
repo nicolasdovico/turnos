@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'mercadopago' => [
+        'access_token' => env('MERCADOPAGO_ACCESS_TOKEN'),
+        'webhook_secret' => env('MERCADOPAGO_WEBHOOK_SECRET', 'mp_test_webhook_secret_key_12345'),
+    ],
+
+    'stripe' => [
+        'secret_key' => env('STRIPE_SECRET_KEY'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET', 'whsec_test_stripe_secret_key_12345'),
+    ],
+
+    'fcm' => [
+        'server_key' => env('FCM_SERVER_KEY', 'mock_fcm_key_123'),
+        'url' => env('FCM_URL', 'https://fcm.googleapis.com/fcm/send'),
+    ],
+
 ];

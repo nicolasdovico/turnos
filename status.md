@@ -1,11 +1,11 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 7.1: Pasarelas de Pago (Mercado Pago / Stripe Webhooks)`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 7.2: Subida de Imágenes a S3 con Presigned URLs`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 17 / 19
+- **Tareas Completadas:** 18 / 19
 - **Fase Actual:** Bloque 7 - Pagos, Assets S3, IoT & Hardening
 - **Última Actualización:** 2026-08-29
 
@@ -53,8 +53,8 @@
 ---
 
 ## 💳 Bloque 7: Pagos, Assets S3, IoT & Hardening (Semanas 14-15)
-- [ ] **Tarea 7.1:** Pasarelas de Pago (Mercado Pago / Stripe Webhooks) *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 7.2:** Subida de Imágenes a S3 con Presigned URLs
+- [x] **Tarea 7.1:** Pasarelas de Pago (Mercado Pago / Stripe Webhooks) *(Completado)*
+- [ ] **Tarea 7.2:** Subida de Imágenes a S3 con Presigned URLs *(⏳ SIGUIENTE A EJECUTAR)*
 - [ ] **Tarea 7.3:** Módulo de Domótica IoT (Control Automático de Luces)
 
 ---

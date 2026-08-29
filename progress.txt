@@ -341,4 +341,28 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Mobile global: 18 tests pasados (100% éxito).
   * Suite Backend global: 74 tests pasados (370 aserciones).
   * Suite Frontend global: 13 tests pasados (100% éxito).
+-------------------------------------------------------------------------------
+[2026-08-29] - TAREA 7.1: PASARELAS DE PAGO (MERCADO PAGO / STRIPE WEBHOOKS)
+-------------------------------------------------------------------------------
+- Módulo de Pasarelas de Pago & Webhooks desarrollado en Backend (Laravel 11):
+  * config/services.php: credenciales y secrets configurados para `mercadopago`, `stripe` y `fcm`.
+  * App\Services\PaymentWebhookService:
+    - `validateMercadoPagoSignature(Request $request)`: Validación criptográfica de la cabecera `x-signature` (HMAC SHA256 sobre manifest `id:[data.id];request-id:[x-request-id];ts:[ts];` contra secret de webhook).
+    - `validateStripeSignature(Request $request)`: Validación criptográfica de la cabecera `Stripe-Signature` (HMAC SHA256 sobre signed payload `[t].[raw_payload]` contra secret de webhook).
+    - `processApprovedPayment(array $paymentData, string $gateway)`: Confirmación atómica y transaccional (`DB::transaction` con `lockForUpdate`):
+      * Turno completo: actualiza estado a 'reservado' y libera el bloqueo temporal en Redis vía `ReservaLockService`.
+      * Split Payment: actualiza la cuota a 'pagado' con timestamp y método de pago; si todas las cuotas del turno están completas, confirma automáticamente el turno a 'reservado'.
+  * App\Http\Controllers\Api\PaymentWebhookController:
+    - `POST /api/webhooks/mercadopago`: Receptor de eventos de pago de Mercado Pago con validación de firmas y retorno de 401 si la firma es apócrifa.
+    - `POST /api/webhooks/stripe`: Receptor de eventos `checkout.session.completed`, `payment_intent.succeeded` y `charge.succeeded` con validación de firmas y retorno de 400 si la firma es apócrifa.
+  * tests/Feature/PaymentWebhookTest.php: 5 tests pasados (16 aserciones) verificando:
+    - Validación de firma HMAC SHA256 y confirmación de turno en Mercado Pago.
+    - Rechazo 401 de webhook Mercado Pago con firma inválida.
+    - Validación de firma HMAC SHA256 y confirmación de turno en Stripe.
+    - Rechazo 400 de webhook Stripe con firma inválida.
+    - Confirmación secuencial de cuotas Split Payment y transición automática a 'reservado'.
+- Resumen de Suites de Tests:
+  * Suite Backend global: 79 tests pasados (386 aserciones).
+  * Suite Mobile global: 18 tests pasados (100% éxito).
+  * Suite Frontend global: 13 tests pasados (100% éxito).
 ===============================================================================
