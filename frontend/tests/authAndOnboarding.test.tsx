@@ -206,7 +206,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(await screen.findByText("➕ Nueva Cancha")).toBeDefined();
     expect(screen.getByText(/1\. Deporte y Formato/i)).toBeDefined();
     expect(screen.getByText(/2\. Tarifas y Precios/i)).toBeDefined();
-    expect(screen.getByText(/3\. Equipamiento & Atributos del Mercado/i)).toBeDefined();
+    expect(screen.getByText(/3\. Equipamiento/i)).toBeDefined();
     expect(screen.getByText(/Iluminación Artificial/i)).toBeDefined();
   });
 

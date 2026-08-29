@@ -673,7 +673,7 @@ export default function ClubAdminPanel() {
               <div>
                 <h2 className="text-xl font-bold text-white">Canchas Disponibles</h2>
                 <p className="text-xs text-slate-400">
-                  Configura tus canchas, tarifas, superficies y equipamiento tecnológico del mercado
+                  Configura tus canchas, tarifas, superficies y equipamiento
                 </p>
               </div>
               <button
@@ -840,10 +840,10 @@ export default function ClubAdminPanel() {
                       </div>
                     </div>
 
-                    {/* SECCIÓN 3: EQUIPAMIENTO TECNOLÓGICO Y AMENITIES DEL MERCADO */}
+                    {/* SECCIÓN 3: EQUIPAMIENTO & SERVICIOS */}
                     <div className="space-y-4 pt-4 border-t border-slate-800">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                        3. Equipamiento & Atributos del Mercado
+                        3. Equipamiento
                       </h4>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
