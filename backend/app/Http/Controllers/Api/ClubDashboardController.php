@@ -57,7 +57,15 @@ class ClubDashboardController extends Controller
         $cleanSubdomain = strtolower(trim($subdomain));
 
         $complejo = Complejo::withoutGlobalScopes()
-            ->with(['plan.modulos', 'canchas', 'horariosAtencion', 'owner', 'tipoNegocio'])
+            ->with([
+                'plan.modulos',
+                'canchas' => function ($query) {
+                    $query->orderBy('nombre', 'asc');
+                },
+                'horariosAtencion',
+                'owner',
+                'tipoNegocio'
+            ])
             ->where('subdominio', $cleanSubdomain)
             ->first();
 

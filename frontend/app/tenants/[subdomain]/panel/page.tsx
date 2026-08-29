@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -263,6 +263,13 @@ export default function ClubAdminPanel() {
   const [canchaToDelete, setCanchaToDelete] = useState<CanchaItem | null>(null);
   const [isDeletingCancha, setIsDeletingCancha] = useState(false);
 
+  // Ordenamiento alfabético natural por Nombre de Cancha
+  const sortedCanchas = useMemo(() => {
+    return [...canchas].sort((a, b) =>
+      (a.nombre || "").localeCompare(b.nombre || "", undefined, { numeric: true, sensitivity: "base" })
+    );
+  }, [canchas]);
+
   const openCreateModal = () => {
     setEditingCancha(null);
     const dep = complejo?.deporte_principal || "padel";
@@ -359,9 +366,13 @@ export default function ClubAdminPanel() {
         return;
       }
 
+      const canchasList = (data.data.canchas || []).sort((a: CanchaItem, b: CanchaItem) =>
+        (a.nombre || "").localeCompare(b.nombre || "", undefined, { numeric: true, sensitivity: "base" })
+      );
+
       setComplejo(data.data.complejo);
       setPlan(data.data.plan);
-      setCanchas(data.data.canchas || []);
+      setCanchas(canchasList);
       setHorarios(data.data.horarios_atencion || []);
       setStats(data.data.stats || { total_canchas: 0, total_turnos: 0, modulos_count: 0 });
     } catch (e: any) {
@@ -1018,9 +1029,9 @@ export default function ClubAdminPanel() {
               </div>
             )}
 
-            {/* Listado Enriquecido de Canchas */}
+            {/* Listado Enriquecido de Canchas (Orden Alfabético) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {canchas.map((c) => {
+              {sortedCanchas.map((c) => {
                 const sportCfg = DEPORTES_CONFIG[c.deporte?.toLowerCase()] || DEPORTES_CONFIG.padel;
                 const tieneParedes = sportCfg?.tieneParedes;
 

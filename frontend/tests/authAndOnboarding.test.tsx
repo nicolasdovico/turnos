@@ -210,6 +210,62 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Iluminación Artificial/i)).toBeDefined();
   });
 
+  it("displays courts sorted alphabetically by name in the admin panel", async () => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Nico Padel",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+                tipo_negocio: { id: 1, nombre: "Club", slug: "club" },
+              },
+              plan: {
+                id: 1,
+                nombre: "Oro",
+                slug: "oro",
+                modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }],
+              },
+              canchas: [
+                { id: 1, nombre: "Cancha Zeta", deporte: "padel", superficie: "cemento", precio_base: 8000, techada: false, estado: "activo" },
+                { id: 2, nombre: "Cancha Alpha", deporte: "padel", superficie: "sintetico_wpt", precio_base: 10000, techada: true, estado: "activo" },
+                { id: 3, nombre: "Cancha Beta", deporte: "padel", superficie: "cristal", precio_base: 9000, techada: true, estado: "activo" },
+              ],
+              stats: { total_canchas: 3, total_turnos: 0, modulos_count: 7 },
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({ data: [] }) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    expect(await screen.findByText("Cancha Alpha")).toBeDefined();
+    expect(await screen.findByText("Cancha Beta")).toBeDefined();
+    expect(await screen.findByText("Cancha Zeta")).toBeDefined();
+
+    const courtHeadings = screen.getAllByRole("heading", { level: 3 });
+    const courtNames = courtHeadings.map((h) => h.textContent).filter((t) => t && t.startsWith("Cancha"));
+    expect(courtNames).toEqual(["Cancha Alpha", "Cancha Beta", "Cancha Zeta"]);
+  });
+
   it("renders Portal Global page with features and marketplace banner", () => {
     render(
       <AuthProvider>

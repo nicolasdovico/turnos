@@ -208,4 +208,48 @@ class ClubCanchaManagementTest extends TestCase
             'estado' => 'inactivo',
         ]);
     }
+
+    public function test_dashboard_returns_canchas_sorted_alphabetically_by_name(): void
+    {
+        Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Zeta Court',
+            'deporte' => 'padel',
+            'superficie' => 'cemento',
+            'precio_base' => 8000,
+            'techada' => false,
+            'estado' => 'activo',
+        ]);
+
+        Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Alpha Court',
+            'deporte' => 'padel',
+            'superficie' => 'sintetico_wpt',
+            'precio_base' => 10000,
+            'techada' => true,
+            'estado' => 'activo',
+        ]);
+
+        Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Beta Court',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 9000,
+            'techada' => true,
+            'estado' => 'activo',
+        ]);
+
+        $response = $this->getJson('/api/clubs/padel-tenis-pro/dashboard');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        $canchas = $response->json('data.canchas');
+        $this->assertCount(3, $canchas);
+        $this->assertEquals('Alpha Court', $canchas[0]['nombre']);
+        $this->assertEquals('Beta Court', $canchas[1]['nombre']);
+        $this->assertEquals('Zeta Court', $canchas[2]['nombre']);
+    }
 }
