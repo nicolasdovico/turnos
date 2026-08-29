@@ -315,4 +315,30 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Mobile global: 10 tests pasados (100% éxito).
   * Suite Backend global: 69 tests pasados (352 aserciones).
   * Suite Frontend global: 13 tests pasados (100% éxito).
+-------------------------------------------------------------------------------
+[2026-08-29] - TAREA 6.2: BUSCADOR POR GEOLOCALIZACIÓN Y NOTIFICACIONES PUSH
+-------------------------------------------------------------------------------
+- Integraciones y servicios desarrollados en Backend (Laravel 11):
+  * Migración 2026_08_29_180001_add_geolocation_and_fcm_fields:
+    - Tabla `complejos`: agregado de `latitud` (decimal 10,7), `longitud` (decimal 10,7), `direccion`, `ciudad` y `telefono`.
+    - Tabla `users`: agregado de `fcm_token` (string nullable).
+  * App\Services\GeolocationService: Cálculo de distancia espacial mediante fórmula de Haversine (`calcularDistanciaHaversine`) y filtrado/ordenamiento espacial (`buscarComplejosCercanos`) con soporte para radio en kilómetros y filtros por deporte.
+  * App\Http\Controllers\Api\ComplejoController:
+    - `GET /api/complejos/cercanos`: endpoint público para geolocalización de clubes con cálculo de distancia y canchas disponibles.
+    - `POST /api/auth/fcm-token`: sincronización del token de notificaciones push del usuario autenticado.
+  * App\Services\FCMNotificationService: Servicio de despacho de notificaciones Firebase Cloud Messaging (FCM) con soporte para entornos de test/local y producción.
+  * App\Jobs\EnviarRecordatorioTurnoJob: Job encolable (`ShouldQueue`) que envía alertas Push automáticas a los clientes con turnos programados próximos a iniciar.
+  * tests/Feature/GeolocationAndNotificationTest.php: 5 tests pasados (18 aserciones) validando cálculo Haversine, ordenamiento por proximidad, filtros por deporte, sincronización de tokens FCM y despacho del job de recordatorio.
+- Integraciones y servicios desarrollados en Mobile (React Native + Expo):
+  * Integración de dependencias: `expo-location` y `expo-notifications`.
+  * src/services/locationService.ts: Gestión de permisos de ubicación en primer plano, obtención de coordenadas GPS actuales (`getCurrentCoordinates`) y consulta de clubes cercanos (`fetchNearbyComplejos`).
+  * src/services/notificationService.ts: Configuración de canales de notificación Android (`turnos-reminders`), registro y obtención de token de dispositivo (`registerForPushNotificationsAsync`), sincronización con backend y programación de recordatorios locales.
+  * src/screens/HomeScreen.tsx: Incorporación de carrusel interactivo de clubes cercanos con badges de distancia en km y deportes disponibles, además de botón de suscripción a notificaciones push.
+  * Tests ejecutados:
+    - __tests__/locationService.test.ts (Jest): 4 tests pasados validando permisos, coordenadas y llamadas a la API espacial.
+    - __tests__/notificationService.test.ts (Jest): 4 tests pasados validando registro push, envío de token FCM y programación de alertas locales.
+- Resumen de Suites de Tests:
+  * Suite Mobile global: 18 tests pasados (100% éxito).
+  * Suite Backend global: 74 tests pasados (370 aserciones).
+  * Suite Frontend global: 13 tests pasados (100% éxito).
 ===============================================================================

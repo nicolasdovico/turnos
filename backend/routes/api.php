@@ -86,6 +86,8 @@ Route::middleware('tenant.has_module:torneos')->group(function () {
 
 
 
+Route::get('/complejos/cercanos', [\App\Http\Controllers\Api\ComplejoController::class, 'cercanos']);
+
 Route::prefix('auth')->group(function () {
     Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'register']);
     Route::post('/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
@@ -93,12 +95,14 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
         Route::get('/me', [\App\Http\Controllers\Api\AuthController::class, 'me']);
+        Route::post('/fcm-token', [\App\Http\Controllers\Api\ComplejoController::class, 'updateFcmToken']);
     });
 });
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
 
 
 

@@ -21,7 +21,20 @@ class Complejo extends Model
         'dominio_personalizado',
         'plan_id',
         'estado',
+        'latitud',
+        'longitud',
+        'direccion',
+        'ciudad',
+        'telefono',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'latitud' => 'float',
+            'longitud' => 'float',
+        ];
+    }
 
     protected static function booted(): void
     {

@@ -1,12 +1,12 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 6.2: Buscador por Geolocalización y Notificaciones Push`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 7.1: Pasarelas de Pago (Mercado Pago / Stripe Webhooks)`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 16 / 19
-- **Fase Actual:** Bloque 6 - Frontend Mobile con React Native
+- **Tareas Completadas:** 17 / 19
+- **Fase Actual:** Bloque 7 - Pagos, Assets S3, IoT & Hardening
 - **Última Actualización:** 2026-08-29
 
 ---
@@ -48,12 +48,12 @@
 
 ## 📱 Bloque 6: Frontend Mobile con React Native (Semanas 12-13)
 - [x] **Tarea 6.1:** Setup de React Native Expo & Autenticación Segura *(Completado)*
-- [ ] **Tarea 6.2:** Buscador por Geolocalización y Notificaciones Push *(⏳ SIGUIENTE A EJECUTAR)*
+- [x] **Tarea 6.2:** Buscador por Geolocalización y Notificaciones Push *(Completado)*
 
 ---
 
 ## 💳 Bloque 7: Pagos, Assets S3, IoT & Hardening (Semanas 14-15)
-- [ ] **Tarea 7.1:** Pasarelas de Pago (Mercado Pago / Stripe Webhooks)
+- [ ] **Tarea 7.1:** Pasarelas de Pago (Mercado Pago / Stripe Webhooks) *(⏳ SIGUIENTE A EJECUTAR)*
 - [ ] **Tarea 7.2:** Subida de Imágenes a S3 con Presigned URLs
 - [ ] **Tarea 7.3:** Módulo de Domótica IoT (Control Automático de Luces)
 
