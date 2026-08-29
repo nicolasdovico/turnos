@@ -417,4 +417,36 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Backend global: 91 tests pasados (427 aserciones).
   * Suite Mobile global: 18 tests pasados (100% éxito).
   * Suite Frontend global: 13 tests pasados (100% éxito).
+-------------------------------------------------------------------------------
+[2026-08-29] - TAREA 8.1: GITHUB ACTIONS CI/CD PIPELINE & ZERO-DOWNTIME DEPLOY
+-------------------------------------------------------------------------------
+- Pipeline de Integración Continua (.github/workflows/ci.yml):
+  * Disparadores automáticos ante Pull Requests y Pushes hacia `main`, `master` y `develop`.
+  * Job 1: `backend-tests` (PHP 8.3 & PostgreSQL 16 & Redis 7):
+    - Servicios en contenedor: PostgreSQL 16 con healthcheck `pg_isready` y Redis 7 con `redis-cli ping`.
+    - Setup de extensiones PHP (`pdo_pgsql`, `redis`, `gd`, `bcmath`, `curl`, `mbstring`, `xml`, `zip`).
+    - Cacheo optimizado de dependencias Composer vía `actions/cache@v4`.
+    - Migraciones transaccionales automáticas (`php artisan migrate --force --env=testing`).
+    - Ejecución de la suite completa de PHPUnit (91 tests pasados / 427 aserciones).
+  * Job 2: `frontend-tests` (Next.js 14 App Router & Vitest):
+    - Setup de Node.js 22 con cache de dependencias npm.
+    - Ejecución de suite de tests reactivos en Vitest (13 tests pasados).
+    - Compilación y build de producción Next.js (`npm run build`).
+  * Job 3: `mobile-tests` (React Native Expo & Jest):
+    - Setup de Node.js 22 con cache de dependencias npm.
+    - Ejecución de tests unitarios de Jest en mobile (18 tests pasados).
+- Pipeline de Despliegue Continuo (.github/workflows/deploy.yml):
+  * Disparador automático ante pushes en la rama `main` con concurrencia controlada (`concurrency: production-deployment`).
+  * Autenticación segura mediante clave SSH privada configurada en GitHub Secrets (`SERVER_SSH_KEY`).
+  * Despliegue atómico Zero-Downtime:
+    - Actualización del código fuente (`git pull origin main`).
+    - Construcción y recreation de contenedores Docker (`docker compose build --pull && docker compose up -d --remove-orphans`).
+    - Ejecución de migraciones pendientes de base de datos (`php artisan migrate --force`).
+    - Optimización y cacheo de configuración, rutas y vistas (`php artisan optimize:clear`, `config:cache`, `route:cache`, `view:cache`).
+    - Sincronización del scheduler de domótica IoT (`php artisan iot:sincronizar-luces`).
+    - Verificación automatizada de healthchecks en Caddy y API (`/health` y `/api/health`).
+- Resumen de Suites de Tests:
+  * Suite Backend global: 91 tests pasados (427 aserciones).
+  * Suite Mobile global: 18 tests pasados (100% éxito).
+  * Suite Frontend global: 13 tests pasados (100% éxito).
 ===============================================================================

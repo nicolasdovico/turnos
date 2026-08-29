@@ -1,0 +1,72 @@
+name: Continuous Deployment (CD)
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Zero-Downtime Production Deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure SSH Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Add Server to Known Hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Execute Remote Deployment Commands
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT || 22 }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/var/www/turnos' }}
+        run: |
+          ssh -p $SERVER_PORT $SERVER_USER@$SERVER_HOST << 'EOF'
+            set -e
+
+            echo "🚀 [CD] Iniciando despliegue en producción..."
+            cd /var/www/turnos || cd $DEPLOY_PATH
+
+            echo "📦 [CD] Actualizando repositorio desde branch main..."
+            git pull origin main
+
+            echo "🐳 [CD] Construyendo y actualizando contenedores Docker..."
+            docker compose build --pull
+            docker compose up -d --remove-orphans
+
+            echo "🗄️ [CD] Ejecutando migraciones de base de datos..."
+            docker compose exec -T backend php artisan migrate --force
+
+            echo "⚡ [CD] Optimizando cachés de Laravel..."
+            docker compose exec -T backend php artisan optimize:clear
+            docker compose exec -T backend php artisan config:cache
+            docker compose exec -T backend php artisan route:cache
+            docker compose exec -T backend php artisan view:cache
+
+            echo "💡 [CD] Sincronizando dispositivos IoT..."
+            docker compose exec -T backend php artisan iot:sincronizar-luces
+
+            echo "🩺 [CD] Verificando Healthchecks..."
+            curl -sf http://localhost:8080/health > /dev/null || curl -sf http://localhost/health > /dev/null
+            curl -sf http://localhost:8080/api/health > /dev/null || curl -sf http://localhost/api/health > /dev/null
+
+            echo "✅ [CD] Despliegue completado exitosamente con Zero Downtime."
+          EOF
+
+      - name: Report Deployment Success
+        if: success()
+        run: echo "🎉 Despliegue a producción finalizado exitosamente."

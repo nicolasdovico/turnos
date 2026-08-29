@@ -1,11 +1,11 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 8.1: GitHub Actions CI/CD Pipeline`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 8.2: Tests de Carga y Estrés de Concurrencia (k6)`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 19 / 22 (Bloques 1 a 7 Completados al 100%)
+- **Tareas Completadas:** 20 / 22 (Bloques 1 a 7 + Tarea 8.1 Completados)
 - **Fase Actual:** Bloque 8 - QA Final, CI/CD & Despliegue
 - **Última Actualización:** 2026-08-29
 
@@ -60,5 +60,5 @@
 ---
 
 ## 🚀 Bloque 8: QA Final, CI/CD & Despliegue (Semana 16)
-- [ ] **Tarea 8.1:** GitHub Actions CI/CD Pipeline *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 8.2:** Tests de Carga y Estrés de Concurrencia (k6)
+- [x] **Tarea 8.1:** GitHub Actions CI/CD Pipeline *(Completado)*
+- [ ] **Tarea 8.2:** Tests de Carga y Estrés de Concurrencia (k6) *(⏳ SIGUIENTE A EJECUTAR)*

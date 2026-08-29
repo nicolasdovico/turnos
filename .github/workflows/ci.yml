@@ -1,0 +1,160 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================
+  # 1. Backend CI (Laravel 11 + PHP 8.3 + PGSQL + Redis)
+  # ==========================================
+  backend-tests:
+    name: Backend Tests (PHP 8.3 & PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: turnos_testing
+          POSTGRES_USER: turnos_user
+          POSTGRES_PASSWORD: turnos_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, redis, gd, bcmath, mbstring, curl, xml, zip, pcntl
+          coverage: none
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir --working-dir=backend)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Backend Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --working-dir=backend
+
+      - name: Setup Environment
+        run: |
+          cd backend
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          else
+            touch .env
+          fi
+          echo "APP_ENV=testing" >> .env
+          echo "APP_KEY=base64:uN89qf7/sW9nZ1J84U8L8x/dG8sJ2L9e3A1b8C7d6E0=" >> .env
+          echo "DB_CONNECTION=pgsql" >> .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_DATABASE=turnos_testing" >> .env
+          echo "DB_USERNAME=turnos_user" >> .env
+          echo "DB_PASSWORD=turnos_password" >> .env
+          echo "REDIS_HOST=127.0.0.1" >> .env
+          echo "REDIS_PORT=6379" >> .env
+          echo "CACHE_STORE=redis" >> .env
+          echo "SESSION_DRIVER=redis" >> .env
+          echo "QUEUE_CONNECTION=sync" >> .env
+
+      - name: Run Database Migrations
+        run: php backend/artisan migrate --force --env=testing
+
+      - name: Execute Backend Tests (PHPUnit)
+        run: php backend/artisan test
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: turnos_testing
+          DB_USERNAME: turnos_user
+          DB_PASSWORD: turnos_password
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+
+  # ==========================================
+  # 2. Frontend CI (Next.js 14 + Vitest)
+  # ==========================================
+  frontend-tests:
+    name: Frontend Tests (Next.js & Vitest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        run: npm --prefix frontend install
+
+      - name: Execute Frontend Tests (Vitest)
+        run: npm --prefix frontend run test
+
+      - name: Build Next.js Application
+        run: npm --prefix frontend run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8080/api
+
+  # ==========================================
+  # 3. Mobile CI (React Native / Expo + Jest)
+  # ==========================================
+  mobile-tests:
+    name: Mobile Tests (React Native Expo & Jest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: mobile/package.json
+
+      - name: Install Mobile Dependencies
+        run: npm --prefix mobile install
+
+      - name: Execute Mobile Tests (Jest)
+        run: npm --prefix mobile test
