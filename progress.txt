@@ -639,6 +639,7 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Muestra la denominación real del negocio (`complejo.tipo_negocio.nombre`), nombre exacto del club, deporte, dirección y teléfono.
     - Selector interactivo de canchas activas con atributos específicos por deporte (Tenis, Pádel, Fútbol, etc.).
     - Grilla horaria conectada dinámicamente al `canchaId` y deporte de la cancha seleccionada con bloqueos atómicos en Redis.
+    - Enlaces de acceso al sitio público ("Ver Sitio Público ↗" y "Ver Grilla ↗") configurados con `target="_blank" rel="noopener noreferrer"` para abrirse siempre en una pestaña nueva del navegador sin perder el contexto del panel de control.
   * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (25 tests pasados al 100%).
 ===============================================================================
 

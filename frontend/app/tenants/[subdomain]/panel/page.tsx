@@ -612,9 +612,11 @@ export default function ClubAdminPanel() {
             <div className="flex items-center gap-3">
               <Link
                 href="/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5"
               >
-                <span>🎾 Ver Sitio Público</span>
+                <span>🎾 Ver Sitio Público ↗</span>
               </Link>
             </div>
           </div>
@@ -1261,8 +1263,13 @@ export default function ClubAdminPanel() {
                         </button>
                       </div>
 
-                      <Link href="/" className="text-emerald-400 font-bold hover:underline text-xs">
-                        Ver Grilla →
+                      <Link
+                        href="/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-400 font-bold hover:underline text-xs"
+                      >
+                        Ver Grilla ↗
                       </Link>
                     </div>
                   </div>

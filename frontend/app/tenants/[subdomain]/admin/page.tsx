@@ -183,9 +183,11 @@ export default function ClubAdminDashboard() {
             <div className="flex items-center gap-3">
               <Link
                 href="/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 text-xs font-bold text-slate-200 border border-slate-700 transition"
               >
-                🎾 Ver Sitio Público / Reservas
+                🎾 Ver Sitio Público / Reservas ↗
               </Link>
               <a
                 href="http://localhost:8080/admin"
