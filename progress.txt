@@ -472,5 +472,25 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Frontend global: 13 tests pasados (100% éxito).
   * Suite Mobile global: 18 tests pasados (100% éxito).
   * Tests de Concurrencia k6: 100% éxito, 0 duplicados, p95 optimizado.
-  * Estado Final: PROYECTO CERTIFICADO Y LISTO PARA PRODUCCIÓN.
+-------------------------------------------------------------------------------
+[2026-08-29] - ONBOARDING UNIFICADO DE CLUBES & AUTENTICACIÓN WEB NEXT.JS
+-------------------------------------------------------------------------------
+- Backend (ClubOnboardingController & Auth):
+  * Migración `add_user_id_to_complejos_table` para vincular relación `User <-> Complejo` (dueño/administrador).
+  * Endpoint `GET /api/clubs/check-subdomain?subdomain=...` con sanitización de slug y lista de subdominios reservados del sistema.
+  * Endpoint `POST /api/clubs/registro` (Onboarding transaccional unificado):
+    - Soporte híbrido: Usuario nuevo (crea User admin) o usuario ya autenticado (vincula cuenta existente).
+    - Creación de Complejo con subdominio único y plan seleccionado (Bronce, Plata, Oro).
+    - Creación automática de horarios de atención (Lunes a Domingo de 08:00 a 23:00).
+    - Inicialización de canchas iniciales personalizadas o cancha por defecto.
+    - Emisión de token Sanctum y URL de redirección directa al subdominio del nuevo club.
+  * Endpoint `GET /api/planes`: listado dinámico de planes con módulos incluidos.
+  * Suite de tests: `tests/Feature/ClubOnboardingTest.php` (5 tests pasados / 41 aserciones). Total backend: 96 tests (468 aserciones).
+- Frontend Web Next.js 14 App Router:
+  * `frontend/context/AuthContext.tsx`: Provider de sesión con `user`, `token`, `login()`, `register()`, `logout()` y persistencia en localStorage/cookies.
+  * `frontend/components/Navbar.tsx`: Barra de navegación responsive con badges de sesión, acceso directo a login/registro y botón destacado "Registrar mi Club".
+  * `frontend/app/login/page.tsx`: Vista de inicio de sesión con feedback de errores y banner para dueños de clubes.
+  * `frontend/app/registro/page.tsx`: Vista de registro de usuario individual (jugadores/clientes).
+  * `frontend/app/registro-club/page.tsx`: Wizard de Onboarding Unificado en 4 pasos con validación en tiempo real de subdominios, selector de planes y creación de canchas iniciales.
+  * `frontend/tests/authAndOnboarding.test.tsx`: Suite de 4 tests en Vitest (17 tests totales en frontend pasados al 100%).
 ===============================================================================
