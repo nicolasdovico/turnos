@@ -63,9 +63,9 @@ El sistema utiliza detección y reescritura de subdominios en el Edge mediante N
 
 | Entorno / Vista | URL Local | Descripción |
 | :--- | :--- | :--- |
-| **Panel Super Admin (Filament v3)** | `http://localhost/admin` | Panel de control administrativo global para gestionar Complejos, Planes, Módulos y Usuarios. |
-| **Marketplace Global** | `http://localhost:3000/` o `http://localhost/` | Landing page principal para explorar complejos deportivos y registrar clubes. |
-| **Club Demo (Home & Reservas)** | `http://padelpro.localhost:3000/` | Web oficial del club `padelpro` con la grilla horaria interactiva en vivo. |
+| **Panel Super Admin (Filament v3)** | `http://localhost:8080/admin` | Panel de control administrativo global para gestionar Complejos, Planes, Módulos y Usuarios. |
+| **Marketplace Global** | `http://localhost:3000/` o `http://localhost:8080/` | Landing page principal para explorar complejos deportivos y registrar clubes. |
+| **Club Demo (Home & Reservas)** | `http://padelpro.localhost:3000/` o `http://padelpro.localhost:8080/` | Web oficial del club `padelpro` con la grilla horaria interactiva en vivo. |
 | **Páginas CMS del Club** | `http://padelpro.localhost:3000/paginas/tarifas` | Páginas informativas personalizadas con renderizado ISR y sanitización XSS. |
 
 ---
@@ -73,12 +73,12 @@ El sistema utiliza detección y reescritura de subdominios en el Edge mediante N
 ## 🔌 Catálogo de Endpoints (API REST Backend)
 
 ### 🔗 URLs Base de Acceso al Backend
-- **Acceso Directo / Global:** `http://localhost/api` *(servido por Caddy en el puerto 80 vía FastCGI a PHP-FPM)*
-- **Acceso por Subdominio de Club (Tenant):** `http://padelpro.localhost/api` *(o cualquier `http://[subdomain].localhost/api`)*
+- **Acceso Directo / Global:** `http://localhost:8080/api` *(servido por Caddy en el puerto 8080 vía FastCGI a PHP-FPM)*
+- **Acceso por Subdominio de Club (Tenant):** `http://padelpro.localhost:8080/api` *(o cualquier `http://[subdomain].localhost:8080/api`)*
 
 > 💡 **Consumo Multi-Tenant:** Puedes especificar el club activo de dos formas equivalentes:
-> 1. **Por subdominio en la URL:** `GET http://padelpro.localhost/api/canchas/1/disponibilidad?fecha=2026-08-30`
-> 2. **Por cabecera HTTP:** `GET http://localhost/api/canchas/1/disponibilidad?fecha=2026-08-30` enviando el header `X-Tenant-ID: padelpro`
+> 1. **Por subdominio en la URL:** `GET http://padelpro.localhost:8080/api/canchas/1/disponibilidad?fecha=2026-08-30`
+> 2. **Por cabecera HTTP:** `GET http://localhost:8080/api/canchas/1/disponibilidad?fecha=2026-08-30` enviando el header `X-Tenant-ID: padelpro`
 
 ---
 

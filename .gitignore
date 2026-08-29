@@ -32,3 +32,11 @@ backend/bootstrap/cache/*
 .vscode/
 *.swp
 *.swo
+
+# Mobile / Expo
+.expo/
+mobile/.expo/
+mobile/node_modules/
+mobile/dist/
+mobile/web-build/
+

@@ -42,7 +42,7 @@ services:
       - saas_network
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost/api
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api
     depends_on:
       - backend
 
@@ -51,7 +51,7 @@ services:
     container_name: saas_webserver
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8080:80"
       - "443:443"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro

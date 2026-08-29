@@ -1,13 +1,13 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 6.1: Setup de React Native Expo & Autenticación Segura`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 6.2: Buscador por Geolocalización y Notificaciones Push`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 15 / 19
+- **Tareas Completadas:** 16 / 19
 - **Fase Actual:** Bloque 6 - Frontend Mobile con React Native
-- **Última Actualización:** 2026-08-28
+- **Última Actualización:** 2026-08-29
 
 ---
 
@@ -47,8 +47,8 @@
 ---
 
 ## 📱 Bloque 6: Frontend Mobile con React Native (Semanas 12-13)
-- [ ] **Tarea 6.1:** Setup de React Native Expo & Autenticación Segura *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 6.2:** Buscador por Geolocalización y Notificaciones Push
+- [x] **Tarea 6.1:** Setup de React Native Expo & Autenticación Segura *(Completado)*
+- [ ] **Tarea 6.2:** Buscador por Geolocalización y Notificaciones Push *(⏳ SIGUIENTE A EJECUTAR)*
 
 ---
 

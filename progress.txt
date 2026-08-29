@@ -287,16 +287,32 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * tests/Unit/FixtureGeneratorTest.php: 5 tests pasados, 39 aserciones exitosas validando bracket de 4 equipos, bracket de 8 equipos, avance de ganadores a la Final, resolución de BYEs y cálculo de tablas de clasificación.
   * tests/Feature/TorneoModuleTest.php: 2 tests pasados, 15 aserciones exitosas validando ciclo completo vía API REST y protección 403 Forbidden cuando el módulo 'torneos' no está contratado.
   * php artisan test: 65 tests pasados en total (332 aserciones).
+-------------------------------------------------------------------------------
+[2026-08-29] - TAREA 6.1: SETUP DE REACT NATIVE EXPO & AUTENTICACIÓN SEGURA
+-------------------------------------------------------------------------------
+- Estructura y configuración del proyecto móvil en /mobile:
+  * package.json: React Native 0.74, Expo SDK 51, expo-secure-store ~13.0, NativeWind ^2.0, Tailwind CSS 3.3.2, Jest y ts-jest.
+  * app.json, tsconfig.json, babel.config.js y tailwind.config.js configurados con alias `@/*` y transpilación de utilidades CSS.
+- Módulo de Seguridad y Autenticación implementado:
+  * Backend (Laravel 11):
+    - App\Http\Controllers\Api\AuthController: Endpoints REST para autenticación con tokens Sanctum:
+      * POST /api/auth/register (Registro y emisión de token)
+      * POST /api/auth/login (Login y validación de credenciales con Hash::check)
+      * POST /api/auth/logout (Revocación del token actual)
+      * GET /api/auth/me (Perfil del usuario autenticado)
+    - tests/Feature/AuthApiTest.php: 4 tests pasados (20 aserciones) verificando registro, login, token Bearer y logout.
+  * Frontend Mobile (React Native + Expo):
+    - src/services/secureStore.ts: Wrapper seguro sobre expo-secure-store para persistencia encriptada de tokens (`auth_token`) e información de usuario (`auth_user`), con métodos `saveToken`, `getToken`, `deleteToken`, `saveUser`, `getUser` y `clearAuth`.
+    - src/services/api.ts: Cliente HTTP con inyección automática de cabeceras `Authorization: Bearer <token>`.
+    - src/context/AuthContext.tsx: Proveedor de contexto React que restaura automáticamente la sesión al arrancar la app y expone el hook `useAuth()`.
+    - src/screens/LoginScreen.tsx: Pantalla de inicio de sesión con validaciones, feedback de errores y estilos NativeWind.
+    - src/screens/RegisterScreen.tsx: Pantalla de registro de jugadores con confirmación de clave y diseño dark mode.
+    - src/screens/HomeScreen.tsx: Dashboard principal con resumen de turnos activos, torneos, convocatorias abiertas y logout.
+    - App.tsx: Enrutador raíz condicional según estado de autenticación.
+- Tests ejecutados:
+  * __tests__/secureStore.test.ts (Jest): 6 tests pasados validando almacenamiento, recuperación, serialización JSON y borrado seguro de tokens.
+  * __tests__/api.test.ts (Jest): 4 tests pasados validando comunicación con backend Sanctum.
+  * Suite Mobile global: 10 tests pasados (100% éxito).
+  * Suite Backend global: 69 tests pasados (352 aserciones).
+  * Suite Frontend global: 13 tests pasados (100% éxito).
 ===============================================================================
-
-
-
-
-
-
-
-
-
-
-
-

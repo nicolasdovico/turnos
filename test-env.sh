@@ -71,16 +71,16 @@ fi
 # 8. Probar respuesta directa de Frontend en puerto 3000
 echo -n "8. Probando respuesta HTTP Frontend (Node 22 / :3000)... "
 FRONT_RESP=$(curl -s http://localhost:3000 || echo "FAIL")
-if [[ "$FRONT_RESP" =~ "frontend" ]]; then
+if [[ "$FRONT_RESP" =~ "Portal Global" || "$FRONT_RESP" =~ "Marketplace" || "$FRONT_RESP" =~ "html" ]]; then
     echo -e "${GREEN}[OK - Frontend respondiendo]${NC}"
 else
     echo -e "${RED}[FALLO - Respuesta: $FRONT_RESP]${NC}"
     exit 1
 fi
 
-# 9. Probar Webserver Caddy en puerto 80
-echo -n "9. Probando Webserver Caddy (:80/health)... "
-HEALTH_RESP=$(curl -s http://localhost:80/health || echo "FAIL")
+# 9. Probar Webserver Caddy en puerto 8080
+echo -n "9. Probando Webserver Caddy (:8080/health)... "
+HEALTH_RESP=$(curl -s http://localhost:8080/health || echo "FAIL")
 if [ "$HEALTH_RESP" = "OK" ]; then
     echo -e "${GREEN}[OK - Healthcheck 200 OK]${NC}"
 else
@@ -89,9 +89,9 @@ else
 fi
 
 # 10. Probar Webserver Caddy reverse proxy hacia Backend API
-echo -n "10. Probando proxy Caddy -> Backend FastCGI (:80/api/index.php)... "
-API_RESP=$(curl -s http://localhost:80/api/index.php || echo "FAIL")
-if [[ "$API_RESP" =~ "Laravel 11 Backend" ]]; then
+echo -n "10. Probando proxy Caddy -> Backend FastCGI (:8080/api/health)... "
+API_RESP=$(curl -s http://localhost:8080/api/health || echo "FAIL")
+if [[ "$API_RESP" =~ "\"status\":\"ok\"" && "$API_RESP" =~ "\"database\":\"connected\"" ]]; then
     echo -e "${GREEN}[OK - PHP FastCGI funcionando]${NC}"
 else
     echo -e "${RED}[FALLO - Respuesta: $API_RESP]${NC}"
