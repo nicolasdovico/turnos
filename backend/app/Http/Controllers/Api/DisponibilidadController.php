@@ -38,6 +38,9 @@ class DisponibilidadController extends Controller
             'cancha_nombre' => $cancha->nombre,
             'fecha' => $validated['fecha'],
             'slots_disponibles' => $slots,
+            'data' => [
+                'slots' => $slots,
+            ],
         ]);
     }
 }

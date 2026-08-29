@@ -59,6 +59,12 @@ export default function GrillaHoraria({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
+  const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  const [clienteNombre, setClienteNombre] = useState<string>("");
+  const [clienteTelefono, setClienteTelefono] = useState<string>("");
+  const [metodoPago, setMetodoPago] = useState<string>("mostrador");
+
   const addToast = (type: "error" | "success" | "warning", text: string) => {
     const newToast: ToastMessage = { id: Date.now() + Math.random(), type, text };
     setToasts((prev) => [...prev, newToast]);
@@ -88,12 +94,25 @@ export default function GrillaHoraria({
       }
 
       const data = await res.json();
-      if (data.data && Array.isArray(data.data.slots)) {
-        setSlots(data.data.slots);
-      } else if (Array.isArray(data.data)) {
-        setSlots(data.data);
-      } else if (Array.isArray(data.slots)) {
-        setSlots(data.slots);
+      const rawSlots =
+        data.slots_disponibles ||
+        data.data?.slots ||
+        (Array.isArray(data.data) ? data.data : null) ||
+        (Array.isArray(data.slots) ? data.slots : null) ||
+        [];
+
+      if (Array.isArray(rawSlots)) {
+        const formattedSlots: Slot[] = rawSlots.map((s: any) => ({
+          hora_inicio: s.hora_inicio,
+          hora_fin: s.hora_fin,
+          disponible:
+            s.disponible !== undefined
+              ? Boolean(s.disponible)
+              : s.estado === "disponible" || s.estado === undefined,
+          precio: s.precio ? Number(s.precio) : undefined,
+          es_fijo: Boolean(s.es_fijo),
+        }));
+        setSlots(formattedSlots);
       }
     } catch (err) {
       addToast("error", "Error al cargar los turnos disponibles.");
@@ -199,6 +218,60 @@ export default function GrillaHoraria({
     }
   };
 
+  const handleOpenConfirmation = () => {
+    if (onConfirmSuccess && activeLock) {
+      onConfirmSuccess(activeLock);
+    }
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmReservation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeLock) return;
+
+    setIsConfirming(true);
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/turnos/confirmar`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          cancha_id: activeLock.canchaId,
+          fecha: activeLock.fecha,
+          hora_inicio: activeLock.horaInicio,
+          hora_fin: activeLock.horaFin,
+          precio: activeLock.precio,
+          token_reserva: activeLock.tokenReserva,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        addToast("error", data.message || "Error al confirmar la reserva.");
+        return;
+      }
+
+      addToast(
+        "success",
+        `¡Reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin}! Te esperamos.`
+      );
+      setActiveLock(null);
+      setIsConfirmModalOpen(false);
+      setClienteNombre("");
+      setClienteTelefono("");
+      fetchDisponibilidad(fecha);
+    } catch (err: any) {
+      addToast("error", err.message || "Error de conexión al confirmar.");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
   const formatCountdown = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
@@ -292,7 +365,7 @@ export default function GrillaHoraria({
             </div>
 
             <button
-              onClick={() => onConfirmSuccess?.(activeLock)}
+              onClick={handleOpenConfirmation}
               className="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 transition shadow-lg"
             >
               Confirmar Reserva
@@ -378,6 +451,121 @@ export default function GrillaHoraria({
           </div>
         )}
       </div>
+
+      {/* Modal de Checkout / Confirmación de Turno */}
+      {isConfirmModalOpen && activeLock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 text-left">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 text-xl border border-emerald-500/20">
+                  🎾
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Confirmar Reserva de Turno</h3>
+                  <p className="text-xs text-slate-400">Completa tus datos para asegurar tu cancha</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsConfirmModalOpen(false)}
+                className="text-slate-400 hover:text-white transition rounded-lg p-1 text-base font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Turno Summary Card */}
+            <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Cancha:</span>
+                <span className="font-bold text-white capitalize">
+                  {canchaNombre} ({deporte})
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Fecha & Horario:</span>
+                <span className="font-bold text-emerald-400">
+                  {activeLock.fecha} • {activeLock.horaInicio} a {activeLock.horaFin} hs
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">Tarifa por turno:</span>
+                <span className="font-extrabold text-white text-base">
+                  ${activeLock.precio.toLocaleString()}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-amber-300 font-semibold">
+                <span>⏱️ Tiempo restante de retención:</span>
+                <span className="font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                  {formatCountdown(remainingSeconds)}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmReservation} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Nombre del Jugador / Reserva
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Juan Pérez"
+                  value={clienteNombre}
+                  onChange={(e) => setClienteNombre(e.target.value)}
+                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Teléfono / WhatsApp de Contacto
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Ej. +54 9 11 1234-5678"
+                  value={clienteTelefono}
+                  onChange={(e) => setClienteTelefono(e.target.value)}
+                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Método de Pago
+                </label>
+                <select
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value)}
+                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
+                  <option value="transferencia">📲 Transferencia Bancaria</option>
+                  <option value="online">💳 Mercado Pago / Tarjeta Online</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmModalOpen(false)}
+                  className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                >
+                  Volver
+                </button>
+                <button
+                  type="submit"
+                  disabled={isConfirming}
+                  className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isConfirming ? "Confirmando..." : "✓ Confirmar Turno"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
