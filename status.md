@@ -1,11 +1,11 @@
 # Estado del Proyecto y Checklist de Tareas (status.md)
 
-> **Siguiente tarea a ejecutar:** `[ ] Tarea 7.2: Subida de Imágenes a S3 con Presigned URLs`
+> **Siguiente tarea a ejecutar:** `[ ] Tarea 7.3: Módulo de Domótica IoT (Control Automático de Luces)`
 
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 18 / 19
+- **Tareas Completadas:** 19 / 19 (Bloques 1 a 6 + 7.1/7.2 Completados)
 - **Fase Actual:** Bloque 7 - Pagos, Assets S3, IoT & Hardening
 - **Última Actualización:** 2026-08-29
 
@@ -54,8 +54,8 @@
 
 ## 💳 Bloque 7: Pagos, Assets S3, IoT & Hardening (Semanas 14-15)
 - [x] **Tarea 7.1:** Pasarelas de Pago (Mercado Pago / Stripe Webhooks) *(Completado)*
-- [ ] **Tarea 7.2:** Subida de Imágenes a S3 con Presigned URLs *(⏳ SIGUIENTE A EJECUTAR)*
-- [ ] **Tarea 7.3:** Módulo de Domótica IoT (Control Automático de Luces)
+- [x] **Tarea 7.2:** Subida de Imágenes a S3 con Presigned URLs *(Completado)*
+- [ ] **Tarea 7.3:** Módulo de Domótica IoT (Control Automático de Luces) *(⏳ SIGUIENTE A EJECUTAR)*
 
 ---
 

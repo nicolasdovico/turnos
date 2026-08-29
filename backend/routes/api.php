@@ -104,9 +104,12 @@ Route::prefix('webhooks')->group(function () {
     Route::post('/stripe', [\App\Http\Controllers\Api\PaymentWebhookController::class, 'handleStripe']);
 });
 
+Route::post('/assets/presigned-url', [\App\Http\Controllers\Api\AssetUploadController::class, 'generatePresignedUrl']);
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
 
 
 

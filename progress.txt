@@ -365,4 +365,28 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Backend global: 79 tests pasados (386 aserciones).
   * Suite Mobile global: 18 tests pasados (100% éxito).
   * Suite Frontend global: 13 tests pasados (100% éxito).
+-------------------------------------------------------------------------------
+[2026-08-29] - TAREA 7.2: SUBIDA DE IMÁGENES A S3/R2 CON PRESIGNED URLS
+-------------------------------------------------------------------------------
+- Configuración de Almacenamiento Desacoplado (AWS S3 & Cloudflare R2):
+  * Paquetes Composer: `league/flysystem-aws-s3-v3:^3.0` y `aws/aws-sdk-php:^3.0` instalados y configurados.
+  * config/filesystems.php: Discos `s3` y `r2` configurados con soporte para buckets personalizados, endpoints S3-compatible, URLs públicas de CDN y `use_path_style_endpoint`.
+- Módulo de URLs Prefirmadas (Zero-Server CPU/Bandwidth Uploads):
+  * App\Services\StoragePresignedUrlService:
+    - Validación estricta de tipos MIME (`image/jpeg`, `image/png`, `image/webp`, `image/avif`, `image/svg+xml`).
+    - Validación de carpetas autorizadas (`assets`, `canchas`, `complejos`, `comprobantes`, `avatars`, `cms`).
+    - Generación de claves únicas particionadas por tenant (`tenants/{tenant_uuid}/{folder}/{uuid}.{ext}` o `global/{folder}/{uuid}.{ext}`).
+    - Generación de URLs prefirmadas SigV4 con TTL parametrizable (default 15 minutos), cabecera `Content-Type` forzada y URL pública directa.
+  * App\Http\Controllers\Api\AssetUploadController:
+    - `POST /api/assets/presigned-url`: Endpoint REST que valida los parámetros de entrada, resuelve el contexto del tenant e invoca el servicio de generación de URLs prefirmadas.
+  * tests/Feature/PresignedUrlTest.php: 5 tests pasados (28 aserciones) verificando:
+    - Generación de URL prefirmada 200 OK con firma SigV4 y clave con extensión correspondiente al MIME type.
+    - Aislamiento automático de clave mediante UUID del tenant activo.
+    - Compatibilidad y soporte para driver Cloudflare R2.
+    - Rechazo `422 Unprocessable Entity` ante tipos MIME no permitidos (ej. scripts o ejecutables).
+    - Rechazo `422 Unprocessable Entity` ante carpetas no autorizadas.
+- Resumen de Suites de Tests:
+  * Suite Backend global: 84 tests pasados (414 aserciones).
+  * Suite Mobile global: 18 tests pasados (100% éxito).
+  * Suite Frontend global: 13 tests pasados (100% éxito).
 ===============================================================================
