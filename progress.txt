@@ -569,5 +569,32 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * `frontend/components/Navbar.tsx`:
     - Ocultamiento estricto de las opciones de administración para visitantes y clientes que solo desean reservar turnos.
     - Renderizado condicional del botón "⚙️ Panel de Administrador" y "⚙️ Panel Club" únicamente cuando `isClubAdmin === true`.
-  * Suite de tests en `frontend/tests/authAndOnboarding.test.tsx`: 7 tests pasados en Vitest (21 tests totales en frontend pasados al 100%).
+-------------------------------------------------------------------------------
+[2026-08-29] - TIPOS DE NEGOCIO DINÁMICOS & NOMENCLATURA ADAPTATIVA (CLUB / COMPLEJO / GIMNASIO)
+-------------------------------------------------------------------------------
+- Backend (Laravel 11):
+  * Migración `create_tipos_negocio_table`:
+    - Tabla `tipos_negocio` con `nombre`, `slug` único, `descripcion` y `esta_activo`.
+    - Clave foránea `tipo_negocio_id` en tabla `complejos` (nullable con nullOnDelete).
+  * Modelo `App\Models\TipoNegocio` y relación `Complejo::tipoNegocio()`.
+  * Seeder `TipoNegocioSeeder` con tipos predeterminados:
+    - `Club` (`club`): Club social y deportivo con socios y canchas.
+    - `Complejo` (`complejo`): Complejo deportivo comercial de alquiler por turno.
+    - `Gimnasio` (`gimnasio`): Centro de entrenamiento, academia o gimnasio.
+  * Super Admin ABM / CRUD en Filament v3 (`App\Filament\Resources\TipoNegocioResource.php`):
+    - Permite al Super Admin dar de alta, editar, activar/desactivar y listar tipos de negocio.
+    - Actualizado `ComplejoResource` para ver y asignar el tipo de negocio a cada complejo.
+  * API REST:
+    - Endpoint público `GET /api/tipos-negocio`: Listado de tipos de negocio activos.
+    - Actualizado `POST /api/clubs/registro`: Acepta `tipo_negocio_id` o `tipo_negocio_slug`, vinculándolo atómicamente al nuevo complejo.
+    - Actualizado `GET /api/clubs/{subdomain}/dashboard`: Retorna la relación `tipo_negocio`.
+  * Tests: `tests/Feature/TipoNegocioTest.php` (4 tests pasados / 33 aserciones). Total backend: 108 tests (540 aserciones).
+- Frontend Web (Next.js 14 App Router):
+  * Wizard de Onboarding (`frontend/app/registro-club/page.tsx`):
+    - Selector interactivo de tipo de negocio (Club vs Complejo vs Gimnasio) consumiendo `/api/tipos-negocio`.
+    - Nomenclatura reactiva y adaptativa: adapta títulos, etiquetas ("Nombre del Complejo", "Subdominio del Complejo"), placeholders, resumen y botón final según la selección.
+  * Panel de Administración (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+    - Badge con el tipo de establecimiento en el encabezado.
+    - Detalle en la pestaña institucional (Tipo de Establecimiento).
+  * Tests: Suite de Vitest actualizada en `tests/authAndOnboarding.test.tsx` (21 tests totales pasados al 100%).
 ===============================================================================
