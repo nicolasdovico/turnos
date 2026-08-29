@@ -40,20 +40,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Restore session from localStorage & cookie on mount
   useEffect(() => {
-    try {
-      const savedToken = localStorage.getItem("saas_token");
-      const savedUser = localStorage.getItem("saas_user");
+    async function restoreSession() {
+      try {
+        const savedToken = localStorage.getItem("saas_token");
+        const savedUser = localStorage.getItem("saas_user");
 
-      if (savedToken && savedUser) {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
-        document.cookie = `saas_auth_token=${savedToken}; path=/; max-age=604800; SameSite=Lax`;
+        if (savedToken) {
+          setToken(savedToken);
+          document.cookie = `saas_auth_token=${savedToken}; path=/; max-age=604800; SameSite=Lax`;
+
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          }
+
+          // Fetch fresh user profile with latest complejos
+          try {
+            const res = await fetch(`${API_BASE}/auth/me`, {
+              headers: {
+                Authorization: `Bearer ${savedToken}`,
+                Accept: "application/json",
+              },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.user) {
+                setUser(data.user);
+                localStorage.setItem("saas_user", JSON.stringify(data.user));
+              }
+            }
+          } catch (fetchErr) {
+            console.error("Error al actualizar perfil en background:", fetchErr);
+          }
+        }
+      } catch (e) {
+        console.error("Error al restaurar sesión:", e);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (e) {
-      console.error("Error al restaurar sesión:", e);
-    } finally {
-      setIsLoading(false);
     }
+
+    restoreSession();
   }, []);
 
   const setAuthSession = (newUser: User, newToken: string) => {

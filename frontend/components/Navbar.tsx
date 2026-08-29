@@ -55,11 +55,11 @@ export default function Navbar() {
   // Check if logged in user is the owner/admin of this club
   useEffect(() => {
     if (isSubdomain && tenantSlug && user) {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
-      fetch(`${apiBase}/clubs/${tenantSlug}/is-admin`, {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
+      fetch(`/api/clubs/${tenantSlug}/is-admin`, {
         headers: {
           Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
         },
       })
         .then((res) => res.json())
@@ -77,7 +77,17 @@ export default function Navbar() {
   }, [isSubdomain, tenantSlug, user, token]);
 
   // User's owned club (if any)
-  const ownedClub = user?.complejos && user.complejos.length > 0 ? user.complejos[0] : null;
+  const userClubs = user?.complejos || [];
+  const ownedClub = userClubs.length > 0 ? userClubs[0] : null;
+
+  // Instant ownership check on current subdomain
+  const isOwnerOfCurrentTenant = Boolean(
+    isSubdomain &&
+    tenantSlug &&
+    userClubs.some((c: any) => c.subdominio.toLowerCase() === tenantSlug.toLowerCase())
+  );
+
+  const isCurrentAdmin = isClubAdmin || isOwnerOfCurrentTenant;
 
   // Build club admin URL from current host/protocol/port
   const getClubAdminUrl = (subdomain: string) => {
@@ -133,7 +143,7 @@ export default function Navbar() {
               <Link href="/" className="hover:text-emerald-600 transition font-semibold text-slate-900">
                 Reservar Canchas
               </Link>
-              {isClubAdmin && (
+              {isCurrentAdmin && (
                 <Link href="/panel" className="hover:text-emerald-600 transition font-bold text-emerald-700 flex items-center gap-1">
                   ⚙️ Panel de Administrador
                 </Link>
@@ -172,7 +182,7 @@ export default function Navbar() {
         {/* Right Auth & CTA Actions */}
         <div className="flex items-center gap-3">
           {/* Subdomain: Club Admin shortcut */}
-          {isSubdomain && isClubAdmin && (
+          {isSubdomain && isCurrentAdmin && (
             <Link
               href="/panel"
               className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 px-3.5 py-2 text-xs font-extrabold border border-slate-800 shadow-sm transition"
