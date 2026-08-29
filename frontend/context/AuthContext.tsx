@@ -38,19 +38,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Restore session from localStorage & cookie on mount
+  // Restore session from localStorage & cookie on mount, with cross-subdomain SSO transfer
   useEffect(() => {
     async function restoreSession() {
       try {
-        const savedToken = localStorage.getItem("saas_token");
-        const savedUser = localStorage.getItem("saas_user");
+        let savedToken = typeof window !== "undefined" ? localStorage.getItem("saas_token") : null;
+        let savedUser = typeof window !== "undefined" ? localStorage.getItem("saas_user") : null;
+
+        // Check if token was passed via URL parameter during subdomain transition
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const urlToken = params.get("auth_token") || params.get("token");
+          if (urlToken) {
+            savedToken = urlToken;
+            localStorage.setItem("saas_token", urlToken);
+            document.cookie = `saas_auth_token=${urlToken}; path=/; max-age=604800; SameSite=Lax`;
+
+            // Clean query param from browser URL bar without page reload
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+          }
+        }
 
         if (savedToken) {
           setToken(savedToken);
           document.cookie = `saas_auth_token=${savedToken}; path=/; max-age=604800; SameSite=Lax`;
 
           if (savedUser) {
-            setUser(JSON.parse(savedUser));
+            try {
+              setUser(JSON.parse(savedUser));
+            } catch (err) {}
           }
 
           // Fetch fresh user profile with latest complejos

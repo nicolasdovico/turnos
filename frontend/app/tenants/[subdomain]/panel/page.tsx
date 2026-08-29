@@ -77,11 +77,18 @@ export default function ClubAdminPanel() {
       setLoading(true);
       setError(null);
 
+      // Get active token from token prop, URL params (SSO transfer) or localStorage
+      let activeToken = token;
+      if (!activeToken && typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        activeToken = params.get("auth_token") || params.get("token") || localStorage.getItem("saas_token");
+      }
+
       // Check admin status for current user
-      const adminRes = await fetch(`${API_BASE}/clubs/${subdomain}/is-admin`, {
+      const adminRes = await fetch(`/api/clubs/${subdomain}/is-admin`, {
         headers: {
           Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
         },
       });
       const adminData = await adminRes.json();

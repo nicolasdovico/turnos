@@ -89,8 +89,11 @@ export default function Navbar() {
 
   const isCurrentAdmin = isClubAdmin || isOwnerOfCurrentTenant;
 
-  // Build club admin URL from current host/protocol/port
+  // Build club admin URL from current host/protocol/port with SSO token transfer
   const getClubAdminUrl = (subdomain: string) => {
+    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
+    const tokenQuery = activeToken ? `?auth_token=${encodeURIComponent(activeToken)}` : "";
+
     if (typeof window !== "undefined") {
       const protocol = window.location.protocol;
       const port = window.location.port ? `:${window.location.port}` : "";
@@ -99,9 +102,9 @@ export default function Navbar() {
       if (hostname.endsWith("turnos.com")) {
         baseHost = "turnos.com";
       }
-      return `${protocol}//${subdomain}.${baseHost}${port}/panel`;
+      return `${protocol}//${subdomain}.${baseHost}${port}/panel${tokenQuery}`;
     }
-    return `http://${subdomain}.localhost:8080/panel`;
+    return `http://${subdomain}.localhost:8080/panel${tokenQuery}`;
   };
 
   // Helper to build links: if on subdomain, global links point to mainDomainUrl
@@ -143,11 +146,6 @@ export default function Navbar() {
               <Link href="/" className="hover:text-emerald-600 transition font-semibold text-slate-900">
                 Reservar Canchas
               </Link>
-              {isCurrentAdmin && (
-                <Link href="/panel" className="hover:text-emerald-600 transition font-bold text-emerald-700 flex items-center gap-1">
-                  ⚙️ Panel de Administrador
-                </Link>
-              )}
               <a href={getGlobalLink("/")} className="hover:text-emerald-600 transition text-slate-500">
                 🌐 Portal Central
               </a>
@@ -160,14 +158,7 @@ export default function Navbar() {
               <Link href="/" className="hover:text-emerald-600 transition">
                 Portal
               </Link>
-              {ownedClub ? (
-                <a
-                  href={getClubAdminUrl(ownedClub.subdominio)}
-                  className="hover:text-emerald-600 transition font-bold text-emerald-700 flex items-center gap-1"
-                >
-                  ⚙️ Administrar {ownedClub.nombre}
-                </a>
-              ) : (
+              {!ownedClub && (
                 <a href={demoClubUrl} className="hover:text-emerald-600 transition text-emerald-700 font-semibold">
                   Demo Club (Padel Pro)
                 </a>
@@ -181,13 +172,13 @@ export default function Navbar() {
 
         {/* Right Auth & CTA Actions */}
         <div className="flex items-center gap-3">
-          {/* Subdomain: Club Admin shortcut */}
+          {/* Subdomain: Club Admin single button */}
           {isSubdomain && isCurrentAdmin && (
             <Link
               href="/panel"
               className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 px-3.5 py-2 text-xs font-extrabold border border-slate-800 shadow-sm transition"
             >
-              <span>⚙️ Panel Club</span>
+              <span>⚙️ Panel de Administrador</span>
             </Link>
           )}
 
@@ -195,9 +186,9 @@ export default function Navbar() {
           {!isSubdomain && ownedClub && (
             <a
               href={getClubAdminUrl(ownedClub.subdominio)}
-              className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 px-3.5 py-2 text-xs font-extrabold border border-slate-800 shadow-sm transition"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-bold shadow-md shadow-emerald-600/20 transition"
             >
-              <span>⚙️ Panel {ownedClub.nombre}</span>
+              <span>⚙️ Administrar {ownedClub.nombre}</span>
             </a>
           )}
 
