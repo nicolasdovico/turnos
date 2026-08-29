@@ -2,11 +2,20 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
+export interface ComplejoResumen {
+  id: number;
+  nombre: string;
+  subdominio: string;
+  estado?: string;
+  deporte_principal?: string;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
   email_verified_at?: string | null;
+  complejos?: ComplejoResumen[];
 }
 
 interface AuthContextType {

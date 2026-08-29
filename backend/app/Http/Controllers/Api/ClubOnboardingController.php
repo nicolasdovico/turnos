@@ -217,6 +217,7 @@ class ClubOnboardingController extends Controller
                 'id' => $result['user']->id,
                 'name' => $result['user']->name,
                 'email' => $result['user']->email,
+                'complejos' => $result['user']->complejos()->get(['id', 'user_id', 'nombre', 'subdominio', 'estado', 'deporte_principal']),
             ],
             'complejo' => $result['complejo'],
             'subdomain_url' => $subdomainUrl,

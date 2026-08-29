@@ -76,6 +76,24 @@ export default function Navbar() {
     }
   }, [isSubdomain, tenantSlug, user, token]);
 
+  // User's owned club (if any)
+  const ownedClub = user?.complejos && user.complejos.length > 0 ? user.complejos[0] : null;
+
+  // Build club admin URL from current host/protocol/port
+  const getClubAdminUrl = (subdomain: string) => {
+    if (typeof window !== "undefined") {
+      const protocol = window.location.protocol;
+      const port = window.location.port ? `:${window.location.port}` : "";
+      const hostname = window.location.hostname;
+      let baseHost = "localhost";
+      if (hostname.endsWith("turnos.com")) {
+        baseHost = "turnos.com";
+      }
+      return `${protocol}//${subdomain}.${baseHost}${port}/panel`;
+    }
+    return `http://${subdomain}.localhost:8080/panel`;
+  };
+
   // Helper to build links: if on subdomain, global links point to mainDomainUrl
   const getGlobalLink = (path: string) => {
     if (isSubdomain && mainDomainUrl) {
@@ -116,7 +134,7 @@ export default function Navbar() {
                 Reservar Canchas
               </Link>
               {isClubAdmin && (
-                <Link href="/panel" className="hover:text-emerald-600 transition font-semibold text-emerald-700">
+                <Link href="/panel" className="hover:text-emerald-600 transition font-bold text-emerald-700 flex items-center gap-1">
                   ⚙️ Panel de Administrador
                 </Link>
               )}
@@ -132,23 +150,28 @@ export default function Navbar() {
               <Link href="/" className="hover:text-emerald-600 transition">
                 Portal
               </Link>
-              <a href={demoClubUrl} className="hover:text-emerald-600 transition text-emerald-700 font-semibold">
-                Demo Club (Padel Pro)
-              </a>
+              {ownedClub ? (
+                <a
+                  href={getClubAdminUrl(ownedClub.subdominio)}
+                  className="hover:text-emerald-600 transition font-bold text-emerald-700 flex items-center gap-1"
+                >
+                  ⚙️ Administrar {ownedClub.nombre}
+                </a>
+              ) : (
+                <a href={demoClubUrl} className="hover:text-emerald-600 transition text-emerald-700 font-semibold">
+                  Demo Club (Padel Pro)
+                </a>
+              )}
               <Link href="/planes" className="hover:text-emerald-600 transition">
                 Planes & Precios
               </Link>
-              {user && (
-                <a href="http://localhost:8080/admin" target="_blank" rel="noreferrer" className="hover:text-emerald-600 transition text-slate-500 text-xs">
-                  Super Admin ↗
-                </a>
-              )}
             </>
           )}
         </nav>
 
         {/* Right Auth & CTA Actions */}
         <div className="flex items-center gap-3">
+          {/* Subdomain: Club Admin shortcut */}
           {isSubdomain && isClubAdmin && (
             <Link
               href="/panel"
@@ -156,6 +179,16 @@ export default function Navbar() {
             >
               <span>⚙️ Panel Club</span>
             </Link>
+          )}
+
+          {/* Main Domain: Shortcut to owned club */}
+          {!isSubdomain && ownedClub && (
+            <a
+              href={getClubAdminUrl(ownedClub.subdominio)}
+              className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 px-3.5 py-2 text-xs font-extrabold border border-slate-800 shadow-sm transition"
+            >
+              <span>⚙️ Panel {ownedClub.nombre}</span>
+            </a>
           )}
 
           {isLoading ? (
@@ -170,12 +203,14 @@ export default function Navbar() {
                   {user.name}
                 </span>
               </div>
-              <a
-                href={getGlobalLink("/registro-club")}
-                className="hidden sm:inline-flex items-center rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition"
-              >
-                + Crear Club
-              </a>
+              {!ownedClub && (
+                <a
+                  href={getGlobalLink("/registro-club")}
+                  className="hidden sm:inline-flex items-center rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition"
+                >
+                  + Crear Club
+                </a>
+              )}
               <button
                 onClick={logout}
                 className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-rose-600 transition"

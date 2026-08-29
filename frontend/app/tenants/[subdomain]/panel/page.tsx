@@ -233,19 +233,10 @@ export default function ClubAdminPanel() {
             <div className="flex items-center gap-3">
               <Link
                 href="/"
-                className="rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 text-xs font-bold text-slate-200 border border-slate-700 transition"
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5"
               >
-                🎾 Ver Sitio Público / Reservas
+                <span>🎾 Ver Sitio Público de Reservas</span>
               </Link>
-              <a
-                href="http://localhost:8080/admin"
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-md transition flex items-center gap-1.5"
-              >
-                <span>⚙️ Filament Super Admin</span>
-                <span>↗</span>
-              </a>
             </div>
           </div>
 

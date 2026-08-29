@@ -59,6 +59,7 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('mobile_app')->plainTextToken;
+        $user->load('complejos:id,user_id,nombre,subdominio,estado,deporte_principal');
 
         return response()->json([
             'token' => $token,
@@ -84,8 +85,10 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user()->load('complejos:id,user_id,nombre,subdominio,estado,deporte_principal');
+
         return response()->json([
-            'user' => $request->user(),
+            'user' => $user,
         ]);
     }
 }
