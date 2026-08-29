@@ -191,11 +191,23 @@ class ClubOnboardingController extends Controller
             OtpVerificationController::dispatchOtp($result['user']->email, $result['user']->name);
         }
 
-        $appUrl = config('app.url', 'http://localhost:8080');
-        $hostParts = parse_url($appUrl);
-        $port = isset($hostParts['port']) ? ":{$hostParts['port']}" : '';
-        $scheme = $hostParts['scheme'] ?? 'http';
-        $subdomainUrl = "{$scheme}://{$subdomain}.localhost{$port}";
+        $incomingHost = $request->header('X-Forwarded-Host') ?? $request->header('Host') ?? parse_url(config('app.url', 'http://localhost:8080'), PHP_URL_HOST) ?? 'localhost';
+        $port = '';
+        if (str_contains($incomingHost, ':')) {
+            $parts = explode(':', $incomingHost);
+            $incomingHost = $parts[0];
+            $port = ':' . $parts[1];
+        } elseif ($configPort = parse_url(config('app.url', 'http://localhost:8080'), PHP_URL_PORT)) {
+            $port = ':' . $configPort;
+        }
+
+        $baseHost = 'localhost';
+        if (str_ends_with($incomingHost, 'turnos.com')) {
+            $baseHost = 'turnos.com';
+        }
+
+        $scheme = $request->header('X-Forwarded-Proto') ?? $request->getScheme() ?? parse_url(config('app.url', 'http://localhost:8080'), PHP_URL_SCHEME) ?? 'http';
+        $subdomainUrl = "{$scheme}://{$subdomain}.{$baseHost}{$port}";
 
         return response()->json([
             'success' => true,

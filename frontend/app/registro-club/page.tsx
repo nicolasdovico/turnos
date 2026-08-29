@@ -48,6 +48,7 @@ export default function RegistroClubPage() {
   const [subdominio, setSubdominio] = useState("");
   const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "unavailable">("idle");
   const [subdomainMsg, setSubdomainMsg] = useState("");
+  const [hostSuffix, setHostSuffix] = useState(".localhost:8080");
   const [selectedPlan, setSelectedPlan] = useState("oro");
   const [deporte, setDeporte] = useState("padel");
   const [ciudad, setCiudad] = useState("");
@@ -85,7 +86,7 @@ export default function RegistroClubPage() {
       .catch((e) => console.log("Usando planes por defecto:", e));
   }, []);
 
-  // Read plan query parameter (e.g. ?plan=plata)
+  // Read plan query parameter (e.g. ?plan=plata) and current host suffix
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -93,6 +94,14 @@ export default function RegistroClubPage() {
       if (planParam && ["bronce", "plata", "oro"].includes(planParam.toLowerCase())) {
         setSelectedPlan(planParam.toLowerCase());
       }
+
+      const port = window.location.port ? `:${window.location.port}` : "";
+      const hostname = window.location.hostname;
+      let base = "localhost";
+      if (hostname.endsWith("turnos.com")) {
+        base = "turnos.com";
+      }
+      setHostSuffix(`.${base}${port}`);
     }
   }, []);
   const slugify = (text: string) => {
@@ -246,9 +255,21 @@ export default function RegistroClubPage() {
         setAuthSession(data.user, data.token);
       }
 
+      let finalSubdomainUrl = data.subdomain_url;
+      if (typeof window !== "undefined") {
+        const protocol = window.location.protocol;
+        const port = window.location.port ? `:${window.location.port}` : "";
+        const host = window.location.hostname;
+        let baseDomain = "localhost";
+        if (host.endsWith("turnos.com")) {
+          baseDomain = "turnos.com";
+        }
+        finalSubdomainUrl = `${protocol}//${data.complejo.subdominio}.${baseDomain}${port}`;
+      }
+
       setSuccessData({
         complejo: data.complejo,
-        subdomain_url: data.subdomain_url,
+        subdomain_url: finalSubdomainUrl,
       });
     } catch (err: any) {
       setError(err.message || "Error de conexión al procesar el registro.");
@@ -373,7 +394,7 @@ export default function RegistroClubPage() {
                   className="w-full px-4 py-3 text-slate-900 text-sm focus:outline-none"
                 />
                 <span className="bg-slate-100 px-3 py-3 text-xs font-bold text-slate-500 flex items-center border-l border-slate-200">
-                  .localhost:8080
+                  {hostSuffix}
                 </span>
               </div>
               <div className="mt-1.5 flex items-center gap-2 text-xs">
