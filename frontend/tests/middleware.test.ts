@@ -14,15 +14,21 @@ describe("Next.js Subdomain Multi-tenant Middleware", () => {
     expect(response.headers.get("x-middleware-rewrite")).toBe("http://localhost:3000/portal");
   });
 
-  it("rewrites subpaths on main domain (e.g. turnos.com/planes) to /portal/planes", () => {
-    const request = new NextRequest("http://turnos.com/planes", {
-      headers: {
-        host: "turnos.com",
-      },
+  it("allows direct requests to main domain standalone routes (/registro-club, /login, /registro) without rewriting", () => {
+    const reqClub = new NextRequest("http://localhost:3000/registro-club", {
+      headers: { host: "localhost:3000" },
     });
+    expect(middleware(reqClub).headers.get("x-middleware-rewrite")).toBeNull();
 
-    const response = middleware(request);
-    expect(response.headers.get("x-middleware-rewrite")).toBe("http://turnos.com/portal/planes");
+    const reqLogin = new NextRequest("http://localhost:3000/login", {
+      headers: { host: "localhost:3000" },
+    });
+    expect(middleware(reqLogin).headers.get("x-middleware-rewrite")).toBeNull();
+
+    const reqRegister = new NextRequest("http://localhost:3000/registro", {
+      headers: { host: "localhost:3000" },
+    });
+    expect(middleware(reqRegister).headers.get("x-middleware-rewrite")).toBeNull();
   });
 
   it("allows direct requests to /portal without rewriting", () => {

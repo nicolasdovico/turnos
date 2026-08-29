@@ -33,13 +33,12 @@ export function middleware(req: NextRequest) {
   const isMainDomain = rootDomains.includes(cleanHostname);
 
   if (isMainDomain) {
-    // If request already points to /portal, continue without rewriting
-    if (pathname.startsWith("/portal")) {
-      return NextResponse.next();
+    // If accessing root "/", rewrite to "/portal"
+    if (pathname === "/") {
+      return NextResponse.rewrite(new URL("/portal", req.url));
     }
-    // Rewrite root and subpaths to /portal
-    const targetPath = `/portal${pathname === "/" ? "" : pathname}`;
-    return NextResponse.rewrite(new URL(targetPath, req.url));
+    // Main domain routes (/registro-club, /login, /registro, /portal, etc.) pass through directly
+    return NextResponse.next();
   }
 
   // Extract tenant identifier (subdomain or custom domain)
