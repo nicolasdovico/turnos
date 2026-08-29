@@ -31,6 +31,27 @@ describe("Next.js Subdomain Multi-tenant Middleware", () => {
     expect(middleware(reqRegister).headers.get("x-middleware-rewrite")).toBeNull();
   });
 
+  it("redirects global platform routes from a subdomain back to the main domain", () => {
+    const request = new NextRequest("http://padelpro.localhost:3000/registro", {
+      headers: {
+        host: "padelpro.localhost:3000",
+      },
+    });
+
+    const response = middleware(request);
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost:3000/registro");
+
+    const reqClub = new NextRequest("http://padelpro.localhost:3000/registro-club", {
+      headers: {
+        host: "padelpro.localhost:3000",
+      },
+    });
+    const resClub = middleware(reqClub);
+    expect(resClub.status).toBe(307);
+    expect(resClub.headers.get("location")).toBe("http://localhost:3000/registro-club");
+  });
+
   it("allows direct requests to /portal without rewriting", () => {
     const request = new NextRequest("http://localhost:3000/portal", {
       headers: {

@@ -18,6 +18,7 @@ export function middleware(req: NextRequest) {
   const url = req.nextUrl;
   const hostname = req.headers.get("host") || "localhost:3000";
   const cleanHostname = hostname.split(":")[0].toLowerCase();
+  const port = hostname.includes(":") ? `:${hostname.split(":")[1]}` : "";
   const pathname = url.pathname;
 
   // List of main domains for the general marketplace / SaaS portal
@@ -32,16 +33,35 @@ export function middleware(req: NextRequest) {
 
   const isMainDomain = rootDomains.includes(cleanHostname);
 
+  // 1. If on main domain
   if (isMainDomain) {
     // If accessing root "/", rewrite to "/portal"
     if (pathname === "/") {
       return NextResponse.rewrite(new URL("/portal", req.url));
     }
-    // Main domain routes (/registro-club, /login, /registro, /portal, etc.) pass through directly
+    // Main domain routes (/registro-club, /planes, /login, /registro, /portal, etc.) pass through directly
     return NextResponse.next();
   }
 
-  // Extract tenant identifier (subdomain or custom domain)
+  // 2. Global platform routes accessed from a subdomain should redirect to main domain
+  const globalRoutes = [
+    "/registro-club",
+    "/planes",
+    "/registro",
+    "/login",
+    "/portal",
+  ];
+
+  if (globalRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
+    let mainHost = "localhost";
+    if (cleanHostname.endsWith(".turnos.com")) {
+      mainHost = "turnos.com";
+    }
+    const redirectUrl = `${url.protocol}//${mainHost}${port}${pathname}${url.search}`;
+    return NextResponse.redirect(new URL(redirectUrl));
+  }
+
+  // 3. Extract tenant identifier (subdomain or custom domain)
   let tenantIdentifier = cleanHostname;
   if (cleanHostname.endsWith(".localhost")) {
     tenantIdentifier = cleanHostname.replace(".localhost", "");
