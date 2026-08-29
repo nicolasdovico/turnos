@@ -17,6 +17,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import PlanesPage from "../app/planes/page";
+import VerificarEmailPage from "../app/verificar-email/page";
 
 describe("Frontend Auth & Club Onboarding Suite", () => {
   it("renders Navbar with guest navigation buttons", () => {
@@ -92,5 +93,18 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText("Oro")).toBeDefined();
     expect(screen.getByText("+ Agregar Cancha")).toBeDefined();
     expect(screen.getByText(/Crear mi Club y Comenzar Prueba Gratis/i)).toBeDefined();
+  });
+
+  it("renders Verificar Email page with 6-digit OTP input boxes and resend cooldown", () => {
+    render(
+      <AuthProvider>
+        <VerificarEmailPage />
+      </AuthProvider>
+    );
+
+    expect(screen.getByText("Verifica tu Correo")).toBeDefined();
+    expect(screen.getAllByPlaceholderText("•").length).toBe(6);
+    expect(screen.getByText("Confirmar Código OTP")).toBeDefined();
+    expect(screen.getByText(/Mailpit Activo/i)).toBeDefined();
   });
 });

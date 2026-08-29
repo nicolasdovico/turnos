@@ -27,12 +27,15 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        $token = $user->createToken('mobile_app')->plainTextToken;
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Disparar código OTP de verificación por correo
+        OtpVerificationController::dispatchOtp($user->email, $user->name);
 
         return response()->json([
             'token' => $token,
             'user' => $user,
-            'message' => 'Usuario registrado exitosamente',
+            'message' => 'Usuario registrado exitosamente. Se ha enviado un código de verificación a tu correo.',
         ], 201);
     }
 

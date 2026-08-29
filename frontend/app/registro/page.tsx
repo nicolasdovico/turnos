@@ -68,7 +68,7 @@ export default function RegisterPage() {
       setError(res.error || "No se pudo completar el registro.");
       setIsSubmitting(false);
     } else {
-      router.push("/");
+      router.push(`/verificar-email?email=${encodeURIComponent(email)}`);
     }
   };
 

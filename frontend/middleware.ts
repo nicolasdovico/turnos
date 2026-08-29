@@ -50,6 +50,7 @@ export function middleware(req: NextRequest) {
     "/registro",
     "/login",
     "/portal",
+    "/verificar-email",
   ];
 
   if (globalRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {

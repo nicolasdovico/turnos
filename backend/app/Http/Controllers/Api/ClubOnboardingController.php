@@ -183,8 +183,13 @@ class ClubOnboardingController extends Controller
                 'user' => $user,
                 'complejo' => $complejo->load(['plan.modulos', 'canchas', 'horariosAtencion']),
                 'token' => $token,
+                'is_new_user' => !$currentUser,
             ];
         });
+
+        if ($result['is_new_user']) {
+            OtpVerificationController::dispatchOtp($result['user']->email, $result['user']->name);
+        }
 
         $appUrl = config('app.url', 'http://localhost:8080');
         $hostParts = parse_url($appUrl);

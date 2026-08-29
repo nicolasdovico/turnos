@@ -6,6 +6,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  email_verified_at?: string | null;
 }
 
 interface AuthContextType {
@@ -16,6 +17,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, password_confirmation: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   setAuthSession: (user: User, token: string) => void;
+  markEmailAsVerified: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,6 +53,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("saas_token", newToken);
     localStorage.setItem("saas_user", JSON.stringify(newUser));
     document.cookie = `saas_auth_token=${newToken}; path=/; max-age=604800; SameSite=Lax`;
+  };
+
+  const markEmailAsVerified = () => {
+    if (user) {
+      const updated = { ...user, email_verified_at: new Date().toISOString() };
+      setUser(updated);
+      localStorage.setItem("saas_user", JSON.stringify(updated));
+    }
   };
 
   const login = async (email: string, password: string) => {
@@ -124,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, setAuthSession }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, setAuthSession, markEmailAsVerified }}>
       {children}
     </AuthContext.Provider>
   );

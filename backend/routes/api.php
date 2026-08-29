@@ -97,6 +97,9 @@ Route::get('/complejos/cercanos', [\App\Http\Controllers\Api\ComplejoController:
 Route::prefix('auth')->group(function () {
     Route::post('/register', [\App\Http\Controllers\Api\AuthController::class, 'register']);
     Route::post('/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
+    Route::post('/verify-otp', [\App\Http\Controllers\Api\OtpVerificationController::class, 'verifyOtp']);
+    Route::post('/resend-otp', [\App\Http\Controllers\Api\OtpVerificationController::class, 'resendOtp']);
+    Route::post('/send-otp', [\App\Http\Controllers\Api\OtpVerificationController::class, 'resendOtp']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
