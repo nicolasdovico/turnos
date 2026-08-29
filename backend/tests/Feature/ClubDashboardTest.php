@@ -25,6 +25,49 @@ class ClubDashboardTest extends TestCase
         ]);
     }
 
+    public function test_check_is_admin_for_guest_regular_user_and_owner(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Nicolás Dueño',
+            'email' => 'nico@owner.com',
+        ]);
+
+        $regularClient = User::factory()->create([
+            'name' => 'Cliente Jugador',
+            'email' => 'cliente@jugador.com',
+        ]);
+
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Nico Pádel Club',
+            'subdominio' => 'nico-padel-auth',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        // 1. Guest (unauthenticated visitor) -> is_admin: false
+        $resGuest = $this->getJson('/api/clubs/nico-padel-auth/is-admin');
+        $resGuest->assertStatus(200)
+            ->assertJsonPath('is_admin', false)
+            ->assertJsonPath('is_authenticated', false);
+
+        // 2. Regular client logged in -> is_admin: false
+        $resClient = $this->actingAs($regularClient, 'sanctum')
+            ->getJson('/api/clubs/nico-padel-auth/is-admin');
+        $resClient->assertStatus(200)
+            ->assertJsonPath('is_admin', false)
+            ->assertJsonPath('is_authenticated', true);
+
+        // 3. Owner of the club logged in -> is_admin: true
+        $resOwner = $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/clubs/nico-padel-auth/is-admin');
+        $resOwner->assertStatus(200)
+            ->assertJsonPath('is_admin', true)
+            ->assertJsonPath('is_authenticated', true)
+            ->assertJsonPath('club_name', 'Nico Pádel Club');
+    }
+
     public function test_get_club_dashboard_data(): void
     {
         $owner = User::factory()->create([

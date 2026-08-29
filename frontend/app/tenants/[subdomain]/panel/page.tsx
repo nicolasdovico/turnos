@@ -54,6 +54,7 @@ export default function ClubAdminPanel() {
 
   const [activeTab, setActiveTab] = useState<"canchas" | "modulos" | "horarios" | "config">("canchas");
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [complejo, setComplejo] = useState<ComplejoData | null>(null);
@@ -75,6 +76,23 @@ export default function ClubAdminPanel() {
     try {
       setLoading(true);
       setError(null);
+
+      // Check admin status for current user
+      const adminRes = await fetch(`${API_BASE}/clubs/${subdomain}/is-admin`, {
+        headers: {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const adminData = await adminRes.json();
+
+      if (!adminData.is_admin) {
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
+      setIsAdmin(true);
+
       const res = await fetch(`${API_BASE}/clubs/${subdomain}/dashboard`);
       const data = await res.json();
 
@@ -97,7 +115,7 @@ export default function ClubAdminPanel() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [subdomain]);
+  }, [subdomain, token]);
 
   const handleCreateCancha = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +164,39 @@ export default function ClubAdminPanel() {
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8 bg-slate-950 text-white">
         <div className="text-center space-y-4">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-          <p className="text-sm font-semibold text-slate-400">Cargando Panel de Control de {subdomain}...</p>
+          <p className="text-sm font-semibold text-slate-400">Verificando credenciales de {subdomain}...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAdmin === false) {
+    return (
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8 bg-slate-950 text-white">
+        <div className="mx-auto max-w-md text-center rounded-3xl bg-slate-900 border border-slate-800 p-8 shadow-2xl space-y-6">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10 text-rose-500 text-3xl border border-rose-500/20">
+            🔒
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">Acceso Restringido</h1>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              Este panel de administración es exclusivo para el dueño o administrador del complejo <strong>{subdomain}</strong>.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/"
+              className="rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-2.5 text-xs font-bold text-slate-200 transition"
+            >
+              ← Ir a Reservar Turnos
+            </Link>
+            <a
+              href="http://localhost:8080/login"
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white transition"
+            >
+              Iniciar Sesión
+            </a>
+          </div>
         </div>
       </div>
     );

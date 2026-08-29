@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, token, isLoading, logout } = useAuth();
   const [currentHost, setCurrentHost] = useState("");
   const [isSubdomain, setIsSubdomain] = useState(false);
   const [tenantSlug, setTenantSlug] = useState("");
   const [mainDomainUrl, setMainDomainUrl] = useState("");
   const [demoClubUrl, setDemoClubUrl] = useState("http://padelpro.localhost:3000");
+  const [isClubAdmin, setIsClubAdmin] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -51,6 +52,30 @@ export default function Navbar() {
     }
   }, []);
 
+  // Check if logged in user is the owner/admin of this club
+  useEffect(() => {
+    if (isSubdomain && tenantSlug && user) {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+      fetch(`${apiBase}/clubs/${tenantSlug}/is-admin`, {
+        headers: {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.is_admin) {
+            setIsClubAdmin(true);
+          } else {
+            setIsClubAdmin(false);
+          }
+        })
+        .catch(() => setIsClubAdmin(false));
+    } else {
+      setIsClubAdmin(false);
+    }
+  }, [isSubdomain, tenantSlug, user, token]);
+
   // Helper to build links: if on subdomain, global links point to mainDomainUrl
   const getGlobalLink = (path: string) => {
     if (isSubdomain && mainDomainUrl) {
@@ -68,15 +93,19 @@ export default function Navbar() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold shadow-md shadow-emerald-500/20">
               ⚡
             </span>
-            <span>Turnos<span className="text-emerald-600">SaaS</span></span>
-          </Link>
-
-          {isSubdomain && (
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-xs font-bold text-emerald-400 shadow-sm border border-slate-800">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              Club: <span className="capitalize text-white">{tenantSlug}</span>
+            <span className="flex items-center gap-1.5">
+              Turnos
+              {isSubdomain ? (
+                <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                  {tenantSlug}
+                </span>
+              ) : (
+                <span className="text-xs font-semibold text-slate-500 hidden sm:inline">
+                  Plataforma SaaS
+                </span>
+              )}
             </span>
-          )}
+          </Link>
         </div>
 
         {/* Center Navigation */}
@@ -86,9 +115,11 @@ export default function Navbar() {
               <Link href="/" className="hover:text-emerald-600 transition font-semibold text-slate-900">
                 Reservar Canchas
               </Link>
-              <Link href="/panel" className="hover:text-emerald-600 transition font-semibold text-slate-700">
-                ⚙️ Panel de Administrador
-              </Link>
+              {isClubAdmin && (
+                <Link href="/panel" className="hover:text-emerald-600 transition font-semibold text-emerald-700">
+                  ⚙️ Panel de Administrador
+                </Link>
+              )}
               <a href={getGlobalLink("/")} className="hover:text-emerald-600 transition text-slate-500">
                 🌐 Portal Central
               </a>
@@ -107,16 +138,18 @@ export default function Navbar() {
               <Link href="/planes" className="hover:text-emerald-600 transition">
                 Planes & Precios
               </Link>
-              <a href="http://localhost:8080/admin" target="_blank" rel="noreferrer" className="hover:text-emerald-600 transition text-slate-500 text-xs">
-                Super Admin ↗
-              </a>
+              {user && (
+                <a href="http://localhost:8080/admin" target="_blank" rel="noreferrer" className="hover:text-emerald-600 transition text-slate-500 text-xs">
+                  Super Admin ↗
+                </a>
+              )}
             </>
           )}
         </nav>
 
         {/* Right Auth & CTA Actions */}
         <div className="flex items-center gap-3">
-          {isSubdomain && (
+          {isSubdomain && isClubAdmin && (
             <Link
               href="/panel"
               className="hidden sm:inline-flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 px-3.5 py-2 text-xs font-extrabold border border-slate-800 shadow-sm transition"

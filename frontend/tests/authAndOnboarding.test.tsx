@@ -35,6 +35,8 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Iniciar Sesión/i)).toBeDefined();
     expect(screen.getByText(/Planes & Precios/i)).toBeDefined();
     expect(screen.getByText(/Registrar mi Club/i)).toBeDefined();
+    expect(screen.queryByText(/Panel de Administrador/i)).toBeNull();
+    expect(screen.queryByText(/Panel Club/i)).toBeNull();
   });
 
   it("renders Planes & Precios page with pricing cards, comparison matrix and FAQ", () => {

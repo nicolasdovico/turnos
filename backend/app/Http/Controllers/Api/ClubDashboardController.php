@@ -12,6 +12,44 @@ use Illuminate\Http\Request;
 class ClubDashboardController extends Controller
 {
     /**
+     * Verificar si el usuario autenticado es el administrador/dueño del club.
+     */
+    public function checkAdmin(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'is_admin' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum');
+
+        if (!$user) {
+            return response()->json([
+                'is_admin' => false,
+                'is_authenticated' => false,
+            ]);
+        }
+
+        $isAdmin = ($complejo->user_id && $complejo->user_id === $user->id) || ($user->role ?? '') === 'admin';
+
+        return response()->json([
+            'is_admin' => $isAdmin,
+            'is_authenticated' => true,
+            'club_name' => $complejo->nombre,
+            'owner_id' => $complejo->user_id,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /**
      * Obtener métricas, canchas, horarios y configuración para el panel del club.
      */
     public function show(Request $request, string $subdomain): JsonResponse
