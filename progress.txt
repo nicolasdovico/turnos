@@ -389,4 +389,32 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Backend global: 84 tests pasados (414 aserciones).
   * Suite Mobile global: 18 tests pasados (100% éxito).
   * Suite Frontend global: 13 tests pasados (100% éxito).
+-------------------------------------------------------------------------------
+[2026-08-29] - TAREA 7.3: MÓDULO DE DOMÓTICA IOT & CONTROL AUTOMÁTICO DE LUCES
+-------------------------------------------------------------------------------
+- Módulo de Domótica IoT y Sincronización Horaria desarrollado en Backend (Laravel 11):
+  * Migración 2026_08_29_190001_create_dispositivos_iot_table:
+    - Tabla `dispositivos_iot`: campos `complejo_id`, `cancha_id`, `nombre`, `tipo` (luces, relay, etc.), `ip_address`, `topic_mqtt`, `token_api`, `endpoint_url`, `minutos_antelacion_encendido` (default 5), `minutos_gracia_apagado` (default 5), `estado_actual` (encendido, apagado, error), `ultimo_cambio_estado` y `esta_activo`.
+  * Modelo App\Models\DispositivoIoT:
+    - Uso de `BelongsToTenant` para aislamiento multitenant.
+    - Método `deberiaEstarEncendido(?Carbon $momento)`: evalúa si el momento actual cae dentro de la ventana de un turno confirmado `[hora_inicio - antelacion, hora_fin + gracia]` de la cancha asociada.
+  * Relaciones añadidas:
+    - `Cancha::dispositivosIoT()` y `Complejo::dispositivosIoT()`.
+  * App\Services\IoTControlService:
+    - `enviarOrden(DispositivoIoT $dispositivo, string $accion, ?string $motivo)`: emisión de órdenes `'ENCENDER'` / `'APAGAR'` con soporte para webhooks HTTP REST, MQTT y logging estructurado, actualizando el estado del dispositivo en base de datos.
+  * Comando Scheduler App\Console\Commands\SincronizarLucesIoTCommand:
+    - Comando `php artisan iot:sincronizar-luces`: itera los complejos con módulo `domotica` contratado, evalúa cada dispositivo activo y sincroniza el estado de las luces en tiempo real.
+    - Registrado en `routes/console.php` para ejecución periódica (`Schedule::command('iot:sincronizar-luces')->everyMinute()`).
+  * tests/Unit/IoTSchedulerTest.php: 7 tests pasados (13 aserciones) verificando:
+    - Encendido de luces dentro del margen de antelación previo al turno.
+    - Mantenimiento de luces encendidas durante la duración del partido.
+    - Apagado automático una vez finalizado el turno y transcurrido el tiempo de gracia.
+    - Rechazo de encendido en dispositivos inactivos o sin cancha vinculada.
+    - Emisión y transición de estados mediante `IoTControlService`.
+    - Ejecución completa del comando Artisan `iot:sincronizar-luces` con reporte en tabla.
+    - Aislamiento y bloqueo de control en complejos que no tengan contratado el módulo `domotica`.
+- Resumen de Suites de Tests:
+  * Suite Backend global: 91 tests pasados (427 aserciones).
+  * Suite Mobile global: 18 tests pasados (100% éxito).
+  * Suite Frontend global: 13 tests pasados (100% éxito).
 ===============================================================================

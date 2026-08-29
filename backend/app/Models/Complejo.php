@@ -107,6 +107,11 @@ class Complejo extends Model
         return $this->hasMany(Torneo::class, 'complejo_id');
     }
 
+    public function dispositivosIoT(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(DispositivoIoT::class, 'complejo_id');
+    }
+
 
 
 
