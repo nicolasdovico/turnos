@@ -10,6 +10,7 @@ interface ComplejoData {
   uuid: string;
   nombre: string;
   subdominio: string;
+  tipo_negocio?: { id: number; nombre: string; slug: string } | null;
   deporte_principal: string;
   telefono: string | null;
   ciudad: string | null;
@@ -226,11 +227,14 @@ export default function ClubAdminPanel() {
                       {complejo?.nombre || subdomain}
                     </h1>
                     <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-0.5 text-xs font-bold">
+                      {complejo?.tipo_negocio?.nombre || "Club"}
+                    </span>
+                    <span className="rounded-full bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-0.5 text-xs font-mono hidden sm:inline">
                       {subdomain}.localhost:8080
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Panel de Administración Oficial del Club • Dueño: <strong className="text-slate-200">{complejo?.owner?.name || user?.name || "Administrador"}</strong>
+                    Panel de Administración Oficial del {complejo?.tipo_negocio?.nombre || "Club"} • Dueño: <strong className="text-slate-200">{complejo?.owner?.name || user?.name || "Administrador"}</strong>
                   </p>
                 </div>
               </div>
@@ -612,6 +616,10 @@ export default function ClubAdminPanel() {
                   <div className="text-base font-bold text-white mt-1">{complejo?.telefono || "No especificado"}</div>
                 </div>
                 <div>
+                  <span className="text-xs font-bold uppercase text-slate-400">Tipo de Establecimiento</span>
+                  <div className="text-base font-bold text-emerald-400 mt-1">{complejo?.tipo_negocio?.nombre || "Club"}</div>
+                </div>
+                <div>
                   <span className="text-xs font-bold uppercase text-slate-400">Ciudad</span>
                   <div className="text-base font-bold text-white mt-1">{complejo?.ciudad || "No especificada"}</div>
                 </div>
@@ -621,16 +629,13 @@ export default function ClubAdminPanel() {
                 </div>
               </div>
 
-              <div className="border-t border-slate-800 pt-6">
-                <a
-                  href="http://localhost:8080/admin"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-6 py-3 text-xs font-bold text-white transition"
-                >
-                  <span>Editar datos avanzados en Filament Admin</span>
-                  <span>↗</span>
-                </a>
+              <div className="border-t border-slate-800 pt-6 flex items-center justify-between">
+                <span className="text-xs text-slate-500">
+                  ✓ Configuración y estado operativo activo en la plataforma.
+                </span>
+                <span className="text-xs font-mono text-slate-400">
+                  ID: {complejo?.uuid?.slice(0, 8)}...
+                </span>
               </div>
             </div>
           </div>

@@ -28,6 +28,7 @@ class Complejo extends Model
         'ciudad',
         'telefono',
         'deporte_principal',
+        'tipo_negocio_id',
     ];
 
     protected function casts(): array
@@ -50,6 +51,11 @@ class Complejo extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function tipoNegocio(): BelongsTo
+    {
+        return $this->belongsTo(TipoNegocio::class, 'tipo_negocio_id');
     }
 
     public function plan(): BelongsTo

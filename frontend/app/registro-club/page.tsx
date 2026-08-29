@@ -13,10 +13,26 @@ interface PlanItem {
   modulos?: { id: number; nombre: string; slug: string }[];
 }
 
+export interface TipoNegocioItem {
+  id: number;
+  nombre: string;
+  slug: string;
+  descripcion?: string;
+  esta_activo: boolean;
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 export default function RegistroClubPage() {
   const { user, token, setAuthSession, login } = useAuth();
+
+  // Business Types state
+  const [tiposNegocio, setTiposNegocio] = useState<TipoNegocioItem[]>([
+    { id: 1, nombre: "Club", slug: "club", descripcion: "Club social y deportivo con socios y canchas.", esta_activo: true },
+    { id: 2, nombre: "Complejo", slug: "complejo", descripcion: "Complejo deportivo comercial de alquiler por turno.", esta_activo: true },
+    { id: 3, nombre: "Gimnasio", slug: "gimnasio", descripcion: "Centro de entrenamiento, academia o gimnasio.", esta_activo: true },
+  ]);
+  const [selectedTipoSlug, setSelectedTipoSlug] = useState<string>("club");
 
   // Plans state
   const [planes, setPlanes] = useState<PlanItem[]>([
@@ -74,7 +90,7 @@ export default function RegistroClubPage() {
   const [error, setError] = useState<string | null>(null);
   const [successData, setSuccessData] = useState<{ complejo: any; subdomain_url: string } | null>(null);
 
-  // Fetch planes from backend
+  // Fetch planes and business types from backend
   useEffect(() => {
     fetch(`${API_BASE}/planes`)
       .then((res) => res.json())
@@ -84,6 +100,15 @@ export default function RegistroClubPage() {
         }
       })
       .catch((e) => console.log("Usando planes por defecto:", e));
+
+    fetch(`${API_BASE}/tipos-negocio`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+          setTiposNegocio(data.data);
+        }
+      })
+      .catch((e) => console.log("Usando tipos de negocio por defecto:", e));
   }, []);
 
   // Read plan query parameter (e.g. ?plan=plata) and current host suffix
@@ -95,6 +120,11 @@ export default function RegistroClubPage() {
         setSelectedPlan(planParam.toLowerCase());
       }
 
+      const tipoParam = params.get("tipo");
+      if (tipoParam) {
+        setSelectedTipoSlug(tipoParam.toLowerCase());
+      }
+
       const port = window.location.port ? `:${window.location.port}` : "";
       const hostname = window.location.hostname;
       let base = "localhost";
@@ -104,6 +134,10 @@ export default function RegistroClubPage() {
       setHostSuffix(`.${base}${port}`);
     }
   }, []);
+
+  // Current selected business type metadata
+  const currentTipo = tiposNegocio.find((t) => t.slug === selectedTipoSlug) || tiposNegocio[0] || { id: 1, nombre: "Club", slug: "club" };
+  const tipoNombre = currentTipo.nombre; // Ej: "Club", "Complejo", "Gimnasio"
   const slugify = (text: string) => {
     return text
       .toString()
@@ -208,6 +242,8 @@ export default function RegistroClubPage() {
       nombre_club: nombreClub,
       subdominio: subdominio,
       plan_slug: selectedPlan,
+      tipo_negocio_slug: selectedTipoSlug,
+      tipo_negocio_id: currentTipo?.id,
       deporte_principal: deporte,
       ciudad: ciudad,
       direccion: direccion,
@@ -245,7 +281,7 @@ export default function RegistroClubPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || "Ocurrió un error al registrar el club.");
+        setError(data.message || "Ocurrió un error al registrar el establecimiento.");
         setIsSubmitting(false);
         return;
       }
@@ -289,13 +325,13 @@ export default function RegistroClubPage() {
             🎉
           </div>
           <span className="inline-block rounded-full bg-emerald-50 px-4 py-1.5 text-xs font-bold text-emerald-700 border border-emerald-200 mb-3">
-            ¡Club Creado con Éxito!
+            ¡{tipoNombre} Creado con Éxito!
           </span>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">
             Bienvenido a {successData.complejo.nombre}
           </h1>
           <p className="mt-3 text-base text-slate-600">
-            Tu complejo deportivo ha sido configurado y tu prueba gratuita de 14 días ya está activa.
+            Tu {tipoNombre.toLowerCase()} deportivo ha sido configurado y tu prueba gratuita de 14 días ya está activa.
           </p>
 
           <div className="my-8 rounded-2xl bg-slate-50 p-6 border border-slate-200 text-left space-y-2">
@@ -304,6 +340,8 @@ export default function RegistroClubPage() {
               {successData.subdomain_url}
             </div>
             <div className="text-xs text-slate-500 pt-2">
+              ✓ Tipo: <strong className="text-slate-800">{successData.complejo.tipo_negocio?.nombre || tipoNombre}</strong>
+              {" • "}
               ✓ Plan: <strong className="text-slate-800">{successData.complejo.plan?.nombre}</strong>
               {" • "}
               ✓ Canchas activas: <strong className="text-slate-800">{successData.complejo.canchas?.length || 1}</strong>
@@ -315,7 +353,7 @@ export default function RegistroClubPage() {
               href={successData.subdomain_url}
               className="rounded-xl bg-emerald-600 px-8 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition"
             >
-              Ir al Sitio de mi Club 🚀
+              Ir al Sitio de mi {tipoNombre} 🚀
             </a>
             <Link
               href="/"
@@ -337,10 +375,10 @@ export default function RegistroClubPage() {
       {/* Page Header */}
       <div className="text-center mb-12">
         <span className="inline-block rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-bold text-emerald-800 mb-3">
-          Onboarding SaaS para Clubes
+          Onboarding SaaS Multitenant
         </span>
         <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
-          Registra tu Club Deportivo
+          Registra tu {tipoNombre} Deportivo
         </h1>
         <p className="mt-3 text-lg text-slate-600 max-w-2xl mx-auto">
           Gestiona reservas en tiempo real, punto de venta buffet, domótica de luces y cobro de turnos con tu propio subdominio.
@@ -355,34 +393,77 @@ export default function RegistroClubPage() {
 
       <form onSubmit={handleSubmit} className="space-y-10">
         {/* =================================================================== */}
-        {/* SECCIÓN 1: DATOS DEL CLUB */}
+        {/* SECCIÓN 1: DATOS DEL CLUB / COMPLEJO */}
         {/* =================================================================== */}
         <div className="rounded-3xl bg-white p-8 shadow-xl border border-slate-100">
           <div className="flex items-center gap-3 mb-6">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-sm">
               1
             </span>
-            <h2 className="text-xl font-bold text-slate-900">Información del Complejo</h2>
+            <h2 className="text-xl font-bold text-slate-900">Información del {tipoNombre}</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Selector de Tipo de Negocio */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                Tipo de Establecimiento / Negocio *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {tiposNegocio.map((tipo) => {
+                  const isSelected = selectedTipoSlug === tipo.slug;
+                  return (
+                    <button
+                      type="button"
+                      key={tipo.id}
+                      onClick={() => setSelectedTipoSlug(tipo.slug)}
+                      className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between ${
+                        isSelected
+                          ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-600/30"
+                          : "border-slate-200 hover:border-slate-300 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
+                          {tipo.slug === "club" && "🏆"}
+                          {tipo.slug === "complejo" && "🏟️"}
+                          {tipo.slug === "gimnasio" && "💪"}
+                          {tipo.nombre}
+                        </span>
+                        <span
+                          className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                            isSelected ? "border-emerald-600 bg-emerald-600" : "border-slate-300"
+                          }`}
+                        >
+                          {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 line-clamp-2">
+                        {tipo.descripcion || `Gestión de turnos y canchas para ${tipo.nombre}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                Nombre del Club o Complejo *
+                Nombre del {tipoNombre} *
               </label>
               <input
                 type="text"
                 required
                 value={nombreClub}
                 onChange={handleNombreClubChange}
-                placeholder="Ej. Pádel Master Center"
+                placeholder={selectedTipoSlug === "complejo" ? "Ej. Complejo Deportivo Central" : selectedTipoSlug === "gimnasio" ? "Ej. Gym Fitness & Pádel" : "Ej. Club Pádel Master"}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                Subdominio Web Personalizado *
+                Subdominio Web del {tipoNombre} *
               </label>
               <div className="flex rounded-xl border border-slate-200 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 overflow-hidden">
                 <input
@@ -390,7 +471,7 @@ export default function RegistroClubPage() {
                   required
                   value={subdominio}
                   onChange={handleSubdomainChange}
-                  placeholder="padel-master"
+                  placeholder={selectedTipoSlug === "complejo" ? "complejo-central" : selectedTipoSlug === "gimnasio" ? "gym-fitness" : "padel-master"}
                   className="w-full px-4 py-3 text-slate-900 text-sm focus:outline-none"
                 />
                 <span className="bg-slate-100 px-3 py-3 text-xs font-bold text-slate-500 flex items-center border-l border-slate-200">
@@ -699,7 +780,7 @@ export default function RegistroClubPage() {
             disabled={isSubmitting}
             className="w-full sm:w-auto min-w-[320px] rounded-2xl bg-emerald-600 px-10 py-4 text-base font-extrabold text-white shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 disabled:opacity-50 transition"
           >
-            {isSubmitting ? "Creando tu Complejo Deportivo..." : "🚀 Crear mi Club y Comenzar Prueba Gratis"}
+            {isSubmitting ? `Creando tu ${tipoNombre}...` : `🚀 Crear mi ${tipoNombre} y Comenzar Prueba Gratis`}
           </button>
           <p className="mt-3 text-xs text-slate-500">
             Al registrarte aceptas los términos del servicio. 14 días gratis sin compromiso.

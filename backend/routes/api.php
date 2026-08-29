@@ -87,6 +87,12 @@ Route::get('/planes', function () {
     ]);
 });
 
+Route::get('/tipos-negocio', function () {
+    return response()->json([
+        'data' => \App\Models\TipoNegocio::where('esta_activo', true)->orderBy('id', 'asc')->get(),
+    ]);
+});
+
 Route::prefix('clubs')->group(function () {
     Route::get('/check-subdomain', [\App\Http\Controllers\Api\ClubOnboardingController::class, 'checkSubdomain']);
     Route::post('/registro', [\App\Http\Controllers\Api\ClubOnboardingController::class, 'registrarClub']);

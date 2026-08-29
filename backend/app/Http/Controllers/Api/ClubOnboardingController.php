@@ -80,6 +80,8 @@ class ClubOnboardingController extends Controller
                 Rule::notIn($this->reservedSubdomains),
             ],
             'plan_slug' => ['required', 'string', 'exists:planes,slug'],
+            'tipo_negocio_id' => ['nullable', 'integer', 'exists:tipos_negocio,id'],
+            'tipo_negocio_slug' => ['nullable', 'string', 'exists:tipos_negocio,slug'],
             'deporte_principal' => ['nullable', 'string', 'max:50'],
             'telefono' => ['nullable', 'string', 'max:50'],
             'ciudad' => ['nullable', 'string', 'max:100'],
@@ -103,7 +105,7 @@ class ClubOnboardingController extends Controller
         $validated = $request->validate($rules, [
             'subdominio.regex' => 'El subdominio sólo puede contener letras minúsculas, números y guiones medios.',
             'subdominio.not_in' => 'El subdominio elegido está reservado por la plataforma.',
-            'subdominio.unique' => 'El subdominio elegido ya está en uso por otro club.',
+            'subdominio.unique' => 'El subdominio elegido ya está en uso por otro club o complejo.',
             'email_admin.unique' => 'Ya existe una cuenta con este correo electrónico. Por favor inicia sesión.',
         ]);
 
@@ -123,12 +125,24 @@ class ClubOnboardingController extends Controller
             // B. Find selected Plan
             $plan = Plan::where('slug', $validated['plan_slug'])->firstOrFail();
 
+            // Resolve Tipo de Negocio
+            $tipoNegocioId = $validated['tipo_negocio_id'] ?? null;
+            if (!$tipoNegocioId && !empty($validated['tipo_negocio_slug'])) {
+                $tipoNegocio = \App\Models\TipoNegocio::where('slug', $validated['tipo_negocio_slug'])->first();
+                $tipoNegocioId = $tipoNegocio?->id;
+            }
+            if (!$tipoNegocioId) {
+                $defaultTipo = \App\Models\TipoNegocio::where('slug', 'club')->first() ?? \App\Models\TipoNegocio::first();
+                $tipoNegocioId = $defaultTipo?->id;
+            }
+
             // C. Create Complejo
             $complejo = Complejo::create([
                 'user_id' => $user->id,
                 'nombre' => $validated['nombre_club'],
                 'subdominio' => $subdomain,
                 'plan_id' => $plan->id,
+                'tipo_negocio_id' => $tipoNegocioId,
                 'estado' => 'activo',
                 'deporte_principal' => $validated['deporte_principal'] ?? 'padel',
                 'telefono' => $validated['telefono'] ?? null,
@@ -217,9 +231,9 @@ class ClubOnboardingController extends Controller
                 'id' => $result['user']->id,
                 'name' => $result['user']->name,
                 'email' => $result['user']->email,
-                'complejos' => $result['user']->complejos()->get(['id', 'user_id', 'nombre', 'subdominio', 'estado', 'deporte_principal']),
+                'complejos' => $result['user']->complejos()->with('tipoNegocio')->get(['id', 'user_id', 'nombre', 'subdominio', 'estado', 'deporte_principal', 'tipo_negocio_id']),
             ],
-            'complejo' => $result['complejo'],
+            'complejo' => $result['complejo']->load('tipoNegocio'),
             'subdomain_url' => $subdomainUrl,
         ], 201);
     }

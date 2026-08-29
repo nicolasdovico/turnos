@@ -94,20 +94,32 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(await screen.findByText("Las contraseñas no coinciden.")).toBeDefined();
   });
 
-  it("renders Club Onboarding page with plan cards, court management and subdomain inputs", () => {
+  it("renders Club Onboarding page with business type selector, plan cards, court management and subdomain inputs", () => {
     render(
       <AuthProvider>
         <RegistroClubPage />
       </AuthProvider>
     );
 
-    expect(screen.getByText("Registra tu Club Deportivo")).toBeDefined();
-    expect(screen.getByPlaceholderText("Ej. Pádel Master Center")).toBeDefined();
+    // Initial state: Club
+    expect(screen.getByText(/Registra tu Club Deportivo/i)).toBeDefined();
+    expect(screen.getByPlaceholderText("Ej. Club Pádel Master")).toBeDefined();
+    expect(screen.getByText(/Tipo de Establecimiento \/ Negocio/i)).toBeDefined();
+    expect(screen.getAllByText(/Complejo/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Gimnasio/i).length).toBeGreaterThanOrEqual(1);
+
+    // Select Complejo
+    const complejoBtn = screen.getByRole("button", { name: /Complejo/i });
+    fireEvent.click(complejoBtn);
+
+    expect(screen.getByText(/Registra tu Complejo Deportivo/i)).toBeDefined();
+    expect(screen.getByPlaceholderText("Ej. Complejo Deportivo Central")).toBeDefined();
+    expect(screen.getByText(/Crear mi Complejo y Comenzar Prueba Gratis/i)).toBeDefined();
+
     expect(screen.getByText("Bronce")).toBeDefined();
     expect(screen.getByText("Plata")).toBeDefined();
     expect(screen.getByText("Oro")).toBeDefined();
     expect(screen.getByText("+ Agregar Cancha")).toBeDefined();
-    expect(screen.getByText(/Crear mi Club y Comenzar Prueba Gratis/i)).toBeDefined();
   });
 
   it("renders Verificar Email page with 6-digit OTP input boxes and resend cooldown", () => {

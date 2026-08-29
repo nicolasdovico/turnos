@@ -35,7 +35,12 @@ class ComplejoResource extends Resource
                 Forms\Components\TextInput::make('dominio_personalizado')
                     ->maxLength(255),
                 Forms\Components\Select::make('plan_id')
-                    ->relationship('plan', 'id'),
+                    ->relationship('plan', 'nombre'),
+                Forms\Components\Select::make('tipo_negocio_id')
+                    ->label('Tipo de Negocio')
+                    ->relationship('tipoNegocio', 'nombre')
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\TextInput::make('estado')
                     ->required()
                     ->maxLength(255)
@@ -48,15 +53,20 @@ class ComplejoResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('uuid')
-                    ->label('UUID'),
+                    ->label('UUID')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('nombre')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('tipoNegocio.nombre')
+                    ->label('Tipo')
+                    ->sortable()
+                    ->badge(),
                 Tables\Columns\TextColumn::make('subdominio')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('dominio_personalizado')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('plan.id')
-                    ->numeric()
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('plan.nombre')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('estado')
                     ->searchable(),

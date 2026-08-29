@@ -57,7 +57,7 @@ class ClubDashboardController extends Controller
         $cleanSubdomain = strtolower(trim($subdomain));
 
         $complejo = Complejo::withoutGlobalScopes()
-            ->with(['plan.modulos', 'canchas', 'horariosAtencion', 'owner'])
+            ->with(['plan.modulos', 'canchas', 'horariosAtencion', 'owner', 'tipoNegocio'])
             ->where('subdominio', $cleanSubdomain)
             ->first();
 
@@ -80,6 +80,11 @@ class ClubDashboardController extends Controller
                     'uuid' => $complejo->uuid,
                     'nombre' => $complejo->nombre,
                     'subdominio' => $complejo->subdominio,
+                    'tipo_negocio' => $complejo->tipoNegocio ? [
+                        'id' => $complejo->tipoNegocio->id,
+                        'nombre' => $complejo->tipoNegocio->nombre,
+                        'slug' => $complejo->tipoNegocio->slug,
+                    ] : null,
                     'deporte_principal' => $complejo->deporte_principal ?? 'padel',
                     'telefono' => $complejo->telefono,
                     'ciudad' => $complejo->ciudad,
