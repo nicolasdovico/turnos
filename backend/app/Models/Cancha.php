@@ -20,6 +20,15 @@ class Cancha extends Model
         'superficie',
         'techada',
         'precio_base',
+        'precio_con_luz',
+        'iluminacion',
+        'tipo_iluminacion',
+        'camara_grabacion',
+        'marcador_digital',
+        'climatizada',
+        'tipo_cubierta',
+        'tipo_pared',
+        'formato',
         'estado',
     ];
 
@@ -27,8 +36,21 @@ class Cancha extends Model
     {
         return [
             'techada' => 'boolean',
+            'iluminacion' => 'boolean',
+            'camara_grabacion' => 'boolean',
+            'marcador_digital' => 'boolean',
+            'climatizada' => 'boolean',
             'precio_base' => 'decimal:2',
+            'precio_con_luz' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Check if the court's sport supports/requires wall attributes.
+     */
+    public function requiereParedes(): bool
+    {
+        return in_array(strtolower($this->deporte), ['padel', 'squash', 'racquetball'], true);
     }
 
     public function turnos(): HasMany

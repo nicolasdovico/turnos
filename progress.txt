@@ -612,4 +612,25 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * `frontend/app/tenants/[subdomain]/panel/page.tsx`:
     - Limpieza de selectores secundarios para mantener el selector centralizado únicamente en la barra superior.
   * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (22 tests pasados al 100%).
+-------------------------------------------------------------------------------
+[2026-08-29] - GESTIÓN Y EDICIÓN COMPLETA DE CANCHAS CON ATRIBUTOS POR DEPORTE
+-------------------------------------------------------------------------------
+- Backend (Laravel 11 & Eloquent):
+  * Migración `2026_08_29_220001_add_sport_aware_attributes_to_canchas_table.php`:
+    - Campos agregados a `canchas`: `iluminacion`, `tipo_iluminacion`, `precio_con_luz`, `camara_grabacion`, `marcador_digital`, `climatizada`, `tipo_cubierta`, `tipo_pared`, `formato`.
+  * Modelo `Cancha.php`: Fillables, casts y helper `requiereParedes(): bool`.
+  * Controlador `ClubDashboardController.php`:
+    - `POST /api/clubs/{subdomain}/canchas`: Creación con sanitización de atributos por deporte.
+    - `PUT /api/clubs/{subdomain}/canchas/{id}`: Edición completa de configuración, precios base, precios con luz y equipamiento.
+    - `DELETE /api/clubs/{subdomain}/canchas/{id}`: Eliminación segura o desactivación si posee turnos históricos.
+  * Tests: `tests/Feature/ClubCanchaManagementTest.php` (5 tests pasados / 29 aserciones). Total suite: 113 tests (569 aserciones).
+- Frontend Web (Next.js 14 App Router):
+  * Panel de Administración (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+    - Modal interactivo de Alta & Edición de Canchas con inteligencia reactiva según el deporte (Pádel, Tenis, Fútbol, Básquet, Squash).
+    - Adaptación dinámica de campos: selector de superficies y formatos según el deporte, y visibilidad condicional de paredes/cerramiento (activo para Pádel/Squash, oculto para Tenis/Fútbol/Básquet).
+    - Configuración de tarifas dobles: precio base diurno y precio nocturno con luz.
+    - Switches de equipamiento: Iluminación LED/Halógena, Techo Indoor/Outdoor, Cámara de Video/Grabación, Marcador Digital y Climatización.
+    - Tarjetas de canchas enriquecidas con insignias (badges) de características, precios dobles, botón de edición directa (`✏️ Editar`), alternar estado (`⏸️ Pausar / Reactivar`) y eliminación (`🗑️`).
+  * Tests: Vitest suite `tests/authAndOnboarding.test.tsx` (22 tests pasados al 100%).
 ===============================================================================
+

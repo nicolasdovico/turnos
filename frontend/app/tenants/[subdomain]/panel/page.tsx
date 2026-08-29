@@ -33,9 +33,107 @@ interface CanchaItem {
   deporte: string;
   superficie: string;
   precio_base: string | number;
+  precio_con_luz?: string | number | null;
   techada: boolean;
+  iluminacion?: boolean;
+  tipo_iluminacion?: string | null;
+  camara_grabacion?: boolean;
+  marcador_digital?: boolean;
+  climatizada?: boolean;
+  tipo_cubierta?: string | null;
+  tipo_pared?: string | null;
+  formato?: string | null;
   estado: string;
 }
+
+interface SportConfig {
+  nombre: string;
+  superficies: { id: string; label: string }[];
+  formatos: { id: string; label: string }[];
+  tieneParedes: boolean;
+  paredes?: { id: string; label: string }[];
+}
+
+const DEPORTES_CONFIG: Record<string, SportConfig> = {
+  padel: {
+    nombre: "Pádel",
+    superficies: [
+      { id: "sintetico_wpt", label: "Césped Sintético Texturado (WPT)" },
+      { id: "sintetico_monofilamento", label: "Césped Sintético Monofilamento" },
+      { id: "sintetico_fibrilado", label: "Césped Sintético Fibrilado" },
+      { id: "cemento", label: "Cemento / Hormigón" },
+    ],
+    formatos: [
+      { id: "dobles", label: "Dobles (2 vs 2 estándar)" },
+      { id: "single", label: "Individual / Single (1 vs 1)" },
+    ],
+    tieneParedes: true,
+    paredes: [
+      { id: "cristal_panoramico", label: "Cristal Panorámico (Sin pilares)" },
+      { id: "cristal_estandar", label: "Cristal Estándar 10/12mm" },
+      { id: "muro_cemento", label: "Muro / Pared de Cemento" },
+      { id: "reja", label: "Reja Perimetral" },
+    ],
+  },
+  tenis: {
+    nombre: "Tenis",
+    superficies: [
+      { id: "polvo_ladrillo", label: "Polvo de Ladrillo (Clay)" },
+      { id: "cemento_rapida", label: "Cemento / Cancha Rápida (Hard Court)" },
+      { id: "cesped_natural", label: "Césped Natural (Grass)" },
+      { id: "sintetico", label: "Césped Sintético" },
+    ],
+    formatos: [
+      { id: "single_dobles", label: "Single & Dobles (Estándar)" },
+      { id: "single", label: "Exclusivo Single" },
+    ],
+    tieneParedes: false,
+  },
+  futbol: {
+    nombre: "Fútbol",
+    superficies: [
+      { id: "sintetico_caucho", label: "Césped Sintético con Caucho" },
+      { id: "sintetico_sin_caucho", label: "Césped Sintético Fibrilado" },
+      { id: "cesped_natural", label: "Césped Natural" },
+      { id: "parquet", label: "Parquet / Piso Flotante (Futsal)" },
+      { id: "cemento", label: "Cemento / Baldosa" },
+    ],
+    formatos: [
+      { id: "f5", label: "Fútbol 5 (Futsal)" },
+      { id: "f7", label: "Fútbol 7" },
+      { id: "f8", label: "Fútbol 8" },
+      { id: "f11", label: "Fútbol 11 (Cancha Reglamentaria)" },
+    ],
+    tieneParedes: false,
+  },
+  basquet: {
+    nombre: "Básquet",
+    superficies: [
+      { id: "parquet_madera", label: "Parquet / Madera Flotante" },
+      { id: "cemento_pulido", label: "Cemento Pulido / Pintura Epoxi" },
+      { id: "goma_poliuretano", label: "Goma / Poliuretano" },
+    ],
+    formatos: [
+      { id: "5v5", label: "5 vs 5 (Cancha Completa)" },
+      { id: "3v3", label: "3 vs 3 (Media Cancha)" },
+    ],
+    tieneParedes: false,
+  },
+  squash: {
+    nombre: "Squash",
+    superficies: [
+      { id: "parquet", label: "Parquet / Madera Natural" },
+    ],
+    formatos: [
+      { id: "individual", label: "Individual (Estándar)" },
+    ],
+    tieneParedes: true,
+    paredes: [
+      { id: "cristal_trasero", label: "Frontis Tradicional + Cristal Trasero" },
+      { id: "cuatro_cristales", label: "Cancha Totalmente de Cristal" },
+    ],
+  },
+};
 
 interface HorarioItem {
   id: number;
@@ -137,14 +235,88 @@ export default function ClubAdminPanel() {
   const [horarios, setHorarios] = useState<HorarioItem[]>([]);
   const [stats, setStats] = useState({ total_canchas: 0, total_turnos: 0, modulos_count: 0 });
 
-  // Modal nueva cancha
-  const [showAddCancha, setShowAddCancha] = useState(false);
-  const [newCanchaNombre, setNewCanchaNombre] = useState("");
-  const [newCanchaSuperficie, setNewCanchaSuperficie] = useState("cristal");
-  const [newCanchaPrecio, setNewCanchaPrecio] = useState("8000");
-  const [newCanchaTechada, setNewCanchaTechada] = useState(false);
+  // Modal Alta / Edición de Cancha
+  const [showCanchaModal, setShowCanchaModal] = useState(false);
+  const [editingCancha, setEditingCancha] = useState<CanchaItem | null>(null);
+
+  const [canchaNombre, setCanchaNombre] = useState("");
+  const [canchaDeporte, setCanchaDeporte] = useState("padel");
+  const [canchaSuperficie, setCanchaSuperficie] = useState("sintetico_wpt");
+  const [canchaFormato, setCanchaFormato] = useState("dobles");
+  const [canchaTipoPared, setCanchaTipoPared] = useState("cristal_panoramico");
+  const [canchaPrecioBase, setCanchaPrecioBase] = useState("8000");
+  const [canchaPrecioConLuz, setCanchaPrecioConLuz] = useState("");
+  const [canchaTechada, setCanchaTechada] = useState(false);
+  const [canchaTipoCubierta, setCanchaTipoCubierta] = useState("outdoor");
+  const [canchaIluminacion, setCanchaIluminacion] = useState(true);
+  const [canchaTipoIluminacion, setCanchaTipoIluminacion] = useState("led");
+  const [canchaCamaraGrabacion, setCanchaCamaraGrabacion] = useState(false);
+  const [canchaMarcadorDigital, setCanchaMarcadorDigital] = useState(false);
+  const [canchaClimatizada, setCanchaClimatizada] = useState(false);
+  const [canchaEstado, setCanchaEstado] = useState("activo");
+
   const [isSavingCancha, setIsSavingCancha] = useState(false);
   const [canchaSuccessMsg, setCanchaSuccessMsg] = useState<string | null>(null);
+
+  const openCreateModal = () => {
+    setEditingCancha(null);
+    const dep = complejo?.deporte_principal || "padel";
+    const depConfig = DEPORTES_CONFIG[dep] || DEPORTES_CONFIG.padel;
+
+    setCanchaNombre(`Cancha ${(canchas.length + 1)}`);
+    setCanchaDeporte(dep);
+    setCanchaSuperficie(depConfig.superficies[0]?.id || "sintetico");
+    setCanchaFormato(depConfig.formatos[0]?.id || "dobles");
+    setCanchaTipoPared(depConfig.paredes ? depConfig.paredes[0]?.id : "");
+    setCanchaPrecioBase("8000");
+    setCanchaPrecioConLuz("");
+    setCanchaTechada(false);
+    setCanchaTipoCubierta("outdoor");
+    setCanchaIluminacion(true);
+    setCanchaTipoIluminacion("led");
+    setCanchaCamaraGrabacion(false);
+    setCanchaMarcadorDigital(false);
+    setCanchaClimatizada(false);
+    setCanchaEstado("activo");
+
+    setShowCanchaModal(true);
+  };
+
+  const openEditModal = (c: CanchaItem) => {
+    setEditingCancha(c);
+    const dep = c.deporte || complejo?.deporte_principal || "padel";
+    const depConfig = DEPORTES_CONFIG[dep] || DEPORTES_CONFIG.padel;
+
+    setCanchaNombre(c.nombre);
+    setCanchaDeporte(dep);
+    setCanchaSuperficie(c.superficie || depConfig.superficies[0]?.id);
+    setCanchaFormato(c.formato || depConfig.formatos[0]?.id);
+    setCanchaTipoPared(c.tipo_pared || (depConfig.paredes ? depConfig.paredes[0]?.id : ""));
+    setCanchaPrecioBase(String(c.precio_base || "8000"));
+    setCanchaPrecioConLuz(c.precio_con_luz ? String(c.precio_con_luz) : "");
+    setCanchaTechada(Boolean(c.techada));
+    setCanchaTipoCubierta(c.tipo_cubierta || (c.techada ? "indoor" : "outdoor"));
+    setCanchaIluminacion(c.iluminacion !== undefined ? Boolean(c.iluminacion) : true);
+    setCanchaTipoIluminacion(c.tipo_iluminacion || "led");
+    setCanchaCamaraGrabacion(Boolean(c.camara_grabacion));
+    setCanchaMarcadorDigital(Boolean(c.marcador_digital));
+    setCanchaClimatizada(Boolean(c.climatizada));
+    setCanchaEstado(c.estado || "activo");
+
+    setShowCanchaModal(true);
+  };
+
+  const handleDeporteChange = (newDeporte: string) => {
+    setCanchaDeporte(newDeporte);
+    const depConfig = DEPORTES_CONFIG[newDeporte] || DEPORTES_CONFIG.padel;
+    setCanchaSuperficie(depConfig.superficies[0]?.id || "sintetico");
+    setCanchaFormato(depConfig.formatos[0]?.id || "");
+    if (depConfig.tieneParedes && depConfig.paredes) {
+      setCanchaTipoPared(depConfig.paredes[0]?.id || "cristal_estandar");
+    } else {
+      setCanchaTipoPared("");
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -198,45 +370,117 @@ export default function ClubAdminPanel() {
     fetchDashboardData();
   }, [subdomain, token]);
 
-  const handleCreateCancha = async (e: React.FormEvent) => {
+  const handleSaveCancha = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCanchaNombre.trim()) return;
+    if (!canchaNombre.trim()) return;
 
     setIsSavingCancha(true);
     setCanchaSuccessMsg(null);
 
+    const depConfig = DEPORTES_CONFIG[canchaDeporte] || DEPORTES_CONFIG.padel;
+
+    const payload = {
+      nombre: canchaNombre,
+      deporte: canchaDeporte,
+      superficie: canchaSuperficie,
+      formato: canchaFormato,
+      tipo_pared: depConfig.tieneParedes ? canchaTipoPared : null,
+      precio_base: parseFloat(canchaPrecioBase) || 8000,
+      precio_con_luz: canchaPrecioConLuz ? parseFloat(canchaPrecioConLuz) : null,
+      techada: canchaTechada,
+      tipo_cubierta: canchaTechada ? "indoor" : canchaTipoCubierta,
+      iluminacion: canchaIluminacion,
+      tipo_iluminacion: canchaIluminacion ? canchaTipoIluminacion : null,
+      camara_grabacion: canchaCamaraGrabacion,
+      marcador_digital: canchaMarcadorDigital,
+      climatizada: canchaClimatizada,
+      estado: canchaEstado,
+    };
+
     try {
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/canchas`, {
-        method: "POST",
+      const url = editingCancha
+        ? `${API_BASE}/clubs/${subdomain}/canchas/${editingCancha.id}`
+        : `${API_BASE}/clubs/${subdomain}/canchas`;
+
+      const method = editingCancha ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "Error al guardar la cancha.");
+        return;
+      }
+
+      setCanchaSuccessMsg(
+        editingCancha ? "¡Cancha actualizada con éxito!" : "¡Cancha agregada con éxito!"
+      );
+      setShowCanchaModal(false);
+      setEditingCancha(null);
+      fetchDashboardData();
+    } catch (e: any) {
+      alert(e.message || "Error de conexión con el servidor.");
+    } finally {
+      setIsSavingCancha(false);
+    }
+  };
+
+  const handleToggleEstado = async (c: CanchaItem) => {
+    const nuevoEstado = c.estado === "activo" ? "mantenimiento" : "activo";
+    try {
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/canchas/${c.id}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          nombre: newCanchaNombre,
-          superficie: newCanchaSuperficie,
-          precio_base: parseFloat(newCanchaPrecio) || 8000,
-          techada: newCanchaTechada,
-          deporte: complejo?.deporte_principal || "padel",
+          nombre: c.nombre,
+          precio_base: c.precio_base,
+          estado: nuevoEstado,
         }),
+      });
+      if (res.ok) {
+        fetchDashboardData();
+      }
+    } catch (e) {
+      console.error("Error al alternar estado:", e);
+    }
+  };
+
+  const handleDeleteCancha = async (c: CanchaItem) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar o pausar la "${c.nombre}"?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/canchas/${c.id}`, {
+        method: "DELETE",
+        headers: {
+          "Accept": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || "Error al crear la cancha.");
-        return;
+      if (res.ok) {
+        setCanchaSuccessMsg(data.message || "Cancha procesada con éxito.");
+        fetchDashboardData();
+      } else {
+        alert(data.message || "Error al eliminar la cancha.");
       }
-
-      setCanchaSuccessMsg("¡Cancha agregada con éxito!");
-      setNewCanchaNombre("");
-      setShowAddCancha(false);
-      fetchDashboardData();
     } catch (e: any) {
       alert(e.message || "Error de conexión.");
-    } finally {
-      setIsSavingCancha(false);
     }
   };
 
@@ -400,112 +644,443 @@ export default function ClubAdminPanel() {
         {/* ========================================================================= */}
         {activeTab === "canchas" && (
           <div className="mt-8 space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white">Canchas Disponibles</h2>
-                <p className="text-xs text-slate-400">Configura tus canchas, superficies y precios por turno</p>
+                <p className="text-xs text-slate-400">
+                  Configura tus canchas, tarifas, superficies y equipamiento tecnológico del mercado
+                </p>
               </div>
               <button
-                onClick={() => setShowAddCancha(!showAddCancha)}
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-md transition"
+                onClick={openCreateModal}
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5 self-start sm:self-auto"
               >
-                {showAddCancha ? "✕ Cancelar" : "+ Agregar Cancha"}
+                <span>+ Nueva Cancha</span>
               </button>
             </div>
 
             {canchaSuccessMsg && (
-              <div className="rounded-2xl bg-emerald-950/60 border border-emerald-500/30 p-4 text-xs font-bold text-emerald-300">
-                {canchaSuccessMsg}
+              <div className="rounded-2xl bg-emerald-950/60 border border-emerald-500/30 p-4 text-xs font-bold text-emerald-300 flex items-center justify-between">
+                <span>{canchaSuccessMsg}</span>
+                <button onClick={() => setCanchaSuccessMsg(null)} className="text-emerald-400 hover:text-white text-sm">✕</button>
               </div>
             )}
 
-            {/* Modal / Form Nueva Cancha */}
-            {showAddCancha && (
-              <form onSubmit={handleCreateCancha} className="rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-4">
-                <h3 className="text-base font-bold text-white">Nueva Cancha de {complejo?.deporte_principal || "Pádel"}</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Nombre de Cancha *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej. Cancha 3 (Central)"
-                      value={newCanchaNombre}
-                      onChange={(e) => setNewCanchaNombre(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Superficie</label>
-                    <select
-                      value={newCanchaSuperficie}
-                      onChange={(e) => setNewCanchaSuperficie(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+            {/* Modal Alta / Edición de Cancha con Inteligencia por Deporte */}
+            {showCanchaModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+                <div className="relative w-full max-w-2xl rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">
+                        {editingCancha ? `✏️ Editar: ${editingCancha.nombre}` : "➕ Nueva Cancha"}
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Los atributos y superficies se adaptan inteligentemente según el deporte elegido
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCanchaModal(false)}
+                      className="rounded-xl p-2 text-slate-400 hover:text-white hover:bg-slate-800 transition"
                     >
-                      <option value="cristal">Cristal / Panorámica</option>
-                      <option value="sintetico">Césped Sintético</option>
-                      <option value="cemento">Cemento / Rápida</option>
-                      <option value="polvo">Polvo de Ladrillo</option>
-                    </select>
+                      ✕
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Precio por Turno ($)</label>
-                    <input
-                      type="number"
-                      required
-                      value={newCanchaPrecio}
-                      onChange={(e) => setNewCanchaPrecio(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                    />
-                  </div>
-                </div>
 
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddCancha(false)}
-                    className="rounded-xl px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSavingCancha}
-                    className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2 text-xs font-bold text-white transition disabled:opacity-50"
-                  >
-                    {isSavingCancha ? "Guardando..." : "Guardar Cancha"}
-                  </button>
+                  <form onSubmit={handleSaveCancha} className="space-y-6">
+                    {/* SECCIÓN 1: DEPORTE Y CONFIGURACIÓN BÁSICA */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                        1. Deporte y Formato
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Deporte *</label>
+                          <select
+                            value={canchaDeporte}
+                            onChange={(e) => handleDeporteChange(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                          >
+                            <option value="padel">🎾 Pádel</option>
+                            <option value="tenis">🎾 Tenis</option>
+                            <option value="futbol">⚽ Fútbol</option>
+                            <option value="basquet">🏀 Básquet</option>
+                            <option value="squash">🏸 Squash</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Nombre de Cancha *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. Cancha 1 (Central Panorámica)"
+                            value={canchaNombre}
+                            onChange={(e) => setCanchaNombre(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Superficie</label>
+                          <select
+                            value={canchaSuperficie}
+                            onChange={(e) => setCanchaSuperficie(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                          >
+                            {(DEPORTES_CONFIG[canchaDeporte]?.superficies || []).map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Formato / Modalidad</label>
+                          <select
+                            value={canchaFormato}
+                            onChange={(e) => setCanchaFormato(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                          >
+                            {(DEPORTES_CONFIG[canchaDeporte]?.formatos || []).map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Selector de Paredes / Cerramiento: SÓLO para deportes con paredes (Pádel, Squash) */}
+                      {DEPORTES_CONFIG[canchaDeporte]?.tieneParedes && (
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+                            Tipo de Pared / Cerramiento (Exclusivo {DEPORTES_CONFIG[canchaDeporte].nombre})
+                          </label>
+                          <select
+                            value={canchaTipoPared}
+                            onChange={(e) => setCanchaTipoPared(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                          >
+                            {(DEPORTES_CONFIG[canchaDeporte]?.paredes || []).map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECCIÓN 2: TARIFAS Y PRECIOS */}
+                    <div className="space-y-4 pt-4 border-t border-slate-800">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                        2. Tarifas y Precios por Turno
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+                            Precio Base Diurno ($) *
+                          </label>
+                          <input
+                            type="number"
+                            required
+                            min="0"
+                            step="100"
+                            placeholder="Ej. 8000"
+                            value={canchaPrecioBase}
+                            onChange={(e) => setCanchaPrecioBase(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+                            Precio Nocturno / con Luz ($) <span className="text-slate-500 lowercase">(opcional)</span>
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="100"
+                            placeholder="Ej. 10000"
+                            value={canchaPrecioConLuz}
+                            onChange={(e) => setCanchaPrecioConLuz(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECCIÓN 3: EQUIPAMIENTO TECNOLÓGICO Y AMENITIES DEL MERCADO */}
+                    <div className="space-y-4 pt-4 border-t border-slate-800">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                        3. Equipamiento & Atributos del Mercado
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Iluminación */}
+                        <label className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition">
+                          <input
+                            type="checkbox"
+                            checked={canchaIluminacion}
+                            onChange={(e) => setCanchaIluminacion(e.target.checked)}
+                            className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
+                          />
+                          <div className="text-xs">
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>💡</span> Iluminación Artificial
+                            </div>
+                            <div className="text-slate-400 text-[11px]">Habilitada para turnos de noche</div>
+                          </div>
+                        </label>
+
+                        {/* Techada / Cubierta */}
+                        <label className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition">
+                          <input
+                            type="checkbox"
+                            checked={canchaTechada}
+                            onChange={(e) => {
+                              setCanchaTechada(e.target.checked);
+                              setCanchaTipoCubierta(e.target.checked ? "indoor" : "outdoor");
+                            }}
+                            className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
+                          />
+                          <div className="text-xs">
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>🏠</span> Techada / Cubierta (Indoor)
+                            </div>
+                            <div className="text-slate-400 text-[11px]">Protegida contra lluvia y sol</div>
+                          </div>
+                        </label>
+
+                        {/* Cámara de Grabación */}
+                        <label className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition">
+                          <input
+                            type="checkbox"
+                            checked={canchaCamaraGrabacion}
+                            onChange={(e) => setCanchaCamaraGrabacion(e.target.checked)}
+                            className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
+                          />
+                          <div className="text-xs">
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>📹</span> Cámara de Grabación
+                            </div>
+                            <div className="text-slate-400 text-[11px]">Grabación y replay de jugadas</div>
+                          </div>
+                        </label>
+
+                        {/* Marcador Digital */}
+                        <label className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition">
+                          <input
+                            type="checkbox"
+                            checked={canchaMarcadorDigital}
+                            onChange={(e) => setCanchaMarcadorDigital(e.target.checked)}
+                            className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
+                          />
+                          <div className="text-xs">
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>🔢</span> Marcador Digital
+                            </div>
+                            <div className="text-slate-400 text-[11px]">Tanteador electrónico en vivo</div>
+                          </div>
+                        </label>
+
+                        {/* Climatización */}
+                        <label className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 cursor-pointer hover:border-slate-700 transition">
+                          <input
+                            type="checkbox"
+                            checked={canchaClimatizada}
+                            onChange={(e) => setCanchaClimatizada(e.target.checked)}
+                            className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
+                          />
+                          <div className="text-xs">
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>❄️</span> Climatización
+                            </div>
+                            <div className="text-slate-400 text-[11px]">Aire acondicionado / Calefacción</div>
+                          </div>
+                        </label>
+
+                        {/* Estado */}
+                        <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
+                          <div className="text-xs">
+                            <div className="font-bold text-white">⚙️ Estado Operativo</div>
+                            <div className="text-slate-400 text-[11px]">Disponibilidad de reservas</div>
+                          </div>
+                          <select
+                            value={canchaEstado}
+                            onChange={(e) => setCanchaEstado(e.target.value)}
+                            className="rounded-lg bg-slate-900 border border-slate-700 text-xs px-2.5 py-1 text-white"
+                          >
+                            <option value="activo">🟢 Activa</option>
+                            <option value="mantenimiento">🟡 Mantenimiento</option>
+                            <option value="inactivo">⚪ Inactiva</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setShowCanchaModal(false)}
+                        className="rounded-xl px-5 py-2.5 text-xs font-bold text-slate-400 hover:text-white transition"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingCancha}
+                        className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
+                      >
+                        {isSavingCancha ? "Guardando..." : editingCancha ? "Actualizar Cancha" : "Crear Cancha"}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              </form>
+              </div>
             )}
 
-            {/* Listado de Canchas */}
+            {/* Listado Enriquecido de Canchas */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {canchas.map((c) => (
-                <div key={c.id} className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-3">
-                      <h3 className="font-extrabold text-lg text-white">{c.nombre}</h3>
-                      <span className="rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2.5 py-0.5 uppercase">
-                        {c.estado}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400">
-                      Deporte: <strong className="text-slate-200 capitalize">{c.deporte}</strong> • Superficie: <strong className="text-slate-200 capitalize">{c.superficie}</strong>
-                    </p>
-                    <div className="mt-4 text-2xl font-black text-emerald-400">
-                      ${c.precio_base} <span className="text-xs font-normal text-slate-400">/ hora</span>
-                    </div>
-                  </div>
+              {canchas.map((c) => {
+                const sportCfg = DEPORTES_CONFIG[c.deporte?.toLowerCase()] || DEPORTES_CONFIG.padel;
+                const tieneParedes = sportCfg?.tieneParedes;
 
-                  <div className="mt-6 border-t border-slate-800 pt-4 flex items-center justify-between text-xs text-slate-400">
-                    <span>{c.techada ? "🏠 Techada" : "☀️ Descubierta"}</span>
-                    <Link href="/" className="text-emerald-400 font-bold hover:underline">
-                      Ver Grilla →
-                    </Link>
+                return (
+                  <div
+                    key={c.id}
+                    className={`rounded-3xl p-6 flex flex-col justify-between transition border ${
+                      c.estado === "mantenimiento"
+                        ? "bg-slate-900/60 border-amber-500/40"
+                        : c.estado === "inactivo"
+                        ? "bg-slate-950/60 border-slate-900 opacity-60"
+                        : "bg-slate-900 border-slate-800 hover:border-emerald-500/40"
+                    }`}
+                  >
+                    <div>
+                      {/* Card Header */}
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-extrabold text-lg text-white">{c.nombre}</h3>
+                          <div className="text-xs text-slate-400 capitalize font-medium">
+                            {c.deporte} • {c.formato || "Estándar"}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full text-[10px] font-bold px-2.5 py-0.5 uppercase ${
+                              c.estado === "activo"
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                : c.estado === "mantenimiento"
+                                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                : "bg-slate-800 text-slate-400 border border-slate-700"
+                            }`}
+                          >
+                            {c.estado}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Attributes Badges / Chips */}
+                      <div className="flex flex-wrap gap-1.5 my-3">
+                        <span className="rounded-lg bg-slate-950/80 border border-slate-800 px-2 py-0.5 text-[11px] text-slate-300 font-medium">
+                          👟 {c.superficie}
+                        </span>
+
+                        {tieneParedes && c.tipo_pared && (
+                          <span className="rounded-lg bg-slate-950/80 border border-slate-800 px-2 py-0.5 text-[11px] text-emerald-300 font-medium">
+                            🪟 {c.tipo_pared}
+                          </span>
+                        )}
+
+                        <span className="rounded-lg bg-slate-950/80 border border-slate-800 px-2 py-0.5 text-[11px] text-slate-300 font-medium">
+                          {c.techada ? "🏠 Techada (Indoor)" : "☀️ Descubierta (Outdoor)"}
+                        </span>
+
+                        {c.iluminacion !== false && (
+                          <span className="rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 text-[11px] font-medium">
+                            💡 Luz {c.tipo_iluminacion || "LED"}
+                          </span>
+                        )}
+
+                        {Boolean(c.camara_grabacion) && (
+                          <span className="rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 text-[11px] font-medium">
+                            📹 Cámara Grabación
+                          </span>
+                        )}
+
+                        {Boolean(c.marcador_digital) && (
+                          <span className="rounded-lg bg-sky-500/10 text-sky-300 border border-sky-500/20 px-2 py-0.5 text-[11px] font-medium">
+                            🔢 Marcador Digital
+                          </span>
+                        )}
+
+                        {Boolean(c.climatizada) && (
+                          <span className="rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 text-[11px] font-medium">
+                            ❄️ Climatizada
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Pricing Details */}
+                      <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-baseline justify-between">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-500">Tarifa Turno:</span>
+                          <div className="text-xl font-black text-emerald-400">
+                            ${c.precio_base} <span className="text-xs font-normal text-slate-400">/ hora</span>
+                          </div>
+                        </div>
+
+                        {c.precio_con_luz && (
+                          <div className="text-right">
+                            <span className="text-[10px] uppercase font-bold text-amber-400/80">🌙 Con Luz:</span>
+                            <div className="text-base font-bold text-amber-300">
+                              ${c.precio_con_luz}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => openEditModal(c)}
+                          className="rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-bold text-slate-200 transition"
+                          title="Editar configuración y atributos"
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          onClick={() => handleToggleEstado(c)}
+                          className="rounded-xl bg-slate-950 hover:bg-slate-800 px-2.5 py-1.5 text-xs font-bold text-slate-400 hover:text-amber-300 border border-slate-800 transition"
+                          title={c.estado === "activo" ? "Poner en mantenimiento" : "Reactivar"}
+                        >
+                          {c.estado === "activo" ? "⏸️" : "▶️"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCancha(c)}
+                          className="rounded-xl bg-slate-950 hover:bg-rose-950/60 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:text-rose-400 border border-slate-800 hover:border-rose-800 transition"
+                          title="Eliminar o inactivar"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+
+                      <Link href="/" className="text-emerald-400 font-bold hover:underline text-xs">
+                        Ver Grilla →
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

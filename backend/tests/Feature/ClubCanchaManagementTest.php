@@ -1,0 +1,211 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Cancha;
+use App\Models\Complejo;
+use App\Models\Plan;
+use App\Models\Turno;
+use App\Models\User;
+use Database\Seeders\ModuloSeeder;
+use Database\Seeders\PlanSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ClubCanchaManagementTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected Complejo $complejo;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed([
+            ModuloSeeder::class,
+            PlanSeeder::class,
+        ]);
+
+        $this->complejo = Complejo::create([
+            'nombre' => 'Club Pádel & Tenis Pro',
+            'subdominio' => 'padel-tenis-pro',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+    }
+
+    public function test_store_cancha_with_sport_aware_attributes_for_padel(): void
+    {
+        $payload = [
+            'nombre' => 'Cancha 1 - Central Panorámica',
+            'deporte' => 'padel',
+            'superficie' => 'sintetico_wpt',
+            'precio_base' => 10000,
+            'precio_con_luz' => 12500,
+            'techada' => true,
+            'iluminacion' => true,
+            'tipo_iluminacion' => 'led',
+            'camara_grabacion' => true,
+            'marcador_digital' => true,
+            'climatizada' => true,
+            'tipo_cubierta' => 'indoor',
+            'tipo_pared' => 'cristal_panoramico',
+            'formato' => 'dobles',
+            'estado' => 'activo',
+        ];
+
+        $response = $this->postJson('/api/clubs/padel-tenis-pro/canchas', $payload);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('cancha.nombre', 'Cancha 1 - Central Panorámica')
+            ->assertJsonPath('cancha.deporte', 'padel')
+            ->assertJsonPath('cancha.tipo_pared', 'cristal_panoramico')
+            ->assertJsonPath('cancha.camara_grabacion', true)
+            ->assertJsonPath('cancha.precio_con_luz', '12500.00');
+
+        $this->assertDatabaseHas('canchas', [
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha 1 - Central Panorámica',
+            'tipo_pared' => 'cristal_panoramico',
+            'camara_grabacion' => true,
+        ]);
+    }
+
+    public function test_store_cancha_for_tenis_or_futbol_sanitizes_walls_to_null(): void
+    {
+        $payload = [
+            'nombre' => 'Cancha 2 - Tenis Clay',
+            'deporte' => 'tenis',
+            'superficie' => 'polvo_ladrillo',
+            'precio_base' => 9000,
+            'precio_con_luz' => 11000,
+            'techada' => false,
+            'iluminacion' => true,
+            'tipo_pared' => 'cristal_panoramico', // Irrelevant for tennis, should be sanitized
+            'formato' => 'single',
+            'estado' => 'activo',
+        ];
+
+        $response = $this->postJson('/api/clubs/padel-tenis-pro/canchas', $payload);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('cancha.deporte', 'tenis')
+            ->assertJsonPath('cancha.tipo_pared', null);
+
+        $this->assertDatabaseHas('canchas', [
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha 2 - Tenis Clay',
+            'tipo_pared' => null,
+        ]);
+    }
+
+    public function test_update_cancha_attributes_and_pricing(): void
+    {
+        $cancha = Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha Original',
+            'deporte' => 'padel',
+            'superficie' => 'cemento',
+            'precio_base' => 8000,
+            'techada' => false,
+            'estado' => 'activo',
+        ]);
+
+        $updatePayload = [
+            'nombre' => 'Cancha Renombrada Panorámica',
+            'deporte' => 'padel',
+            'superficie' => 'sintetico_monofilamento',
+            'precio_base' => 12000,
+            'precio_con_luz' => 14000,
+            'techada' => true,
+            'iluminacion' => true,
+            'tipo_iluminacion' => 'led',
+            'camara_grabacion' => true,
+            'marcador_digital' => true,
+            'climatizada' => false,
+            'tipo_cubierta' => 'indoor',
+            'tipo_pared' => 'cristal_panoramico',
+            'formato' => 'dobles',
+            'estado' => 'mantenimiento',
+        ];
+
+        $response = $this->putJson("/api/clubs/padel-tenis-pro/canchas/{$cancha->id}", $updatePayload);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('cancha.nombre', 'Cancha Renombrada Panorámica')
+            ->assertJsonPath('cancha.precio_base', '12000.00')
+            ->assertJsonPath('cancha.precio_con_luz', '14000.00')
+            ->assertJsonPath('cancha.estado', 'mantenimiento')
+            ->assertJsonPath('cancha.camara_grabacion', true);
+
+        $this->assertDatabaseHas('canchas', [
+            'id' => $cancha->id,
+            'nombre' => 'Cancha Renombrada Panorámica',
+            'estado' => 'mantenimiento',
+            'superficie' => 'sintetico_monofilamento',
+        ]);
+    }
+
+    public function test_destroy_cancha_without_turnos_deletes_permanently(): void
+    {
+        $cancha = Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha a Borrar',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 8000,
+            'estado' => 'activo',
+        ]);
+
+        $response = $this->deleteJson("/api/clubs/padel-tenis-pro/canchas/{$cancha->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('action', 'deleted');
+
+        $this->assertDatabaseMissing('canchas', [
+            'id' => $cancha->id,
+        ]);
+    }
+
+    public function test_destroy_cancha_with_turnos_marks_it_inactiva(): void
+    {
+        $user = User::factory()->create();
+
+        $cancha = Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha con Reservas',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 8000,
+            'estado' => 'activo',
+        ]);
+
+        Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $cancha->id,
+            'user_id' => $user->id,
+            'fecha' => '2026-09-01',
+            'hora_inicio' => '18:00:00',
+            'hora_fin' => '19:00:00',
+            'precio' => 8000,
+            'estado' => 'confirmado',
+        ]);
+
+        $response = $this->deleteJson("/api/clubs/padel-tenis-pro/canchas/{$cancha->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('action', 'deactivated');
+
+        $this->assertDatabaseHas('canchas', [
+            'id' => $cancha->id,
+            'estado' => 'inactivo',
+        ]);
+    }
+}

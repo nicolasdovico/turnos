@@ -136,14 +136,78 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Mailpit Activo/i)).toBeDefined();
   });
 
-  it("renders Club Admin Panel with courts, modules, schedules and stats tabs", () => {
+  it("renders Club Admin Panel with sport-aware courts, attributes, and modal", async () => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Nico Padel",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+                tipo_negocio: { id: 1, nombre: "Club", slug: "club" },
+              },
+              plan: {
+                id: 1,
+                nombre: "Oro",
+                slug: "oro",
+                modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }],
+              },
+              canchas: [
+                {
+                  id: 1,
+                  nombre: "Cancha 1 (Panorámica)",
+                  deporte: "padel",
+                  superficie: "sintetico_wpt",
+                  precio_base: 8000,
+                  precio_con_luz: 10000,
+                  techada: true,
+                  iluminacion: true,
+                  tipo_pared: "cristal_panoramico",
+                  camara_grabacion: true,
+                  marcador_digital: true,
+                  estado: "activo",
+                },
+              ],
+              stats: { total_canchas: 1, total_turnos: 0, modulos_count: 7 },
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({ data: [] }) } as any;
+    });
+
     render(
       <AuthProvider>
         <ClubAdminPanel />
       </AuthProvider>
     );
 
-    expect(screen.getByText(/nico-padel/i)).toBeDefined();
+    expect(await screen.findByText(/Canchas Disponibles/i)).toBeDefined();
+    expect(await screen.findByText(/Cancha 1 \(Panorámica\)/i)).toBeDefined();
+    expect(await screen.findByText(/Cámara Grabación/i)).toBeDefined();
+    expect(await screen.findByText(/\+ Nueva Cancha/i)).toBeDefined();
+
+    // Open modal
+    const addBtn = screen.getByText(/\+ Nueva Cancha/i);
+    fireEvent.click(addBtn);
+
+    expect(await screen.findByText("➕ Nueva Cancha")).toBeDefined();
+    expect(screen.getByText(/1\. Deporte y Formato/i)).toBeDefined();
+    expect(screen.getByText(/2\. Tarifas y Precios/i)).toBeDefined();
+    expect(screen.getByText(/3\. Equipamiento & Atributos del Mercado/i)).toBeDefined();
+    expect(screen.getByText(/Iluminación Artificial/i)).toBeDefined();
   });
 
   it("renders Portal Global page with features and marketplace banner", () => {

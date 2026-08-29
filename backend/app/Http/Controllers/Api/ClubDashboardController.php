@@ -116,7 +116,7 @@ class ClubDashboardController extends Controller
     }
 
     /**
-     * Crear una nueva cancha para el club.
+     * Crear una nueva cancha para el club con atributos adaptativos por deporte.
      */
     public function storeCancha(Request $request, string $subdomain): JsonResponse
     {
@@ -138,17 +138,40 @@ class ClubDashboardController extends Controller
             'deporte' => 'nullable|string|max:50',
             'superficie' => 'nullable|string|max:50',
             'precio_base' => 'required|numeric|min:0',
+            'precio_con_luz' => 'nullable|numeric|min:0',
             'techada' => 'boolean',
+            'iluminacion' => 'boolean',
+            'tipo_iluminacion' => 'nullable|string|max:50',
+            'camara_grabacion' => 'boolean',
+            'marcador_digital' => 'boolean',
+            'climatizada' => 'boolean',
+            'tipo_cubierta' => 'nullable|string|max:50',
+            'tipo_pared' => 'nullable|string|max:50',
+            'formato' => 'nullable|string|max:50',
+            'estado' => 'nullable|string|in:activo,mantenimiento,inactivo',
         ]);
+
+        $deporte = strtolower($validated['deporte'] ?? ($complejo->deporte_principal ?? 'padel'));
+        $requiereParedes = in_array($deporte, ['padel', 'squash', 'racquetball'], true);
+        $tipoPared = $requiereParedes ? ($validated['tipo_pared'] ?? null) : null;
 
         $cancha = Cancha::create([
             'complejo_id' => $complejo->id,
             'nombre' => $validated['nombre'],
-            'deporte' => $validated['deporte'] ?? ($complejo->deporte_principal ?? 'padel'),
+            'deporte' => $deporte,
             'superficie' => $validated['superficie'] ?? 'cristal',
             'precio_base' => $validated['precio_base'],
+            'precio_con_luz' => $validated['precio_con_luz'] ?? null,
             'techada' => $validated['techada'] ?? false,
-            'estado' => 'activo',
+            'iluminacion' => $validated['iluminacion'] ?? true,
+            'tipo_iluminacion' => $validated['tipo_iluminacion'] ?? 'led',
+            'camara_grabacion' => $validated['camara_grabacion'] ?? false,
+            'marcador_digital' => $validated['marcador_digital'] ?? false,
+            'climatizada' => $validated['climatizada'] ?? false,
+            'tipo_cubierta' => $validated['tipo_cubierta'] ?? ($validated['techada'] ?? false ? 'indoor' : 'outdoor'),
+            'tipo_pared' => $tipoPared,
+            'formato' => $validated['formato'] ?? null,
+            'estado' => $validated['estado'] ?? 'activo',
         ]);
 
         return response()->json([
@@ -156,5 +179,133 @@ class ClubDashboardController extends Controller
             'message' => 'Cancha creada exitosamente.',
             'cancha' => $cancha,
         ], 201);
+    }
+
+    /**
+     * Actualizar una cancha existente con atributos deportivos y configuración de precios.
+     */
+    public function updateCancha(Request $request, string $subdomain, int $canchaId): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $cancha = Cancha::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->where('id', $canchaId)
+            ->first();
+
+        if (!$cancha) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cancha no encontrada.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:255',
+            'deporte' => 'nullable|string|max:50',
+            'superficie' => 'nullable|string|max:50',
+            'precio_base' => 'required|numeric|min:0',
+            'precio_con_luz' => 'nullable|numeric|min:0',
+            'techada' => 'boolean',
+            'iluminacion' => 'boolean',
+            'tipo_iluminacion' => 'nullable|string|max:50',
+            'camara_grabacion' => 'boolean',
+            'marcador_digital' => 'boolean',
+            'climatizada' => 'boolean',
+            'tipo_cubierta' => 'nullable|string|max:50',
+            'tipo_pared' => 'nullable|string|max:50',
+            'formato' => 'nullable|string|max:50',
+            'estado' => 'nullable|string|in:activo,mantenimiento,inactivo',
+        ]);
+
+        $deporte = strtolower($validated['deporte'] ?? $cancha->deporte);
+        $requiereParedes = in_array($deporte, ['padel', 'squash', 'racquetball'], true);
+        $tipoPared = $requiereParedes ? ($validated['tipo_pared'] ?? $cancha->tipo_pared) : null;
+
+        $cancha->update([
+            'nombre' => $validated['nombre'],
+            'deporte' => $deporte,
+            'superficie' => $validated['superficie'] ?? $cancha->superficie,
+            'precio_base' => $validated['precio_base'],
+            'precio_con_luz' => array_key_exists('precio_con_luz', $validated) ? $validated['precio_con_luz'] : $cancha->precio_con_luz,
+            'techada' => $validated['techada'] ?? $cancha->techada,
+            'iluminacion' => $validated['iluminacion'] ?? $cancha->iluminacion,
+            'tipo_iluminacion' => $validated['tipo_iluminacion'] ?? $cancha->tipo_iluminacion,
+            'camara_grabacion' => $validated['camara_grabacion'] ?? $cancha->camara_grabacion,
+            'marcador_digital' => $validated['marcador_digital'] ?? $cancha->marcador_digital,
+            'climatizada' => $validated['climatizada'] ?? $cancha->climatizada,
+            'tipo_cubierta' => $validated['tipo_cubierta'] ?? ($validated['techada'] ?? $cancha->techada ? 'indoor' : 'outdoor'),
+            'tipo_pared' => $tipoPared,
+            'formato' => $validated['formato'] ?? $cancha->formato,
+            'estado' => $validated['estado'] ?? $cancha->estado,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cancha actualizada exitosamente.',
+            'cancha' => $cancha,
+        ]);
+    }
+
+    /**
+     * Desactivar o eliminar una cancha.
+     */
+    public function destroyCancha(Request $request, string $subdomain, int $canchaId): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $cancha = Cancha::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->where('id', $canchaId)
+            ->first();
+
+        if (!$cancha) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cancha no encontrada.',
+            ], 404);
+        }
+
+        // Check if there are associated turnos
+        $hasTurnos = $cancha->turnos()->exists();
+
+        if ($hasTurnos) {
+            $cancha->update(['estado' => 'inactivo']);
+            return response()->json([
+                'success' => true,
+                'message' => 'La cancha tiene historial de reservas. Ha sido marcada como inactiva.',
+                'action' => 'deactivated',
+            ]);
+        }
+
+        $cancha->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cancha eliminada exitosamente.',
+            'action' => 'deleted',
+        ]);
     }
 }
