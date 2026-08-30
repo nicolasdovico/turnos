@@ -45,8 +45,9 @@ class DisponibilidadService
             ];
         }
 
-        $fechaCarbon = Carbon::parse($fecha);
-        $hoy = Carbon::today();
+        $timezone = $cancha->complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
+        $fechaCarbon = Carbon::parse($fecha, $timezone);
+        $hoy = Carbon::today($timezone);
 
         // Si la fecha solicitada es estrictamente anterior a hoy (ayer o antes), no hay disponibilidad
         if ($fechaCarbon->copy()->startOfDay()->lt($hoy)) {
@@ -109,9 +110,9 @@ class DisponibilidadService
             $precio = (float) $cancha->precio_base;
         }
 
-        $horaApertura = Carbon::parse($fecha . ' ' . $horario->hora_apertura);
-        $horaCierre = Carbon::parse($fecha . ' ' . $horario->hora_cierre);
-        $ahora = Carbon::now();
+        $horaApertura = Carbon::parse($fecha . ' ' . $horario->hora_apertura, $timezone);
+        $horaCierre = Carbon::parse($fecha . ' ' . $horario->hora_cierre, $timezone);
+        $ahora = Carbon::now($timezone);
 
         // Fetch non-available turnos in database (reservado, bloqueado, confirmado, etc.)
         $turnosOcupados = Turno::with('cliente')
@@ -145,9 +146,9 @@ class DisponibilidadService
             $startTs = $currentSlotStart->timestamp;
             $endTs = $slotEnd->timestamp;
 
-            $estaOcupadoEnDb = $turnosOcupados->contains(function ($t) use ($fecha, $startTs, $endTs) {
-                $tInicio = Carbon::parse($fecha . ' ' . $t->hora_inicio)->timestamp;
-                $tFin = Carbon::parse($fecha . ' ' . $t->hora_fin)->timestamp;
+            $estaOcupadoEnDb = $turnosOcupados->contains(function ($t) use ($fecha, $startTs, $endTs, $timezone) {
+                $tInicio = Carbon::parse($fecha . ' ' . $t->hora_inicio, $timezone)->timestamp;
+                $tFin = Carbon::parse($fecha . ' ' . $t->hora_fin, $timezone)->timestamp;
                 return $tInicio < $endTs && $tFin > $startTs;
             });
 
@@ -165,7 +166,7 @@ class DisponibilidadService
                     // Espacio hacia el próximo turno ocupado o cierre
                     $proximoTurnoTs = $horaCierre->timestamp;
                     foreach ($turnosOcupados as $t) {
-                        $tInicio = Carbon::parse($fecha . ' ' . $t->hora_inicio)->timestamp;
+                        $tInicio = Carbon::parse($fecha . ' ' . $t->hora_inicio, $timezone)->timestamp;
                         if ($tInicio >= $endTs && $tInicio < $proximoTurnoTs) {
                             $proximoTurnoTs = $tInicio;
                         }
@@ -175,7 +176,7 @@ class DisponibilidadService
                     // Espacio desde el turno ocupado anterior o apertura
                     $anteriorTurnoFinTs = $horaApertura->timestamp;
                     foreach ($turnosOcupados as $t) {
-                        $tFin = Carbon::parse($fecha . ' ' . $t->hora_fin)->timestamp;
+                        $tFin = Carbon::parse($fecha . ' ' . $t->hora_fin, $timezone)->timestamp;
                         if ($tFin <= $startTs && $tFin > $anteriorTurnoFinTs) {
                             $anteriorTurnoFinTs = $tFin;
                         }

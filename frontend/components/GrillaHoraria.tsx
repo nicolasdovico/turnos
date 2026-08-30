@@ -82,6 +82,13 @@ export interface CurrentUser {
   is_admin?: boolean;
 }
 
+export const getLocalDateString = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function GrillaHoraria({
   canchaId,
   canchaNombre = "Cancha 1",
@@ -99,7 +106,7 @@ export default function GrillaHoraria({
   initialSlots,
   onConfirmSuccess,
 }: GrillaHorariaProps) {
-  const getTodayString = () => new Date().toISOString().split("T")[0];
+  const getTodayString = () => getLocalDateString();
   const [fecha, setFecha] = useState<string>(fechaInicial || getTodayString());
   const [duracion, setDuracion] = useState<number>(duracionInicial || (deporte?.toLowerCase() === "padel" ? 90 : 60));
   const [isFlexible, setIsFlexible] = useState<boolean>(Boolean(permiteDuracionFlexible));

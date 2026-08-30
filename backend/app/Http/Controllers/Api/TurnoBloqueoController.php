@@ -34,8 +34,9 @@ class TurnoBloqueoController extends Controller
             ], 404);
         }
 
-        $slotStartDateTime = \Carbon\Carbon::parse($validated['fecha'] . ' ' . $validated['hora_inicio']);
-        if ($slotStartDateTime->isPast()) {
+        $timezone = $cancha->complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
+        $slotStartDateTime = \Carbon\Carbon::parse($validated['fecha'] . ' ' . $validated['hora_inicio'], $timezone);
+        if ($slotStartDateTime->lessThanOrEqualTo(\Carbon\Carbon::now($timezone))) {
             return response()->json([
                 'error' => 'PAST_SLOT_NOT_ALLOWED',
                 'message' => 'No es posible reservar o bloquear un horario que ya ha pasado.',

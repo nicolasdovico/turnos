@@ -682,5 +682,31 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Backend (PHPUnit): 119 tests pasados al 100% (611 aserciones).
   * Suite Frontend (Vitest): 32 tests pasados al 100%.
   * Suite Mobile (Jest): 18 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-08-30] - CORRECCIÓN DE TIMEZONE & ALINEACIÓN HORARIA LOCAL (ARGENTINA UTC-3)
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * El backend corría por defecto en UTC (UTC+0). Al consultar disponibilidad a las 17:30 (hora local Argentina UTC-3), el backend evaluaba la hora actual como 20:30 UTC.
+  * Como consecuencia, los turnos de las 18:00, 19:00 y 20:00 se comparaban erróneamente contra las 20:30 UTC y eran descartados como "turnos del pasado".
+  * Adicionalmente, el frontend usaba `new Date().toISOString().split("T")[0]` que en horarios nocturnos (después de las 21:00 UTC-3) devolvía la fecha de mañana en UTC.
+- Solución Implementada:
+  * Base de Datos & Multi-Tenancy:
+    - Migración `2026_08_30_230001_add_timezone_to_complejos_table.php` agregando la columna `timezone` (default: `'America/Argentina/Buenos_Aires'`) a la tabla `complejos`.
+    - Actualización del modelo `Complejo.php` con `$fillable = [..., 'timezone']`.
+  * Configuración de Entorno & Laravel:
+    - `backend/config/app.php`: `timezone => env('APP_TIMEZONE', 'America/Argentina/Buenos_Aires')`.
+    - `backend/.env`, `.env.example`, `.env.testing.example` y `.env.testing`: `APP_TIMEZONE=America/Argentina/Buenos_Aires`.
+  * Backend Services & Controllers Timezone-Aware:
+    - `DisponibilidadService.php`: Resuelve el timezone del complejo (`$cancha->complejo?->timezone ?: config('app.timezone')`), instancia `$ahora = Carbon::now($timezone)` y parsea los slots en la zona horaria local.
+    - `TurnoBloqueoController.php` & `TurnoConfirmarController.php`: Validación de temporalidad alineada a la zona horaria del complejo, permitiendo bloquear y confirmar turnos futuros sin falso positivo de `PAST_SLOT_NOT_ALLOWED`.
+    - `DispositivoIoT.php` & `SincronizarLucesIoTCommand.php`: Cálculo de ventanas horarias alineadas al timezone del club.
+  * Frontend Web (Next.js 14):
+    - `GrillaHoraria.tsx`: Implementación del helper `getLocalDateString()` que formatea la fecha del navegador (`YYYY-MM-DD`) respetando la zona horaria local del cliente y eliminando el desfasaje de `toISOString()`.
+  * Suites de Tests & Verificación:
+    - Test unitario `test_disponibilidad_respeta_timezone_local_del_complejo` agregado a `DisponibilidadServiceTest.php`.
+    - Suite Backend (PHPUnit): 120 tests pasados al 100% (619 aserciones).
+    - Suite Frontend (Vitest): 32 tests pasados al 100%.
+    - Suite Mobile (Jest): 18 tests pasados al 100%.
+    - Verificación HTTP en vivo vía curl: Horario de 18:00 a 19:00 y posteriores visibles y disponibles en Cancha 1 de `nico-padel`.
 ===============================================================================
 

@@ -28,6 +28,7 @@ class Complejo extends Model
         'ciudad',
         'telefono',
         'deporte_principal',
+        'timezone',
         'tipo_negocio_id',
     ];
 

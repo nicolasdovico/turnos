@@ -277,4 +277,44 @@ class DisponibilidadServiceTest extends TestCase
                 'error' => 'PAST_SLOT_NOT_ALLOWED',
             ]);
     }
+
+    /**
+     * Test availability calculation respects the complex local timezone (e.g. America/Argentina/Buenos_Aires)
+     * and shows upcoming evening slots (e.g. 18:00 when local time is 17:30).
+     */
+    public function test_disponibilidad_respeta_timezone_local_del_complejo(): void
+    {
+        // Configurar complejo con timezone de Argentina
+        $this->complejo->update(['timezone' => 'America/Argentina/Buenos_Aires']);
+
+        // Horario de domingo: 08:00 a 23:00
+        HorarioAtencion::create([
+            'complejo_id' => $this->complejo->id,
+            'dia_semana' => 0, // Domingo
+            'hora_apertura' => '08:00',
+            'hora_cierre' => '23:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        // Simular que en Argentina son las 17:30 del domingo (equivalente a 20:30 UTC)
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-30 17:30:00', 'America/Argentina/Buenos_Aires'));
+
+        $slots = $this->service->obtenerSlotsDisponibles($this->cancha->id, '2026-08-30');
+
+        // Los horarios de 18:00 a 22:00 deben estar disponibles
+        $horasInicio = array_column($slots, 'hora_inicio');
+        $this->assertContains('18:00', $horasInicio);
+        $this->assertContains('19:00', $horasInicio);
+        $this->assertContains('20:00', $horasInicio);
+        $this->assertContains('21:00', $horasInicio);
+        $this->assertContains('22:00', $horasInicio);
+
+        // Los horarios anteriores a las 17:30 NO deben mostrarse
+        $this->assertNotContains('17:00', $horasInicio);
+        $this->assertNotContains('16:00', $horasInicio);
+        $this->assertNotContains('08:00', $horasInicio);
+
+        // Limpiar mock de tiempo
+        \Carbon\Carbon::setTestNow();
+    }
 }

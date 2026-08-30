@@ -60,7 +60,8 @@ class DispositivoIoT extends Model
             return false;
         }
 
-        $momento = $momento ?: Carbon::now();
+        $timezone = $this->complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
+        $momento = $momento ?: Carbon::now($timezone);
         $fecha = $momento->format('Y-m-d');
 
         // Buscar turnos reservados para la cancha en el día
@@ -73,10 +74,10 @@ class DispositivoIoT extends Model
             $horaInicio = substr($turno->hora_inicio, 0, 5);
             $horaFin = substr($turno->hora_fin, 0, 5);
 
-            $inicioVentana = Carbon::parse("{$fecha} {$horaInicio}")
+            $inicioVentana = Carbon::parse("{$fecha} {$horaInicio}", $timezone)
                 ->subMinutes($this->minutos_antelacion_encendido);
 
-            $finVentana = Carbon::parse("{$fecha} {$horaFin}")
+            $finVentana = Carbon::parse("{$fecha} {$horaFin}", $timezone)
                 ->addMinutes($this->minutos_gracia_apagado);
 
             if ($momento->betweenIncluded($inicioVentana, $finVentana)) {

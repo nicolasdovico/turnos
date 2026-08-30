@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import GrillaHoraria, { Slot } from "../components/GrillaHoraria";
+import GrillaHoraria, { Slot, getLocalDateString } from "../components/GrillaHoraria";
 
 describe("Componente Reactivo GrillaHoraria", () => {
   const mockSlots: Slot[] = [
@@ -607,7 +607,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
     );
 
     const inputFecha = screen.getByLabelText(/Fecha:/i) as HTMLInputElement;
-    const today = new Date().toISOString().split("T")[0];
+    const today = getLocalDateString();
     
     // min attribute debe estar fijado en la fecha de hoy
     expect(inputFecha.min).toBe(today);

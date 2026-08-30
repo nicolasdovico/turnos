@@ -44,12 +44,13 @@ class TurnoConfirmarController extends Controller
             ], 404);
         }
 
-        $fechaCarbon = Carbon::parse($validated['fecha']);
+        $timezone = $cancha->complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
+        $fechaCarbon = Carbon::parse($validated['fecha'], $timezone);
         $fechaNormalizada = $fechaCarbon->format('Y-m-d');
-        $horaInicioNormalizada = Carbon::parse($validated['hora_inicio'])->format('H:i');
+        $horaInicioNormalizada = Carbon::parse($validated['hora_inicio'], $timezone)->format('H:i');
 
-        $slotStartDateTime = Carbon::parse($fechaNormalizada . ' ' . $horaInicioNormalizada);
-        if ($slotStartDateTime->isPast()) {
+        $slotStartDateTime = Carbon::parse($fechaNormalizada . ' ' . $horaInicioNormalizada, $timezone);
+        if ($slotStartDateTime->lessThanOrEqualTo(Carbon::now($timezone))) {
             return response()->json([
                 'error' => 'PAST_SLOT_NOT_ALLOWED',
                 'message' => 'No es posible confirmar un turno en una fecha u horario que ya ha pasado.',
