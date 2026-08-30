@@ -362,4 +362,195 @@ describe("Componente Reactivo GrillaHoraria", () => {
       );
     });
   });
+
+  it("permite al recepcionista asignar turnos en mostrador sin exigir crear cuenta", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, token_reserva: "admin-lock", ttl: 600 }),
+        });
+      }
+      if (url.includes("/turnos/confirmar")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              turno: {
+                id: 99,
+                cancha_id: 1,
+                cliente_nombre: "Mariano Werner",
+                cliente_telefono: "+54 9 11 4444-1111",
+              },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            slots_disponibles: [{ hora_inicio: "15:00", hora_fin: "16:30", disponible: true, precio: 12000 }],
+            turnos_ocupados: [],
+          }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 15:00 a 16:30 Disponible")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Turno 15:00 a 16:30 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // El modal de recepcionista se abre con título de Asignación en Mostrador
+    expect(screen.getByText("Asignación de Turno en Mostrador")).toBeDefined();
+    expect(screen.getByText(/Modo Recepción/i)).toBeDefined();
+
+    // Completar nombre y teléfono del cliente presencial
+    const inputNombre = screen.getByPlaceholderText(/Mariano Werner/i);
+    const inputTelefono = screen.getByPlaceholderText(/4567-8901/i);
+
+    fireEvent.change(inputNombre, { target: { value: "Mariano Werner" } });
+    fireEvent.change(inputTelefono, { target: { value: "+54 9 11 4444-1111" } });
+
+    const btnAsignar = screen.getByRole("button", { name: /Asignar en Mostrador/i });
+    fireEvent.click(btnAsignar);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/confirmar"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("Mariano Werner"),
+        })
+      );
+    });
+  });
+
+  it("permite a un visitante público crear su cuenta rápida en el checkout y confirmar su turno", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, token_reserva: "client-lock", ttl: 600 }),
+        });
+      }
+      if (url.includes("/auth/register")) {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: () =>
+            Promise.resolve({
+              token: "new-user-token",
+              user: { id: 77, name: "Lucas Martínez", email: "lucas@example.com", telefono: "+54 9 11 2345-6789" },
+            }),
+        });
+      }
+      if (url.includes("/turnos/confirmar")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              turno: {
+                id: 101,
+                cancha_id: 1,
+                cliente_id: 77,
+                cliente_nombre: "Lucas Martínez",
+              },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            slots_disponibles: [{ hora_inicio: "17:00", hora_fin: "18:30", disponible: true, precio: 10000 }],
+            turnos_ocupados: [],
+          }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={false}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 17:00 a 18:30 Disponible")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Turno 17:00 a 18:30 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // Modal de registro rápido
+    expect(screen.getByText("✨ Crear Cuenta Rápida")).toBeDefined();
+
+    const inputNombre = screen.getByPlaceholderText(/Lucas Martínez/i);
+    const inputTelefono = screen.getByPlaceholderText(/2345-6789/i);
+    const inputEmail = screen.getByPlaceholderText(/lucas@example.com/i);
+    const inputPassword = screen.getByPlaceholderText(/••••••••/i);
+
+    fireEvent.change(inputNombre, { target: { value: "Lucas Martínez" } });
+    fireEvent.change(inputTelefono, { target: { value: "+54 9 11 2345-6789" } });
+    fireEvent.change(inputEmail, { target: { value: "lucas@example.com" } });
+    fireEvent.change(inputPassword, { target: { value: "secret123" } });
+
+    const btnSubmit = screen.getByRole("button", { name: /Crear Cuenta & Confirmar/i });
+    fireEvent.click(btnSubmit);
+
+    await waitFor(() => {
+      // 1. Debe registrar al usuario
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/auth/register"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("lucas@example.com"),
+        })
+      );
+
+      // 2. Debe confirmar la reserva
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/confirmar"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("Lucas Martínez"),
+        })
+      );
+    });
+  });
 });

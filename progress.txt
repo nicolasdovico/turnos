@@ -643,11 +643,17 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Centro de Operaciones & Visibilidad Diferenciada de Turnos Ocupados:
     - Para Clientes (Sitio Público): Los turnos ocupados no se muestran (grilla limpia que exhibe exclusivamente los slots libres para reservar).
     - Para Administradores (Modo Admin): Sección dedicada "📋 Turnos Reservados & Ocupados del Día" con tarjetas enriquecidas (horario, nombre del titular, teléfono, botón de acceso directo a WhatsApp, monto, estado de pago, badge de turno fijo) y diálogo modal interactivo para "Liberar / Cancelar Turno" (`DELETE /api/clubs/{subdomain}/turnos/{id}`).
-    - Persistencia Completa de Datos del Jugador (Guest & Registrado):
-      * Migración `2026_08_29_230003_add_guest_client_details_to_turnos_table` (`cliente_nombre`, `cliente_telefono`, `metodo_pago` en tabla `turnos`).
-      * `TurnoConfirmarController.php`: Validación y almacenamiento automático de nombre y teléfono ingresados en checkout.
-      * `DisponibilidadService.php`: Mapeo prioritario de `cliente_nombre` y `cliente_telefono` para que el administrador siempre vea el nombre y teléfono real de quien reservó.
-      * `GrillaHoraria.tsx`: Envío de datos del jugador en la confirmación y pase de cabecera `Authorization: Bearer <token>` en la consulta de disponibilidad para reconocer la sesión del administrador.
-  * Tests: Vitest suite (28 tests pasados al 100%) y PHPUnit suite (117 tests pasados al 100%).
+  * Modelo de Autenticación en Checkout (Modelo A) y Asignación Manual en Recepción:
+    - Flujo Cliente Web (Modelo A de Baja Fricción):
+      * Visitante Anónimo: Modal de confirmación con selector integrado de `[ ✨ Crear Cuenta Rápida ]` (Nombre, Teléfono, Email, Contraseña min 6) y `[ 🔑 Ya tengo Cuenta ]`. Al enviar, se registra/inicia sesión automáticamente de fondo y confirma la reserva en un único paso atómico sin perder el turno retenido.
+      * Usuario Autenticado: Reconoce la sesión activa, muestra badge `👤 Reservando como <nombre>`, autocompleta el teléfono y confirma en 1 clic.
+    - Flujo Empleado / Recepcionista del Club:
+      * Modal exclusivo `🏢 Asignación de Turno en Mostrador / Recepción`.
+      * Permite registrar reservas presenciales o telefónicas ingresando Nombre y Teléfono del cliente sin exigirle que cree una cuenta online.
+      * Soporta selección de estado de cobro (`💵 Cobrado en Mostrador`, `📲 Transferencia`, `🕒 Pendiente de Pago`, `💳 Tarjeta / Débito`).
+    - Backend & Base de Datos:
+      * Migración `2026_08_29_230004_add_telefono_to_users_table`: teléfono en perfil de usuario.
+      * `AuthController.php`: Registro flexible con soporte de teléfono y contraseña min 6.
+  * Tests: Vitest suite (30 tests pasados al 100%) y PHPUnit suite (117 tests pasados al 100%).
 ===============================================================================
 

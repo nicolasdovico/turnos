@@ -74,6 +74,14 @@ export interface TurnoOcupado {
   cliente_telefono?: string | null;
 }
 
+export interface CurrentUser {
+  id: number;
+  name: string;
+  email: string;
+  telefono?: string | null;
+  is_admin?: boolean;
+}
+
 export default function GrillaHoraria({
   canchaId,
   canchaNombre = "Cancha 1",
@@ -109,6 +117,11 @@ export default function GrillaHoraria({
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [authMode, setAuthMode] = useState<"register" | "login">("register");
+  const [authEmail, setAuthEmail] = useState<string>("");
+  const [authPassword, setAuthPassword] = useState<string>("");
+  const [authError, setAuthError] = useState<string | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>("");
   const [clienteTelefono, setClienteTelefono] = useState<string>("");
   const [metodoPago, setMetodoPago] = useState<string>("mostrador");
@@ -121,6 +134,31 @@ export default function GrillaHoraria({
       setIsFlexible(permiteDuracionFlexible);
     }
   }, [canchaId, duracionInicial, permiteDuracionFlexible]);
+
+  // Check authenticated user session
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (token) {
+      fetch(`${apiUrl}/auth/me`, {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.user) {
+            setCurrentUser(data.user);
+            if (!isAdmin) {
+              setClienteNombre(data.user.name || "");
+              setClienteTelefono(data.user.telefono || "");
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [apiUrl, subdomain, isAdmin]);
 
   const addToast = (type: "error" | "success" | "warning", text: string) => {
     const newToast: ToastMessage = { id: Date.now() + Math.random(), type, text };
@@ -336,12 +374,93 @@ export default function GrillaHoraria({
     if (!activeLock) return;
 
     setIsConfirming(true);
+    setAuthError(null);
+
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      let activeToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      let targetNombre = clienteNombre.trim();
+      let targetTelefono = clienteTelefono.trim();
+
+      // If user is a visitor (not admin and not logged in), execute register or login first
+      if (!isAdmin && !currentUser) {
+        if (authMode === "register") {
+          if (!targetNombre) {
+            throw new Error("Ingresa tu Nombre y Apellido para registrarte.");
+          }
+          if (!authEmail.trim()) {
+            throw new Error("Ingresa un correo electrónico válido.");
+          }
+          if (!authPassword || authPassword.length < 6) {
+            throw new Error("La contraseña debe tener al menos 6 caracteres.");
+          }
+
+          const regRes = await fetch(`${apiUrl}/auth/register`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+            },
+            body: JSON.stringify({
+              name: targetNombre,
+              email: authEmail.trim(),
+              telefono: targetTelefono || undefined,
+              password: authPassword,
+            }),
+          });
+
+          const regData = await regRes.json();
+          if (!regRes.ok) {
+            throw new Error(regData.message || regData.error || "Error al crear la cuenta.");
+          }
+
+          activeToken = regData.token;
+          if (activeToken) {
+            localStorage.setItem("token", activeToken);
+          }
+          if (regData.user) {
+            setCurrentUser(regData.user);
+          }
+        } else {
+          // Login mode
+          if (!authEmail.trim() || !authPassword) {
+            throw new Error("Ingresa tu Email y Contraseña.");
+          }
+
+          const loginRes = await fetch(`${apiUrl}/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+            },
+            body: JSON.stringify({
+              email: authEmail.trim(),
+              password: authPassword,
+            }),
+          });
+
+          const loginData = await loginRes.json();
+          if (!loginRes.ok) {
+            throw new Error(loginData.message || loginData.error || "Credenciales incorrectas.");
+          }
+
+          activeToken = loginData.token;
+          if (activeToken) {
+            localStorage.setItem("token", activeToken);
+          }
+          if (loginData.user) {
+            setCurrentUser(loginData.user);
+            targetNombre = loginData.user.name || targetNombre;
+            targetTelefono = loginData.user.telefono || targetTelefono;
+          }
+        }
+      }
+
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         Accept: "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
       };
       if (subdomain) headers["X-Tenant-ID"] = subdomain;
 
@@ -355,28 +474,31 @@ export default function GrillaHoraria({
           hora_fin: activeLock.horaFin,
           precio: activeLock.precio,
           token_reserva: activeLock.tokenReserva,
-          cliente_nombre: clienteNombre.trim() || undefined,
-          cliente_telefono: clienteTelefono.trim() || undefined,
+          cliente_nombre: targetNombre || undefined,
+          cliente_telefono: targetTelefono || undefined,
           metodo_pago: metodoPago,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        addToast("error", data.message || "Error al confirmar la reserva.");
-        return;
+        throw new Error(data.message || data.error || "Error al confirmar la reserva.");
       }
 
-      addToast(
-        "success",
-        `¡Reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin}! Te esperamos.`
-      );
+      const successMsg = isAdmin
+        ? `¡Turno de las ${activeLock.horaInicio} hs asignado exitosamente a ${targetNombre || "Cliente Mostrador"}!`
+        : `¡Reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin} hs! Te esperamos.`;
+
+      addToast("success", successMsg);
       setActiveLock(null);
       setIsConfirmModalOpen(false);
-      setClienteNombre("");
-      setClienteTelefono("");
+      if (isAdmin) {
+        setClienteNombre("");
+        setClienteTelefono("");
+      }
       fetchDisponibilidad(fecha);
     } catch (err: any) {
+      setAuthError(err.message || "Error al confirmar.");
       addToast("error", err.message || "Error de conexión al confirmar.");
     } finally {
       setIsConfirming(false);
@@ -801,15 +923,23 @@ export default function GrillaHoraria({
       {/* Modal de Checkout / Confirmación de Turno */}
       {isConfirmModalOpen && activeLock && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 text-left">
+          <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 text-left max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 text-xl border border-emerald-500/20">
-                  🎾
+                  {isAdmin ? "🏢" : "🎾"}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Confirmar Reserva de Turno</h3>
-                  <p className="text-xs text-slate-400">Completa tus datos para asegurar tu cancha</p>
+                  <h3 className="text-lg font-bold text-white">
+                    {isAdmin ? "Asignación de Turno en Mostrador" : "Confirmar Reserva de Turno"}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isAdmin
+                      ? "Asigna este horario al jugador presencial o telefónico"
+                      : currentUser
+                      ? "Confirma tu cancha con tu cuenta de jugador"
+                      : "Inicia sesión o regístrate en 1 paso para confirmar tu cancha"}
+                  </p>
                 </div>
               </div>
               <button
@@ -836,7 +966,7 @@ export default function GrillaHoraria({
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400">Tarifa por turno:</span>
+                <span className="text-slate-400">Tarifa del turno:</span>
                 <span className="font-extrabold text-white text-base">
                   ${activeLock.precio.toLocaleString()}
                 </span>
@@ -849,48 +979,247 @@ export default function GrillaHoraria({
               </div>
             </div>
 
+            {/* Error banner */}
+            {authError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{authError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleConfirmReservation} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Nombre del Jugador / Reserva
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Juan Pérez"
-                  value={clienteNombre}
-                  onChange={(e) => setClienteNombre(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
+              {/* CASE 1: Admin / Receptionist Walk-in Mode */}
+              {isAdmin ? (
+                <>
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs flex items-center gap-2">
+                    <span>ℹ️</span>
+                    <span>Modo Recepción: Asignación directa a cliente en el club o por llamada.</span>
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Teléfono / WhatsApp de Contacto
-                </label>
-                <input
-                  type="tel"
-                  placeholder="Ej. +54 9 11 1234-5678"
-                  value={clienteTelefono}
-                  onChange={(e) => setClienteTelefono(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Nombre y Apellido del Jugador *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Mariano Werner"
+                      value={clienteNombre}
+                      onChange={(e) => setClienteNombre(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Método de Pago
-                </label>
-                <select
-                  value={metodoPago}
-                  onChange={(e) => setMetodoPago(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
-                  <option value="transferencia">📲 Transferencia Bancaria</option>
-                  <option value="online">💳 Mercado Pago / Tarjeta Online</option>
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Teléfono / WhatsApp de Contacto
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="Ej. +54 9 11 4567-8901"
+                      value={clienteTelefono}
+                      onChange={(e) => setClienteTelefono(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Estado / Método de Cobro
+                    </label>
+                    <select
+                      value={metodoPago}
+                      onChange={(e) => setMetodoPago(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value="mostrador">💵 Cobrado en Mostrador / Efectivo</option>
+                      <option value="transferencia">📲 Cobrado por Transferencia Bancaria</option>
+                      <option value="pendiente">🕒 Pendiente de Pago (Paga al jugar)</option>
+                      <option value="online">💳 Cobrado con Tarjeta / Online</option>
+                    </select>
+                  </div>
+                </>
+              ) : currentUser ? (
+                /* CASE 2: Logged-in Customer */
+                <>
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span>👤</span>
+                      <span>
+                        Reservando como <strong>{currentUser.name}</strong> ({currentUser.email})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Teléfono / WhatsApp de Contacto
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="Ej. +54 9 11 1234-5678"
+                      value={clienteTelefono}
+                      onChange={(e) => setClienteTelefono(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Método de Pago
+                    </label>
+                    <select
+                      value={metodoPago}
+                      onChange={(e) => setMetodoPago(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
+                      <option value="transferencia">📲 Transferencia Bancaria</option>
+                      <option value="online">💳 Mercado Pago / Tarjeta Online</option>
+                    </select>
+                  </div>
+                </>
+              ) : (
+                /* CASE 3: Unauthenticated Visitor -> Model A Register or Login */
+                <>
+                  <div className="flex p-1 bg-slate-950 rounded-2xl border border-slate-800 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode("register");
+                        setAuthError(null);
+                      }}
+                      className={`flex-1 py-2 font-bold rounded-xl transition ${
+                        authMode === "register"
+                          ? "bg-emerald-500 text-slate-950 shadow"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      ✨ Crear Cuenta Rápida
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode("login");
+                        setAuthError(null);
+                      }}
+                      className={`flex-1 py-2 font-bold rounded-xl transition ${
+                        authMode === "login"
+                          ? "bg-emerald-500 text-slate-950 shadow"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      🔑 Ya tengo Cuenta
+                    </button>
+                  </div>
+
+                  {authMode === "register" ? (
+                    <>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          Nombre y Apellido *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ej. Lucas Martínez"
+                          value={clienteNombre}
+                          onChange={(e) => setClienteNombre(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          Teléfono / WhatsApp *
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          placeholder="Ej. +54 9 11 2345-6789"
+                          value={clienteTelefono}
+                          onChange={(e) => setClienteTelefono(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          Email *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="lucas@example.com"
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          Crear Contraseña (mínimo 6 caracteres) *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          minLength={6}
+                          placeholder="••••••••"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          Email *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="tu@email.com"
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          Contraseña *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="••••••••"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Método de Pago
+                    </label>
+                    <select
+                      value={metodoPago}
+                      onChange={(e) => setMetodoPago(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
+                      <option value="transferencia">📲 Transferencia Bancaria</option>
+                      <option value="online">💳 Mercado Pago / Tarjeta Online</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-3 pt-4 border-t border-slate-800">
                 <button
@@ -905,7 +1234,15 @@ export default function GrillaHoraria({
                   disabled={isConfirming}
                   className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
-                  {isConfirming ? "Confirmando..." : "✓ Confirmar Turno"}
+                  {isConfirming
+                    ? "Procesando..."
+                    : isAdmin
+                    ? "📝 Asignar en Mostrador"
+                    : currentUser
+                    ? "✓ Confirmar Turno"
+                    : authMode === "register"
+                    ? "✨ Crear Cuenta & Confirmar"
+                    : "🔑 Ingresar & Confirmar"}
                 </button>
               </div>
             </form>
