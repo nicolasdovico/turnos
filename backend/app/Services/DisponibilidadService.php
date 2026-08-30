@@ -46,6 +46,29 @@ class DisponibilidadService
         }
 
         $fechaCarbon = Carbon::parse($fecha);
+        $hoy = Carbon::today();
+
+        // Si la fecha solicitada es estrictamente anterior a hoy (ayer o antes), no hay disponibilidad
+        if ($fechaCarbon->copy()->startOfDay()->lt($hoy)) {
+            return [
+                'cancha_id' => $canchaId,
+                'cancha_nombre' => $cancha->nombre,
+                'deporte' => $cancha->deporte,
+                'fecha' => $fechaCarbon->format('Y-m-d'),
+                'duracion_minutos' => $duracionMinutos ?? 60,
+                'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
+                'duraciones_permitidas' => [60, 90, 120],
+                'slots' => [],
+                'slots_disponibles' => [],
+                'turnos_ocupados' => [],
+                'optimizacion_anti_baches' => [
+                    'activa' => false,
+                    'total_horarios_protegidos' => 0,
+                    'horarios_protegidos' => [],
+                ],
+            ];
+        }
+
         $diaSemana = $fechaCarbon->dayOfWeek; // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
 
         $horario = HorarioAtencion::where('complejo_id', $cancha->complejo_id)
@@ -88,6 +111,7 @@ class DisponibilidadService
 
         $horaApertura = Carbon::parse($fecha . ' ' . $horario->hora_apertura);
         $horaCierre = Carbon::parse($fecha . ' ' . $horario->hora_cierre);
+        $ahora = Carbon::now();
 
         // Fetch non-available turnos in database (reservado, bloqueado, confirmado, etc.)
         $turnosOcupados = Turno::with('cliente')
@@ -108,6 +132,13 @@ class DisponibilidadService
         while ($currentSlotStart->copy()->addMinutes($duracionMinutos)->lessThanOrEqualTo($horaCierre)) {
             $slotEnd = $currentSlotStart->copy()->addMinutes($duracionMinutos);
             $horaInicioFormatted = $currentSlotStart->format('H:i');
+            $horaFinFormatted = $slotEnd->format('H:i');
+
+            // 0. Verificación de temporalidad: si el inicio del turno ya pasó (para hoy o fechas pasadas), omitirlo
+            if ($currentSlotStart->lessThanOrEqualTo($ahora)) {
+                $currentSlotStart->addMinutes($stepMinutos);
+                continue;
+            }
             $horaFinFormatted = $slotEnd->format('H:i');
 
             // 1. Check if overlaps with any occupied turno in DB

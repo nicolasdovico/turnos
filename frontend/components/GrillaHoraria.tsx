@@ -144,25 +144,32 @@ export default function GrillaHoraria({
   // Check authenticated user session
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (token) {
-      fetch(`${apiUrl}/auth/me`, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
-        },
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data?.user) {
-            setCurrentUser(data.user);
-            if (!isAdmin) {
-              setClienteNombre(data.user.name || "");
-              setClienteTelefono(data.user.telefono || "");
-            }
-          }
-        })
-        .catch(() => {});
+    if (token && typeof fetch === "function") {
+      try {
+        const promise = fetch(`${apiUrl}/auth/me`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+            ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+          },
+        });
+        if (promise && typeof promise.then === "function") {
+          promise
+            .then((res) => (res && res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.user) {
+                setCurrentUser(data.user);
+                if (!isAdmin) {
+                  setClienteNombre(data.user.name || "");
+                  setClienteTelefono(data.user.telefono || "");
+                }
+              }
+            })
+            .catch(() => {});
+        }
+      } catch {
+        // ignore
+      }
     }
   }, [apiUrl, subdomain, isAdmin]);
 
@@ -351,9 +358,41 @@ export default function GrillaHoraria({
     };
   }, [activeLock]);
 
+  const isSlotInPast = (slotHoraInicio: string, slotFecha: string) => {
+    const today = getTodayString();
+    if (slotFecha < today) return true;
+    if (slotFecha > today) return false;
+    // slotFecha === today: compare with current hours & minutes
+    const now = new Date();
+    const [slotHour, slotMin] = slotHoraInicio.split(":").map(Number);
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
+    if (slotHour < currentHour) return true;
+    if (slotHour === currentHour && slotMin <= currentMin) return true;
+    return false;
+  };
+
+  const handleFechaChange = (newFecha: string) => {
+    const today = getTodayString();
+    if (newFecha && newFecha < today) {
+      addToast("warning", "No se pueden seleccionar fechas del pasado.");
+      setFecha(today);
+      setActiveLock(null);
+      fetchDisponibilidad(today);
+      return;
+    }
+    setFecha(newFecha);
+    setActiveLock(null);
+    fetchDisponibilidad(newFecha);
+  };
+
   // Request atomic slot lock in Redis
   const handleSelectSlot = async (slot: Slot) => {
     if (!slot.disponible) return;
+    if (isSlotInPast(slot.hora_inicio, fecha)) {
+      addToast("warning", "Este horario ya ha pasado y no puede asignarse.");
+      return;
+    }
     if (activeLock && activeLock.horaInicio === slot.hora_inicio) return;
 
     setLockingSlot(slot.hora_inicio);
@@ -660,8 +699,9 @@ export default function GrillaHoraria({
           <input
             id="fecha-picker"
             type="date"
+            min={getTodayString()}
             value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
+            onChange={(e) => handleFechaChange(e.target.value)}
             className="bg-slate-900 text-white text-sm font-semibold rounded-xl px-3 py-1.5 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
@@ -789,78 +829,81 @@ export default function GrillaHoraria({
 
       {/* Grid of Time Slots (Available only for clients, segmented for admin) */}
       <div className="mt-8">
-        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-          {isAdmin
-            ? `Horarios Disponibles para Reservar (${slots.filter((s) => s.disponible).length})`
-            : `Horarios Disponibles (${slots.filter((s) => s.disponible).length} turnos)`}
-        </h3>
+        {(() => {
+          const availableSlots = slots.filter((s) => s.disponible && !isSlotInPast(s.hora_inicio, fecha));
+          return (
+            <>
+              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                {isAdmin
+                  ? `Horarios Disponibles para Reservar (${availableSlots.length})`
+                  : `Horarios Disponibles (${availableSlots.length} turnos)`}
+              </h3>
 
-        {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-20 bg-slate-800/40 rounded-2xl animate-pulse" />
-            ))}
-          </div>
-        ) : slots.filter((s) => s.disponible).length === 0 ? (
-          <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-800">
-            <Clock className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-slate-400 font-medium">No hay turnos disponibles para la fecha seleccionada.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {slots
-              .filter((slot) => slot.disponible)
-              .map((slot) => {
-                const isLockedByMe = activeLock?.horaInicio === slot.hora_inicio;
-                const isLocking = lockingSlot === slot.hora_inicio;
+              {loading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="h-20 bg-slate-800/40 rounded-2xl animate-pulse" />
+                  ))}
+                </div>
+              ) : availableSlots.length === 0 ? (
+                <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-800">
+                  <Clock className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+                  <p className="text-slate-400 font-medium">No hay turnos disponibles para la fecha seleccionada.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {availableSlots.map((slot) => {
+                    const isLockedByMe = activeLock?.horaInicio === slot.hora_inicio;
+                    const isLocking = lockingSlot === slot.hora_inicio;
 
-                let buttonClasses =
-                  "relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 ";
+                    let buttonClasses =
+                      "relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 ";
 
-                if (isLockedByMe) {
-                  buttonClasses += "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500 shadow-lg";
-                } else {
-                  buttonClasses +=
-                    "bg-slate-800/60 border-slate-700/80 text-white hover:border-emerald-500/70 hover:bg-slate-800 cursor-pointer hover:shadow-md";
-                }
+                    if (isLockedByMe) {
+                      buttonClasses += "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500 shadow-lg";
+                    } else {
+                      buttonClasses +=
+                        "bg-slate-800/60 border-slate-700/80 text-white hover:border-emerald-500/70 hover:bg-slate-800 cursor-pointer hover:shadow-md";
+                    }
 
-                return (
-                  <button
-                    key={slot.hora_inicio}
-                    disabled={isLocking}
-                    onClick={() => handleSelectSlot(slot)}
-                    className={buttonClasses}
-                    aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Disponible`}
-                  >
-                    <div className="flex justify-between items-start w-full">
-                      <span className="font-mono text-lg font-extrabold tracking-tight">
-                        {slot.hora_inicio}
-                      </span>
-                      {isLockedByMe ? (
-                        <span className="flex h-2 w-2 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                      ) : (
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          Libre
-                        </span>
-                      )}
-                    </div>
+                    return (
+                      <button
+                        key={slot.hora_inicio}
+                        disabled={isLocking}
+                        onClick={() => handleSelectSlot(slot)}
+                        className={buttonClasses}
+                        aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Disponible`}
+                      >
+                        <div className="flex justify-between items-start w-full">
+                          <span className="font-mono text-lg font-extrabold tracking-tight">
+                            {slot.hora_inicio}
+                          </span>
+                          {isLockedByMe ? (
+                            <span className="flex h-2 w-2 relative">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              Libre
+                            </span>
+                          )}
+                        </div>
 
-                    <div className="mt-3 flex justify-between items-baseline w-full">
-                      <span className="text-xs text-slate-400 font-medium">{slot.hora_fin}</span>
-                      {slot.precio && (
-                        <span className="text-xs font-semibold text-emerald-400">
-                          ${slot.precio.toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-          </div>
-        )}
+                        <div className="mt-3 flex justify-between items-end w-full">
+                          <span className="text-xs text-slate-400 font-medium">hasta {slot.hora_fin}</span>
+                          <span className="text-xs font-black text-emerald-400">
+                            ${slot.precio?.toLocaleString() || precioBase || 0}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Admin-Only Reserved / Occupied Turnos Section */}

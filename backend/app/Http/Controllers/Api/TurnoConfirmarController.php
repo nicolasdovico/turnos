@@ -48,6 +48,14 @@ class TurnoConfirmarController extends Controller
         $fechaNormalizada = $fechaCarbon->format('Y-m-d');
         $horaInicioNormalizada = Carbon::parse($validated['hora_inicio'])->format('H:i');
 
+        $slotStartDateTime = Carbon::parse($fechaNormalizada . ' ' . $horaInicioNormalizada);
+        if ($slotStartDateTime->isPast()) {
+            return response()->json([
+                'error' => 'PAST_SLOT_NOT_ALLOWED',
+                'message' => 'No es posible confirmar un turno en una fecha u horario que ya ha pasado.',
+            ], 422);
+        }
+
         // Calculate hora_fin if omitted
         if (!empty($validated['hora_fin'])) {
             $horaFinNormalizada = Carbon::parse($validated['hora_fin'])->format('H:i');

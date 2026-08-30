@@ -12,6 +12,14 @@ describe("Componente Reactivo GrillaHoraria", () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    localStorage.clear();
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ slots_disponibles: [], turnos_ocupados: [] }),
+      })
+    );
   });
 
   afterEach(() => {
@@ -586,5 +594,63 @@ describe("Componente Reactivo GrillaHoraria", () => {
         })
       );
     });
+  });
+
+  it("bloquea fechas pasadas en el selector de fecha y previene seleccionar fechas anteriores a hoy", async () => {
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        fechaInicial="2026-09-01"
+      />
+    );
+
+    const inputFecha = screen.getByLabelText(/Fecha:/i) as HTMLInputElement;
+    const today = new Date().toISOString().split("T")[0];
+    
+    // min attribute debe estar fijado en la fecha de hoy
+    expect(inputFecha.min).toBe(today);
+
+    // Intentar cambiar a una fecha del pasado
+    fireEvent.change(inputFecha, { target: { value: "2020-01-01" } });
+
+    // Debe mostrar alerta de advertencia y reiniciar a la fecha de hoy
+    await waitFor(() => {
+      expect(screen.getByText(/No se pueden seleccionar fechas del pasado/i)).toBeDefined();
+      expect(inputFecha.value).toBe(today);
+    });
+  });
+
+  it("no muestra horarios que ya han pasado cuando la fecha seleccionada es hoy", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-01T15:30:00"));
+
+    const mixedSlots: Slot[] = [
+      { hora_inicio: "10:00", hora_fin: "11:00", disponible: true, precio: 8000 },
+      { hora_inicio: "14:00", hora_fin: "15:00", disponible: true, precio: 8000 },
+      { hora_inicio: "18:00", hora_fin: "19:00", disponible: true, precio: 8000 },
+      { hora_inicio: "20:00", hora_fin: "21:00", disponible: true, precio: 8000 },
+    ];
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        fechaInicial="2026-09-01"
+        initialSlots={mixedSlots}
+      />
+    );
+
+    // Los slots de las 10:00 y 14:00 (anteriores a las 15:30) NO deben aparecer
+    expect(screen.queryByLabelText("Turno 10:00 a 11:00 Disponible")).toBeNull();
+    expect(screen.queryByLabelText("Turno 14:00 a 15:00 Disponible")).toBeNull();
+
+    // Los slots de las 18:00 y 20:00 (posteriores a las 15:30) SÍ deben aparecer
+    expect(screen.getByLabelText("Turno 18:00 a 19:00 Disponible")).toBeDefined();
+    expect(screen.getByLabelText("Turno 20:00 a 21:00 Disponible")).toBeDefined();
+
+    vi.useRealTimers();
   });
 });

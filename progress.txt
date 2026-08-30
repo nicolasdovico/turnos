@@ -656,6 +656,16 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Backend & Base de Datos:
       * Migración `2026_08_29_230004_add_telefono_to_users_table`: teléfono en perfil de usuario.
       * `AuthController.php`: Registro flexible con soporte de teléfono y contraseña min 6.
-  * Tests: Vitest suite (30 tests pasados al 100%) y PHPUnit suite (117 tests pasados al 100%).
+  * Control de Temporalidad en Calendario y Grilla Horaria (Exclusión de Pasado):
+    - Selector de Fechas (Frontend):
+      * `<input type="date">` con atributo `min={today}` para bloquear visualmente la selección de días anteriores.
+      * Handler `handleFechaChange` que detecta y rechaza intentos de ingresar fechas anteriores a hoy, mostrando alerta y reajustando automáticamente al día actual.
+    - Filtro de Horarios Pasados del Día Actual:
+      * En Frontend (`GrillaHoraria.tsx`): Helper `isSlotInPast` que filtra los horarios del día cuya hora de inicio sea anterior a la hora actual del sistema (`availableSlots.filter(...)`).
+      * En Backend (`DisponibilidadService.php`): Si la fecha consultada es anterior a hoy, retorna `slots_disponibles: []`. En la generación de slots para hoy, descarta cualquier horario donde `$currentSlotStart <= now()`.
+    - Blindaje de Seguridad en Controladores Backend:
+      * `TurnoBloqueoController.php`: Validación que rechaza con error 422 (`PAST_SLOT_NOT_ALLOWED`) cualquier intento de bloqueo temporal en fechas u horarios pasados.
+      * `TurnoConfirmarController.php`: Validación que rechaza con error 422 (`PAST_SLOT_NOT_ALLOWED`) cualquier confirmación en fechas u horarios pasados.
+  * Tests: Vitest suite (32 tests pasados al 100%) y PHPUnit suite (119 tests pasados al 100%).
 ===============================================================================
 

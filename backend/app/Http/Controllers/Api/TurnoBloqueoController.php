@@ -34,6 +34,14 @@ class TurnoBloqueoController extends Controller
             ], 404);
         }
 
+        $slotStartDateTime = \Carbon\Carbon::parse($validated['fecha'] . ' ' . $validated['hora_inicio']);
+        if ($slotStartDateTime->isPast()) {
+            return response()->json([
+                'error' => 'PAST_SLOT_NOT_ALLOWED',
+                'message' => 'No es posible reservar o bloquear un horario que ya ha pasado.',
+            ], 422);
+        }
+
         $userId = auth()->id() ?? $request->input('user_id') ?? 'guest_' . Str::random(10);
 
         $tokenReserva = $this->reservaLockService->adquirirBloqueo(

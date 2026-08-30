@@ -224,4 +224,57 @@ class DisponibilidadServiceTest extends TestCase
 
         $this->assertCount(4, $response->json('slots_disponibles'));
     }
+
+    /**
+     * Test past date (yesterday or earlier) returns empty available slots.
+     */
+    public function test_fecha_pasada_retorna_slots_vacios(): void
+    {
+        $fechaPasada = '2020-01-06'; // A past Monday
+        $slots = $this->service->obtenerSlotsDisponibles($this->cancha->id, $fechaPasada);
+
+        $this->assertEmpty($slots);
+
+        $response = $this->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->getJson("/api/canchas/{$this->cancha->id}/disponibilidad?fecha={$fechaPasada}");
+
+        $response->assertStatus(200);
+        $this->assertEmpty($response->json('slots_disponibles'));
+    }
+
+    /**
+     * Test locking or confirming a past slot returns 422 Unprocessable Entity.
+     */
+    public function test_bloqueo_y_confirmacion_rechaza_horarios_pasados(): void
+    {
+        $fechaPasada = '2020-01-06';
+
+        // 1. Bloqueo temporal en el pasado
+        $lockRes = $this->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->postJson('/api/turnos/bloquear-temporal', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $fechaPasada,
+                'hora_inicio' => '10:00',
+            ]);
+
+        $lockRes->assertStatus(422)
+            ->assertJson([
+                'error' => 'PAST_SLOT_NOT_ALLOWED',
+            ]);
+
+        // 2. Confirmación directa en el pasado
+        $confirmRes = $this->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $fechaPasada,
+                'hora_inicio' => '10:00',
+                'hora_fin' => '11:00',
+                'cliente_nombre' => 'Jugador Pasado',
+            ]);
+
+        $confirmRes->assertStatus(422)
+            ->assertJson([
+                'error' => 'PAST_SLOT_NOT_ALLOWED',
+            ]);
+    }
 }
