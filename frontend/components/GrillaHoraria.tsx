@@ -122,6 +122,12 @@ export default function GrillaHoraria({
   const [authEmail, setAuthEmail] = useState<string>("");
   const [authPassword, setAuthPassword] = useState<string>("");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [registrationStep, setRegistrationStep] = useState<"form" | "otp">("form");
+  const [otpCode, setOtpCode] = useState<string>("");
+  const [otpCountdown, setOtpCountdown] = useState<number>(0);
+  const [isResendingOtp, setIsResendingOtp] = useState<boolean>(false);
+  const [pendingRegisteredUser, setPendingRegisteredUser] = useState<{ token: string; user: CurrentUser } | null>(null);
+  const otpTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>("");
   const [clienteTelefono, setClienteTelefono] = useState<string>("");
   const [metodoPago, setMetodoPago] = useState<string>("mostrador");
@@ -159,6 +165,52 @@ export default function GrillaHoraria({
         .catch(() => {});
     }
   }, [apiUrl, subdomain, isAdmin]);
+
+  // Cooldown countdown for OTP resend
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      otpTimerRef.current = setInterval(() => {
+        setOtpCountdown((prev) => {
+          if (prev <= 1) {
+            if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+    };
+  }, [otpCountdown]);
+
+  const handleResendOtp = async () => {
+    if (!authEmail.trim() || otpCountdown > 0) return;
+    setIsResendingOtp(true);
+    setAuthError(null);
+    try {
+      const res = await fetch(`${apiUrl}/auth/resend-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+        body: JSON.stringify({ email: authEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al reenviar el código OTP.");
+      }
+      setOtpCountdown(60);
+      addToast("success", "Se ha enviado un nuevo código de 6 dígitos a tu correo.");
+    } catch (err: any) {
+      setAuthError(err.message || "Error al reenviar código.");
+      addToast("error", err.message || "Error al reenviar código.");
+    } finally {
+      setIsResendingOtp(false);
+    }
+  };
 
   const addToast = (type: "error" | "success" | "warning", text: string) => {
     const newToast: ToastMessage = { id: Date.now() + Math.random(), type, text };
@@ -381,45 +433,89 @@ export default function GrillaHoraria({
       let targetNombre = clienteNombre.trim();
       let targetTelefono = clienteTelefono.trim();
 
-      // If user is a visitor (not admin and not logged in), execute register or login first
+      // If user is a visitor (not admin and not logged in)
       if (!isAdmin && !currentUser) {
         if (authMode === "register") {
-          if (!targetNombre) {
-            throw new Error("Ingresa tu Nombre y Apellido para registrarte.");
-          }
-          if (!authEmail.trim()) {
-            throw new Error("Ingresa un correo electrónico válido.");
-          }
-          if (!authPassword || authPassword.length < 6) {
-            throw new Error("La contraseña debe tener al menos 6 caracteres.");
+          // STEP 1: Registration form submitted -> register user, trigger OTP and switch to OTP step
+          if (registrationStep === "form") {
+            if (!targetNombre) {
+              throw new Error("Ingresa tu Nombre y Apellido para registrarte.");
+            }
+            if (!authEmail.trim()) {
+              throw new Error("Ingresa un correo electrónico válido.");
+            }
+            if (!authPassword || authPassword.length < 6) {
+              throw new Error("La contraseña debe tener al menos 6 caracteres.");
+            }
+
+            const regRes = await fetch(`${apiUrl}/auth/register`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+              },
+              body: JSON.stringify({
+                name: targetNombre,
+                email: authEmail.trim(),
+                telefono: targetTelefono || undefined,
+                password: authPassword,
+              }),
+            });
+
+            const regData = await regRes.json();
+            if (!regRes.ok) {
+              throw new Error(regData.message || regData.error || "Error al crear la cuenta.");
+            }
+
+            // Save pending registration user & token
+            setPendingRegisteredUser({
+              token: regData.token,
+              user: regData.user,
+            });
+            setRegistrationStep("otp");
+            setOtpCountdown(60);
+            setOtpCode("");
+            addToast("success", `¡Código de 6 dígitos enviado a ${authEmail.trim()}! Ingrésalo para verificar.`);
+            setIsConfirming(false);
+            return;
           }
 
-          const regRes = await fetch(`${apiUrl}/auth/register`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
-            },
-            body: JSON.stringify({
-              name: targetNombre,
-              email: authEmail.trim(),
-              telefono: targetTelefono || undefined,
-              password: authPassword,
-            }),
-          });
+          // STEP 2: In-Modal OTP Verification submitted
+          if (registrationStep === "otp") {
+            if (otpCode.trim().length !== 6) {
+              throw new Error("Ingresa el código de 6 dígitos enviado a tu correo.");
+            }
 
-          const regData = await regRes.json();
-          if (!regRes.ok) {
-            throw new Error(regData.message || regData.error || "Error al crear la cuenta.");
-          }
+            const verifyRes = await fetch(`${apiUrl}/auth/verify-otp`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+              },
+              body: JSON.stringify({
+                email: authEmail.trim(),
+                codigo: otpCode.trim(),
+              }),
+            });
 
-          activeToken = regData.token;
-          if (activeToken) {
-            localStorage.setItem("token", activeToken);
-          }
-          if (regData.user) {
-            setCurrentUser(regData.user);
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData.success) {
+              throw new Error(verifyData.message || "Código de verificación incorrecto o expirado.");
+            }
+
+            // OTP verified! Set authenticated user and token
+            if (pendingRegisteredUser?.token) {
+              activeToken = pendingRegisteredUser.token;
+              localStorage.setItem("token", activeToken);
+            }
+            if (pendingRegisteredUser?.user) {
+              setCurrentUser({
+                ...pendingRegisteredUser.user,
+                ...verifyData.user,
+              });
+            }
           }
         } else {
           // Login mode
@@ -487,19 +583,21 @@ export default function GrillaHoraria({
 
       const successMsg = isAdmin
         ? `¡Turno de las ${activeLock.horaInicio} hs asignado exitosamente a ${targetNombre || "Cliente Mostrador"}!`
-        : `¡Reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin} hs! Te esperamos.`;
+        : `¡Cuenta verificada y reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin} hs! Te esperamos.`;
 
       addToast("success", successMsg);
       setActiveLock(null);
       setIsConfirmModalOpen(false);
+      setRegistrationStep("form");
+      setOtpCode("");
       if (isAdmin) {
         setClienteNombre("");
         setClienteTelefono("");
       }
       fetchDisponibilidad(fecha);
     } catch (err: any) {
-      setAuthError(err.message || "Error al confirmar.");
-      addToast("error", err.message || "Error de conexión al confirmar.");
+      setAuthError(err.message || "Error al procesar la solicitud.");
+      addToast("error", err.message || "Error al confirmar.");
     } finally {
       setIsConfirming(false);
     }
@@ -1114,64 +1212,136 @@ export default function GrillaHoraria({
                   </div>
 
                   {authMode === "register" ? (
-                    <>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-300 mb-1">
-                          Nombre y Apellido *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ej. Lucas Martínez"
-                          value={clienteNombre}
-                          onChange={(e) => setClienteNombre(e.target.value)}
-                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </div>
+                    registrationStep === "otp" ? (
+                      /* STEP 2: In-Modal OTP Verification */
+                      <div className="space-y-4 animate-in fade-in duration-200">
+                        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 space-y-1">
+                          <div className="font-bold flex items-center gap-1.5 text-white">
+                            <span>✉️</span> Código de Verificación Enviado
+                          </div>
+                          <p>
+                            Enviamos un código de 6 dígitos a <strong className="text-white">{authEmail}</strong>. Ingrésalo para verificar tu correo y asegurar tu cancha.
+                          </p>
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-300 mb-1">
-                          Teléfono / WhatsApp *
-                        </label>
-                        <input
-                          type="tel"
-                          required
-                          placeholder="Ej. +54 9 11 2345-6789"
-                          value={clienteTelefono}
-                          onChange={(e) => setClienteTelefono(e.target.value)}
-                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-2 text-center">
+                            Ingresa el Código de 6 dígitos *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            maxLength={6}
+                            autoFocus
+                            placeholder="000000"
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+                            className="w-full text-center text-2xl font-mono font-black tracking-[0.5em] rounded-2xl bg-slate-950 border border-slate-700 px-4 py-3 text-emerald-400 placeholder-slate-600 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-300 mb-1">
-                          Email *
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          placeholder="lucas@example.com"
-                          value={authEmail}
-                          onChange={(e) => setAuthEmail(e.target.value)}
-                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </div>
+                        <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
+                          <button
+                            type="button"
+                            disabled={otpCountdown > 0 || isResendingOtp}
+                            onClick={handleResendOtp}
+                            className="text-emerald-400 hover:underline font-bold disabled:text-slate-600 disabled:no-underline"
+                          >
+                            {isResendingOtp
+                              ? "Reenviando..."
+                              : otpCountdown > 0
+                              ? `Reenviar código en ${otpCountdown}s`
+                              : "Reenviar nuevo código"}
+                          </button>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-300 mb-1">
-                          Crear Contraseña (mínimo 6 caracteres) *
-                        </label>
-                        <input
-                          type="password"
-                          required
-                          minLength={6}
-                          placeholder="••••••••"
-                          value={authPassword}
-                          onChange={(e) => setAuthPassword(e.target.value)}
-                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRegistrationStep("form");
+                              setAuthError(null);
+                            }}
+                            className="text-slate-400 hover:text-white underline font-medium"
+                          >
+                            ← Editar mis datos
+                          </button>
+                        </div>
                       </div>
-                    </>
+                    ) : (
+                      /* STEP 1: Registration Form */
+                      <>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1">
+                            Nombre y Apellido *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ej. Lucas Martínez"
+                            value={clienteNombre}
+                            onChange={(e) => setClienteNombre(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1">
+                            Teléfono / WhatsApp *
+                          </label>
+                          <input
+                            type="tel"
+                            required
+                            placeholder="Ej. +54 9 11 2345-6789"
+                            value={clienteTelefono}
+                            onChange={(e) => setClienteTelefono(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1">
+                            Email *
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            placeholder="lucas@example.com"
+                            value={authEmail}
+                            onChange={(e) => setAuthEmail(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1">
+                            Crear Contraseña (mínimo 6 caracteres) *
+                          </label>
+                          <input
+                            type="password"
+                            required
+                            minLength={6}
+                            placeholder="••••••••"
+                            value={authPassword}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1">
+                            Método de Pago
+                          </label>
+                          <select
+                            value={metodoPago}
+                            onChange={(e) => setMetodoPago(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          >
+                            <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
+                            <option value="transferencia">📲 Transferencia Bancaria</option>
+                            <option value="online">💳 Mercado Pago / Tarjeta Online</option>
+                          </select>
+                        </div>
+                      </>
+                    )
                   ) : (
                     <>
                       <div>
@@ -1201,37 +1371,42 @@ export default function GrillaHoraria({
                           className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          Método de Pago
+                        </label>
+                        <select
+                          value={metodoPago}
+                          onChange={(e) => setMetodoPago(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        >
+                          <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
+                          <option value="transferencia">📲 Transferencia Bancaria</option>
+                          <option value="online">💳 Mercado Pago / Tarjeta Online</option>
+                        </select>
+                      </div>
                     </>
                   )}
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">
-                      Método de Pago
-                    </label>
-                    <select
-                      value={metodoPago}
-                      onChange={(e) => setMetodoPago(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
-                      <option value="transferencia">📲 Transferencia Bancaria</option>
-                      <option value="online">💳 Mercado Pago / Tarjeta Online</option>
-                    </select>
-                  </div>
                 </>
               )}
 
               <div className="flex gap-3 pt-4 border-t border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setIsConfirmModalOpen(false)}
+                  onClick={() => {
+                    setIsConfirmModalOpen(false);
+                    setRegistrationStep("form");
+                    setOtpCode("");
+                    setAuthError(null);
+                  }}
                   className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
                 >
                   Volver
                 </button>
                 <button
                   type="submit"
-                  disabled={isConfirming}
+                  disabled={isConfirming || (authMode === "register" && registrationStep === "otp" && otpCode.length !== 6)}
                   className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   {isConfirming
@@ -1241,7 +1416,9 @@ export default function GrillaHoraria({
                     : currentUser
                     ? "✓ Confirmar Turno"
                     : authMode === "register"
-                    ? "✨ Crear Cuenta & Confirmar"
+                    ? registrationStep === "otp"
+                      ? "✓ Verificar & Confirmar"
+                      : "✨ Continuar (Paso 1/2)"
                     : "🔑 Ingresar & Confirmar"}
                 </button>
               </div>

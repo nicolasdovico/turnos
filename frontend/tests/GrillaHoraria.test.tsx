@@ -467,6 +467,18 @@ describe("Componente Reactivo GrillaHoraria", () => {
             }),
         });
       }
+      if (url.includes("/auth/verify-otp")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "¡Correo verificado exitosamente!",
+              user: { id: 77, name: "Lucas Martínez", email: "lucas@example.com" },
+            }),
+        });
+      }
       if (url.includes("/turnos/confirmar")) {
         return Promise.resolve({
           ok: true,
@@ -517,7 +529,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
 
     fireEvent.click(screen.getByText("Confirmar Reserva"));
 
-    // Modal de registro rápido
+    // Modal de registro rápido (Paso 1)
     expect(screen.getByText("✨ Crear Cuenta Rápida")).toBeDefined();
 
     const inputNombre = screen.getByPlaceholderText(/Lucas Martínez/i);
@@ -530,11 +542,11 @@ describe("Componente Reactivo GrillaHoraria", () => {
     fireEvent.change(inputEmail, { target: { value: "lucas@example.com" } });
     fireEvent.change(inputPassword, { target: { value: "secret123" } });
 
-    const btnSubmit = screen.getByRole("button", { name: /Crear Cuenta & Confirmar/i });
-    fireEvent.click(btnSubmit);
+    const btnPaso1 = screen.getByRole("button", { name: /Continuar \(Paso 1\/2\)/i });
+    fireEvent.click(btnPaso1);
 
+    // 1. Debe haber llamado a register
     await waitFor(() => {
-      // 1. Debe registrar al usuario
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("/auth/register"),
         expect.objectContaining({
@@ -542,8 +554,30 @@ describe("Componente Reactivo GrillaHoraria", () => {
           body: expect.stringContaining("lucas@example.com"),
         })
       );
+    });
 
-      // 2. Debe confirmar la reserva
+    // 2. Transiciona a Paso 2: Verificación OTP in-modal
+    await waitFor(() => {
+      expect(screen.getByText(/Código de Verificación Enviado/i)).toBeDefined();
+    });
+
+    const inputOtp = screen.getByPlaceholderText("000000");
+    fireEvent.change(inputOtp, { target: { value: "482910" } });
+
+    const btnVerificarConfirmar = screen.getByRole("button", { name: /Verificar & Confirmar/i });
+    fireEvent.click(btnVerificarConfirmar);
+
+    await waitFor(() => {
+      // 3. Debe haber llamado a verify-otp
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/auth/verify-otp"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("482910"),
+        })
+      );
+
+      // 4. Debe haber confirmado el turno
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("/turnos/confirmar"),
         expect.objectContaining({

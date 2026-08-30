@@ -643,13 +643,15 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Centro de Operaciones & Visibilidad Diferenciada de Turnos Ocupados:
     - Para Clientes (Sitio Público): Los turnos ocupados no se muestran (grilla limpia que exhibe exclusivamente los slots libres para reservar).
     - Para Administradores (Modo Admin): Sección dedicada "📋 Turnos Reservados & Ocupados del Día" con tarjetas enriquecidas (horario, nombre del titular, teléfono, botón de acceso directo a WhatsApp, monto, estado de pago, badge de turno fijo) y diálogo modal interactivo para "Liberar / Cancelar Turno" (`DELETE /api/clubs/{subdomain}/turnos/{id}`).
-  * Modelo de Autenticación en Checkout (Modelo A) y Asignación Manual en Recepción:
-    - Flujo Cliente Web (Modelo A de Baja Fricción):
-      * Visitante Anónimo: Modal de confirmación con selector integrado de `[ ✨ Crear Cuenta Rápida ]` (Nombre, Teléfono, Email, Contraseña min 6) y `[ 🔑 Ya tengo Cuenta ]`. Al enviar, se registra/inicia sesión automáticamente de fondo y confirma la reserva en un único paso atómico sin perder el turno retenido.
-      * Usuario Autenticado: Reconoce la sesión activa, muestra badge `👤 Reservando como <nombre>`, autocompleta el teléfono y confirma en 1 clic.
+  * Modelo de Autenticación en Checkout (Modelo A) con Verificación OTP en 2 Pasos y Asignación Manual en Recepción:
+    - Flujo Cliente Web (Modelo A con Verificación OTP In-Modal):
+      * Paso 1 (Formulario de Registro): El usuario ingresa Nombre, Teléfono, Email, Contraseña y Método de Pago $\rightarrow$ Clic en `[ ✨ Continuar (Paso 1/2) ]`. El backend crea la cuenta y despacha el código OTP de 6 dígitos.
+      * Paso 2 (Verificación In-Modal): Sin salir de la página y manteniendo el contador de 10 min de retención visible, se le pide el código de 6 dígitos. Cuenta con botón de reenvío con cooldown de 60s y opción para editar datos. Al ingresar el código, se valida via `POST /api/auth/verify-otp`, se marca `email_verified_at` y se confirma la reserva atómicamente.
+      * Pestaña Login: Los clientes con cuenta existente ingresan Email y Contraseña y confirman directamente.
+      * Usuario con Sesión Activa: Reconoce la sesión con badge `👤 Reservando como <nombre>`, autocompleta el teléfono y confirma en 1 clic.
     - Flujo Empleado / Recepcionista del Club:
       * Modal exclusivo `🏢 Asignación de Turno en Mostrador / Recepción`.
-      * Permite registrar reservas presenciales o telefónicas ingresando Nombre y Teléfono del cliente sin exigirle que cree una cuenta online.
+      * Permite registrar reservas presenciales o telefónicas ingresando Nombre y Teléfono del cliente sin exigirle que cree una cuenta online ni validar OTP.
       * Soporta selección de estado de cobro (`💵 Cobrado en Mostrador`, `📲 Transferencia`, `🕒 Pendiente de Pago`, `💳 Tarjeta / Débito`).
     - Backend & Base de Datos:
       * Migración `2026_08_29_230004_add_telefono_to_users_table`: teléfono en perfil de usuario.
