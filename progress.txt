@@ -640,6 +640,9 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Panel de Administración (`panel/page.tsx`): Sección "3. Duración de Turno & Modalidad" en el modal de alta y edición de canchas, permitiendo elegir entre **Duración Fija** (60 min, 90 min, 120 min) o **Duración Flexible** con switch de Algoritmo Anti-Baches.
     - Portal Público & Grilla Horaria (`GrillaHoraria.tsx`): Selector interactivo de duración para clientes (`[ ⏱️ 60 min ] [ ⏱️ 90 min ] [ ⏱️ 120 min ]`).
     - Feedback Inteligente Exclusivo para el Administrador: Banner informativo en la grilla que le notifica al dueño en tiempo real qué horarios fueron optimizados y el motivo exacto (ej. `🚫 18:00 a 19:30: Dejaría un hueco muerto de 30 min (19:30 a 20:00)`), sin interferir con la vista limpia de los clientes.
-  * Tests: Vitest suite (27 tests pasados al 100%) y PHPUnit suite (116 tests pasados al 100%).
+  * Centro de Operaciones & Visibilidad Diferenciada de Turnos Ocupados:
+    - Para Clientes (Sitio Público): Los turnos ocupados no se muestran (grilla limpia que exhibe exclusivamente los slots libres para reservar).
+    - Para Administradores (Modo Admin): Sección dedicada "📋 Turnos Reservados & Ocupados del Día" con tarjetas enriquecidas (horario, nombre del titular, teléfono, botón de acceso directo a WhatsApp, monto, estado de pago, badge de turno fijo) y diálogo modal interactivo para "Liberar / Cancelar Turno" (`DELETE /api/clubs/{subdomain}/turnos/{id}`).
+  * Tests: Vitest suite (28 tests pasados al 100%) y PHPUnit suite (116 tests pasados al 100%).
 ===============================================================================
 

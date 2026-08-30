@@ -33,8 +33,23 @@ class DisponibilidadController extends Controller
         }
 
         $duracion = isset($validated['duracion']) ? (int) $validated['duracion'] : null;
-        $disponibilidad = $this->disponibilidadService->obtenerDisponibilidadCompleta($id, $validated['fecha'], $duracion);
+
+        $esAdmin = false;
+        $user = auth('sanctum')->user() ?: $request->user();
+        if (!$user && $request->bearerToken()) {
+            $user = \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable;
+        }
+
+        if ($user) {
+            $complejo = \App\Models\Complejo::find($cancha->complejo_id);
+            if ($complejo && ($user->id === $complejo->user_id || $user->is_admin)) {
+                $esAdmin = true;
+            }
+        }
+
+        $disponibilidad = $this->disponibilidadService->obtenerDisponibilidadCompleta($id, $validated['fecha'], $duracion, $esAdmin);
         $slots = $disponibilidad['slots'];
+        $turnosOcupados = $disponibilidad['turnos_ocupados'];
         $antiBaches = $disponibilidad['optimizacion_anti_baches'];
 
         return response()->json([
@@ -49,12 +64,16 @@ class DisponibilidadController extends Controller
             'precio_90_min' => $cancha->precio_90_min !== null ? (float) $cancha->precio_90_min : round((float) $cancha->precio_base * 1.5, 2),
             'precio_120_min' => $cancha->precio_120_min !== null ? (float) $cancha->precio_120_min : round((float) $cancha->precio_base * 2.0, 2),
             'slots_disponibles' => $slots,
+            'turnos_ocupados' => $turnosOcupados,
             'optimizacion_anti_baches' => $antiBaches,
+            'is_admin' => $esAdmin,
             'data' => [
                 'slots' => $slots,
+                'turnos_ocupados' => $turnosOcupados,
                 'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),
                 'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
                 'optimizacion_anti_baches' => $antiBaches,
+                'is_admin' => $esAdmin,
             ],
         ]);
     }

@@ -28,14 +28,15 @@ class DisponibilidadService
     }
 
     /**
-     * Calculate full availability along with anti-bache audit details for club administrators.
+     * Calculate full availability along with anti-bache audit details and occupied turnos for club administrators.
      */
-    public function obtenerDisponibilidadCompleta(int $canchaId, string $fecha, ?int $duracionSolicitada = null): array
+    public function obtenerDisponibilidadCompleta(int $canchaId, string $fecha, ?int $duracionSolicitada = null, bool $esAdmin = false): array
     {
         $cancha = Cancha::find($canchaId);
         if (!$cancha || $cancha->estado !== 'activo') {
             return [
                 'slots' => [],
+                'turnos_ocupados' => [],
                 'optimizacion_anti_baches' => [
                     'activa' => false,
                     'total_horarios_protegidos' => 0,
@@ -54,6 +55,7 @@ class DisponibilidadService
         if (!$horario) {
             return [
                 'slots' => [],
+                'turnos_ocupados' => [],
                 'optimizacion_anti_baches' => [
                     'activa' => false,
                     'total_horarios_protegidos' => 0,
@@ -88,9 +90,11 @@ class DisponibilidadService
         $horaCierre = Carbon::parse($fecha . ' ' . $horario->hora_cierre);
 
         // Fetch non-available turnos in database (reservado, bloqueado, confirmado, etc.)
-        $turnosOcupados = Turno::where('cancha_id', $canchaId)
+        $turnosOcupados = Turno::with('cliente')
+            ->where('cancha_id', $canchaId)
             ->where('fecha', $fechaCarbon->format('Y-m-d'))
             ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+            ->orderBy('hora_inicio', 'asc')
             ->get();
 
         $slotsDisponibles = [];
@@ -181,8 +185,33 @@ class DisponibilidadService
             $currentSlotStart->addMinutes($stepMinutos);
         }
 
+        // Formatted occupied turnos list (with client details for admin view)
+        $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($esAdmin) {
+            $data = [
+                'id' => $t->id,
+                'cancha_id' => $t->cancha_id,
+                'fecha' => is_string($t->fecha) ? $t->fecha : $t->fecha->format('Y-m-d'),
+                'hora_inicio' => Carbon::parse($t->hora_inicio)->format('H:i'),
+                'hora_fin' => Carbon::parse($t->hora_fin)->format('H:i'),
+                'duracion_minutos' => Carbon::parse($t->hora_inicio)->diffInMinutes(Carbon::parse($t->hora_fin)),
+                'precio' => (float) $t->precio,
+                'estado' => $t->estado,
+                'es_fijo' => (bool) $t->es_fijo,
+            ];
+
+            if ($esAdmin) {
+                $data['cliente_id'] = $t->cliente_id;
+                $data['cliente_nombre'] = $t->cliente?->name ?? 'Cliente Mostrador / Anónimo';
+                $data['cliente_email'] = $t->cliente?->email;
+                $data['cliente_telefono'] = $t->cliente?->telefono ?? ($t->cliente ? '+54 9 11 5555-4321' : 'Sin teléfono');
+            }
+
+            return $data;
+        })->values()->all();
+
         return [
             'slots' => $slotsDisponibles,
+            'turnos_ocupados' => $turnosOcupadosData,
             'optimizacion_anti_baches' => [
                 'activa' => $antiBachesActivo,
                 'total_horarios_protegidos' => count($horariosProtegidos),

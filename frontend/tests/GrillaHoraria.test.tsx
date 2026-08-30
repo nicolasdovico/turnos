@@ -18,7 +18,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
     vi.restoreAllMocks();
   });
 
-  it("renderiza los turnos disponibles y deshabilita los ocupados", () => {
+  it("renderiza los turnos disponibles y oculta los no disponibles para los clientes", () => {
     render(
       <GrillaHoraria
         canchaId={1}
@@ -32,11 +32,9 @@ describe("Componente Reactivo GrillaHoraria", () => {
     expect(screen.getByText("Cancha Principal")).toBeDefined();
     expect(screen.getByLabelText("Turno 09:00 a 10:00 Disponible")).toBeDefined();
     expect(screen.getByLabelText("Turno 10:00 a 11:00 Disponible")).toBeDefined();
-    expect(screen.getByLabelText("Turno 11:00 a 12:00 Ocupado")).toBeDefined();
 
-    // The occupied slot (11:00) should be disabled
-    const occupiedButton = screen.getByLabelText("Turno 11:00 a 12:00 Ocupado");
-    expect((occupiedButton as HTMLButtonElement).disabled).toBe(true);
+    // The occupied slot (11:00) should be omitted for clients
+    expect(screen.queryByLabelText("Turno 11:00 a 12:00 Ocupado")).toBeNull();
   });
 
 
@@ -263,6 +261,105 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(adminBanner).toBeDefined();
       expect(adminBanner.textContent).toContain("Regla Anti-Baches en Acción");
       expect(adminBanner.textContent).toContain("Dejaría un hueco muerto de 30 min");
+    });
+  });
+
+  it("oculta completamente los turnos ocupados a los clientes y los muestra enriquecidos exclusivamente al administrador con opción de liberar", async () => {
+    const mockTurnosOcupados = [
+      {
+        id: 42,
+        cancha_id: 1,
+        fecha: "2026-09-01",
+        hora_inicio: "20:00",
+        hora_fin: "21:30",
+        duracion_minutos: 90,
+        precio: 12000,
+        estado: "confirmado",
+        cliente_nombre: "Martín Palermo",
+        cliente_telefono: "+54 9 11 9999-8888",
+        es_fijo: false,
+      },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (typeof url === "string" && url.includes("/turnos/42")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, message: "Turno liberado" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            cancha_id: 1,
+            slots_disponibles: [
+              { hora_inicio: "18:30", hora_fin: "20:00", disponible: true, precio: 12000 },
+              { hora_inicio: "20:00", hora_fin: "21:30", disponible: false },
+            ],
+            turnos_ocupados: mockTurnosOcupados,
+          }),
+      });
+    });
+
+    // 1. Cliente común: NO ve el turno 20:00-21:30 ni la sección de turnos ocupados
+    const { unmount } = render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        fechaInicial="2026-09-01"
+        isAdmin={false}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 18:30 a 20:00 Disponible")).toBeDefined();
+    });
+
+    // El slot ocupado de las 20:00 no debe estar en los botones de selección
+    expect(screen.queryByLabelText(/Turno 20:00 a 21:30/i)).toBeNull();
+    // La sección administrativa no debe existir
+    expect(screen.queryByTestId("admin-occupied-turnos-section")).toBeNull();
+
+    unmount();
+
+    // 2. Administrador: Ve la sección de turnos ocupados con el nombre del cliente y teléfono
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-occupied-turnos-section")).toBeDefined();
+      expect(screen.getByText("Martín Palermo")).toBeDefined();
+      expect(screen.getByText(/9999-8888/)).toBeDefined();
+      expect(screen.getByText("WhatsApp ↗")).toBeDefined();
+    });
+
+    // Probar liberación de turno
+    const btnLiberar = screen.getByRole("button", { name: /Liberar Turno/i });
+    fireEvent.click(btnLiberar);
+
+    // Debe abrirse modal de confirmación
+    expect(screen.getByText("¿Liberar este Turno?")).toBeDefined();
+
+    const btnConfirmarLiberacion = screen.getByRole("button", { name: /Sí, Liberar Turno/i });
+    fireEvent.click(btnConfirmarLiberacion);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/clubs/padel-pro/turnos/42"),
+        expect.objectContaining({ method: "DELETE" })
+      );
     });
   });
 });

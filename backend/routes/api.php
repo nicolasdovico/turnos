@@ -101,6 +101,7 @@ Route::prefix('clubs')->group(function () {
     Route::post('/{subdomain}/canchas', [\App\Http\Controllers\Api\ClubDashboardController::class, 'storeCancha']);
     Route::put('/{subdomain}/canchas/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateCancha']);
     Route::delete('/{subdomain}/canchas/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyCancha']);
+    Route::delete('/{subdomain}/turnos/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyTurno']);
 });
 
 Route::get('/complejos/cercanos', [\App\Http\Controllers\Api\ComplejoController::class, 'cercanos']);

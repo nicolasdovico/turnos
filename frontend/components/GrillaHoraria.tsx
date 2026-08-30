@@ -58,6 +58,22 @@ export interface AntiBachesInfo {
   }>;
 }
 
+export interface TurnoOcupado {
+  id: number;
+  cancha_id: number;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  duracion_minutos?: number;
+  precio: number;
+  estado: string;
+  es_fijo?: boolean;
+  cliente_id?: number | null;
+  cliente_nombre?: string;
+  cliente_email?: string | null;
+  cliente_telefono?: string | null;
+}
+
 export default function GrillaHoraria({
   canchaId,
   canchaNombre = "Cancha 1",
@@ -81,6 +97,9 @@ export default function GrillaHoraria({
   const [isFlexible, setIsFlexible] = useState<boolean>(Boolean(permiteDuracionFlexible));
   const [antiBachesInfo, setAntiBachesInfo] = useState<AntiBachesInfo | null>(null);
   const [slots, setSlots] = useState<Slot[]>(initialSlots || []);
+  const [turnosOcupados, setTurnosOcupados] = useState<TurnoOcupado[]>([]);
+  const [turnoToCancel, setTurnoToCancel] = useState<TurnoOcupado | null>(null);
+  const [isCancelingTurno, setIsCancelingTurno] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [lockingSlot, setLockingSlot] = useState<string | null>(null);
   const [activeLock, setActiveLock] = useState<ActiveLock | null>(null);
@@ -142,6 +161,13 @@ export default function GrillaHoraria({
       if (data.optimizacion_anti_baches) {
         setAntiBachesInfo(data.optimizacion_anti_baches);
       }
+      if (Array.isArray(data.turnos_ocupados)) {
+        setTurnosOcupados(data.turnos_ocupados);
+      } else if (Array.isArray(data.data?.turnos_ocupados)) {
+        setTurnosOcupados(data.data.turnos_ocupados);
+      } else {
+        setTurnosOcupados([]);
+      }
       const rawSlots =
         data.slots_disponibles ||
         data.data?.slots ||
@@ -166,6 +192,34 @@ export default function GrillaHoraria({
       addToast("error", "Error al cargar los turnos disponibles.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelTurno = async () => {
+    if (!turnoToCancel || !subdomain) return;
+    setIsCancelingTurno(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch(`${apiUrl}/clubs/${subdomain}/turnos/${turnoToCancel.id}`, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("No se pudo liberar el turno.");
+      }
+
+      addToast("success", `Turno de las ${turnoToCancel.hora_inicio} hs liberado exitosamente.`);
+      setTurnoToCancel(null);
+      fetchDisponibilidad(fecha, duracion);
+    } catch (err: any) {
+      addToast("error", err.message || "Error al liberar el turno.");
+    } finally {
+      setIsCancelingTurno(false);
     }
   };
 
@@ -504,10 +558,12 @@ export default function GrillaHoraria({
         </div>
       )}
 
-      {/* Grid of Time Slots */}
+      {/* Grid of Time Slots (Available only for clients, segmented for admin) */}
       <div className="mt-8">
         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-          Horarios del Día ({slots.length} turnos)
+          {isAdmin
+            ? `Horarios Disponibles para Reservar (${slots.filter((s) => s.disponible).length})`
+            : `Horarios Disponibles (${slots.filter((s) => s.disponible).length} turnos)`}
         </h3>
 
         {loading ? (
@@ -516,71 +572,205 @@ export default function GrillaHoraria({
               <div key={i} className="h-20 bg-slate-800/40 rounded-2xl animate-pulse" />
             ))}
           </div>
-        ) : slots.length === 0 ? (
+        ) : slots.filter((s) => s.disponible).length === 0 ? (
           <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-800">
             <Clock className="w-10 h-10 text-slate-600 mx-auto mb-2" />
             <p className="text-slate-400 font-medium">No hay turnos disponibles para la fecha seleccionada.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {slots.map((slot) => {
-              const isLockedByMe = activeLock?.horaInicio === slot.hora_inicio;
-              const isLocking = lockingSlot === slot.hora_inicio;
+            {slots
+              .filter((slot) => slot.disponible)
+              .map((slot) => {
+                const isLockedByMe = activeLock?.horaInicio === slot.hora_inicio;
+                const isLocking = lockingSlot === slot.hora_inicio;
 
-              let buttonClasses =
-                "relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 ";
+                let buttonClasses =
+                  "relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 ";
 
-              if (!slot.disponible) {
-                buttonClasses += "bg-slate-800/30 border-slate-800 text-slate-500 cursor-not-allowed opacity-60";
-              } else if (isLockedByMe) {
-                buttonClasses += "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500 shadow-lg";
-              } else {
-                buttonClasses +=
-                  "bg-slate-800/60 border-slate-700/80 text-white hover:border-emerald-500/70 hover:bg-slate-800 cursor-pointer hover:shadow-md";
-              }
+                if (isLockedByMe) {
+                  buttonClasses += "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500 shadow-lg";
+                } else {
+                  buttonClasses +=
+                    "bg-slate-800/60 border-slate-700/80 text-white hover:border-emerald-500/70 hover:bg-slate-800 cursor-pointer hover:shadow-md";
+                }
 
-              return (
-                <button
-                  key={slot.hora_inicio}
-                  disabled={!slot.disponible || isLocking}
-                  onClick={() => handleSelectSlot(slot)}
-                  className={buttonClasses}
-                  aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} ${slot.disponible ? "Disponible" : "Ocupado"}`}
-                >
-                  <div className="flex justify-between items-start w-full">
-                    <span className="font-mono text-lg font-extrabold tracking-tight">
-                      {slot.hora_inicio}
-                    </span>
-                    {isLockedByMe ? (
-                      <span className="flex h-2 w-2 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                return (
+                  <button
+                    key={slot.hora_inicio}
+                    disabled={isLocking}
+                    onClick={() => handleSelectSlot(slot)}
+                    className={buttonClasses}
+                    aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Disponible`}
+                  >
+                    <div className="flex justify-between items-start w-full">
+                      <span className="font-mono text-lg font-extrabold tracking-tight">
+                        {slot.hora_inicio}
                       </span>
-                    ) : slot.disponible ? (
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        Libre
-                      </span>
-                    ) : (
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                        Ocupado
-                      </span>
-                    )}
-                  </div>
+                      {isLockedByMe ? (
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          Libre
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="mt-3 flex justify-between items-baseline w-full">
-                    <span className="text-xs text-slate-400 font-medium">{slot.hora_fin}</span>
-                    {slot.precio && (
-                      <span className="text-xs font-semibold text-emerald-400">
-                        ${slot.precio.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+                    <div className="mt-3 flex justify-between items-baseline w-full">
+                      <span className="text-xs text-slate-400 font-medium">{slot.hora_fin}</span>
+                      {slot.precio && (
+                        <span className="text-xs font-semibold text-emerald-400">
+                          ${slot.precio.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
           </div>
         )}
       </div>
+
+      {/* Admin-Only Reserved / Occupied Turnos Section */}
+      {isAdmin && (
+        <div data-testid="admin-occupied-turnos-section" className="mt-10 pt-8 border-t border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <span>📋</span> Turnos Reservados & Ocupados del Día ({turnosOcupados.length})
+              </h3>
+              <p className="text-xs text-slate-400">
+                Información exclusiva del administrador para control de cancha y recepción de jugadores
+              </p>
+            </div>
+            <span className="self-start sm:self-auto px-2.5 py-1 rounded-xl bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[11px] font-bold">
+              Vista Administrador
+            </span>
+          </div>
+
+          {turnosOcupados.length === 0 ? (
+            <div className="text-center py-8 bg-slate-950/50 rounded-2xl border border-slate-800/80">
+              <span className="text-2xl block mb-1">✨</span>
+              <p className="text-xs text-slate-400 font-medium">
+                No hay turnos ocupados registrados en esta cancha para la fecha seleccionada.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {turnosOcupados.map((turno) => (
+                <div
+                  key={turno.id}
+                  data-testid="admin-reserved-card"
+                  className="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 hover:border-slate-700 transition flex flex-col justify-between gap-3 shadow-sm"
+                >
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm font-extrabold text-white bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-800">
+                        ⏰ {turno.hora_inicio} - {turno.hora_fin}
+                      </span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                        {turno.estado || "Ocupado"}
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1 pt-0.5">
+                      <div className="font-bold text-white flex items-center gap-1.5 truncate">
+                        <span>👤</span>
+                        <span className="truncate">{turno.cliente_nombre || "Cliente Mostrador"}</span>
+                        {turno.es_fijo && (
+                          <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">
+                            🔁 Fijo
+                          </span>
+                        )}
+                      </div>
+
+                      {turno.cliente_telefono && (
+                        <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                          <span className="truncate">📱 {turno.cliente_telefono}</span>
+                          <a
+                            href={`https://wa.me/${turno.cliente_telefono.replace(/[^0-9]/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-400 hover:underline text-[11px] font-bold shrink-0 ml-2"
+                          >
+                            WhatsApp ↗
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                    <span className="font-bold text-emerald-400 font-mono">
+                      ${turno.precio ? turno.precio.toLocaleString() : "0"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setTurnoToCancel(turno)}
+                      className="px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 text-[11px] font-bold transition flex items-center gap-1"
+                    >
+                      <span>✕</span> Liberar Turno
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal Confirmación de Cancelación / Liberación de Turno (Admin) */}
+      {turnoToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-left">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400 text-2xl border border-rose-500/20">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">¿Liberar este Turno?</h3>
+                <p className="text-xs text-slate-400">El horario volverá a estar disponible para el público</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Horario:</span>
+                <span className="font-mono font-bold text-white">{turnoToCancel.hora_inicio} a {turnoToCancel.hora_fin} hs</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Titular:</span>
+                <span className="font-bold text-slate-200">{turnoToCancel.cliente_nombre || "Cliente Mostrador"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Monto:</span>
+                <span className="font-bold text-emerald-400">${turnoToCancel.precio?.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setTurnoToCancel(null)}
+                className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                disabled={isCancelingTurno}
+                onClick={handleCancelTurno}
+                className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isCancelingTurno ? "Liberando..." : "Sí, Liberar Turno"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Checkout / Confirmación de Turno */}
       {isConfirmModalOpen && activeLock && (

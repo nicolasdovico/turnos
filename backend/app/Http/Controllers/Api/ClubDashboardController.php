@@ -340,4 +340,41 @@ class ClubDashboardController extends Controller
             'action' => 'deleted',
         ]);
     }
+
+    /**
+     * Cancelar o liberar un turno por parte del administrador.
+     */
+    public function destroyTurno(Request $request, string $subdomain, int $turnoId): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $turno = Turno::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->where('id', $turnoId)
+            ->first();
+
+        if (!$turno) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Turno no encontrado.',
+            ], 404);
+        }
+
+        $turno->update(['estado' => 'cancelado']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Turno liberado y cancelado exitosamente.',
+        ]);
+    }
 }
