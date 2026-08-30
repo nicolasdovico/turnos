@@ -653,4 +653,116 @@ describe("Componente Reactivo GrillaHoraria", () => {
 
     vi.useRealTimers();
   });
+
+  it("muestra múltiples turnos retenidos con sus cuentas regresivas exclusivamente al administrador con opción de forzar liberación", async () => {
+    const mockTurnosRetenidos = [
+      {
+        cancha_id: 1,
+        cancha_nombre: "Cancha Central",
+        fecha: "2026-09-01",
+        hora_inicio: "19:00",
+        hora_fin: "20:00",
+        duracion_minutos: 60,
+        precio: 10000,
+        ttl_segundos: 450,
+        expira_en_segundos: 450,
+        estado: "bloqueado_temporal",
+      },
+      {
+        cancha_id: 1,
+        cancha_nombre: "Cancha Central",
+        fecha: "2026-09-01",
+        hora_inicio: "21:00",
+        hora_fin: "22:00",
+        duracion_minutos: 60,
+        precio: 10000,
+        ttl_segundos: 520,
+        expira_en_segundos: 520,
+        estado: "bloqueado_temporal",
+      },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (typeof url === "string" && url.includes("/turnos/liberar-bloqueo")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, message: "Bloqueo liberado" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            cancha_id: 1,
+            slots_disponibles: [
+              { hora_inicio: "18:00", hora_fin: "19:00", disponible: true },
+              { hora_inicio: "20:00", hora_fin: "21:00", disponible: true },
+            ],
+            turnos_ocupados: [],
+            turnos_retenidos: mockTurnosRetenidos,
+          }),
+      });
+    });
+
+    // 1. Cliente público: NO ve el contenedor de turnos retenidos
+    const { unmount } = render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        fechaInicial="2026-09-01"
+        isAdmin={false}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 18:00 a 19:00 Disponible")).toBeDefined();
+    });
+
+    expect(screen.queryByTestId("admin-retained-locks-container")).toBeNull();
+
+    unmount();
+
+    // 2. Administrador: SÍ ve el contenedor con todos los turnos retenidos uno debajo del otro
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    await waitFor(() => {
+      const container = screen.getByTestId("admin-retained-locks-container");
+      expect(container).toBeDefined();
+      expect(container.textContent).toContain("Turnos Retenidos en Proceso de Reserva (2)");
+    });
+
+    // Verificar que se listan ambos turnos retenidos con sus tiempos
+    expect(screen.getByText(/19:00 - 20:00 hs/)).toBeDefined();
+    expect(screen.getByText(/21:00 - 22:00 hs/)).toBeDefined();
+    expect(screen.getByTestId("countdown-timer-19:00")).toBeDefined();
+    expect(screen.getByTestId("countdown-timer-21:00")).toBeDefined();
+
+    // Probar forzar liberación de un turno retenido
+    const botonesLiberar = screen.getAllByRole("button", { name: /Forzar Liberación/i });
+    expect(botonesLiberar.length).toBe(2);
+
+    fireEvent.click(botonesLiberar[0]);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/liberar-bloqueo"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"hora_inicio":"19:00"'),
+        })
+      );
+    });
+  });
 });

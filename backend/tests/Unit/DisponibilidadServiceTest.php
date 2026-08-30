@@ -317,4 +317,39 @@ class DisponibilidadServiceTest extends TestCase
         // Limpiar mock de tiempo
         \Carbon\Carbon::setTestNow();
     }
+
+    public function test_disponibilidad_retorna_turnos_retenidos_con_ttl_exclusivamente_para_admin(): void
+    {
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-31 07:00:00', 'America/Argentina/Buenos_Aires'));
+
+        // Simular dos bloqueos atómicos en Redis para los turnos de 09:00 y 11:00
+        $key1 = \App\Services\ReservaLockService::getLockKey($this->cancha->id, $this->fechaLunes, '09:00');
+        $key2 = \App\Services\ReservaLockService::getLockKey($this->cancha->id, $this->fechaLunes, '11:00');
+        Redis::set($key1, 'token-1', 'EX', 400);
+        Redis::set($key2, 'token-2', 'EX', 550);
+
+        // 1. Consulta como cliente (esAdmin = false)
+        $resCliente = $this->service->obtenerDisponibilidadCompleta($this->cancha->id, $this->fechaLunes, 60, false);
+        $this->assertEmpty($resCliente['turnos_retenidos']);
+        
+        $horasDisponiblesCliente = array_column($resCliente['slots'], 'hora_inicio');
+        $this->assertNotContains('09:00', $horasDisponiblesCliente);
+        $this->assertNotContains('11:00', $horasDisponiblesCliente);
+        $this->assertContains('08:00', $horasDisponiblesCliente);
+        $this->assertContains('10:00', $horasDisponiblesCliente);
+
+        // 2. Consulta como administrador (esAdmin = true)
+        $resAdmin = $this->service->obtenerDisponibilidadCompleta($this->cancha->id, $this->fechaLunes, 60, true);
+        $this->assertCount(2, $resAdmin['turnos_retenidos']);
+
+        $horasRetenidas = array_column($resAdmin['turnos_retenidos'], 'hora_inicio');
+        $this->assertContains('09:00', $horasRetenidas);
+        $this->assertContains('11:00', $horasRetenidas);
+
+        $retenido09 = collect($resAdmin['turnos_retenidos'])->firstWhere('hora_inicio', '09:00');
+        $this->assertGreaterThan(0, $retenido09['ttl_segundos']);
+        $this->assertEquals('bloqueado_temporal', $retenido09['estado']);
+
+        \Carbon\Carbon::setTestNow();
+    }
 }

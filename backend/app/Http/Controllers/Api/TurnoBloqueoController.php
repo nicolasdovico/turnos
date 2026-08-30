@@ -70,4 +70,37 @@ class TurnoBloqueoController extends Controller
             'hora_inicio' => $validated['hora_inicio'],
         ], 200);
     }
+
+    /**
+     * Handle releasing a temporary atomic lock.
+     */
+    public function liberarBloqueo(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'cancha_id' => ['required', 'integer'],
+            'fecha' => ['required', 'date_format:Y-m-d'],
+            'hora_inicio' => ['required', 'string'],
+            'token_reserva' => ['nullable', 'string'],
+        ]);
+
+        $cancha = Cancha::find($validated['cancha_id']);
+        if (!$cancha) {
+            return response()->json([
+                'error' => 'CANCHA_NOT_FOUND',
+                'message' => 'Cancha no encontrada.',
+            ], 404);
+        }
+
+        $this->reservaLockService->liberarBloqueo(
+            $validated['cancha_id'],
+            $validated['fecha'],
+            $validated['hora_inicio'],
+            $validated['token_reserva'] ?? null
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Bloqueo temporal liberado correctamente.',
+        ]);
+    }
 }

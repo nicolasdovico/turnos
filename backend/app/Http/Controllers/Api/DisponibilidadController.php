@@ -50,6 +50,7 @@ class DisponibilidadController extends Controller
         $disponibilidad = $this->disponibilidadService->obtenerDisponibilidadCompleta($id, $validated['fecha'], $duracion, $esAdmin);
         $slots = $disponibilidad['slots'];
         $turnosOcupados = $disponibilidad['turnos_ocupados'];
+        $turnosRetenidos = $disponibilidad['turnos_retenidos'] ?? [];
         $antiBaches = $disponibilidad['optimizacion_anti_baches'];
 
         return response()->json([
@@ -65,11 +66,13 @@ class DisponibilidadController extends Controller
             'precio_120_min' => $cancha->precio_120_min !== null ? (float) $cancha->precio_120_min : round((float) $cancha->precio_base * 2.0, 2),
             'slots_disponibles' => $slots,
             'turnos_ocupados' => $turnosOcupados,
+            'turnos_retenidos' => $turnosRetenidos,
             'optimizacion_anti_baches' => $antiBaches,
             'is_admin' => $esAdmin,
             'data' => [
                 'slots' => $slots,
                 'turnos_ocupados' => $turnosOcupados,
+                'turnos_retenidos' => $turnosRetenidos,
                 'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),
                 'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
                 'optimizacion_anti_baches' => $antiBaches,

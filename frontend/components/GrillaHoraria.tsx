@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock } from "lucide-react";
 
 export interface Slot {
@@ -57,6 +57,20 @@ export interface AntiBachesInfo {
     duracion_minutos: number;
     motivo: string;
   }>;
+}
+
+export interface RetainedLock {
+  cancha_id: number;
+  cancha_nombre?: string;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  duracion_minutos?: number;
+  precio?: number;
+  ttl_segundos: number;
+  expira_en_segundos?: number;
+  token_reserva?: string;
+  is_mine?: boolean;
 }
 
 export interface TurnoOcupado {
@@ -127,6 +141,7 @@ export default function GrillaHoraria({
   const [antiBachesInfo, setAntiBachesInfo] = useState<AntiBachesInfo | null>(null);
   const [slots, setSlots] = useState<Slot[]>(initialSlots || []);
   const [turnosOcupados, setTurnosOcupados] = useState<TurnoOcupado[]>([]);
+  const [turnosRetenidos, setTurnosRetenidos] = useState<RetainedLock[]>([]);
   const [turnoToCancel, setTurnoToCancel] = useState<TurnoOcupado | null>(null);
   const [isCancelingTurno, setIsCancelingTurno] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
@@ -290,6 +305,13 @@ export default function GrillaHoraria({
       } else {
         setTurnosOcupados([]);
       }
+      if (Array.isArray(data.turnos_retenidos)) {
+        setTurnosRetenidos(data.turnos_retenidos);
+      } else if (Array.isArray(data.data?.turnos_retenidos)) {
+        setTurnosRetenidos(data.data.turnos_retenidos);
+      } else {
+        setTurnosRetenidos([]);
+      }
       const rawSlots =
         data.slots_disponibles ||
         data.data?.slots ||
@@ -345,39 +367,128 @@ export default function GrillaHoraria({
     }
   };
 
+  const handleLiberarBloqueo = async (lock: RetainedLock | ActiveLock) => {
+    try {
+      const horaInicio = "hora_inicio" in lock ? lock.hora_inicio : lock.horaInicio;
+      const lockFecha = lock.fecha;
+      const token = getAuthToken(propToken);
+      const tokenReserva =
+        "token_reserva" in lock
+          ? lock.token_reserva
+          : "tokenReserva" in lock
+          ? lock.tokenReserva
+          : undefined;
+
+      await fetch(`${apiUrl}/turnos/liberar-bloqueo`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+        body: JSON.stringify({
+          cancha_id: canchaId,
+          fecha: lockFecha,
+          hora_inicio: horaInicio,
+          token_reserva: tokenReserva,
+        }),
+      });
+
+      if (activeLock && activeLock.horaInicio === horaInicio) {
+        setActiveLock(null);
+      }
+
+      setTurnosRetenidos((prev) => prev.filter((r) => r.hora_inicio !== horaInicio));
+      addToast("success", `Bloqueo de las ${horaInicio} hs liberado correctamente.`);
+      fetchDisponibilidad(fecha, duracion);
+    } catch {
+      addToast("error", "Error al liberar el turno retenido.");
+    }
+  };
+
   useEffect(() => {
     if (!initialSlots || fecha !== fechaInicial) {
       fetchDisponibilidad(fecha, duracion);
     }
   }, [fecha, canchaId, duracion]);
 
-  // Visual countdown timer for Redis atomic lock
+  // Master visual countdown timer for all active and retained locks
   useEffect(() => {
-    if (!activeLock) {
+    const hasActiveLock = Boolean(activeLock);
+    const hasRetained = turnosRetenidos.length > 0;
+
+    if (!hasActiveLock && !hasRetained) {
       if (timerRef.current) clearInterval(timerRef.current);
       setRemainingSeconds(0);
       return;
     }
 
-    const updateTimer = () => {
-      const secondsLeft = Math.max(0, Math.floor((activeLock.expiresAt - Date.now()) / 1000));
-      setRemainingSeconds(secondsLeft);
-
-      if (secondsLeft <= 0) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        setActiveLock(null);
-        addToast("warning", "El tiempo de bloqueo de 10 minutos ha expirado. Selecciona el turno nuevamente.");
-        fetchDisponibilidad(fecha);
+    const updateTimers = () => {
+      // 1. Decrement activeLock remaining seconds
+      if (activeLock) {
+        const secondsLeft = Math.max(0, Math.floor((activeLock.expiresAt - Date.now()) / 1000));
+        setRemainingSeconds(secondsLeft);
+        if (secondsLeft <= 0) {
+          setActiveLock(null);
+          addToast("warning", "El tiempo de retención del turno ha expirado. Selecciona el turno nuevamente.");
+          fetchDisponibilidad(fecha, duracion);
+        }
       }
+
+      // 2. Decrement all retained locks
+      setTurnosRetenidos((prev) => {
+        let hasExpired = false;
+        const updated = prev
+          .map((r) => {
+            const nextTtl = r.ttl_segundos - 1;
+            if (nextTtl <= 0) hasExpired = true;
+            return { ...r, ttl_segundos: nextTtl };
+          })
+          .filter((r) => r.ttl_segundos > 0);
+
+        if (hasExpired) {
+          fetchDisponibilidad(fecha, duracion);
+        }
+        return updated;
+      });
     };
 
-    updateTimer();
-    timerRef.current = setInterval(updateTimer, 1000);
+    updateTimers();
+    timerRef.current = setInterval(updateTimers, 1000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [activeLock]);
+  }, [activeLock, turnosRetenidos.length, fecha, duracion]);
+
+  const allAdminRetainedLocks: RetainedLock[] = useMemo(() => {
+    const map = new Map<string, RetainedLock>();
+
+    turnosRetenidos.forEach((r) => {
+      map.set(r.hora_inicio, {
+        ...r,
+        is_mine: activeLock ? activeLock.horaInicio === r.hora_inicio : false,
+      });
+    });
+
+    if (activeLock) {
+      map.set(activeLock.horaInicio, {
+        cancha_id: activeLock.canchaId,
+        cancha_nombre: canchaNombre,
+        fecha: activeLock.fecha,
+        hora_inicio: activeLock.horaInicio,
+        hora_fin: activeLock.horaFin,
+        duracion_minutos: activeLock.duracionMinutos,
+        precio: activeLock.precio,
+        ttl_segundos: remainingSeconds,
+        token_reserva: activeLock.tokenReserva,
+        is_mine: true,
+      });
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+  }, [turnosRetenidos, activeLock, remainingSeconds, canchaNombre]);
 
   const isSlotInPast = (slotHoraInicio: string, slotFecha: string) => {
     const today = getTodayString();
@@ -815,8 +926,8 @@ export default function GrillaHoraria({
         </div>
       )}
 
-      {/* Active Lock Checkout Banner with 10-minute Visual Timer */}
-      {activeLock && (
+      {/* Client-Only Active Lock Banner */}
+      {!isAdmin && activeLock && (
         <div
           data-testid="active-lock-banner"
           className="mt-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-900/60 to-emerald-800/40 border border-emerald-500/40 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-lg animate-pulse-slow"
@@ -849,6 +960,124 @@ export default function GrillaHoraria({
             >
               Confirmar Reserva
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Admin-Only Multi-Retained Locks Container (Stacked Vertically) */}
+      {isAdmin && allAdminRetainedLocks.length > 0 && (
+        <div
+          data-testid="admin-retained-locks-container"
+          className="mt-6 p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-amber-500/40 shadow-xl space-y-3"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+            <div>
+              <h3 className="text-sm font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                <span>⏱️</span> Turnos Retenidos en Proceso de Reserva ({allAdminRetainedLocks.length})
+              </h3>
+              <p className="text-xs text-slate-400">
+                Turnos bloqueados temporalmente por usuarios en checkout online o asignación en recepción
+              </p>
+            </div>
+            <span className="self-start sm:self-auto px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[11px] font-bold">
+              Vista Admin • Bloqueos en Tiempo Real
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2.5">
+            {allAdminRetainedLocks.map((lock) => {
+              const isMyLock = Boolean(lock.is_mine || (activeLock && activeLock.horaInicio === lock.hora_inicio));
+              const currentTtl = isMyLock ? remainingSeconds : lock.ttl_segundos;
+
+              return (
+                <div
+                  key={`${lock.fecha}-${lock.hora_inicio}`}
+                  data-testid="admin-retained-lock-item"
+                  className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                    isMyLock
+                      ? "bg-emerald-950/50 border-emerald-500/50 shadow-md shadow-emerald-950/40"
+                      : "bg-slate-900/90 border-slate-800 hover:border-slate-700"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`p-2.5 rounded-xl border shrink-0 ${
+                        isMyLock
+                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                          : "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                      }`}
+                    >
+                      <Lock className="w-5 h-5" />
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-sm font-extrabold text-white">
+                          ⏰ {lock.hora_inicio} - {lock.hora_fin} hs
+                        </span>
+                        {isMyLock ? (
+                          <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            👤 Asignación en Pantalla (Tu Mostrador)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                            🌐 Retenido por Usuario (Checkout Online)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {isMyLock
+                          ? "Has seleccionado este horario en el panel para asignarlo a un cliente."
+                          : "Un usuario está en el paso de checkout completando el pago/datos."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                    <div
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-mono font-bold text-sm ${
+                        currentTtl < 120
+                          ? "bg-rose-950/80 border-rose-500/60 text-rose-300 animate-pulse"
+                          : isMyLock
+                          ? "bg-slate-950 border-emerald-500/50 text-emerald-300"
+                          : "bg-slate-950 border-amber-500/40 text-amber-300"
+                      }`}
+                    >
+                      <Clock className="w-4 h-4 text-slate-400" />
+                      <span data-testid={`countdown-timer-${lock.hora_inicio}`}>
+                        {formatCountdown(currentTtl)}
+                      </span>
+                    </div>
+
+                    {isMyLock ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleOpenConfirmation}
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 text-xs transition shadow"
+                        >
+                          Confirmar Reserva
+                        </button>
+                        <button
+                          onClick={() => handleLiberarBloqueo(lock)}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 text-xs font-semibold transition"
+                          title="Cancelar asignación"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleLiberarBloqueo(lock)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition shadow-sm"
+                        title="Forzar liberación del turno retenido"
+                      >
+                        🔓 Forzar Liberación
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

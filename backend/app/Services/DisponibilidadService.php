@@ -123,6 +123,7 @@ class DisponibilidadService
             ->get();
 
         $slotsDisponibles = [];
+        $turnosRetenidos = [];
         $horariosProtegidos = [];
         $currentSlotStart = $horaApertura->copy();
 
@@ -156,6 +157,27 @@ class DisponibilidadService
             $lockKeyLegacy = self::getLockKey($canchaId, $fechaCarbon->format('Y-m-d'), $horaInicioFormatted);
             $lockKeyStandard = ReservaLockService::getLockKey($canchaId, $fechaCarbon->format('Y-m-d'), $horaInicioFormatted);
             $estaBloqueadoEnRedis = (bool) Redis::get($lockKeyLegacy) || (bool) Redis::get($lockKeyStandard);
+
+            if ($estaBloqueadoEnRedis && !$estaOcupadoEnDb) {
+                $ttl = (int) Redis::ttl($lockKeyStandard);
+                if ($ttl <= 0) {
+                    $ttl = (int) Redis::ttl($lockKeyLegacy);
+                }
+                if ($ttl > 0) {
+                    $turnosRetenidos[] = [
+                        'cancha_id' => $canchaId,
+                        'cancha_nombre' => $cancha->nombre,
+                        'fecha' => $fechaCarbon->format('Y-m-d'),
+                        'hora_inicio' => $horaInicioFormatted,
+                        'hora_fin' => $horaFinFormatted,
+                        'duracion_minutos' => $duracionMinutos,
+                        'precio' => $precio,
+                        'ttl_segundos' => $ttl,
+                        'expira_en_segundos' => $ttl,
+                        'estado' => 'bloqueado_temporal',
+                    ];
+                }
+            }
 
             if (!$estaOcupadoEnDb && !$estaBloqueadoEnRedis) {
                 // 3. Regla Anti-Baches (Gap Prevention): Verificar si este turno deja un hueco huérfano < 60 min
@@ -245,6 +267,7 @@ class DisponibilidadService
         return [
             'slots' => $slotsDisponibles,
             'turnos_ocupados' => $turnosOcupadosData,
+            'turnos_retenidos' => $esAdmin ? $turnosRetenidos : [],
             'optimizacion_anti_baches' => [
                 'activa' => $antiBachesActivo,
                 'total_horarios_protegidos' => count($horariosProtegidos),

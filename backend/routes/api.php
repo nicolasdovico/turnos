@@ -35,6 +35,9 @@ Route::get('/canchas/{id}/disponibilidad', DisponibilidadController::class)
 Route::post('/turnos/bloquear-temporal', TurnoBloqueoController::class)
     ->middleware('tenant.has_module:reservas');
 
+Route::post('/turnos/liberar-bloqueo', [TurnoBloqueoController::class, 'liberarBloqueo'])
+    ->middleware('tenant.has_module:reservas');
+
 Route::post('/turnos/confirmar', \App\Http\Controllers\Api\TurnoConfirmarController::class)
     ->middleware('tenant.has_module:reservas');
 

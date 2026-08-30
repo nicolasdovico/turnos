@@ -724,4 +724,26 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Frontend (Vitest): 32 tests pasados al 100%.
   * Suite Backend (PHPUnit): 120 tests pasados al 100% (619 aserciones).
   * Suite Mobile (Jest): 18 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-08-30] - VISUALIZACIÓN MÚLTIPLE DE TURNOS RETENIDOS EN CHECKOUT (VISTA ADMIN CON CUENTA REGRESIVA)
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * Solo se mostraba un único turno retenido en el banner superior cuando un usuario iniciaba checkout. Si múltiples usuarios retenían turnos en simultáneo, el administrador solo podía ver uno solo.
+- Solución Implementada:
+  * Backend:
+    - `DisponibilidadService.php`: Detección en bucle de todos los bloqueos atómicos en Redis para la cancha/fecha consultada, calculando el TTL exacto restante (`Redis::ttl`) de cada bloqueo activo y adjuntándolos como `turnos_retenidos` exclusivamente cuando `$esAdmin === true` (los clientes públicos reciben `turnos_retenidos = []` para preservar privacidad de concurrencia).
+    - `DisponibilidadController.php`: Exposición de `turnos_retenidos` en el endpoint `GET /api/canchas/{id}/disponibilidad`.
+    - `TurnoBloqueoController.php` & `routes/api.php`: Nuevo método y endpoint `POST /api/turnos/liberar-bloqueo` que permite al administrador forzar la liberación de turnos retenidos o cancelar asignaciones previas antes de que expire el TTL.
+  * Frontend Web (Next.js 14):
+    - `GrillaHoraria.tsx`:
+      - Interfaz `RetainedLock` y estado reactivo `turnosRetenidos`.
+      - Ticker maestro con `setInterval(..., 1000)` que decrementa los segundos restantes de todos los turnos retenidos en simultáneo y refresca automáticamente la grilla al expirar alguno para disponibilizar el horario.
+      - Para Clientes (`!isAdmin`): Mantiene banner exclusivo de su propia reserva en checkout.
+      - Para Administradores (`isAdmin`): Renderiza el contenedor `admin-retained-locks-container` mostrando todos los turnos retenidos uno debajo del otro, con etiquetas diferenciadas (`Asignación en Mostrador` vs `Retenido por Usuario Checkout Online`), cuenta regresiva en vivo por turno (`data-testid="countdown-timer-HH:MM"`) y botón de acción `[ 🔓 Forzar Liberación ]`.
+  * Suites de Tests & Verificación:
+    - Test unitario backend en `DisponibilidadServiceTest.php`: `test_disponibilidad_retorna_turnos_retenidos_con_ttl_exclusivamente_para_admin`.
+    - Test frontend en `GrillaHoraria.test.tsx`: `muestra múltiples turnos retenidos con sus cuentas regresivas exclusivamente al administrador con opción de forzar liberación`.
+    - Suite Backend (PHPUnit): 121 tests pasados al 100% (629 aserciones).
+    - Suite Frontend (Vitest): 33 tests pasados al 100%.
+    - Suite Mobile (Jest): 18 tests pasados al 100%.
 ===============================================================================
