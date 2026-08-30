@@ -746,4 +746,45 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Suite Backend (PHPUnit): 121 tests pasados al 100% (629 aserciones).
     - Suite Frontend (Vitest): 33 tests pasados al 100%.
     - Suite Mobile (Jest): 18 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-08-30] - SEÑA OBLIGATORIA (50% CONFIGURABLE), SIMULADOR DEV, BILLETERA VIRTUAL & LISTA DE ESPERA INTELIGENTE
+-------------------------------------------------------------------------------
+- Arquitectura y Requerimientos Implementados:
+  * Punto 1: Seña Obligatoria Configurable (50% por defecto, 10-100% por club) & Simulador de Pagos Sandbox para Desarrollo.
+  * Punto 2: Política de Cancelación con Reembolsos en Billetera Virtual (ventana de 4 horas por defecto configurable por club).
+  * Punto 3: Saldo de Billetera Virtual con aislamiento multi-tenant por Complejo/Club.
+  * Punto 4: Lista de Espera Inteligente y Notificaciones Push Automáticas (FCM) al liberarse turnos cancelados.
+- Backend (Laravel 11):
+  * Migraciones & Base de Datos:
+    - `2026_08_30_200215_add_payment_and_cancellation_rules_to_complejos_table.php`: Columnas `tipo_cobro_reserva`, `porcentaje_sena` (default 50.00), `monto_sena_fijo`, `permite_mostrador_publico`, `horas_limite_cancelacion` (default 4).
+    - `2026_08_30_200221_add_financial_fields_to_turnos_table.php`: Columnas `monto_pagado`, `saldo_pendiente`, `estado_pago`.
+    - `2026_08_30_200227_create_user_creditos_and_wallet_movimientos_tables.php`: Tablas `user_creditos` (saldo por usuario y complejo) y `wallet_movimientos` (historial de débitos/créditos con referencias de auditoría).
+    - `2026_08_30_200233_create_lista_espera_table.php`: Tabla `lista_espera` con `cancha_id`, `user_id`, `fecha`, `hora_inicio`, `hora_fin`, `notificado_at`.
+  * Modelos Eloquent:
+    - Creados `UserCredito`, `WalletMovimiento`, `ListaEspera` (con trait `BelongsToTenant`).
+    - Actualizados `Complejo` (relaciones `userCreditos`, `listaEspera`), `Turno` (campos financieros y casting decimal), `User` (`creditos`, `walletMovimientos`).
+  * Servicios & Jobs:
+    - `WalletService.php`: Métodos `obtenerSaldo`, `acreditar`, `debitar` (con transacciones ACID y `lockForUpdate`).
+    - `NotificarListaEsperaJob.php`: Notificación push asíncrona vía Firebase Cloud Messaging (FCM) a los usuarios suscritos en espera del slot liberado.
+  * Controladores y Rutas (`routes/api.php`):
+    - `TurnoConfirmarController.php`: Cálculo dinámico de seña requerida (50% por defecto), soporte para método `'simulador_dev'`, consumo opcional de saldo de billetera (`aplicar_credito_wallet`) y persistencia de `monto_pagado`, `saldo_pendiente` y `estado_pago`.
+    - `TurnoCancelacionController.php`: Endpoint `POST /api/turnos/{id}/cancelar-cliente` que evalúa la ventana de horas previas (`horas_limite_cancelacion`). Si cancela con >= 4hs, reembolsa automáticamente el 100% de la seña pagada a su billetera virtual del complejo. Si cancela con < 4hs, retiene la seña como penalidad (`retenido_penalidad`). En ambos casos despacha `NotificarListaEsperaJob`.
+    - `WalletController.php`: `GET /api/wallet/saldo`, `GET /api/wallet/movimientos`.
+    - `ListaEsperaController.php`: `POST /api/lista-espera`, `DELETE /api/lista-espera`, `GET /api/lista-espera`.
+  * Tests Backend (PHPUnit):
+    - `SenaYPagoSimuladoTest.php`: Verifica cálculo de seña, confirmación con simulador dev, débito de billetera y consulta de saldos.
+    - `PoliticaCancelacionBilleteraTest.php`: Verifica reembolso automático a billetera virtual si cancela con > 4hs y retención de seña si cancela con < 4hs, así como despacho del Job de espera.
+    - `ListaEsperaTest.php`: Verifica suscripción, desuscripción y despacho de push FCM con marcado de notificado.
+- Frontend Web (Next.js 14):
+  * `GrillaHoraria.tsx`:
+    - Tarjeta de confirmación / checkout con desglose financiero: Tarifa Total, Seña Requerida Online (50%), Saldo a Pagar en el Club.
+    - Checkbox reactivo de Billetera Virtual (`💰 Usar saldo en Billetera Virtual ($X disponibles)`) que deduce el crédito del monto de la seña.
+    - Bloque de Simulador de Desarrollo Sandbox: Botón `[ 💳 Simular Pago Aprobado ($X) ]` (envía `metodo_pago: 'simulador_dev'`) y botón `[ ❌ Simular Rechazo ]` (muestra toast de tarjeta rechazada).
+    - Sección pública de Lista de Espera en turnos ocupados: Renderiza tarjetas para slots ocupados con botón reactivo `[ 🔔 Avisarme ]` que registra la alerta en `POST /api/lista-espera` y cambia su estado a `[ ✓ Notificación Activa ]`.
+  * Tests Frontend (Vitest):
+    - `tests/GrillaHoraria.test.tsx`: Tests para simulación de pago con seña del 50% y suscripción de clientes a lista de espera.
+- Suites de Tests y Verificación:
+  * Backend (PHPUnit): 128 tests pasados al 100% (659 aserciones).
+  * Frontend (Vitest): 35 tests pasados al 100%.
+  * Mobile (Jest): 18 tests pasados al 100%.
 ===============================================================================

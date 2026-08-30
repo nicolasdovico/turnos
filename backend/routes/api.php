@@ -41,6 +41,18 @@ Route::post('/turnos/liberar-bloqueo', [TurnoBloqueoController::class, 'liberarB
 Route::post('/turnos/confirmar', \App\Http\Controllers\Api\TurnoConfirmarController::class)
     ->middleware('tenant.has_module:reservas');
 
+Route::post('/turnos/{id}/cancelar-cliente', [\App\Http\Controllers\Api\TurnoCancelacionController::class, 'cancelarCliente'])
+    ->middleware('tenant.has_module:reservas');
+
+Route::get('/wallet/saldo', [\App\Http\Controllers\Api\WalletController::class, 'getSaldo']);
+Route::get('/wallet/movimientos', [\App\Http\Controllers\Api\WalletController::class, 'getMovimientos']);
+
+Route::post('/lista-espera', [\App\Http\Controllers\Api\ListaEsperaController::class, 'suscribir']);
+Route::post('/canchas/{id}/lista-espera', [\App\Http\Controllers\Api\ListaEsperaController::class, 'suscribir']);
+Route::delete('/lista-espera', [\App\Http\Controllers\Api\ListaEsperaController::class, 'desuscribir']);
+Route::delete('/canchas/{id}/lista-espera', [\App\Http\Controllers\Api\ListaEsperaController::class, 'desuscribir']);
+Route::get('/lista-espera/mis-suscripciones', [\App\Http\Controllers\Api\ListaEsperaController::class, 'misSuscripciones']);
+
 Route::post('/turnos/fijos', \App\Http\Controllers\Api\TurnoFijoController::class)
     ->middleware(['tenant.has_module:reservas', 'tenant.has_module:turnos_fijos']);
 

@@ -24,7 +24,10 @@ class Turno extends Model
         'hora_inicio',
         'hora_fin',
         'precio',
+        'monto_pagado',
+        'saldo_pendiente',
         'metodo_pago',
+        'estado_pago',
         'estado',
         'es_fijo',
     ];
@@ -34,6 +37,8 @@ class Turno extends Model
         return [
             'fecha' => 'date:Y-m-d',
             'precio' => 'decimal:2',
+            'monto_pagado' => 'decimal:2',
+            'saldo_pendiente' => 'decimal:2',
             'es_fijo' => 'boolean',
         ];
     }
@@ -61,6 +66,11 @@ class Turno extends Model
     public function partidoAbierto(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(PartidoAbierto::class, 'turno_id');
+    }
+
+    public function walletMovimientos(): HasMany
+    {
+        return $this->hasMany(WalletMovimiento::class, 'turno_id');
     }
 }
 

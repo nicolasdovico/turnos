@@ -30,6 +30,11 @@ class Complejo extends Model
         'deporte_principal',
         'timezone',
         'tipo_negocio_id',
+        'tipo_cobro_reserva',
+        'porcentaje_sena',
+        'monto_sena_fijo',
+        'permite_mostrador_publico',
+        'horas_limite_cancelacion',
     ];
 
     protected function casts(): array
@@ -37,6 +42,10 @@ class Complejo extends Model
         return [
             'latitud' => 'float',
             'longitud' => 'float',
+            'porcentaje_sena' => 'decimal:2',
+            'monto_sena_fijo' => 'decimal:2',
+            'permite_mostrador_publico' => 'boolean',
+            'horas_limite_cancelacion' => 'integer',
         ];
     }
 
@@ -124,6 +133,21 @@ class Complejo extends Model
     public function dispositivosIoT(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(DispositivoIoT::class, 'complejo_id');
+    }
+
+    public function userCreditos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserCredito::class, 'complejo_id');
+    }
+
+    public function walletMovimientos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(WalletMovimiento::class, 'complejo_id');
+    }
+
+    public function listaEspera(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ListaEspera::class, 'complejo_id');
     }
 
 

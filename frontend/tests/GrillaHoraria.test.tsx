@@ -765,4 +765,175 @@ describe("Componente Reactivo GrillaHoraria", () => {
       );
     });
   });
+
+  it("permite simular pago de seña del 50% con simulador sandbox y confirma el turno", async () => {
+    localStorage.setItem("saas_token", "fake-token");
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 1, name: "Max Verstappen", email: "max@redbull.com", telefono: "1122334455" })
+    );
+
+    const availableSlots: Slot[] = [
+      { hora_inicio: "18:00", hora_fin: "19:00", disponible: true, precio: 10000 },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url, options) => {
+      const urlStr = typeof url === "string" ? url : "";
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ user: { id: 1, name: "Max Verstappen", email: "max@redbull.com" } }),
+        });
+      }
+      if (urlStr.includes("/wallet/saldo")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ saldo: 2500.0 }),
+        });
+      }
+      if (urlStr.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, ttl: 600, token_reserva: "lock-token-123" }),
+        });
+      }
+      if (urlStr.includes("/turnos/confirmar")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "Turno confirmado",
+              turno: {
+                id: 10,
+                monto_pagado: 5000,
+                saldo_pendiente: 5000,
+                estado_pago: "senado",
+              },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ slots: availableSlots }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        initialSlots={availableSlots}
+      />
+    );
+
+    // 1. Click en slot disponible
+    fireEvent.click(screen.getByLabelText("Turno 18:00 a 19:00 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+
+    // 2. Abrir modal
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // 3. Verificar desglose financiero de seña
+    await waitFor(() => {
+      expect(screen.getByTestId("sena-breakdown")).toBeDefined();
+      expect(screen.getByText(/Saldo a pagar en el club/i)).toBeDefined();
+    });
+
+    // 4. Click en Simular Pago Aprobado
+    const botonSimular = screen.getByRole("button", { name: /Simular Pago Aprobado/i });
+    expect(botonSimular).toBeDefined();
+
+    fireEvent.click(botonSimular);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/confirmar"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"metodo_pago":"simulador_dev"'),
+        })
+      );
+    });
+  });
+
+  it("permite a un visitante público suscribirse a la lista de espera de un turno ocupado", async () => {
+    localStorage.setItem("saas_token", "fake-token-waitlist");
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 2, name: "Charles Leclerc", email: "charles@ferrari.com" })
+    );
+
+    const mixedSlots: Slot[] = [
+      { hora_inicio: "18:00", hora_fin: "19:00", disponible: true, precio: 10000 },
+      { hora_inicio: "19:00", hora_fin: "20:00", disponible: false, precio: 10000 },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : "";
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ user: { id: 2, name: "Charles Leclerc", email: "charles@ferrari.com" } }),
+        });
+      }
+      if (urlStr.includes("/lista-espera")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, message: "Suscripción confirmada" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ slots: mixedSlots }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        initialSlots={mixedSlots}
+      />
+    );
+
+    // Verificar que aparece la sección de lista de espera para el horario de las 19:00 ocupado
+    await waitFor(() => {
+      expect(screen.getByTestId("public-waitlist-section")).toBeDefined();
+      expect(screen.getByText(/Lista de Espera/i)).toBeDefined();
+    });
+
+    const botonAvisarme = screen.getByRole("button", { name: /Avisarme/i });
+    expect(botonAvisarme).toBeDefined();
+
+    fireEvent.click(botonAvisarme);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/lista-espera"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"hora_inicio":"19:00"'),
+        })
+      );
+      expect(screen.getByText("✓ Notificación Activa")).toBeDefined();
+    });
+  });
 });

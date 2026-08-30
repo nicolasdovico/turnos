@@ -7,6 +7,7 @@ use App\Models\Cancha;
 use App\Models\HorarioAtencion;
 use App\Models\Turno;
 use App\Services\ReservaLockService;
+use App\Services\WalletService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ use Illuminate\Support\Facades\DB;
 class TurnoConfirmarController extends Controller
 {
     public function __construct(
-        protected ReservaLockService $reservaLockService
+        protected ReservaLockService $reservaLockService,
+        protected WalletService $walletService
     ) {}
 
     /**
@@ -32,11 +34,13 @@ class TurnoConfirmarController extends Controller
             'cliente_nombre' => ['nullable', 'string', 'max:255'],
             'cliente_telefono' => ['nullable', 'string', 'max:50'],
             'metodo_pago' => ['nullable', 'string', 'max:50'],
+            'monto_pagado' => ['nullable', 'numeric', 'min:0'],
             'precio' => ['nullable', 'numeric', 'min:0'],
             'token_reserva' => ['nullable', 'string'],
+            'aplicar_credito_wallet' => ['nullable', 'boolean'],
         ]);
 
-        $cancha = Cancha::find($validated['cancha_id']);
+        $cancha = Cancha::with('complejo')->find($validated['cancha_id']);
         if (!$cancha) {
             return response()->json([
                 'error' => 'CANCHA_NOT_FOUND',
@@ -78,6 +82,51 @@ class TurnoConfirmarController extends Controller
         $precio = $validated['precio'] ?? (float) $cancha->precio_base;
         $tokenReserva = $validated['token_reserva'] ?? null;
 
+        $complejo = $cancha->complejo;
+        $tipoCobro = $complejo?->tipo_cobro_reserva ?? 'sena';
+        $porcentajeSena = (float) ($complejo?->porcentaje_sena ?? 50.0);
+
+        // Calculate required payment (seña vs full)
+        $montoRequerido = $precio;
+        if ($tipoCobro === 'sena') {
+            $montoRequerido = round(($precio * $porcentajeSena) / 100, 2);
+        }
+
+        $montoPagado = isset($validated['monto_pagado']) ? (float) $validated['monto_pagado'] : 0.0;
+        $aplicarWallet = (bool) ($validated['aplicar_credito_wallet'] ?? false);
+
+        // If user is simulating payment in dev mode or paying with wallet
+        if ($metodoPago === 'simulador_dev') {
+            $montoPagado = $montoRequerido;
+        } elseif ($metodoPago === 'wallet_credito') {
+            $montoPagado = $montoRequerido;
+            $aplicarWallet = true;
+        }
+
+        if ($aplicarWallet && $user) {
+            $saldoDisponible = $this->walletService->obtenerSaldo($user->id, $cancha->complejo_id);
+            $aDebitar = min($saldoDisponible, $montoRequerido);
+            if ($aDebitar > 0) {
+                $this->walletService->debitar(
+                    $user->id,
+                    $cancha->complejo_id,
+                    $aDebitar,
+                    'uso_reserva',
+                    null,
+                    "Pago/Seña para reserva en {$cancha->nombre}"
+                );
+                $montoPagado = max($montoPagado, $aDebitar);
+            }
+        }
+
+        $saldoPendiente = max(0.0, round($precio - $montoPagado, 2));
+        $estadoPago = 'pendiente';
+        if ($saldoPendiente <= 0.0) {
+            $estadoPago = 'pagado_total';
+        } elseif ($montoPagado > 0.0) {
+            $estadoPago = 'senado';
+        }
+
         try {
             $turno = DB::transaction(function () use (
                 $cancha,
@@ -89,6 +138,9 @@ class TurnoConfirmarController extends Controller
                 $clienteTelefono,
                 $metodoPago,
                 $precio,
+                $montoPagado,
+                $saldoPendiente,
+                $estadoPago,
                 $tokenReserva
             ) {
                 // SELECT FOR UPDATE to lock slot row and guarantee ACID consistency
@@ -109,7 +161,10 @@ class TurnoConfirmarController extends Controller
                         'cliente_telefono' => $clienteTelefono,
                         'hora_fin' => $horaFinNormalizada,
                         'precio' => $precio,
+                        'monto_pagado' => $montoPagado,
+                        'saldo_pendiente' => $saldoPendiente,
                         'metodo_pago' => $metodoPago,
+                        'estado_pago' => $estadoPago,
                         'estado' => 'reservado',
                         'es_fijo' => false,
                     ]);
@@ -125,7 +180,10 @@ class TurnoConfirmarController extends Controller
                         'hora_inicio' => $horaInicioNormalizada,
                         'hora_fin' => $horaFinNormalizada,
                         'precio' => $precio,
+                        'monto_pagado' => $montoPagado,
+                        'saldo_pendiente' => $saldoPendiente,
                         'metodo_pago' => $metodoPago,
+                        'estado_pago' => $estadoPago,
                         'estado' => 'reservado',
                         'es_fijo' => false,
                     ]);

@@ -166,7 +166,11 @@ export default function GrillaHoraria({
   const otpTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>("");
   const [clienteTelefono, setClienteTelefono] = useState<string>("");
-  const [metodoPago, setMetodoPago] = useState<string>("mostrador");
+  const [metodoPago, setMetodoPago] = useState<string>("simulador_dev");
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [useWalletCredit, setUseWalletCredit] = useState<boolean>(false);
+  const [subscribedWaitlists, setSubscribedWaitlists] = useState<Set<string>>(new Set());
+  const [subscribingSlot, setSubscribingSlot] = useState<string | null>(null);
 
   useEffect(() => {
     if (duracionInicial) {
@@ -176,6 +180,28 @@ export default function GrillaHoraria({
       setIsFlexible(permiteDuracionFlexible);
     }
   }, [canchaId, duracionInicial, permiteDuracionFlexible]);
+
+  const fetchWalletBalance = async () => {
+    try {
+      const token = getAuthToken(propToken);
+      if (!token) return;
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+      const subParam = subdomain ? `?subdomain=${subdomain}` : "";
+      const res = await fetch(`${apiUrl}/wallet/saldo${subParam}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data.saldo === "number") {
+          setWalletBalance(data.saldo);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   // Check authenticated user session
   useEffect(() => {
@@ -199,6 +225,7 @@ export default function GrillaHoraria({
                   setClienteNombre(data.user.name || "");
                   setClienteTelefono(data.user.telefono || "");
                 }
+                fetchWalletBalance();
               }
             })
             .catch(() => {});
@@ -749,6 +776,7 @@ export default function GrillaHoraria({
           cliente_nombre: targetNombre || undefined,
           cliente_telefono: targetTelefono || undefined,
           metodo_pago: metodoPago,
+          aplicar_credito_wallet: useWalletCredit,
         }),
       });
 
@@ -771,11 +799,54 @@ export default function GrillaHoraria({
         setClienteTelefono("");
       }
       fetchDisponibilidad(fecha);
+      fetchWalletBalance();
     } catch (err: any) {
       setAuthError(err.message || "Error al procesar la solicitud.");
       addToast("error", err.message || "Error al confirmar.");
     } finally {
       setIsConfirming(false);
+    }
+  };
+
+  const handleSubscribeWaitlist = async (slot: Slot) => {
+    try {
+      const activeToken = getAuthToken(propToken);
+      if (!activeToken && !currentUser) {
+        addToast("warning", "Inicia sesión o regístrate para recibir la alerta cuando se libere el turno.");
+        setIsConfirmModalOpen(true);
+        return;
+      }
+
+      setSubscribingSlot(slot.hora_inicio);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/lista-espera`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          cancha_id: canchaId,
+          fecha,
+          hora_inicio: slot.hora_inicio,
+          hora_fin: slot.hora_fin,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al suscribirse a la lista de espera.");
+      }
+
+      setSubscribedWaitlists((prev) => new Set(prev).add(`${fecha}-${slot.hora_inicio}`));
+      addToast("success", `¡Listo! Te avisaremos al instante si se libera el turno de las ${slot.hora_inicio} hs.`);
+    } catch (err: any) {
+      addToast("error", err.message || "Error al suscribirse a la lista de espera.");
+    } finally {
+      setSubscribingSlot(null);
     }
   };
 
@@ -1156,6 +1227,61 @@ export default function GrillaHoraria({
                   })}
                 </div>
               )}
+
+              {/* Public Waitlist for Occupied Slots */}
+              {!isAdmin && slots.some((s) => !s.disponible && !isSlotInPast(s.hora_inicio, fecha)) && (
+                <div data-testid="public-waitlist-section" className="mt-8 pt-6 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🔔</span> ¿Buscabas otro horario? Súmate a la Lista de Espera
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Si alguien cancela su reserva, te notificaremos por push al instante para que lo aproveches
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                    {slots
+                      .filter((s) => !s.disponible && !isSlotInPast(s.hora_inicio, fecha))
+                      .map((s) => {
+                        const isSubscribed = subscribedWaitlists.has(`${fecha}-${s.hora_inicio}`);
+                        const isSubscribing = subscribingSlot === s.hora_inicio;
+
+                        return (
+                          <div
+                            key={s.hora_inicio}
+                            data-testid={`waitlist-card-${s.hora_inicio}`}
+                            className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between gap-2"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-sm font-bold text-slate-300">
+                                ⏰ {s.hora_inicio}
+                              </span>
+                              <span className="text-[10px] uppercase font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+                                Ocupado
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={isSubscribed || isSubscribing}
+                              onClick={() => handleSubscribeWaitlist(s)}
+                              className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 ${
+                                isSubscribed
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-default"
+                                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer"
+                              }`}
+                            >
+                              {isSubscribed ? "✓ Notificación Activa" : isSubscribing ? "Guardando..." : "🔔 Avisarme"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
             </>
           );
         })()}
@@ -1358,33 +1484,115 @@ export default function GrillaHoraria({
               </button>
             </div>
 
-            {/* Turno Summary Card */}
-            <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 space-y-3">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400">Cancha:</span>
-                <span className="font-bold text-white capitalize">
-                  {canchaNombre} ({deporte})
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400">Fecha & Horario:</span>
-                <span className="font-bold text-emerald-400">
-                  {activeLock.fecha} • {activeLock.horaInicio} a {activeLock.horaFin} hs
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400">Tarifa del turno:</span>
-                <span className="font-extrabold text-white text-base">
-                  ${activeLock.precio.toLocaleString()}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-amber-300 font-semibold">
-                <span>⏱️ Tiempo restante de retención:</span>
-                <span className="font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                  {formatCountdown(remainingSeconds)}
-                </span>
-              </div>
-            </div>
+            {/* Turno Summary Card with Seña Breakdown & Dev Simulator */}
+            {(() => {
+              const tarifaTotal = activeLock.precio || 0;
+              const porcentajeSena = 50;
+              const montoSena = Math.round((tarifaTotal * porcentajeSena) / 100);
+              const saldoPendiente = tarifaTotal - montoSena;
+              const descuentoWallet = useWalletCredit ? Math.min(walletBalance, montoSena) : 0;
+              const montoFinalAPagar = Math.max(0, montoSena - descuentoWallet);
+
+              return (
+                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 space-y-3">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Cancha:</span>
+                    <span className="font-bold text-white capitalize">
+                      {canchaNombre} ({deporte})
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Fecha & Horario:</span>
+                    <span className="font-bold text-emerald-400">
+                      {activeLock.fecha} • {activeLock.horaInicio} a {activeLock.horaFin} hs
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-400">Tarifa total del turno:</span>
+                      <span className="font-bold text-slate-300">${tarifaTotal.toLocaleString()}</span>
+                    </div>
+                    <div data-testid="sena-breakdown" className="flex justify-between items-center text-xs bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+                      <span className="font-bold text-emerald-300">
+                        {`💳 Seña Requerida Online (${porcentajeSena}%):`}
+                      </span>
+                      <span className="font-extrabold text-emerald-400 text-sm">
+                        ${montoSena.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs px-1 text-slate-400">
+                      <span>Saldo a pagar en el club:</span>
+                      <span className="font-medium text-slate-300">${saldoPendiente.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {/* Wallet Credit Checkbox */}
+                  {walletBalance > 0 && (
+                    <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="use-wallet-check"
+                          checked={useWalletCredit}
+                          onChange={(e) => setUseWalletCredit(e.target.checked)}
+                          className="rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700"
+                        />
+                        <label htmlFor="use-wallet-check" className="text-blue-200 cursor-pointer font-medium">
+                          💰 Usar saldo en Billetera Virtual (${walletBalance.toLocaleString()} disponibles)
+                        </label>
+                      </div>
+                      {useWalletCredit && (
+                        <span className="font-bold text-emerald-400 font-mono">-${descuentoWallet.toLocaleString()}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* DEV Payment Simulator Box */}
+                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-amber-300">
+                      <span>🎮 Simulador de Pasarela (Modo Desarrollo)</span>
+                      <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 font-bold">
+                        DEV SANDBOX
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-200/80">
+                      Prueba el flujo de cobro y reserva de turnos con seña sin requerir tarjetas reales.
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          setMetodoPago("simulador_dev");
+                          handleConfirmReservation(e);
+                        }}
+                        disabled={isConfirming}
+                        className="flex-1 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow flex items-center justify-center gap-1.5"
+                      >
+                        💳 Simular Pago Aprobado (${montoFinalAPagar.toLocaleString()})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          addToast("error", "Simulador: Pago rechazado por fondos insuficientes o rechazo bancario.");
+                          setAuthError("Pago simulado rechazado por la pasarela de pagos.");
+                        }}
+                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 text-xs font-bold transition"
+                      >
+                        ❌ Simular Rechazo
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-amber-300 font-semibold">
+                    <span>⏱️ Tiempo restante de retención:</span>
+                    <span className="font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      {formatCountdown(remainingSeconds)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Error banner */}
             {authError && (

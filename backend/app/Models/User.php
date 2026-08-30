@@ -59,4 +59,19 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->hasMany(Complejo::class, 'user_id');
     }
+
+    public function creditos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserCredito::class, 'user_id');
+    }
+
+    public function walletMovimientos(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(WalletMovimiento::class, 'user_id');
+    }
+
+    public function listaEspera(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ListaEspera::class, 'user_id');
+    }
 }
