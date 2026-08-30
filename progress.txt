@@ -667,5 +667,20 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
       * `TurnoBloqueoController.php`: Validación que rechaza con error 422 (`PAST_SLOT_NOT_ALLOWED`) cualquier intento de bloqueo temporal en fechas u horarios pasados.
       * `TurnoConfirmarController.php`: Validación que rechaza con error 422 (`PAST_SLOT_NOT_ALLOWED`) cualquier confirmación en fechas u horarios pasados.
   * Tests: Vitest suite (32 tests pasados al 100%) y PHPUnit suite (119 tests pasados al 100%).
+-------------------------------------------------------------------------------
+[2026-08-30] - SEGURIDAD & REMEDIACIÓN GITGUARDIAN: ROTACIÓN DE APP_KEY Y PURGA DE SECRETOS
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * Detección de `APP_KEY` hardcodeada en el archivo de CI (`.github/workflows/ci.yml`) y en `backend/.env.testing` committeado a git.
+- Acciones de Remediación Ejecutadas:
+  * Rotación Inmediata de Claves: Generación de nueva `APP_KEY` privada y aleatoria en `backend/.env` mediante `php artisan key:generate`.
+  * Generación Dinámica en CI/CD: Actualización de `.github/workflows/ci.yml` para invocar `php artisan key:generate` dinámicamente en el runner de GitHub Actions, eliminando toda clave estática o hardcodeada.
+  * Desindexación y Purga de Git: Eliminación de `backend/.env.testing` del seguimiento de Git (`git rm --cached`).
+  * Creación de Template Seguro: Creación de `backend/.env.testing.example` con variables de testing y clave vacía (`APP_KEY=`).
+  * Blindaje de `.gitignore`: Configuración estricta en la raíz y en `backend/.gitignore` para ignorar todos los archivos `.env*` (`.env.testing`, `.env.local`, etc.) preservando únicamente `.env.example` y `.env.*.example`.
+- Verificación de Calidad y Suites de Tests:
+  * Suite Backend (PHPUnit): 119 tests pasados al 100% (611 aserciones).
+  * Suite Frontend (Vitest): 32 tests pasados al 100%.
+  * Suite Mobile (Jest): 18 tests pasados al 100%.
 ===============================================================================
 
