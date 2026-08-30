@@ -283,4 +283,40 @@ class ConfirmarReservaTest extends TestCase
                 'module' => 'turnos_fijos',
             ]);
     }
+
+    /**
+     * Test confirming reservation with guest name and phone stores them accurately.
+     */
+    public function test_confirmar_reserva_guest_persiste_nombre_telefono_y_metodo_pago(): void
+    {
+        $fecha = '2026-08-31';
+        $horaInicio = '17:00';
+
+        $confirmResponse = $this->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->canchaPlata->id,
+                'fecha' => $fecha,
+                'hora_inicio' => $horaInicio,
+                'cliente_nombre' => 'Rodrigo De Paul',
+                'cliente_telefono' => '+54 9 11 4444-3333',
+                'metodo_pago' => 'transferencia',
+                'precio' => 10000,
+            ]);
+
+        $confirmResponse->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('turno.cliente_nombre', 'Rodrigo De Paul')
+            ->assertJsonPath('turno.cliente_telefono', '+54 9 11 4444-3333')
+            ->assertJsonPath('turno.metodo_pago', 'transferencia');
+
+        app()->instance('currentTenant', $this->complejoPlata);
+        $this->assertDatabaseHas('turnos', [
+            'cancha_id' => $this->canchaPlata->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '17:00',
+            'cliente_nombre' => 'Rodrigo De Paul',
+            'cliente_telefono' => '+54 9 11 4444-3333',
+            'metodo_pago' => 'transferencia',
+        ]);
+    }
 }

@@ -643,6 +643,11 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Centro de Operaciones & Visibilidad Diferenciada de Turnos Ocupados:
     - Para Clientes (Sitio Público): Los turnos ocupados no se muestran (grilla limpia que exhibe exclusivamente los slots libres para reservar).
     - Para Administradores (Modo Admin): Sección dedicada "📋 Turnos Reservados & Ocupados del Día" con tarjetas enriquecidas (horario, nombre del titular, teléfono, botón de acceso directo a WhatsApp, monto, estado de pago, badge de turno fijo) y diálogo modal interactivo para "Liberar / Cancelar Turno" (`DELETE /api/clubs/{subdomain}/turnos/{id}`).
-  * Tests: Vitest suite (28 tests pasados al 100%) y PHPUnit suite (116 tests pasados al 100%).
+    - Persistencia Completa de Datos del Jugador (Guest & Registrado):
+      * Migración `2026_08_29_230003_add_guest_client_details_to_turnos_table` (`cliente_nombre`, `cliente_telefono`, `metodo_pago` en tabla `turnos`).
+      * `TurnoConfirmarController.php`: Validación y almacenamiento automático de nombre y teléfono ingresados en checkout.
+      * `DisponibilidadService.php`: Mapeo prioritario de `cliente_nombre` y `cliente_telefono` para que el administrador siempre vea el nombre y teléfono real de quien reservó.
+      * `GrillaHoraria.tsx`: Envío de datos del jugador en la confirmación y pase de cabecera `Authorization: Bearer <token>` en la consulta de disponibilidad para reconocer la sesión del administrador.
+  * Tests: Vitest suite (28 tests pasados al 100%) y PHPUnit suite (117 tests pasados al 100%).
 ===============================================================================
 

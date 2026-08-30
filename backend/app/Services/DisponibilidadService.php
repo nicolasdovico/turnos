@@ -195,15 +195,16 @@ class DisponibilidadService
                 'hora_fin' => Carbon::parse($t->hora_fin)->format('H:i'),
                 'duracion_minutos' => Carbon::parse($t->hora_inicio)->diffInMinutes(Carbon::parse($t->hora_fin)),
                 'precio' => (float) $t->precio,
+                'metodo_pago' => $t->metodo_pago ?? 'mostrador',
                 'estado' => $t->estado,
                 'es_fijo' => (bool) $t->es_fijo,
             ];
 
             if ($esAdmin) {
                 $data['cliente_id'] = $t->cliente_id;
-                $data['cliente_nombre'] = $t->cliente?->name ?? 'Cliente Mostrador / Anónimo';
+                $data['cliente_nombre'] = $t->cliente_nombre ?: ($t->cliente?->name ?: 'Cliente Mostrador');
                 $data['cliente_email'] = $t->cliente?->email;
-                $data['cliente_telefono'] = $t->cliente?->telefono ?? ($t->cliente ? '+54 9 11 5555-4321' : 'Sin teléfono');
+                $data['cliente_telefono'] = $t->cliente_telefono ?: ($t->cliente?->telefono ?: null);
             }
 
             return $data;

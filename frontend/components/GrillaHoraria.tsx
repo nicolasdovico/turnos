@@ -139,7 +139,11 @@ export default function GrillaHoraria({
     if (initialSlots && targetFecha === fechaInicial && slots.length > 0 && !targetDuracion) return;
     setLoading(true);
     try {
-      const headers: Record<string, string> = { Accept: "application/json" };
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
       if (subdomain) headers["X-Tenant-ID"] = subdomain;
 
       const durParam = targetDuracion ? `&duracion=${targetDuracion}` : "";
@@ -333,9 +337,11 @@ export default function GrillaHoraria({
 
     setIsConfirming(true);
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
       if (subdomain) headers["X-Tenant-ID"] = subdomain;
 
@@ -349,6 +355,9 @@ export default function GrillaHoraria({
           hora_fin: activeLock.horaFin,
           precio: activeLock.precio,
           token_reserva: activeLock.tokenReserva,
+          cliente_nombre: clienteNombre.trim() || undefined,
+          cliente_telefono: clienteTelefono.trim() || undefined,
+          metodo_pago: metodoPago,
         }),
       });
 
@@ -676,20 +685,22 @@ export default function GrillaHoraria({
                       </span>
                     </div>
 
-                    <div className="text-xs space-y-1 pt-0.5">
-                      <div className="font-bold text-white flex items-center gap-1.5 truncate">
-                        <span>👤</span>
-                        <span className="truncate">{turno.cliente_nombre || "Cliente Mostrador"}</span>
+                    <div className="text-xs space-y-1.5 pt-0.5">
+                      <div className="font-bold text-white flex items-center justify-between gap-1.5">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <span>👤</span>
+                          <span className="truncate">{turno.cliente_nombre || "Cliente Mostrador"}</span>
+                        </span>
                         {turno.es_fijo && (
-                          <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">
+                          <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold shrink-0">
                             🔁 Fijo
                           </span>
                         )}
                       </div>
 
-                      {turno.cliente_telefono && (
-                        <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                          <span className="truncate">📱 {turno.cliente_telefono}</span>
+                      {turno.cliente_telefono ? (
+                        <div className="flex items-center justify-between text-slate-300 text-[11px] bg-slate-900/80 px-2.5 py-1 rounded-xl border border-slate-800">
+                          <span className="truncate font-mono">📱 {turno.cliente_telefono}</span>
                           <a
                             href={`https://wa.me/${turno.cliente_telefono.replace(/[^0-9]/g, "")}`}
                             target="_blank"
@@ -699,12 +710,27 @@ export default function GrillaHoraria({
                             WhatsApp ↗
                           </a>
                         </div>
+                      ) : (
+                        <div className="text-slate-500 text-[11px] italic px-1">
+                          Sin teléfono registrado
+                        </div>
                       )}
+
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 pt-0.5">
+                        <span>Pago:</span>
+                        <span className="text-slate-200 capitalize font-medium">
+                          {turno.metodo_pago === "online"
+                            ? "💳 Mercado Pago / Online"
+                            : turno.metodo_pago === "transferencia"
+                            ? "📲 Transferencia"
+                            : "💵 Mostrador / Efectivo"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                    <span className="font-bold text-emerald-400 font-mono">
+                    <span className="font-bold text-emerald-400 font-mono text-sm">
                       ${turno.precio ? turno.precio.toLocaleString() : "0"}
                     </span>
                     <button

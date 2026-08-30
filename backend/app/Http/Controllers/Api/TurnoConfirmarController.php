@@ -29,6 +29,9 @@ class TurnoConfirmarController extends Controller
             'hora_inicio' => ['required', 'string'],
             'hora_fin' => ['nullable', 'string'],
             'cliente_id' => ['nullable', 'integer', 'exists:users,id'],
+            'cliente_nombre' => ['nullable', 'string', 'max:255'],
+            'cliente_telefono' => ['nullable', 'string', 'max:50'],
+            'metodo_pago' => ['nullable', 'string', 'max:50'],
             'precio' => ['nullable', 'numeric', 'min:0'],
             'token_reserva' => ['nullable', 'string'],
         ]);
@@ -58,7 +61,11 @@ class TurnoConfirmarController extends Controller
                 ->format('H:i');
         }
 
-        $clienteId = $validated['cliente_id'] ?? auth()->id();
+        $user = auth()->user() ?: ($request->bearerToken() ? \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable : null);
+        $clienteId = $validated['cliente_id'] ?? $user?->id;
+        $clienteNombre = !empty($validated['cliente_nombre']) ? trim($validated['cliente_nombre']) : ($user?->name ?? 'Cliente Mostrador');
+        $clienteTelefono = !empty($validated['cliente_telefono']) ? trim($validated['cliente_telefono']) : ($user?->telefono ?? null);
+        $metodoPago = $validated['metodo_pago'] ?? 'mostrador';
         $precio = $validated['precio'] ?? (float) $cancha->precio_base;
         $tokenReserva = $validated['token_reserva'] ?? null;
 
@@ -69,6 +76,9 @@ class TurnoConfirmarController extends Controller
                 $horaInicioNormalizada,
                 $horaFinNormalizada,
                 $clienteId,
+                $clienteNombre,
+                $clienteTelefono,
+                $metodoPago,
                 $precio,
                 $tokenReserva
             ) {
@@ -86,8 +96,11 @@ class TurnoConfirmarController extends Controller
                 if ($existingTurno) {
                     $existingTurno->update([
                         'cliente_id' => $clienteId,
+                        'cliente_nombre' => $clienteNombre,
+                        'cliente_telefono' => $clienteTelefono,
                         'hora_fin' => $horaFinNormalizada,
                         'precio' => $precio,
+                        'metodo_pago' => $metodoPago,
                         'estado' => 'reservado',
                         'es_fijo' => false,
                     ]);
@@ -97,10 +110,13 @@ class TurnoConfirmarController extends Controller
                         'complejo_id' => $cancha->complejo_id,
                         'cancha_id' => $cancha->id,
                         'cliente_id' => $clienteId,
+                        'cliente_nombre' => $clienteNombre,
+                        'cliente_telefono' => $clienteTelefono,
                         'fecha' => $fechaNormalizada,
                         'hora_inicio' => $horaInicioNormalizada,
                         'hora_fin' => $horaFinNormalizada,
                         'precio' => $precio,
+                        'metodo_pago' => $metodoPago,
                         'estado' => 'reservado',
                         'es_fijo' => false,
                     ]);

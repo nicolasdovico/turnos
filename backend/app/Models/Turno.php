@@ -18,10 +18,13 @@ class Turno extends Model
         'complejo_id',
         'cancha_id',
         'cliente_id',
+        'cliente_nombre',
+        'cliente_telefono',
         'fecha',
         'hora_inicio',
         'hora_fin',
         'precio',
+        'metodo_pago',
         'estado',
         'es_fijo',
     ];
