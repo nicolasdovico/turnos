@@ -358,6 +358,7 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
                     precio90Min={selectedCancha.precio_90_min ? Number(selectedCancha.precio_90_min) : undefined}
                     precio120Min={selectedCancha.precio_120_min ? Number(selectedCancha.precio_120_min) : undefined}
                     isAdmin={isAdmin}
+                    token={token}
                   />
                 </div>
               </div>

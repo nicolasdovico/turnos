@@ -707,6 +707,21 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Suite Backend (PHPUnit): 120 tests pasados al 100% (619 aserciones).
     - Suite Frontend (Vitest): 32 tests pasados al 100%.
     - Suite Mobile (Jest): 18 tests pasados al 100%.
-    - Verificación HTTP en vivo vía curl: Horario de 18:00 a 19:00 y posteriores visibles y disponibles en Cancha 1 de `nico-padel`.
+  * Verificación HTTP en vivo vía curl: Horario de 18:00 a 19:00 y posteriores visibles y disponibles en Cancha 1 de `nico-padel`.
+-------------------------------------------------------------------------------
+[2026-08-30] - VISIBILIDAD DE TITULAR / CLIENTE EN TARJETAS DE TURNOS OCUPADOS (VISTA ADMIN)
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * En la tarjeta de "Turnos Reservados & Ocupados del Día" para administradores, no se mostraba el nombre del titular de la reserva.
+  * Causa raíz: `GrillaHoraria.tsx` buscaba el token en `localStorage.getItem("token")`, pero `AuthContext` guardaba la sesión en `localStorage.getItem("saas_token")`. Al llamar a `GET /api/canchas/{id}/disponibilidad`, la petición no enviaba la cabecera `Authorization: Bearer <token>`, por lo que el backend evaluaba `$esAdmin = false` y omitía por privacidad los campos de cliente (`cliente_nombre`, `cliente_telefono`, `cliente_email`).
+- Solución Implementada:
+  * Frontend Web (Next.js 14):
+    - `GrillaHoraria.tsx`: Implementación del helper `getAuthToken(propToken)` que busca en `saas_token`, `token` y `auth_token`. Inyección automática de la cabecera `Authorization: Bearer <token>` en todas las llamadas API (`fetchDisponibilidad`, `handleCancelTurno`, `handleSelectSlot`, `handleConfirmReservation`).
+    - `GrillaHorariaProps`: Nuevo prop `token?: string | null` y pase explícito desde `app/tenants/[subdomain]/page.tsx` (`token={token}`).
+    - `AuthContext.tsx`: Sincronización bidireccional de `saas_token` y `token` en `localStorage` tanto en `setAuthSession` como en `logout`.
+    - Diseño de Tarjeta Enriquecido: Resaltado visual destacado del nombre del titular (`👤 {turno.cliente_nombre || "Cliente Mostrador"}`), visualización de email si existe (`✉️ {turno.cliente_email}`) y botón directo de WhatsApp con teléfono formateado.
+- Verificación de Calidad y Suites de Tests:
+  * Suite Frontend (Vitest): 32 tests pasados al 100%.
+  * Suite Backend (PHPUnit): 120 tests pasados al 100% (619 aserciones).
+  * Suite Mobile (Jest): 18 tests pasados al 100%.
 ===============================================================================
-

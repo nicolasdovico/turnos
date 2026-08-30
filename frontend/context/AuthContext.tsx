@@ -103,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(newUser);
     setToken(newToken);
     localStorage.setItem("saas_token", newToken);
+    localStorage.setItem("token", newToken);
     localStorage.setItem("saas_user", JSON.stringify(newUser));
     document.cookie = `saas_auth_token=${newToken}; path=/; max-age=604800; SameSite=Lax`;
   };
@@ -180,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setToken(null);
       localStorage.removeItem("saas_token");
+      localStorage.removeItem("token");
       localStorage.removeItem("saas_user");
       document.cookie = "saas_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }

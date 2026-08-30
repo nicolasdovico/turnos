@@ -24,6 +24,7 @@ export interface GrillaHorariaProps {
   precio90Min?: number;
   precio120Min?: number;
   isAdmin?: boolean;
+  token?: string | null;
   apiUrl?: string;
   initialSlots?: Slot[];
   onConfirmSuccess?: (data: any) => void;
@@ -66,6 +67,7 @@ export interface TurnoOcupado {
   hora_fin: string;
   duracion_minutos?: number;
   precio: number;
+  metodo_pago?: string;
   estado: string;
   es_fijo?: boolean;
   cliente_id?: number | null;
@@ -89,6 +91,17 @@ export const getLocalDateString = (d: Date = new Date()): string => {
   return `${year}-${month}-${day}`;
 };
 
+export const getAuthToken = (explicitToken?: string | null): string | null => {
+  if (explicitToken) return explicitToken;
+  if (typeof window === "undefined") return null;
+  return (
+    localStorage.getItem("saas_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("auth_token") ||
+    null
+  );
+};
+
 export default function GrillaHoraria({
   canchaId,
   canchaNombre = "Cancha 1",
@@ -102,6 +115,7 @@ export default function GrillaHoraria({
   precio90Min,
   precio120Min,
   isAdmin = false,
+  token: propToken,
   apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api",
   initialSlots,
   onConfirmSuccess,
@@ -150,7 +164,7 @@ export default function GrillaHoraria({
 
   // Check authenticated user session
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const token = getAuthToken(propToken);
     if (token && typeof fetch === "function") {
       try {
         const promise = fetch(`${apiUrl}/auth/me`, {
@@ -178,7 +192,7 @@ export default function GrillaHoraria({
         // ignore
       }
     }
-  }, [apiUrl, subdomain, isAdmin]);
+  }, [apiUrl, subdomain, isAdmin, propToken]);
 
   // Cooldown countdown for OTP resend
   useEffect(() => {
@@ -243,7 +257,7 @@ export default function GrillaHoraria({
     if (initialSlots && targetFecha === fechaInicial && slots.length > 0 && !targetDuracion) return;
     setLoading(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const token = getAuthToken(propToken);
       const headers: Record<string, string> = {
         Accept: "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -307,7 +321,7 @@ export default function GrillaHoraria({
     if (!turnoToCancel || !subdomain) return;
     setIsCancelingTurno(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const token = getAuthToken(propToken);
       const res = await fetch(`${apiUrl}/clubs/${subdomain}/turnos/${turnoToCancel.id}`, {
         method: "DELETE",
         headers: {
@@ -475,7 +489,7 @@ export default function GrillaHoraria({
     setAuthError(null);
 
     try {
-      let activeToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      let activeToken = getAuthToken(propToken);
       let targetNombre = clienteNombre.trim();
       let targetTelefono = clienteTelefono.trim();
 
@@ -554,13 +568,16 @@ export default function GrillaHoraria({
             // OTP verified! Set authenticated user and token
             if (pendingRegisteredUser?.token) {
               activeToken = pendingRegisteredUser.token;
+              localStorage.setItem("saas_token", activeToken);
               localStorage.setItem("token", activeToken);
             }
             if (pendingRegisteredUser?.user) {
-              setCurrentUser({
+              const fullUser = {
                 ...pendingRegisteredUser.user,
                 ...verifyData.user,
-              });
+              };
+              setCurrentUser(fullUser);
+              localStorage.setItem("saas_user", JSON.stringify(fullUser));
             }
           }
         } else {
@@ -589,10 +606,12 @@ export default function GrillaHoraria({
 
           activeToken = loginData.token;
           if (activeToken) {
+            localStorage.setItem("saas_token", activeToken);
             localStorage.setItem("token", activeToken);
           }
           if (loginData.user) {
             setCurrentUser(loginData.user);
+            localStorage.setItem("saas_user", JSON.stringify(loginData.user));
             targetNombre = loginData.user.name || targetNombre;
             targetTelefono = loginData.user.telefono || targetTelefono;
           }
@@ -955,21 +974,32 @@ export default function GrillaHoraria({
                       </span>
                     </div>
 
-                    <div className="text-xs space-y-1.5 pt-0.5">
-                      <div className="font-bold text-white flex items-center justify-between gap-1.5">
-                        <span className="flex items-center gap-1.5 truncate">
-                          <span>👤</span>
-                          <span className="truncate">{turno.cliente_nombre || "Cliente Mostrador"}</span>
-                        </span>
-                        {turno.es_fijo && (
-                          <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold shrink-0">
-                            🔁 Fijo
+                    <div className="text-xs space-y-2 pt-0.5">
+                      <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-1">
+                        <div className="font-bold text-white flex items-center justify-between gap-1.5">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span className="text-emerald-400 font-bold text-sm">👤</span>
+                            <span className="truncate font-extrabold text-white text-[13px] tracking-tight">
+                              {turno.cliente_nombre || "Cliente Mostrador"}
+                            </span>
                           </span>
+                          {turno.es_fijo && (
+                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold shrink-0">
+                              🔁 Fijo
+                            </span>
+                          )}
+                        </div>
+
+                        {turno.cliente_email && (
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 truncate px-0.5">
+                            <span>✉️</span>
+                            <span className="truncate">{turno.cliente_email}</span>
+                          </div>
                         )}
                       </div>
 
                       {turno.cliente_telefono ? (
-                        <div className="flex items-center justify-between text-slate-300 text-[11px] bg-slate-900/80 px-2.5 py-1 rounded-xl border border-slate-800">
+                        <div className="flex items-center justify-between text-slate-300 text-[11px] bg-slate-900/80 px-2.5 py-1.5 rounded-xl border border-slate-800">
                           <span className="truncate font-mono">📱 {turno.cliente_telefono}</span>
                           <a
                             href={`https://wa.me/${turno.cliente_telefono.replace(/[^0-9]/g, "")}`}
