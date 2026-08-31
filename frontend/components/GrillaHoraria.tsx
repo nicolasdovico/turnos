@@ -303,15 +303,19 @@ export default function GrillaHoraria({
       const token = getAuthToken(propToken);
       const headers: Record<string, string> = {
         Accept: "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       };
       if (subdomain) headers["X-Tenant-ID"] = subdomain;
 
       const durParam = targetDuracion ? `&duracion=${targetDuracion}` : "";
+      const timestamp = Date.now();
       const res = await fetch(
-        `${apiUrl}/canchas/${canchaId}/disponibilidad?fecha=${targetFecha}${durParam}`,
+        `${apiUrl}/canchas/${canchaId}/disponibilidad?fecha=${targetFecha}${durParam}&_t=${timestamp}`,
         {
           headers,
+          cache: "no-store",
         }
       );
 
@@ -348,46 +352,43 @@ export default function GrillaHoraria({
         [];
 
       if (Array.isArray(rawSlots)) {
-        const formattedSlots: Slot[] = rawSlots.map((s: any) => ({
-          hora_inicio: s.hora_inicio,
-          hora_fin: s.hora_fin,
-          disponible:
-            s.disponible !== undefined
-              ? Boolean(s.disponible)
-              : s.estado === "disponible" || s.estado === undefined,
-          precio: s.precio ? Number(s.precio) : undefined,
-          es_fijo: Boolean(s.es_fijo),
-        }));
-        setSlots(formattedSlots);
+        setSlots(rawSlots);
+      } else {
+        setSlots([]);
       }
-    } catch (err) {
-      addToast("error", "Error al cargar los turnos disponibles.");
+    } catch {
+      addToast("error", "Error al cargar la disponibilidad horaria.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancelTurno = async () => {
-    if (!turnoToCancel || !subdomain) return;
-    setIsCancelingTurno(true);
+    if (!turnoToCancel) return;
+    const targetTurno = turnoToCancel;
     try {
+      setIsCancelingTurno(true);
       const token = getAuthToken(propToken);
-      const res = await fetch(`${apiUrl}/clubs/${subdomain}/turnos/${turnoToCancel.id}`, {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/turnos/${targetTurno.id}`, {
         method: "DELETE",
-        headers: {
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
-        },
+        headers,
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        throw new Error("No se pudo liberar el turno.");
+        throw new Error(data.message || "Error al cancelar el turno.");
       }
 
-      addToast("success", `Turno de las ${turnoToCancel.hora_inicio} hs liberado exitosamente.`);
+      addToast("success", `Turno de las ${targetTurno.hora_inicio} hs liberado correctamente.`);
       setTurnoToCancel(null);
-      fetchDisponibilidad(fecha, duracion);
+      fetchDisponibilidad(fecha);
     } catch (err: any) {
       addToast("error", err.message || "Error al liberar el turno.");
     } finally {
@@ -396,6 +397,38 @@ export default function GrillaHoraria({
   };
 
   const getLockStorageKey = (cid: number) => `active_lock_${subdomain || "club"}_${cid}`;
+  const getMultiLocksStorageKey = (cid: number) => `multi_locks_${subdomain || "club"}_${cid}`;
+
+  const getSavedMultiLocks = (cid: number): Record<string, ActiveLock> => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = localStorage.getItem(getMultiLocksStorageKey(cid));
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      const now = Date.now();
+      const valid: Record<string, ActiveLock> = {};
+      Object.entries(parsed).forEach(([k, v]: [string, any]) => {
+        if (v && v.expiresAt > now) {
+          valid[k] = v;
+        }
+      });
+      return valid;
+    } catch {
+      return {};
+    }
+  };
+
+  const saveMultiLocks = (cid: number, locks: Record<string, ActiveLock>) => {
+    if (typeof window === "undefined") return;
+    const now = Date.now();
+    const valid: Record<string, ActiveLock> = {};
+    Object.entries(locks).forEach(([k, v]) => {
+      if (v && v.expiresAt > now) {
+        valid[k] = v;
+      }
+    });
+    localStorage.setItem(getMultiLocksStorageKey(cid), JSON.stringify(valid));
+  };
 
   const handleLiberarBloqueo = async (lock: RetainedLock | ActiveLock) => {
     try {
@@ -410,13 +443,11 @@ export default function GrillaHoraria({
           ? lock.tokenReserva
           : undefined;
 
-      if (typeof window !== "undefined") {
-        localStorage.removeItem(getLockStorageKey(targetCanchaId));
-      }
-
+      const targetKey = `${lockFecha}_${horaInicio}`;
       setMyLockedSlots((prev) => {
         const next = { ...prev };
-        delete next[`${lockFecha}_${horaInicio}`];
+        delete next[targetKey];
+        saveMultiLocks(targetCanchaId, next);
         return next;
       });
 
@@ -449,32 +480,21 @@ export default function GrillaHoraria({
     }
   };
 
-  // Restore active lock for this court and date from localStorage if still valid
+  // Restore active locks for this court and date from localStorage if still valid
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const storageKey = getLockStorageKey(canchaId);
-    const savedLockStr = localStorage.getItem(storageKey);
-    if (savedLockStr) {
-      try {
-        const parsed: ActiveLock = JSON.parse(savedLockStr);
-        if (parsed.fecha === fecha && parsed.expiresAt > Date.now()) {
-          setActiveLock(parsed);
-          setMyLockedSlots((prev) => ({
-            ...prev,
-            [`${parsed.fecha}_${parsed.horaInicio}`]: parsed,
-          }));
-          const rem = Math.max(0, Math.floor((parsed.expiresAt - Date.now()) / 1000));
-          setRemainingSeconds(rem);
-        } else {
-          localStorage.removeItem(storageKey);
-          setActiveLock(null);
-        }
-      } catch {
-        localStorage.removeItem(storageKey);
-        setActiveLock(null);
-      }
+    const validLocks = getSavedMultiLocks(canchaId);
+    setMyLockedSlots(validLocks);
+    const locksForDate = Object.values(validLocks).filter(
+      (l) => l.fecha === fecha && l.expiresAt > Date.now()
+    );
+    if (locksForDate.length > 0) {
+      const latest = locksForDate[locksForDate.length - 1];
+      setActiveLock(latest);
+      setRemainingSeconds(Math.max(0, Math.floor((latest.expiresAt - Date.now()) / 1000)));
     } else {
       setActiveLock(null);
+      setRemainingSeconds(0);
     }
   }, [canchaId, fecha, subdomain]);
 
@@ -488,29 +508,47 @@ export default function GrillaHoraria({
   useEffect(() => {
     const hasActiveLock = Boolean(activeLock);
     const hasRetained = turnosRetenidos.length > 0;
+    const hasMyLocks = Object.keys(myLockedSlots).length > 0;
 
-    if (!hasActiveLock && !hasRetained) {
+    if (!hasActiveLock && !hasRetained && !hasMyLocks) {
       if (timerRef.current) clearInterval(timerRef.current);
       setRemainingSeconds(0);
       return;
     }
 
     const updateTimers = () => {
+      const now = Date.now();
+
       // 1. Decrement activeLock remaining seconds
       if (activeLock) {
-        const secondsLeft = Math.max(0, Math.floor((activeLock.expiresAt - Date.now()) / 1000));
+        const secondsLeft = Math.max(0, Math.floor((activeLock.expiresAt - now) / 1000));
         setRemainingSeconds(secondsLeft);
         if (secondsLeft <= 0) {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem(getLockStorageKey(canchaId));
-          }
           setActiveLock(null);
           addToast("warning", "El tiempo de retención del turno ha expirado. Selecciona el turno nuevamente.");
           fetchDisponibilidad(fecha, duracion);
         }
       }
 
-      // 2. Decrement all retained locks
+      // 2. Decrement myLockedSlots and remove expired only when changed
+      setMyLockedSlots((prev) => {
+        let changed = false;
+        const updated: Record<string, ActiveLock> = {};
+        Object.entries(prev).forEach(([k, lock]) => {
+          if (lock.expiresAt > now) {
+            updated[k] = lock;
+          } else {
+            changed = true;
+          }
+        });
+        if (changed) {
+          saveMultiLocks(canchaId, updated);
+          return updated;
+        }
+        return prev;
+      });
+
+      // 3. Decrement all retained locks
       setTurnosRetenidos((prev) => {
         let hasExpired = false;
         const updated = prev
@@ -534,16 +572,18 @@ export default function GrillaHoraria({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [activeLock, turnosRetenidos.length, fecha, duracion]);
+  }, [activeLock?.horaInicio, turnosRetenidos.length, Object.keys(myLockedSlots).length, fecha, duracion]);
 
   const allAdminRetainedLocks: RetainedLock[] = useMemo(() => {
     const map = new Map<string, RetainedLock>();
+    const now = Date.now();
 
+    // 1. Add server retained locks for this court/date
     turnosRetenidos.forEach((r) => {
       const myLock = myLockedSlots[`${r.fecha}_${r.hora_inicio}`] || (activeLock && activeLock.horaInicio === r.hora_inicio ? activeLock : null);
       const isMine = Boolean(myLock);
       const effectiveTtl = myLock
-        ? Math.max(0, Math.floor((myLock.expiresAt - Date.now()) / 1000))
+        ? Math.max(0, Math.floor((myLock.expiresAt - now) / 1000))
         : r.ttl_segundos;
 
       map.set(r.hora_inicio, {
@@ -554,7 +594,30 @@ export default function GrillaHoraria({
       });
     });
 
-    if (activeLock) {
+    // 2. Add local myLockedSlots for this date (in case server response is pending or offline)
+    Object.values(myLockedSlots).forEach((ml) => {
+      if (ml.fecha === fecha && ml.expiresAt > now) {
+        const ttl = Math.max(0, Math.floor((ml.expiresAt - now) / 1000));
+        const existing = map.get(ml.horaInicio);
+        map.set(ml.horaInicio, {
+          cancha_id: ml.canchaId,
+          cancha_nombre: canchaNombre,
+          fecha: ml.fecha,
+          hora_inicio: ml.horaInicio,
+          hora_fin: ml.horaFin,
+          duracion_minutos: ml.duracionMinutos || duracion,
+          precio: ml.precio,
+          token_reserva: ml.tokenReserva,
+          ...existing,
+          is_mine: true,
+          ttl_segundos: ttl,
+        });
+      }
+    });
+
+    // 3. Add activeLock if not already in map
+    if (activeLock && activeLock.fecha === fecha && activeLock.expiresAt > now) {
+      const ttl = Math.max(0, Math.floor((activeLock.expiresAt - now) / 1000));
       const existing = map.get(activeLock.horaInicio);
       map.set(activeLock.horaInicio, {
         cancha_id: activeLock.canchaId,
@@ -562,34 +625,17 @@ export default function GrillaHoraria({
         fecha: activeLock.fecha,
         hora_inicio: activeLock.horaInicio,
         hora_fin: activeLock.horaFin,
-        duracion_minutos: activeLock.duracionMinutos,
+        duracion_minutos: activeLock.duracionMinutos || duracion,
         precio: activeLock.precio,
-        ttl_segundos: remainingSeconds,
         token_reserva: activeLock.tokenReserva,
         ...existing,
         is_mine: true,
+        ttl_segundos: ttl,
       });
     }
 
-    Object.values(myLockedSlots).forEach((ml) => {
-      if (ml.fecha === fecha && ml.expiresAt > Date.now() && !map.has(ml.horaInicio)) {
-        map.set(ml.horaInicio, {
-          cancha_id: ml.canchaId,
-          cancha_nombre: canchaNombre,
-          fecha: ml.fecha,
-          hora_inicio: ml.horaInicio,
-          hora_fin: ml.horaFin,
-          duracion_minutos: ml.duracionMinutos,
-          precio: ml.precio,
-          ttl_segundos: Math.max(0, Math.floor((ml.expiresAt - Date.now()) / 1000)),
-          token_reserva: ml.tokenReserva,
-          is_mine: true,
-        });
-      }
-    });
-
     return Array.from(map.values()).sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
-  }, [turnosRetenidos, activeLock, myLockedSlots, remainingSeconds, canchaNombre, fecha]);
+  }, [turnosRetenidos, activeLock, myLockedSlots, remainingSeconds, canchaNombre, fecha, duracion]);
 
   const isSlotInPast = (slotHoraInicio: string, slotFecha: string) => {
     const today = getTodayString();
@@ -683,13 +729,15 @@ export default function GrillaHoraria({
       };
 
       setActiveLock(newLock);
-      setMyLockedSlots((prev) => ({
-        ...prev,
-        [`${fecha}_${slot.hora_inicio}`]: newLock,
-      }));
-      if (typeof window !== "undefined") {
-        localStorage.setItem(getLockStorageKey(canchaId), JSON.stringify(newLock));
-      }
+      setRemainingSeconds(ttl);
+      setMyLockedSlots((prev) => {
+        const updated = {
+          ...prev,
+          [`${fecha}_${slot.hora_inicio}`]: newLock,
+        };
+        saveMultiLocks(canchaId, updated);
+        return updated;
+      });
 
       addToast("success", `¡Turno ${slot.hora_inicio} bloqueado con éxito! Tienes 10 minutos para confirmar.`);
       fetchDisponibilidad(fecha, duracion);
@@ -878,13 +926,12 @@ export default function GrillaHoraria({
         : `¡Cuenta verificada y reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin} hs! Te esperamos.`;
 
       addToast("success", successMsg);
-      if (typeof window !== "undefined") {
-        localStorage.removeItem(getLockStorageKey(canchaId));
-      }
       if (activeLock) {
+        const targetKey = `${activeLock.fecha}_${activeLock.horaInicio}`;
         setMyLockedSlots((prev) => {
           const next = { ...prev };
-          delete next[`${activeLock.fecha}_${activeLock.horaInicio}`];
+          delete next[targetKey];
+          saveMultiLocks(canchaId, next);
           return next;
         });
       }
