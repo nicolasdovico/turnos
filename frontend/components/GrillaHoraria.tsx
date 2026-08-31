@@ -910,7 +910,8 @@ export default function GrillaHoraria({
             min={getTodayString()}
             value={fecha}
             onChange={(e) => handleFechaChange(e.target.value)}
-            className="bg-slate-900 text-white text-sm font-semibold rounded-xl px-3 py-1.5 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            style={{ colorScheme: "dark" }}
+            className="bg-slate-900 text-white text-sm font-semibold rounded-xl px-3 py-1.5 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-90 hover:[&::-webkit-calendar-picker-indicator]:opacity-100"
           />
         </div>
       </div>
