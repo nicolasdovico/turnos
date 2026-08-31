@@ -95,6 +95,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
             fecha: "2026-09-01",
             hora_inicio: "09:00",
             hora_fin: "10:00",
+            duracion_minutos: 60,
           }),
         })
       );

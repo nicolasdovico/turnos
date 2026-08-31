@@ -232,4 +232,138 @@ class AtomicLockTest extends TestCase
         $slotsAfter = array_column($dispResponseAfter->json('slots_disponibles'), 'hora_inicio');
         $this->assertNotContains('19:00', $slotsAfter);
     }
+
+    /**
+     * Test interval overlap prevention when locking slots with different durations (e.g. 90 min vs 60/90 min).
+     */
+    public function test_prevents_overlapping_locks_with_different_durations(): void
+    {
+        // Allow flexible duration on court
+        $this->cancha->update([
+            'permite_duracion_flexible' => true,
+            'duracion_minutos' => 60,
+        ]);
+
+        // User A locks 09:00 to 10:30 (90 minutes)
+        $responseA = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->postJson('/api/turnos/bloquear-temporal', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $this->fecha,
+                'hora_inicio' => '09:00',
+                'hora_fin' => '10:30',
+                'duracion_minutos' => 90,
+            ]);
+
+        $responseA->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        // User B attempts to lock 09:30 to 11:00 (overlaps with [09:00, 10:30)) -> 409 Conflict
+        $responseB = $this->actingAs($this->userB)
+            ->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->postJson('/api/turnos/bloquear-temporal', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $this->fecha,
+                'hora_inicio' => '09:30',
+                'hora_fin' => '11:00',
+                'duracion_minutos' => 90,
+            ]);
+
+        $responseB->assertStatus(409)
+            ->assertJson(['error' => 'TURNO_ALREADY_LOCKED']);
+
+        // User B attempts to lock 10:00 to 11:00 (overlaps with [09:00, 10:30)) -> 409 Conflict
+        $responseB2 = $this->actingAs($this->userB)
+            ->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->postJson('/api/turnos/bloquear-temporal', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $this->fecha,
+                'hora_inicio' => '10:00',
+                'hora_fin' => '11:00',
+                'duracion_minutos' => 60,
+            ]);
+
+        $responseB2->assertStatus(409)
+            ->assertJson(['error' => 'TURNO_ALREADY_LOCKED']);
+
+        // User B attempts to lock 10:30 to 12:00 (does NOT overlap with [09:00, 10:30)) -> 200 OK
+        $responseB3 = $this->actingAs($this->userB)
+            ->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->postJson('/api/turnos/bloquear-temporal', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $this->fecha,
+                'hora_inicio' => '10:30',
+                'hora_fin' => '12:00',
+                'duracion_minutos' => 90,
+            ]);
+
+        $responseB3->assertStatus(200)
+            ->assertJson(['success' => true]);
+    }
+
+    /**
+     * Test availability endpoint hides all slots overlapping with an active temporary lock.
+     */
+    public function test_availability_hides_all_overlapping_slots_for_active_lock(): void
+    {
+        $this->cancha->update([
+            'permite_duracion_flexible' => true,
+            'duracion_minutos' => 60,
+        ]);
+
+        // User A locks 09:00 to 10:30 (90 min)
+        $this->actingAs($this->userA)
+            ->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->postJson('/api/turnos/bloquear-temporal', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $this->fecha,
+                'hora_inicio' => '09:00',
+                'hora_fin' => '10:30',
+                'duracion_minutos' => 90,
+            ])->assertStatus(200);
+
+        // Fetch 90 min availability
+        $dispResponse = $this->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->getJson("/api/canchas/{$this->cancha->id}/disponibilidad?fecha={$this->fecha}&duracion=90");
+
+        $dispResponse->assertStatus(200);
+        $slots = array_column($dispResponse->json('slots_disponibles'), 'hora_inicio');
+
+        // 09:00, 09:30, 10:00 must NOT be available because they overlap with [09:00, 10:30)
+        $this->assertNotContains('09:00', $slots);
+        $this->assertNotContains('09:30', $slots);
+        $this->assertNotContains('10:00', $slots);
+
+        // 10:30 must be available
+        $this->assertContains('10:30', $slots);
+    }
+
+    /**
+     * Test confirming reservation rejects overlapping turnos in database.
+     */
+    public function test_cannot_confirm_slot_overlapping_with_existing_db_turno(): void
+    {
+        // Existing confirmed turno from 14:00 to 15:30
+        Turno::create([
+            'cancha_id' => $this->cancha->id,
+            'fecha' => $this->fecha,
+            'hora_inicio' => '14:00',
+            'hora_fin' => '15:30',
+            'precio' => 15000.00,
+            'estado' => 'reservado',
+        ]);
+
+        // Try to confirm turno starting at 14:30 to 16:00 (overlaps with [14:00, 15:30))
+        $response = $this->actingAs($this->userB)
+            ->withHeader('X-Tenant-ID', $this->complejo->uuid)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $this->fecha,
+                'hora_inicio' => '14:30',
+                'hora_fin' => '16:00',
+            ]);
+
+        $response->assertStatus(409)
+            ->assertJson(['error' => 'SLOT_ALREADY_RESERVED']);
+    }
 }

@@ -571,6 +571,7 @@ export default function GrillaHoraria({
           fecha,
           hora_inicio: slot.hora_inicio,
           hora_fin: slot.hora_fin,
+          duracion_minutos: slot.duracion_minutos || duracion,
         }),
       });
 

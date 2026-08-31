@@ -811,4 +811,32 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Backend (PHPUnit): 130 tests pasados al 100% (667 aserciones).
   * Frontend (Vitest): 36 tests pasados al 100%.
   * Mobile (Jest): 18 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-08-30] - PREVENCIÓN DE SOLAPAMIENTO DE INTERVALOS TEMPORALES EN BLOQUEOS, DISPONIBILIDAD Y CONFIRMACIÓN
+-------------------------------------------------------------------------------
+- Problema Resuelto:
+  * En canchas con duraciones flexibles o variables (60, 90, 120 min), si un usuario bloqueaba un turno (ej. 09:00 a 10:30), otro usuario podía bloquear o reservar un turno solapado (ej. 09:30 a 11:00 ó 10:00 a 11:00) en la misma cancha porque las claves Redis anteriores solo cotejaban coincidencia exacta del minuto de inicio.
+- Backend (Laravel 11):
+  * `ReservaLockService.php`:
+    - Detección de solapamiento de intervalos `[S1, E1) ∩ [S2, E2) ≠ ∅` (condición matemática `S1 < E2 && E1 > S2`).
+    - Métodos `obtenerBloqueosActivos`, `haySolapamientoEnBloqueos`, `calcularHoraFin` y `liberarBloqueosSolapados`.
+    - `adquirirBloqueo`: Valida solapamientos contra la base de datos y contra todos los bloqueos temporales activos en Redis para la misma cancha y fecha antes de conceder el token.
+  * `TurnoBloqueoController.php`:
+    - Acepta `hora_fin` y `duracion_minutos` opcionales en `POST /api/turnos/bloquear-temporal`.
+  * `DisponibilidadService.php`:
+    - Consulta los bloqueos activos de Redis con sus intervalos temporales y oculta dinámicamente cualquier slot candidato que se solape con un bloqueo temporal activo (ej. si está bloqueado 09:00 a 10:30, oculta 09:00, 09:30 y 10:00; y mantiene disponible 10:30).
+  * `TurnoConfirmarController.php`:
+    - En la transacción con `lockForUpdate`, verifica solapamiento de intervalos contra turnos ocupados en DB antes de persistir, evitando colisiones concurrentes y liberando los bloqueos solapados en Redis.
+  * `TurnoFijoController.php`:
+    - Verifica solapamiento de intervalos para turnos recurrentes fijos.
+  * Tests Backend (`AtomicLockTest.php`):
+    - `test_prevents_overlapping_locks_with_different_durations`: Bloqueo 09:00-10:30 (90 min) rechaza 09:30-11:00 y 10:00-11:00 con 409 Conflict, y permite 10:30-12:00.
+    - `test_availability_hides_all_overlapping_slots_for_active_lock`: Oculta slots solapados de la disponibilidad.
+    - `test_cannot_confirm_slot_overlapping_with_existing_db_turno`: Rechaza confirmación si existe turno solapado en DB.
+- Frontend (Next.js 14):
+  * `GrillaHoraria.tsx`: Envía `duracion_minutos` en el payload de `POST /api/turnos/bloquear-temporal`.
+- Suites de Tests y Verificación:
+  * Backend (PHPUnit): 133 tests pasados al 100% (683 aserciones).
+  * Frontend (Vitest): 36 tests pasados al 100%.
+  * Mobile (Jest): 18 tests pasados al 100%.
 ===============================================================================

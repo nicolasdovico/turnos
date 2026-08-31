@@ -143,16 +143,24 @@ class TurnoConfirmarController extends Controller
                 $estadoPago,
                 $tokenReserva
             ) {
-                // SELECT FOR UPDATE to lock slot row and guarantee ACID consistency
+                // SELECT FOR UPDATE: Check if any overlapping reserved/confirmed turno already exists
+                $overlappingTurno = Turno::where('cancha_id', $cancha->id)
+                    ->where('fecha', $fechaNormalizada)
+                    ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+                    ->where('hora_inicio', '<', $horaFinNormalizada)
+                    ->where('hora_fin', '>', $horaInicioNormalizada)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($overlappingTurno) {
+                    return null;
+                }
+
                 $existingTurno = Turno::where('cancha_id', $cancha->id)
                     ->where('fecha', $fechaNormalizada)
                     ->where('hora_inicio', $horaInicioNormalizada)
                     ->lockForUpdate()
                     ->first();
-
-                if ($existingTurno && in_array($existingTurno->estado, ['reservado', 'bloqueado'], true)) {
-                    return null;
-                }
 
                 if ($existingTurno) {
                     $existingTurno->update([
@@ -195,6 +203,13 @@ class TurnoConfirmarController extends Controller
                     $fechaNormalizada,
                     $horaInicioNormalizada,
                     $tokenReserva
+                );
+
+                $this->reservaLockService->liberarBloqueosSolapados(
+                    $cancha->id,
+                    $fechaNormalizada,
+                    $horaInicioNormalizada,
+                    $horaFinNormalizada
                 );
 
                 return $turnoConfirmado;

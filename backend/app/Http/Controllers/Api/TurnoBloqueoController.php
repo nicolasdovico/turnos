@@ -24,6 +24,8 @@ class TurnoBloqueoController extends Controller
             'cancha_id' => ['required', 'integer'],
             'fecha' => ['required', 'date_format:Y-m-d'],
             'hora_inicio' => ['required', 'string'],
+            'hora_fin' => ['nullable', 'string'],
+            'duracion_minutos' => ['nullable', 'integer'],
         ]);
 
         $cancha = Cancha::find($validated['cancha_id']);
@@ -50,7 +52,9 @@ class TurnoBloqueoController extends Controller
             $validated['fecha'],
             $validated['hora_inicio'],
             $userId,
-            ReservaLockService::DEFAULT_TTL_SECONDS
+            ReservaLockService::DEFAULT_TTL_SECONDS,
+            $validated['hora_fin'] ?? null,
+            $validated['duracion_minutos'] ?? null
         );
 
         if (!$tokenReserva) {

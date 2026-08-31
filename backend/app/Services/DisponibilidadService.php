@@ -10,6 +10,13 @@ use Illuminate\Support\Facades\Redis;
 
 class DisponibilidadService
 {
+    protected ReservaLockService $reservaLockService;
+
+    public function __construct(?ReservaLockService $reservaLockService = null)
+    {
+        $this->reservaLockService = $reservaLockService ?? app(ReservaLockService::class);
+    }
+
     /**
      * Generate the Redis lock key for a specific slot.
      */
@@ -122,6 +129,8 @@ class DisponibilidadService
             ->orderBy('hora_inicio', 'asc')
             ->get();
 
+        $activeLocks = $this->reservaLockService->obtenerBloqueosActivos($canchaId, $fechaCarbon->format('Y-m-d'));
+
         $slotsDisponibles = [];
         $turnosRetenidos = [];
         $horariosProtegidos = [];
@@ -153,27 +162,31 @@ class DisponibilidadService
                 return $tInicio < $endTs && $tFin > $startTs;
             });
 
-            // 2. Check if locked in Redis (atomic lock with TTL during checkout)
-            $lockKeyLegacy = self::getLockKey($canchaId, $fechaCarbon->format('Y-m-d'), $horaInicioFormatted);
-            $lockKeyStandard = ReservaLockService::getLockKey($canchaId, $fechaCarbon->format('Y-m-d'), $horaInicioFormatted);
-            $estaBloqueadoEnRedis = (bool) Redis::get($lockKeyLegacy) || (bool) Redis::get($lockKeyStandard);
-
-            if ($estaBloqueadoEnRedis && !$estaOcupadoEnDb) {
-                $ttl = (int) Redis::ttl($lockKeyStandard);
-                if ($ttl <= 0) {
-                    $ttl = (int) Redis::ttl($lockKeyLegacy);
+            // 2. Check if overlaps with any active temporary lock in Redis
+            $overlappingLock = null;
+            foreach ($activeLocks as $lock) {
+                $lInicioTs = Carbon::parse($fecha . ' ' . $lock['hora_inicio'], $timezone)->timestamp;
+                $lFinTs = Carbon::parse($fecha . ' ' . $lock['hora_fin'], $timezone)->timestamp;
+                if ($lInicioTs < $endTs && $lFinTs > $startTs) {
+                    $overlappingLock = $lock;
+                    break;
                 }
-                if ($ttl > 0) {
+            }
+            $estaBloqueadoEnRedis = ($overlappingLock !== null);
+
+            if ($estaBloqueadoEnRedis && !$estaOcupadoEnDb && $esAdmin && $overlappingLock) {
+                $alreadyInRetenidos = collect($turnosRetenidos)->contains(fn ($r) => $r['hora_inicio'] === $overlappingLock['hora_inicio']);
+                if (!$alreadyInRetenidos) {
                     $turnosRetenidos[] = [
                         'cancha_id' => $canchaId,
                         'cancha_nombre' => $cancha->nombre,
                         'fecha' => $fechaCarbon->format('Y-m-d'),
-                        'hora_inicio' => $horaInicioFormatted,
-                        'hora_fin' => $horaFinFormatted,
-                        'duracion_minutos' => $duracionMinutos,
+                        'hora_inicio' => $overlappingLock['hora_inicio'],
+                        'hora_fin' => $overlappingLock['hora_fin'],
+                        'duracion_minutos' => $overlappingLock['duracion_minutos'] ?? $duracionMinutos,
                         'precio' => $precio,
-                        'ttl_segundos' => $ttl,
-                        'expira_en_segundos' => $ttl,
+                        'ttl_segundos' => $overlappingLock['ttl'] ?? 600,
+                        'expira_en_segundos' => $overlappingLock['ttl'] ?? 600,
                         'estado' => 'bloqueado_temporal',
                     ];
                 }
@@ -237,6 +250,27 @@ class DisponibilidadService
             }
 
             $currentSlotStart->addMinutes($stepMinutos);
+        }
+
+        // Add any remaining active locks for admin view
+        if ($esAdmin) {
+            foreach ($activeLocks as $lock) {
+                $alreadyInRetenidos = collect($turnosRetenidos)->contains(fn ($r) => $r['hora_inicio'] === $lock['hora_inicio']);
+                if (!$alreadyInRetenidos) {
+                    $turnosRetenidos[] = [
+                        'cancha_id' => $canchaId,
+                        'cancha_nombre' => $cancha->nombre,
+                        'fecha' => $fechaCarbon->format('Y-m-d'),
+                        'hora_inicio' => $lock['hora_inicio'],
+                        'hora_fin' => $lock['hora_fin'],
+                        'duracion_minutos' => $lock['duracion_minutos'] ?? $duracionMinutos,
+                        'precio' => $precio,
+                        'ttl_segundos' => $lock['ttl'] ?? 600,
+                        'expira_en_segundos' => $lock['ttl'] ?? 600,
+                        'estado' => 'bloqueado_temporal',
+                    ];
+                }
+            }
         }
 
         // Formatted occupied turnos list (with client details for admin view)

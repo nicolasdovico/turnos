@@ -96,8 +96,9 @@ class TurnoFijoController extends Controller
                 foreach ($fechas as $fecha) {
                     $conflicto = Turno::where('cancha_id', $cancha->id)
                         ->where('fecha', $fecha)
-                        ->where('hora_inicio', $horaInicioNormalizada)
-                        ->whereIn('estado', ['reservado', 'bloqueado'])
+                        ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+                        ->where('hora_inicio', '<', $horaFinNormalizada)
+                        ->where('hora_fin', '>', $horaInicioNormalizada)
                         ->lockForUpdate()
                         ->first();
 
