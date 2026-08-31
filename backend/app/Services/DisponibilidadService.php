@@ -247,6 +247,7 @@ class DisponibilidadService
                         'duracion_minutos' => $duracionMinutos,
                         'precio' => $precio,
                         'estado' => 'disponible',
+                        'disponible' => true,
                     ];
                 }
             }

@@ -352,7 +352,18 @@ export default function GrillaHoraria({
         [];
 
       if (Array.isArray(rawSlots)) {
-        setSlots(rawSlots);
+        const formattedSlots: Slot[] = rawSlots.map((s: any) => ({
+          hora_inicio: s.hora_inicio,
+          hora_fin: s.hora_fin,
+          disponible:
+            s.disponible !== undefined
+              ? Boolean(s.disponible)
+              : s.estado === "disponible" || s.estado === undefined,
+          precio: s.precio ? Number(s.precio) : undefined,
+          duracion_minutos: s.duracion_minutos ? Number(s.duracion_minutos) : undefined,
+          es_fijo: Boolean(s.es_fijo),
+        }));
+        setSlots(formattedSlots);
       } else {
         setSlots([]);
       }
