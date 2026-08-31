@@ -303,7 +303,7 @@ class DisponibilidadService
         return [
             'slots' => $slotsDisponibles,
             'turnos_ocupados' => $turnosOcupadosData,
-            'turnos_retenidos' => $esAdmin ? $turnosRetenidos : [],
+            'turnos_retenidos' => $turnosRetenidos,
             'optimizacion_anti_baches' => [
                 'activa' => $antiBachesActivo,
                 'total_horarios_protegidos' => count($horariosProtegidos),

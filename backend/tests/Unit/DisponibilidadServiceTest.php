@@ -318,7 +318,7 @@ class DisponibilidadServiceTest extends TestCase
         \Carbon\Carbon::setTestNow();
     }
 
-    public function test_disponibilidad_retorna_turnos_retenidos_con_ttl_exclusivamente_para_admin(): void
+    public function test_disponibilidad_retorna_turnos_retenidos_con_ttl(): void
     {
         \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-31 07:00:00', 'America/Argentina/Buenos_Aires'));
 
@@ -328,25 +328,21 @@ class DisponibilidadServiceTest extends TestCase
         Redis::set($key1, 'token-1', 'EX', 400);
         Redis::set($key2, 'token-2', 'EX', 550);
 
-        // 1. Consulta como cliente (esAdmin = false)
-        $resCliente = $this->service->obtenerDisponibilidadCompleta($this->cancha->id, $this->fechaLunes, 60, false);
-        $this->assertEmpty($resCliente['turnos_retenidos']);
+        // 1. Consulta disponibilidad
+        $res = $this->service->obtenerDisponibilidadCompleta($this->cancha->id, $this->fechaLunes, 60, true);
+        $this->assertCount(2, $res['turnos_retenidos']);
         
-        $horasDisponiblesCliente = array_column($resCliente['slots'], 'hora_inicio');
-        $this->assertNotContains('09:00', $horasDisponiblesCliente);
-        $this->assertNotContains('11:00', $horasDisponiblesCliente);
-        $this->assertContains('08:00', $horasDisponiblesCliente);
-        $this->assertContains('10:00', $horasDisponiblesCliente);
+        $horasDisponibles = array_column($res['slots'], 'hora_inicio');
+        $this->assertNotContains('09:00', $horasDisponibles);
+        $this->assertNotContains('11:00', $horasDisponibles);
+        $this->assertContains('08:00', $horasDisponibles);
+        $this->assertContains('10:00', $horasDisponibles);
 
-        // 2. Consulta como administrador (esAdmin = true)
-        $resAdmin = $this->service->obtenerDisponibilidadCompleta($this->cancha->id, $this->fechaLunes, 60, true);
-        $this->assertCount(2, $resAdmin['turnos_retenidos']);
-
-        $horasRetenidas = array_column($resAdmin['turnos_retenidos'], 'hora_inicio');
+        $horasRetenidas = array_column($res['turnos_retenidos'], 'hora_inicio');
         $this->assertContains('09:00', $horasRetenidas);
         $this->assertContains('11:00', $horasRetenidas);
 
-        $retenido09 = collect($resAdmin['turnos_retenidos'])->firstWhere('hora_inicio', '09:00');
+        $retenido09 = collect($res['turnos_retenidos'])->firstWhere('hora_inicio', '09:00');
         $this->assertGreaterThan(0, $retenido09['ttl_segundos']);
         $this->assertEquals('bloqueado_temporal', $retenido09['estado']);
 
