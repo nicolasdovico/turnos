@@ -35,13 +35,13 @@ class DisponibilidadController extends Controller
         $duracion = isset($validated['duracion']) ? (int) $validated['duracion'] : null;
 
         $esAdmin = false;
-        $user = auth('sanctum')->user() ?: $request->user();
+        $user = auth('sanctum')->user() ?: (auth()->user() ?: $request->user());
         if (!$user && $request->bearerToken()) {
             $user = \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable;
         }
 
         if ($user) {
-            $complejo = \App\Models\Complejo::find($cancha->complejo_id);
+            $complejo = \App\Models\Complejo::withoutGlobalScopes()->find($cancha->complejo_id);
             if ($complejo && ($user->id === $complejo->user_id || ($user->role ?? '') === 'admin' || !empty($user->is_admin))) {
                 $esAdmin = true;
             }

@@ -650,6 +650,7 @@ export default function GrillaHoraria({
       }
 
       addToast("success", `¡Turno ${slot.hora_inicio} bloqueado con éxito! Tienes 10 minutos para confirmar.`);
+      fetchDisponibilidad(fecha, duracion);
     } catch (err) {
       addToast("error", "Error de red al intentar bloquear el turno.");
     } finally {
@@ -1182,7 +1183,26 @@ export default function GrillaHoraria({
                     {isMyLock ? (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={handleOpenConfirmation}
+                          onClick={() => {
+                            const selectedLock: ActiveLock = {
+                              canchaId: lock.cancha_id || canchaId,
+                              fecha: lock.fecha,
+                              horaInicio: lock.hora_inicio,
+                              horaFin: lock.hora_fin,
+                              tokenReserva: lock.token_reserva || (activeLock?.tokenReserva || "lock-token"),
+                              ttlSeconds: currentTtl,
+                              expiresAt: Date.now() + currentTtl * 1000,
+                              precio: lock.precio || 0,
+                            };
+                            setActiveLock(selectedLock);
+                            if (typeof window !== "undefined") {
+                              localStorage.setItem(getLockStorageKey(lock.cancha_id || canchaId), JSON.stringify(selectedLock));
+                            }
+                            if (onConfirmSuccess) {
+                              onConfirmSuccess(selectedLock);
+                            }
+                            setIsConfirmModalOpen(true);
+                          }}
                           className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 text-xs transition shadow flex items-center gap-1"
                         >
                           Confirmar Reserva
