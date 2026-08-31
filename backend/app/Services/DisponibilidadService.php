@@ -187,6 +187,8 @@ class DisponibilidadService
                         'precio' => $precio,
                         'ttl_segundos' => $overlappingLock['ttl'] ?? 600,
                         'expira_en_segundos' => $overlappingLock['ttl'] ?? 600,
+                        'token_reserva' => $overlappingLock['token'] ?? null,
+                        'user_id' => $overlappingLock['user_id'] ?? null,
                         'estado' => 'bloqueado_temporal',
                     ];
                 }
@@ -267,6 +269,8 @@ class DisponibilidadService
                         'precio' => $precio,
                         'ttl_segundos' => $lock['ttl'] ?? 600,
                         'expira_en_segundos' => $lock['ttl'] ?? 600,
+                        'token_reserva' => $lock['token'] ?? null,
+                        'user_id' => $lock['user_id'] ?? null,
                         'estado' => 'bloqueado_temporal',
                     ];
                 }

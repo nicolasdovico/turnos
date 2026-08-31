@@ -95,11 +95,26 @@ class TurnoBloqueoController extends Controller
             ], 404);
         }
 
+        $esAdmin = false;
+        $user = auth('sanctum')->user() ?: $request->user();
+        if (!$user && $request->bearerToken()) {
+            $user = \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable;
+        }
+
+        if ($user) {
+            $complejo = \App\Models\Complejo::find($cancha->complejo_id);
+            if ($complejo && ($user->id === $complejo->user_id || ($user->role ?? '') === 'admin' || !empty($user->is_admin))) {
+                $esAdmin = true;
+            }
+        }
+
+        $token = $esAdmin ? null : ($validated['token_reserva'] ?? null);
+
         $this->reservaLockService->liberarBloqueo(
             $validated['cancha_id'],
             $validated['fecha'],
             $validated['hora_inicio'],
-            $validated['token_reserva'] ?? null
+            $token
         );
 
         return response()->json([

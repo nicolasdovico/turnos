@@ -394,10 +394,13 @@ export default function GrillaHoraria({
     }
   };
 
+  const getLockStorageKey = (cid: number) => `active_lock_${subdomain || "club"}_${cid}`;
+
   const handleLiberarBloqueo = async (lock: RetainedLock | ActiveLock) => {
     try {
       const horaInicio = "hora_inicio" in lock ? lock.hora_inicio : lock.horaInicio;
       const lockFecha = lock.fecha;
+      const targetCanchaId = "cancha_id" in lock ? lock.cancha_id : (lock.canchaId || canchaId);
       const token = getAuthToken(propToken);
       const tokenReserva =
         "token_reserva" in lock
@@ -405,6 +408,16 @@ export default function GrillaHoraria({
           : "tokenReserva" in lock
           ? lock.tokenReserva
           : undefined;
+
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(getLockStorageKey(targetCanchaId));
+      }
+
+      if (activeLock && activeLock.horaInicio === horaInicio && (activeLock.canchaId === targetCanchaId || !activeLock.canchaId)) {
+        setActiveLock(null);
+      }
+
+      setTurnosRetenidos((prev) => prev.filter((r) => r.hora_inicio !== horaInicio));
 
       await fetch(`${apiUrl}/turnos/liberar-bloqueo`, {
         method: "POST",
@@ -415,24 +428,44 @@ export default function GrillaHoraria({
           ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
         },
         body: JSON.stringify({
-          cancha_id: canchaId,
+          cancha_id: targetCanchaId,
           fecha: lockFecha,
           hora_inicio: horaInicio,
           token_reserva: tokenReserva,
         }),
       });
 
-      if (activeLock && activeLock.horaInicio === horaInicio) {
-        setActiveLock(null);
-      }
-
-      setTurnosRetenidos((prev) => prev.filter((r) => r.hora_inicio !== horaInicio));
-      addToast("success", `Bloqueo de las ${horaInicio} hs liberado correctamente.`);
+      addToast("success", `Bloqueo de las ${horaInicio} hs cancelado / liberado correctamente.`);
       fetchDisponibilidad(fecha, duracion);
     } catch {
       addToast("error", "Error al liberar el turno retenido.");
     }
   };
+
+  // Restore active lock for this court and date from localStorage if still valid
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storageKey = getLockStorageKey(canchaId);
+    const savedLockStr = localStorage.getItem(storageKey);
+    if (savedLockStr) {
+      try {
+        const parsed: ActiveLock = JSON.parse(savedLockStr);
+        if (parsed.fecha === fecha && parsed.expiresAt > Date.now()) {
+          setActiveLock(parsed);
+          const rem = Math.max(0, Math.floor((parsed.expiresAt - Date.now()) / 1000));
+          setRemainingSeconds(rem);
+        } else {
+          localStorage.removeItem(storageKey);
+          setActiveLock(null);
+        }
+      } catch {
+        localStorage.removeItem(storageKey);
+        setActiveLock(null);
+      }
+    } else {
+      setActiveLock(null);
+    }
+  }, [canchaId, fecha, subdomain]);
 
   useEffect(() => {
     if (!initialSlots || fecha !== fechaInicial) {
@@ -457,6 +490,9 @@ export default function GrillaHoraria({
         const secondsLeft = Math.max(0, Math.floor((activeLock.expiresAt - Date.now()) / 1000));
         setRemainingSeconds(secondsLeft);
         if (secondsLeft <= 0) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(getLockStorageKey(canchaId));
+          }
           setActiveLock(null);
           addToast("warning", "El tiempo de retención del turno ha expirado. Selecciona el turno nuevamente.");
           fetchDisponibilidad(fecha, duracion);
@@ -533,6 +569,9 @@ export default function GrillaHoraria({
 
   const handleFechaChange = (newFecha: string) => {
     const today = getTodayString();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(getLockStorageKey(canchaId));
+    }
     if (newFecha && newFecha < today) {
       addToast("warning", "No se pueden seleccionar fechas del pasado.");
       setFecha(today);
@@ -594,7 +633,7 @@ export default function GrillaHoraria({
       const token = data.token_reserva || data.data?.token_reserva || "lock-token";
       const expiresAt = Date.now() + ttl * 1000;
 
-      setActiveLock({
+      const newLock: ActiveLock = {
         canchaId,
         fecha,
         horaInicio: slot.hora_inicio,
@@ -603,7 +642,12 @@ export default function GrillaHoraria({
         ttlSeconds: ttl,
         expiresAt,
         precio: slot.precio || 0,
-      });
+      };
+
+      setActiveLock(newLock);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(getLockStorageKey(canchaId), JSON.stringify(newLock));
+      }
 
       addToast("success", `¡Turno ${slot.hora_inicio} bloqueado con éxito! Tienes 10 minutos para confirmar.`);
     } catch (err) {
@@ -791,6 +835,9 @@ export default function GrillaHoraria({
         : `¡Cuenta verificada y reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin} hs! Te esperamos.`;
 
       addToast("success", successMsg);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(getLockStorageKey(canchaId));
+      }
       setActiveLock(null);
       setIsConfirmModalOpen(false);
       setRegistrationStep("form");
@@ -1027,12 +1074,22 @@ export default function GrillaHoraria({
               </span>
             </div>
 
-            <button
-              onClick={handleOpenConfirmation}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 transition shadow-lg"
-            >
-              Confirmar Reserva
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleOpenConfirmation}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 transition shadow-lg"
+              >
+                Confirmar Reserva
+              </button>
+              <button
+                onClick={() => activeLock && handleLiberarBloqueo(activeLock)}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500/50 text-xs font-bold transition flex items-center gap-1.5"
+                title="Cancelar y liberar este turno retenido"
+              >
+                <span>✕</span>
+                <span>Cancelar</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1126,25 +1183,27 @@ export default function GrillaHoraria({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={handleOpenConfirmation}
-                          className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 text-xs transition shadow"
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 text-xs transition shadow flex items-center gap-1"
                         >
                           Confirmar Reserva
                         </button>
                         <button
                           onClick={() => handleLiberarBloqueo(lock)}
-                          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 text-xs font-semibold transition"
-                          title="Cancelar asignación"
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500/50 text-xs font-semibold transition flex items-center gap-1.5"
+                          title="Rechazar / Cancelar asignación"
                         >
-                          ✕
+                          <span>✕</span>
+                          <span>Rechazar / Cancelar</span>
                         </button>
                       </div>
                     ) : (
                       <button
                         onClick={() => handleLiberarBloqueo(lock)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition shadow-sm"
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition shadow-sm flex items-center gap-1.5"
                         title="Forzar liberación del turno retenido"
                       >
-                        🔓 Forzar Liberación
+                        <span>🔓</span>
+                        <span>Forzar Liberación</span>
                       </button>
                     )}
                   </div>
@@ -1922,6 +1981,19 @@ export default function GrillaHoraria({
                   className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
                 >
                   Volver
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsConfirmModalOpen(false);
+                    if (activeLock) {
+                      handleLiberarBloqueo(activeLock);
+                    }
+                  }}
+                  className="flex-1 rounded-xl bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500/40 py-2.5 text-xs font-bold transition"
+                  title="Cancelar la reserva y liberar el horario inmediatamente"
+                >
+                  ✕ Liberar Turno
                 </button>
                 <button
                   type="submit"
