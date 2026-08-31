@@ -147,6 +147,7 @@ export default function GrillaHoraria({
   const [loading, setLoading] = useState<boolean>(false);
   const [lockingSlot, setLockingSlot] = useState<string | null>(null);
   const [activeLock, setActiveLock] = useState<ActiveLock | null>(null);
+  const [myLockedSlots, setMyLockedSlots] = useState<Record<string, ActiveLock>>({});
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -413,6 +414,12 @@ export default function GrillaHoraria({
         localStorage.removeItem(getLockStorageKey(targetCanchaId));
       }
 
+      setMyLockedSlots((prev) => {
+        const next = { ...prev };
+        delete next[`${lockFecha}_${horaInicio}`];
+        return next;
+      });
+
       if (activeLock && activeLock.horaInicio === horaInicio && (activeLock.canchaId === targetCanchaId || !activeLock.canchaId)) {
         setActiveLock(null);
       }
@@ -452,6 +459,10 @@ export default function GrillaHoraria({
         const parsed: ActiveLock = JSON.parse(savedLockStr);
         if (parsed.fecha === fecha && parsed.expiresAt > Date.now()) {
           setActiveLock(parsed);
+          setMyLockedSlots((prev) => ({
+            ...prev,
+            [`${parsed.fecha}_${parsed.horaInicio}`]: parsed,
+          }));
           const rem = Math.max(0, Math.floor((parsed.expiresAt - Date.now()) / 1000));
           setRemainingSeconds(rem);
         } else {
@@ -529,13 +540,22 @@ export default function GrillaHoraria({
     const map = new Map<string, RetainedLock>();
 
     turnosRetenidos.forEach((r) => {
+      const myLock = myLockedSlots[`${r.fecha}_${r.hora_inicio}`] || (activeLock && activeLock.horaInicio === r.hora_inicio ? activeLock : null);
+      const isMine = Boolean(myLock);
+      const effectiveTtl = myLock
+        ? Math.max(0, Math.floor((myLock.expiresAt - Date.now()) / 1000))
+        : r.ttl_segundos;
+
       map.set(r.hora_inicio, {
         ...r,
-        is_mine: activeLock ? activeLock.horaInicio === r.hora_inicio : false,
+        ttl_segundos: effectiveTtl,
+        token_reserva: r.token_reserva || myLock?.tokenReserva,
+        is_mine: isMine,
       });
     });
 
     if (activeLock) {
+      const existing = map.get(activeLock.horaInicio);
       map.set(activeLock.horaInicio, {
         cancha_id: activeLock.canchaId,
         cancha_nombre: canchaNombre,
@@ -546,12 +566,30 @@ export default function GrillaHoraria({
         precio: activeLock.precio,
         ttl_segundos: remainingSeconds,
         token_reserva: activeLock.tokenReserva,
+        ...existing,
         is_mine: true,
       });
     }
 
+    Object.values(myLockedSlots).forEach((ml) => {
+      if (ml.fecha === fecha && ml.expiresAt > Date.now() && !map.has(ml.horaInicio)) {
+        map.set(ml.horaInicio, {
+          cancha_id: ml.canchaId,
+          cancha_nombre: canchaNombre,
+          fecha: ml.fecha,
+          hora_inicio: ml.horaInicio,
+          hora_fin: ml.horaFin,
+          duracion_minutos: ml.duracionMinutos,
+          precio: ml.precio,
+          ttl_segundos: Math.max(0, Math.floor((ml.expiresAt - Date.now()) / 1000)),
+          token_reserva: ml.tokenReserva,
+          is_mine: true,
+        });
+      }
+    });
+
     return Array.from(map.values()).sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
-  }, [turnosRetenidos, activeLock, remainingSeconds, canchaNombre]);
+  }, [turnosRetenidos, activeLock, myLockedSlots, remainingSeconds, canchaNombre, fecha]);
 
   const isSlotInPast = (slotHoraInicio: string, slotFecha: string) => {
     const today = getTodayString();
@@ -645,6 +683,10 @@ export default function GrillaHoraria({
       };
 
       setActiveLock(newLock);
+      setMyLockedSlots((prev) => ({
+        ...prev,
+        [`${fecha}_${slot.hora_inicio}`]: newLock,
+      }));
       if (typeof window !== "undefined") {
         localStorage.setItem(getLockStorageKey(canchaId), JSON.stringify(newLock));
       }
@@ -838,6 +880,13 @@ export default function GrillaHoraria({
       addToast("success", successMsg);
       if (typeof window !== "undefined") {
         localStorage.removeItem(getLockStorageKey(canchaId));
+      }
+      if (activeLock) {
+        setMyLockedSlots((prev) => {
+          const next = { ...prev };
+          delete next[`${activeLock.fecha}_${activeLock.horaInicio}`];
+          return next;
+        });
       }
       setActiveLock(null);
       setIsConfirmModalOpen(false);

@@ -174,7 +174,7 @@ class DisponibilidadService
             }
             $estaBloqueadoEnRedis = ($overlappingLock !== null);
 
-            if ($estaBloqueadoEnRedis && !$estaOcupadoEnDb && $esAdmin && $overlappingLock) {
+            if ($estaBloqueadoEnRedis && !$estaOcupadoEnDb && $overlappingLock) {
                 $alreadyInRetenidos = collect($turnosRetenidos)->contains(fn ($r) => $r['hora_inicio'] === $overlappingLock['hora_inicio']);
                 if (!$alreadyInRetenidos) {
                     $turnosRetenidos[] = [
@@ -254,26 +254,24 @@ class DisponibilidadService
             $currentSlotStart->addMinutes($stepMinutos);
         }
 
-        // Add any remaining active locks for admin view
-        if ($esAdmin) {
-            foreach ($activeLocks as $lock) {
-                $alreadyInRetenidos = collect($turnosRetenidos)->contains(fn ($r) => $r['hora_inicio'] === $lock['hora_inicio']);
-                if (!$alreadyInRetenidos) {
-                    $turnosRetenidos[] = [
-                        'cancha_id' => $canchaId,
-                        'cancha_nombre' => $cancha->nombre,
-                        'fecha' => $fechaCarbon->format('Y-m-d'),
-                        'hora_inicio' => $lock['hora_inicio'],
-                        'hora_fin' => $lock['hora_fin'],
-                        'duracion_minutos' => $lock['duracion_minutos'] ?? $duracionMinutos,
-                        'precio' => $precio,
-                        'ttl_segundos' => $lock['ttl'] ?? 600,
-                        'expira_en_segundos' => $lock['ttl'] ?? 600,
-                        'token_reserva' => $lock['token'] ?? null,
-                        'user_id' => $lock['user_id'] ?? null,
-                        'estado' => 'bloqueado_temporal',
-                    ];
-                }
+        // Add all active locks from Redis to turnosRetenidos
+        foreach ($activeLocks as $lock) {
+            $alreadyInRetenidos = collect($turnosRetenidos)->contains(fn ($r) => $r['hora_inicio'] === $lock['hora_inicio']);
+            if (!$alreadyInRetenidos) {
+                $turnosRetenidos[] = [
+                    'cancha_id' => $canchaId,
+                    'cancha_nombre' => $cancha->nombre,
+                    'fecha' => $fechaCarbon->format('Y-m-d'),
+                    'hora_inicio' => $lock['hora_inicio'],
+                    'hora_fin' => $lock['hora_fin'],
+                    'duracion_minutos' => $lock['duracion_minutos'] ?? $duracionMinutos,
+                    'precio' => $precio,
+                    'ttl_segundos' => $lock['ttl'] ?? 600,
+                    'expira_en_segundos' => $lock['ttl'] ?? 600,
+                    'token_reserva' => $lock['token'] ?? null,
+                    'user_id' => $lock['user_id'] ?? null,
+                    'estado' => 'bloqueado_temporal',
+                ];
             }
         }
 
