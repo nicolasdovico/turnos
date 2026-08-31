@@ -126,4 +126,80 @@ class ClubDashboardTest extends TestCase
             'nombre' => 'Cancha 4 Panorámica',
         ]);
     }
+
+    public function test_club_owner_can_update_payment_and_cancellation_policies(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Nicolás Dueño',
+            'email' => 'nico@owner-policy.com',
+        ]);
+
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Nico Pádel Club',
+            'subdominio' => 'nico-policy-club',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+            'porcentaje_sena' => 50.00,
+            'horas_limite_cancelacion' => 4,
+            'tipo_cobro_reserva' => 'sena',
+            'permite_mostrador_publico' => true,
+        ]);
+
+        $payload = [
+            'porcentaje_sena' => 30.00,
+            'horas_limite_cancelacion' => 6,
+            'tipo_cobro_reserva' => 'sena',
+            'permite_mostrador_publico' => false,
+            'telefono' => '+54 9 11 9999-8888',
+        ];
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-policy-club/configuracion', $payload);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('complejo.porcentaje_sena', 30)
+            ->assertJsonPath('complejo.horas_limite_cancelacion', 6)
+            ->assertJsonPath('complejo.permite_mostrador_publico', false);
+
+        $this->assertDatabaseHas('complejos', [
+            'id' => $complejo->id,
+            'porcentaje_sena' => 30.00,
+            'horas_limite_cancelacion' => 6,
+            'permite_mostrador_publico' => false,
+        ]);
+    }
+
+    public function test_non_owner_cannot_update_club_policies(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Dueño Real',
+            'email' => 'dueno@real.com',
+        ]);
+
+        $intruder = User::factory()->create([
+            'name' => 'Otro Usuario',
+            'email' => 'otro@usuario.com',
+        ]);
+
+        Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Privado',
+            'subdominio' => 'club-privado',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+            'porcentaje_sena' => 50.00,
+        ]);
+
+        $response = $this->actingAs($intruder, 'sanctum')
+            ->putJson('/api/clubs/club-privado/configuracion', [
+                'porcentaje_sena' => 20.00,
+            ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('success', false);
+    }
 }

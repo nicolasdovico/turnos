@@ -16,6 +16,10 @@ interface ComplejoData {
   ciudad: string | null;
   direccion: string | null;
   estado: string;
+  tipo_cobro_reserva?: string;
+  porcentaje_sena?: number;
+  horas_limite_cancelacion?: number;
+  permite_mostrador_publico?: boolean;
   owner: { id: number; name: string; email: string } | null;
 }
 
@@ -230,7 +234,7 @@ export default function ClubAdminPanel() {
   const subdomain = (params?.subdomain as string) || "demo";
   const { user, token } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"canchas" | "modulos" | "horarios" | "config">("canchas");
+  const [activeTab, setActiveTab] = useState<"canchas" | "modulos" | "horarios" | "politicas" | "config">("canchas");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -240,6 +244,15 @@ export default function ClubAdminPanel() {
   const [canchas, setCanchas] = useState<CanchaItem[]>([]);
   const [horarios, setHorarios] = useState<HorarioItem[]>([]);
   const [stats, setStats] = useState({ total_canchas: 0, total_turnos: 0, modulos_count: 0 });
+
+  // Estados para Políticas de Cobro, Seña y Cancelación
+  const [tipoCobroReserva, setTipoCobroReserva] = useState<string>("sena");
+  const [porcentajeSena, setPorcentajeSena] = useState<number>(50);
+  const [horasLimiteCancelacion, setHorasLimiteCancelacion] = useState<number>(4);
+  const [permiteMostradorPublico, setPermiteMostradorPublico] = useState<boolean>(true);
+  const [isSavingPoliticas, setIsSavingPoliticas] = useState(false);
+  const [politicasSuccessMsg, setPoliticasSuccessMsg] = useState<string | null>(null);
+  const [politicasErrorMsg, setPoliticasErrorMsg] = useState<string | null>(null);
 
   // Modal Alta / Edición de Cancha
   const [showCanchaModal, setShowCanchaModal] = useState(false);
@@ -398,7 +411,22 @@ export default function ClubAdminPanel() {
         (a.nombre || "").localeCompare(b.nombre || "", undefined, { numeric: true, sensitivity: "base" })
       );
 
-      setComplejo(data.data.complejo);
+      if (data.data?.complejo) {
+        setComplejo(data.data.complejo);
+        if (data.data.complejo.tipo_cobro_reserva) {
+          setTipoCobroReserva(data.data.complejo.tipo_cobro_reserva);
+        }
+        if (typeof data.data.complejo.porcentaje_sena === "number") {
+          setPorcentajeSena(data.data.complejo.porcentaje_sena);
+        }
+        if (typeof data.data.complejo.horas_limite_cancelacion === "number") {
+          setHorasLimiteCancelacion(data.data.complejo.horas_limite_cancelacion);
+        }
+        if (data.data.complejo.permite_mostrador_publico !== undefined) {
+          setPermiteMostradorPublico(Boolean(data.data.complejo.permite_mostrador_publico));
+        }
+      }
+
       setPlan(data.data.plan);
       setCanchas(canchasList);
       setHorarios(data.data.horarios_atencion || []);
@@ -413,6 +441,45 @@ export default function ClubAdminPanel() {
   useEffect(() => {
     fetchDashboardData();
   }, [subdomain, token]);
+
+  const handleSavePoliticas = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingPoliticas(true);
+    setPoliticasSuccessMsg(null);
+    setPoliticasErrorMsg(null);
+
+    try {
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/configuracion`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+        body: JSON.stringify({
+          tipo_cobro_reserva: tipoCobroReserva,
+          porcentaje_sena: porcentajeSena,
+          horas_limite_cancelacion: horasLimiteCancelacion,
+          permite_mostrador_publico: permiteMostradorPublico,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al guardar las políticas del club.");
+      }
+
+      setPoliticasSuccessMsg("¡Políticas de cobro de seña y cancelación guardadas exitosamente!");
+      if (data.complejo) {
+        setComplejo((prev) => (prev ? { ...prev, ...data.complejo } : prev));
+      }
+    } catch (err: any) {
+      setPoliticasErrorMsg(err.message || "Error al guardar.");
+    } finally {
+      setIsSavingPoliticas(false);
+    }
+  };
 
   const handleSaveCancha = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -709,6 +776,16 @@ export default function ClubAdminPanel() {
             }`}
           >
             🕒 Horarios de Atención
+          </button>
+          <button
+            onClick={() => setActiveTab("politicas")}
+            className={`pb-4 transition border-b-2 ${
+              activeTab === "politicas"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            💳 Políticas de Seña & Cancelación
           </button>
           <button
             onClick={() => setActiveTab("config")}
@@ -1604,7 +1681,272 @@ export default function ClubAdminPanel() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: DATOS DEL CLUB */}
+        {/* TAB 4: POLÍTICAS DE SEÑA & CANCELACIÓN */}
+        {/* ========================================================================= */}
+        {activeTab === "politicas" && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Políticas de Cobro, Seña y Cancelación</h2>
+                <p className="text-xs text-slate-400">
+                  Define cómo los jugadores deben señar sus turnos y las reglas de reembolso a billetera virtual
+                </p>
+              </div>
+            </div>
+
+            {politicasSuccessMsg && (
+              <div role="alert" className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                <span>✓</span>
+                <span>{politicasSuccessMsg}</span>
+              </div>
+            )}
+
+            {politicasErrorMsg && (
+              <div role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{politicasErrorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSavePoliticas} className="space-y-6">
+              {/* Card 1: Modalidad de Cobro */}
+              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20 text-xl">
+                    💳
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">1. Modalidad de Cobro para Reservas Online</h3>
+                    <p className="text-xs text-slate-400">Elige qué monto debe abonar el jugador para asegurar su cancha</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                  <label
+                    className={`p-4 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                      tipoCobroReserva === "sena"
+                        ? "bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/50"
+                        : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-sm">Seña Obligatoria</span>
+                      <input
+                        type="radio"
+                        name="tipo_cobro"
+                        value="sena"
+                        checked={tipoCobroReserva === "sena"}
+                        onChange={() => setTipoCobroReserva("sena")}
+                        className="text-emerald-500 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-2">
+                      El jugador paga un porcentaje (ej. 50%) online y el saldo restante en el club.
+                    </p>
+                    <span className="mt-3 inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 w-fit">
+                      ⭐ Recomendado
+                    </span>
+                  </label>
+
+                  <label
+                    className={`p-4 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                      tipoCobroReserva === "total"
+                        ? "bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/50"
+                        : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-sm">Pago Total (100%)</span>
+                      <input
+                        type="radio"
+                        name="tipo_cobro"
+                        value="total"
+                        checked={tipoCobroReserva === "total"}
+                        onChange={() => {
+                          setTipoCobroReserva("total");
+                          setPorcentajeSena(100);
+                        }}
+                        className="text-emerald-500 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-2">
+                      Exige abonar el 100% del valor de la cancha al momento de reservar.
+                    </p>
+                  </label>
+
+                  <label
+                    className={`p-4 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
+                      tipoCobroReserva === "ninguno"
+                        ? "bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/50"
+                        : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-sm">Sin Seña Previa</span>
+                      <input
+                        type="radio"
+                        name="tipo_cobro"
+                        value="ninguno"
+                        checked={tipoCobroReserva === "ninguno"}
+                        onChange={() => setTipoCobroReserva("ninguno")}
+                        className="text-emerald-500 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-2">
+                      Permite reservar gratis online y cobrar el total en el mostrador del club.
+                    </p>
+                  </label>
+                </div>
+              </div>
+
+              {/* Card 2: Porcentaje de Seña */}
+              {tipoCobroReserva === "sena" && (
+                <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-white">2. Porcentaje de Seña Requerida</h3>
+                      <p className="text-xs text-slate-400">Configura entre el 10% y el 100% del valor total del turno</p>
+                    </div>
+                    <span className="text-2xl font-black text-emerald-400 font-mono bg-emerald-950 px-4 py-1.5 rounded-2xl border border-emerald-500/30">
+                      {porcentajeSena}%
+                    </span>
+                  </div>
+
+                  {/* Slider & Presets */}
+                  <div className="space-y-4 pt-2">
+                    <input
+                      type="range"
+                      min={10}
+                      max={100}
+                      step={5}
+                      aria-label="Porcentaje de Seña"
+                      value={porcentajeSena}
+                      onChange={(e) => setPorcentajeSena(Number(e.target.value))}
+                      className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-slate-400 font-bold">Valores rápidos:</span>
+                      {[20, 30, 50, 70, 100].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setPorcentajeSena(val)}
+                          className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
+                            porcentajeSena === val
+                              ? "bg-emerald-500 text-slate-950 shadow"
+                              : "bg-slate-800 text-slate-300 hover:text-white"
+                          }`}
+                        >
+                          {val}%
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Live Simulation Box */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs">
+                      <span className="text-slate-400">
+                        Ejemplo para un turno de <strong>$10.000</strong>:
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-emerald-400 font-bold">
+                          Seña Online: ${(10000 * porcentajeSena / 100).toLocaleString()}
+                        </span>
+                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-300 font-bold">
+                          En el Club: ${(10000 - (10000 * porcentajeSena / 100)).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Card 3: Política de Cancelación y Billetera Virtual */}
+              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-white">3. Política de Cancelación & Reembolso</h3>
+                    <p className="text-xs text-slate-400">
+                      Anticipación mínima requerida para devolver la seña en créditos de Billetera Virtual
+                    </p>
+                  </div>
+                  <span className="text-xl font-black text-emerald-400 font-mono bg-emerald-950 px-3.5 py-1 rounded-2xl border border-emerald-500/30">
+                    {horasLimiteCancelacion} hs
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 pt-2">
+                  {[1, 2, 4, 6, 12, 24, 48].map((hs) => (
+                    <button
+                      key={hs}
+                      type="button"
+                      onClick={() => setHorasLimiteCancelacion(hs)}
+                      className={`p-3 rounded-2xl border text-center transition ${
+                        horasLimiteCancelacion === hs
+                          ? "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500/50 shadow"
+                          : "bg-slate-950/60 border-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <div className="text-sm font-black">{hs} hs</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {hs === 4 ? "Por Defecto" : hs === 24 ? "1 Día" : "Previas"}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-200 space-y-2">
+                  <div className="font-bold flex items-center gap-1.5 text-blue-300">
+                    <span>💡</span> ¿Cómo funciona para el jugador y el club?
+                  </div>
+                  <ul className="space-y-1.5 text-[11px] list-disc list-inside text-blue-200/90">
+                    <li>
+                      <strong>Cancelación con {horasLimiteCancelacion}hs o más de aviso:</strong> El 100% de la seña abonada se acredita automáticamente en la <strong>Billetera Virtual</strong> del jugador para usar en su próximo turno en {complejo?.nombre}.
+                    </li>
+                    <li>
+                      <strong>Cancelación con menos de {horasLimiteCancelacion}hs:</strong> El club <strong>retiene la seña</strong> en concepto de penalidad por vacancia de la cancha.
+                    </li>
+                    <li>
+                      <strong>Lista de Espera:</strong> En ambos casos, el turno liberado se notifica por push inmediatamente a los jugadores suscritos en espera.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Card 4: Mostrador Presencial */}
+              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex items-center justify-between">
+                <div className="space-y-1 pr-4">
+                  <div className="font-bold text-sm text-white">Permitir Pago en Mostrador para Clientes Públicos</div>
+                  <p className="text-xs text-slate-400">
+                    Si está activo, los jugadores pueden optar por reservar online y abonar presencialmente sin tarjeta previa.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  aria-label="Permitir Pago en Mostrador"
+                  checked={permiteMostradorPublico}
+                  onChange={(e) => setPermiteMostradorPublico(e.target.checked)}
+                  className="w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-950 border-slate-700 cursor-pointer"
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingPoliticas}
+                  className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-emerald-600/20 transition disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <span>{isSavingPoliticas ? "Guardando..." : "💾 Guardar Políticas de Reserva"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 5: DATOS DEL CLUB */}
         {/* ========================================================================= */}
         {activeTab === "config" && (
           <div className="mt-8 space-y-6">

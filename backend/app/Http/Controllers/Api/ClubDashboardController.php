@@ -98,6 +98,11 @@ class ClubDashboardController extends Controller
                     'ciudad' => $complejo->ciudad,
                     'direccion' => $complejo->direccion,
                     'estado' => $complejo->estado,
+                    'tipo_cobro_reserva' => $complejo->tipo_cobro_reserva ?? 'sena',
+                    'porcentaje_sena' => (float) ($complejo->porcentaje_sena ?? 50.00),
+                    'monto_sena_fijo' => $complejo->monto_sena_fijo ? (float) $complejo->monto_sena_fijo : null,
+                    'horas_limite_cancelacion' => (int) ($complejo->horas_limite_cancelacion ?? 4),
+                    'permite_mostrador_publico' => (bool) ($complejo->permite_mostrador_publico ?? true),
                     'created_at' => $complejo->created_at,
                     'owner' => $complejo->owner ? [
                         'id' => $complejo->owner->id,
@@ -375,6 +380,78 @@ class ClubDashboardController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Turno liberado y cancelado exitosamente.',
+        ]);
+    }
+
+    /**
+     * Actualizar políticas de cobro de seña, cancelación y configuración general del club.
+     */
+    public function updateConfiguracion(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if ($user) {
+            $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+            $isAdmin = ($user->role ?? '') === 'admin';
+            if (!$isOwner && !$isAdmin) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes permisos para modificar las políticas de este club.',
+                ], 403);
+            }
+        }
+
+        $validated = $request->validate([
+            'nombre' => 'nullable|string|max:255',
+            'telefono' => 'nullable|string|max:50',
+            'ciudad' => 'nullable|string|max:100',
+            'direccion' => 'nullable|string|max:255',
+            'tipo_cobro_reserva' => 'nullable|string|in:sena,total,ninguno',
+            'porcentaje_sena' => 'nullable|numeric|min:10|max:100',
+            'monto_sena_fijo' => 'nullable|numeric|min:0',
+            'horas_limite_cancelacion' => 'nullable|integer|min:0|max:72',
+            'permite_mostrador_publico' => 'nullable|boolean',
+        ]);
+
+        $updateData = [];
+        foreach ($validated as $key => $value) {
+            if ($value !== null) {
+                $updateData[$key] = $value;
+            }
+        }
+
+        if (!empty($updateData)) {
+            $complejo->update($updateData);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Políticas y configuración del club actualizadas exitosamente.',
+            'complejo' => [
+                'id' => $complejo->id,
+                'nombre' => $complejo->nombre,
+                'subdominio' => $complejo->subdominio,
+                'tipo_cobro_reserva' => $complejo->tipo_cobro_reserva ?? 'sena',
+                'porcentaje_sena' => (float) ($complejo->porcentaje_sena ?? 50.00),
+                'monto_sena_fijo' => $complejo->monto_sena_fijo ? (float) $complejo->monto_sena_fijo : null,
+                'horas_limite_cancelacion' => (int) ($complejo->horas_limite_cancelacion ?? 4),
+                'permite_mostrador_publico' => (bool) ($complejo->permite_mostrador_publico ?? true),
+                'telefono' => $complejo->telefono,
+                'ciudad' => $complejo->ciudad,
+                'direccion' => $complejo->direccion,
+            ],
         ]);
     }
 }

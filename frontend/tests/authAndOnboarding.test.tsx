@@ -410,4 +410,91 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText("POS & Buffet")).toBeDefined();
     expect(screen.getByText("Domótica IoT")).toBeDefined();
   });
+
+  it("renders and updates payment and cancellation policies in club admin panel", async () => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any, options: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("configuracion") && options?.method === "PUT") {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            message: "Políticas guardadas exitosamente",
+            complejo: {
+              id: 1,
+              nombre: "Nico Padel",
+              subdominio: "nico-padel",
+              porcentaje_sena: 30,
+              horas_limite_cancelacion: 6,
+              tipo_cobro_reserva: "sena",
+            },
+          }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Nico Padel",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+                porcentaje_sena: 50,
+                horas_limite_cancelacion: 4,
+                tipo_cobro_reserva: "sena",
+                permite_mostrador_publico: true,
+              },
+              plan: {
+                id: 1,
+                nombre: "Oro",
+                slug: "oro",
+                modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }],
+              },
+              canchas: [],
+              stats: { total_canchas: 0, total_turnos: 0, modulos_count: 1 },
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Switch to Políticas tab
+    const politicasTabBtn = await screen.findByRole("button", { name: /Políticas de Seña & Cancelación/i });
+    fireEvent.click(politicasTabBtn);
+
+    expect(await screen.findByText(/Políticas de Cobro, Seña y Cancelación/i)).toBeDefined();
+    expect(screen.getByText("Seña Obligatoria")).toBeDefined();
+    expect(screen.getByText("Pago Total (100%)")).toBeDefined();
+    expect(screen.getByText("Sin Seña Previa")).toBeDefined();
+
+    // Click quick 30% preset button
+    const preset30Btn = screen.getByRole("button", { name: "30%" });
+    fireEvent.click(preset30Btn);
+
+    // Click 6hs button
+    const btn6hs = screen.getByRole("button", { name: /6 hs/i });
+    fireEvent.click(btn6hs);
+
+    // Click submit
+    const saveBtn = screen.getByRole("button", { name: /Guardar Políticas de Reserva/i });
+    fireEvent.click(saveBtn);
+
+    expect(await screen.findByText(/Políticas de cobro de seña y cancelación guardadas exitosamente!/i)).toBeDefined();
+  });
 });

@@ -787,4 +787,28 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Backend (PHPUnit): 128 tests pasados al 100% (659 aserciones).
   * Frontend (Vitest): 35 tests pasados al 100%.
   * Mobile (Jest): 18 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-08-30] - PANEL DE CONFIGURACIÓN DE POLÍTICAS DE SEÑA Y CANCELACIÓN PARA DUEÑOS DE CLUBES
+-------------------------------------------------------------------------------
+- Backend (Laravel 11):
+  * `ClubDashboardController.php`:
+    - Método `show`: Retorna `tipo_cobro_reserva`, `porcentaje_sena`, `horas_limite_cancelacion` y `permite_mostrador_publico`.
+    - Método `updateConfiguracion`: Endpoint `PUT /api/clubs/{subdomain}/configuracion` con validaciones (`min:10|max:100` para seña, `min:0|max:72` para horas) y chequeo de permisos de administrador/dueño.
+  * Tests Backend (`ClubDashboardTest.php`):
+    - `test_club_owner_can_update_payment_and_cancellation_policies`: Valida persistencia de cambios en la base de datos.
+    - `test_non_owner_cannot_update_club_policies`: Valida protección 403 Forbidden para usuarios ajenos al complejo.
+- Frontend Web (Next.js 14):
+  * `app/tenants/[subdomain]/panel/page.tsx` & `app/tenants/[subdomain]/admin/page.tsx`:
+    - Nueva pestaña interactiva **"💳 Políticas de Seña & Cancelación"**.
+    - Selector visual de modalidad: Seña Obligatoria (Recomendado) / Pago Total (100%) / Sin Seña Previa (Mostrador).
+    - Slider interactivo y botones rápidos de % de Seña (20%, 30%, 50%, 70%, 100%) con caja de simulación de cobro en vivo.
+    - Selector de Horas de Cancelación (1h, 2hs, 4hs, 6hs, 12hs, 24hs, 48hs) con desglose explicativo de Billetera Virtual vs Retención.
+    - Switch para permitir o restringir reservas en mostrador a clientes públicos.
+    - Formulario con persistencia en vivo vía `PUT /api/clubs/{subdomain}/configuracion` y alertas de feedback.
+  * Tests Frontend (`authAndOnboarding.test.tsx`):
+    - `renders and updates payment and cancellation policies in club admin panel`: Test de integración que verifica la navegación a la pestaña de políticas, interacción con el selector y guardado exitoso.
+- Suites de Tests y Verificación:
+  * Backend (PHPUnit): 130 tests pasados al 100% (667 aserciones).
+  * Frontend (Vitest): 36 tests pasados al 100%.
+  * Mobile (Jest): 18 tests pasados al 100%.
 ===============================================================================
