@@ -66,7 +66,7 @@ class TurnoFijoController extends Controller
             $horario = HorarioAtencion::where('complejo_id', $cancha->complejo_id)
                 ->where('dia_semana', $targetDiaSemana)
                 ->first();
-            $duracion = $horario?->duracion_turno_minutos ?: 60;
+            $duracion = $cancha->duracion_minutos ?: ($horario?->duracion_turno_minutos ?: 60);
             $horaFinNormalizada = Carbon::parse($startDate->format('Y-m-d') . ' ' . $horaInicioNormalizada)
                 ->addMinutes($duracion)
                 ->format('H:i');

@@ -9,6 +9,7 @@ export interface Slot {
   disponible: boolean;
   precio?: number;
   es_fijo?: boolean;
+  duracion_minutos?: number;
 }
 
 export interface GrillaHorariaProps {

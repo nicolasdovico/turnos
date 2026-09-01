@@ -194,10 +194,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth debe utilizarse dentro de un AuthProvider");
+    return {
+      user: null,
+      token: null,
+      isLoading: false,
+      login: async () => ({ success: false, error: undefined }),
+      register: async () => ({ success: false, error: undefined }),
+      logout: async () => {},
+      setAuthSession: () => {},
+      markEmailAsVerified: () => {},
+    };
   }
   return context;
 }

@@ -837,6 +837,38 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * `GrillaHoraria.tsx`: Envía `duracion_minutos` en el payload de `POST /api/turnos/bloquear-temporal`.
 - Suites de Tests y Verificación:
   * Backend (PHPUnit): 133 tests pasados al 100% (683 aserciones).
-  * Frontend (Vitest): 36 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-09-01] - GESTIÓN Y MODIFICACIÓN DE HORARIOS DE ATENCIÓN SEMANALES DESDE EL PANEL DE CLUB
+-------------------------------------------------------------------------------
+- Requerimiento:
+  * Permitir al administrador/dueño del club modificar los horarios de apertura, cierre y duración por turno para cada día de la semana (ordenados estrictamente de Lunes a Domingo) desde `http://nico-padel.localhost:8080/panel`, solapa "Horarios de Atención".
+  * Los días cerrados se deshabilitan mediante un switch toggle interactivo (`abierto: false`).
+  * Incluir accesos rápidos de productividad ("Copiar Lunes a Viernes", "Copiar a Toda la Semana", "Restablecer Horarios").
+- Backend (Laravel 11):
+  * `routes/api.php`:
+    - Registrada ruta `PUT /api/clubs/{subdomain}/horarios` apuntando a `ClubDashboardController@updateHorarios`.
+  * `ClubDashboardController.php`:
+    - Método `updateHorarios`: Valida array de horarios (`dia_semana: 0..6`, `abierto: bool`, `hora_apertura: H:i`, `hora_cierre: H:i`, `duracion_turno_minutos: in:30,60,90,120`).
+    - Valida que `hora_apertura < hora_cierre` para días abiertos.
+    - Ejecuta en `DB::transaction()`: Si `abierto === false`, elimina el registro de `HorarioAtencion` para ese día; si `abierto === true`, realiza `updateOrCreate`.
+    - Retorna lista actualizada de `horarios_atencion` del club.
+  * Tests Backend (`ClubDashboardTest.php`):
+    - `test_club_owner_can_update_weekly_business_hours`: Valida actualización de horarios, creación de nuevos días y eliminación de días cerrados.
+    - `test_non_owner_cannot_update_club_horarios`: Valida protección 403 Forbidden para usuarios ajenos al club.
+    - `test_validates_opening_time_before_closing_time`: Valida error 422 si la hora de apertura es posterior o igual a la de cierre.
+- Frontend Web (Next.js 14):
+  * `app/tenants/[subdomain]/panel/page.tsx`:
+    - Interfaz `HorarioDiaForm` y configuración `DIAS_CONFIG` ordenada de Lunes (1) a Domingo (0).
+    - Mapeo bidireccional entre la respuesta de la API y el estado del formulario en la solapa "🕒 Horarios de Atención".
+    - Tarjetas interactivas para cada día con selector de estado Abierto/Cerrado (switch toggle), selectores de `hora_apertura` y `hora_cierre`, y dropdown de `duracion_turno_minutos` (30, 60, 90, 120 min).
+    - Botones de acción rápida: "⚡ Copiar Lun a Vie", "⚡ Toda la Semana", "🔄 Restablecer".
+    - Guardado transaccional vía `PUT /api/clubs/{subdomain}/horarios` con spinners y notificaciones de éxito/error.
+  * `app/tenants/[subdomain]/admin/page.tsx`: Reexporta `ClubAdminPanel` para consistencia absoluta.
+  * Tests Frontend (`authAndOnboarding.test.tsx`):
+    - `renders and updates weekly business hours in club admin panel`: Test de integración en Vitest que valida navegación a la solapa, visualización de los 7 días ordenados de Lunes a Domingo, uso de presets rápidos, desactivación de días vía switch y envío del payload PUT.
+- Suites de Tests y Verificación:
+  * Backend (PHPUnit): 136 tests pasados al 100% (691 aserciones).
+  * Frontend (Vitest): 37 tests pasados al 100%.
   * Mobile (Jest): 18 tests pasados al 100%.
 ===============================================================================
+

@@ -454,4 +454,93 @@ class ClubDashboardController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Actualizar los horarios de atención semanales del club (abrir/cerrar días, ajustar apertura/cierre y duración).
+     */
+    public function updateHorarios(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if ($user) {
+            $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+            $isAdmin = ($user->role ?? '') === 'admin';
+            if (!$isOwner && !$isAdmin) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes permisos para modificar los horarios de este club.',
+                ], 403);
+            }
+        }
+
+        $validated = $request->validate([
+            'horarios' => 'required|array|min:1|max:7',
+            'horarios.*.dia_semana' => 'required|integer|min:0|max:6',
+            'horarios.*.abierto' => 'required|boolean',
+            'horarios.*.hora_apertura' => 'nullable|required_if:horarios.*.abierto,true|string|max:5',
+            'horarios.*.hora_cierre' => 'nullable|required_if:horarios.*.abierto,true|string|max:5',
+            'horarios.*.duracion_turno_minutos' => 'nullable|integer|in:30,60,90,120',
+        ]);
+
+        // Validación de coherencia de horarios para los días abiertos
+        foreach ($validated['horarios'] as $item) {
+            if (!empty($item['abierto'])) {
+                $apertura = $item['hora_apertura'] ?? '08:00';
+                $cierre = $item['hora_cierre'] ?? '23:00';
+                if ($apertura >= $cierre) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Para el día seleccionado, la hora de apertura ({$apertura}) debe ser anterior a la hora de cierre ({$cierre}).",
+                    ], 422);
+                }
+            }
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($complejo, $validated) {
+            foreach ($validated['horarios'] as $item) {
+                $dia = (int) $item['dia_semana'];
+                $abierto = (bool) $item['abierto'];
+
+                if (!$abierto) {
+                    \App\Models\HorarioAtencion::where('complejo_id', $complejo->id)
+                        ->where('dia_semana', $dia)
+                        ->delete();
+                } else {
+                    \App\Models\HorarioAtencion::updateOrCreate(
+                        [
+                            'complejo_id' => $complejo->id,
+                            'dia_semana' => $dia,
+                        ],
+                        [
+                            'hora_apertura' => $item['hora_apertura'],
+                            'hora_cierre' => $item['hora_cierre'],
+                            'duracion_turno_minutos' => $item['duracion_turno_minutos'] ?? 60,
+                        ]
+                    );
+                }
+            }
+        });
+
+        $horariosActualizados = \App\Models\HorarioAtencion::where('complejo_id', $complejo->id)
+            ->orderBy('dia_semana', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Horarios de atención actualizados exitosamente.',
+            'horarios' => $horariosActualizados,
+        ]);
+    }
 }

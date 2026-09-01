@@ -34,6 +34,14 @@ class ClubCanchaManagementTest extends TestCase
             'deporte_principal' => 'padel',
             'estado' => 'activo',
         ]);
+
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-31 07:00:00', 'America/Argentina/Buenos_Aires'));
+    }
+
+    protected function tearDown(): void
+    {
+        \Carbon\Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_store_cancha_with_sport_aware_attributes_for_padel(): void

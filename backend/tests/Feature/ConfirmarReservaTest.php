@@ -83,10 +83,12 @@ class ConfirmarReservaTest extends TestCase
         ]);
 
         $this->cliente = User::factory()->create(['name' => 'Carlos Gomez', 'email' => 'carlos@example.com']);
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-31 07:00:00', 'America/Argentina/Buenos_Aires'));
     }
 
     protected function tearDown(): void
     {
+        \Carbon\Carbon::setTestNow();
         Redis::flushdb();
         parent::tearDown();
     }

@@ -497,4 +497,97 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
 
     expect(await screen.findByText(/Políticas de cobro de seña y cancelación guardadas exitosamente!/i)).toBeDefined();
   });
+
+  it("renders and updates weekly business hours in club admin panel", async () => {
+    let putHorariosPayload: any = null;
+
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any, options?: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("/horarios") && options?.method === "PUT") {
+        putHorariosPayload = JSON.parse(options.body);
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            message: "Horarios de atención actualizados exitosamente.",
+            horarios: [
+              { id: 1, dia_semana: 1, hora_apertura: "09:00", hora_cierre: "22:00", duracion_turno_minutos: 90 },
+              { id: 2, dia_semana: 2, hora_apertura: "09:00", hora_cierre: "22:00", duracion_turno_minutos: 90 },
+            ],
+          }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Nico Padel",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+              },
+              plan: {
+                id: 1,
+                nombre: "Oro",
+                slug: "oro",
+                modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }],
+              },
+              canchas: [],
+              horarios_atencion: [
+                { id: 1, dia_semana: 1, hora_apertura: "08:00:00", hora_cierre: "23:00:00", duracion_turno_minutos: 60 },
+                { id: 2, dia_semana: 2, hora_apertura: "08:00:00", hora_cierre: "23:00:00", duracion_turno_minutos: 60 },
+              ],
+              stats: { total_canchas: 0, total_turnos: 0, modulos_count: 1 },
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Switch to Horarios tab
+    const horariosTabBtn = await screen.findByRole("button", { name: /Horarios de Atención/i });
+    fireEvent.click(horariosTabBtn);
+
+    expect(await screen.findByText(/Horarios de Atención del Club/i)).toBeDefined();
+    expect(screen.getByText("Lunes")).toBeDefined();
+    expect(screen.getByText("Martes")).toBeDefined();
+    expect(screen.getByText("Miércoles")).toBeDefined();
+    expect(screen.getByText("Jueves")).toBeDefined();
+    expect(screen.getByText("Viernes")).toBeDefined();
+    expect(screen.getByText("Sábado")).toBeDefined();
+    expect(screen.getByText("Domingo")).toBeDefined();
+
+    // Click quick action "⚡ Copiar Lun a Vie"
+    const btnCopiarLunVie = screen.getByRole("button", { name: /⚡ Copiar Lun a Vie/i });
+    fireEvent.click(btnCopiarLunVie);
+    expect(await screen.findByText(/Horario del Lunes copiado a Martes, Miércoles, Jueves y Viernes/i)).toBeDefined();
+
+    // Toggle switch on Sunday to close it
+    const toggleDomingo = screen.getByRole("checkbox", { name: /Estado de atención Domingo/i });
+    fireEvent.click(toggleDomingo);
+
+    // Submit form
+    const saveHorariosBtn = screen.getByRole("button", { name: /Guardar Horarios de Atención/i });
+    fireEvent.click(saveHorariosBtn);
+
+    expect(await screen.findByText(/¡Horarios de atención actualizados exitosamente!/i)).toBeDefined();
+    expect(putHorariosPayload).toBeDefined();
+    expect(putHorariosPayload.horarios).toHaveLength(7);
+  });
 });

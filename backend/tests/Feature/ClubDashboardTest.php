@@ -202,4 +202,117 @@ class ClubDashboardTest extends TestCase
         $response->assertStatus(403)
             ->assertJsonPath('success', false);
     }
+
+    public function test_club_owner_can_update_weekly_business_hours(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Nicolás Dueño',
+            'email' => 'nico@horarios.com',
+        ]);
+
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Nico Pádel Club',
+            'subdominio' => 'nico-horarios-club',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        // Create initial hours for all 7 days
+        for ($d = 0; $d <= 6; $d++) {
+            \App\Models\HorarioAtencion::create([
+                'complejo_id' => $complejo->id,
+                'dia_semana' => $d,
+                'hora_apertura' => '08:00',
+                'hora_cierre' => '23:00',
+                'duracion_turno_minutos' => 60,
+            ]);
+        }
+
+        // Payload: Monday to Friday 09:00 - 22:00 (90 min), Saturday 09:00 - 18:00 (60 min), Sunday Closed
+        $payload = [
+            'horarios' => [
+                ['dia_semana' => 1, 'abierto' => true, 'hora_apertura' => '09:00', 'hora_cierre' => '22:00', 'duracion_turno_minutos' => 90],
+                ['dia_semana' => 2, 'abierto' => true, 'hora_apertura' => '09:00', 'hora_cierre' => '22:00', 'duracion_turno_minutos' => 90],
+                ['dia_semana' => 3, 'abierto' => true, 'hora_apertura' => '09:00', 'hora_cierre' => '22:00', 'duracion_turno_minutos' => 90],
+                ['dia_semana' => 4, 'abierto' => true, 'hora_apertura' => '09:00', 'hora_cierre' => '22:00', 'duracion_turno_minutos' => 90],
+                ['dia_semana' => 5, 'abierto' => true, 'hora_apertura' => '09:00', 'hora_cierre' => '22:00', 'duracion_turno_minutos' => 90],
+                ['dia_semana' => 6, 'abierto' => true, 'hora_apertura' => '09:00', 'hora_cierre' => '18:00', 'duracion_turno_minutos' => 60],
+                ['dia_semana' => 0, 'abierto' => false],
+            ],
+        ];
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-horarios-club/horarios', $payload);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(6, 'horarios');
+
+        // Check DB has Lunes (1) updated
+        $this->assertDatabaseHas('horarios_atencion', [
+            'complejo_id' => $complejo->id,
+            'dia_semana' => 1,
+            'hora_apertura' => '09:00:00',
+            'hora_cierre' => '22:00:00',
+            'duracion_turno_minutos' => 90,
+        ]);
+
+        // Check DB does NOT have Domingo (0)
+        $this->assertDatabaseMissing('horarios_atencion', [
+            'complejo_id' => $complejo->id,
+            'dia_semana' => 0,
+        ]);
+    }
+
+    public function test_non_owner_cannot_update_club_horarios(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner@club.com']);
+        $intruder = User::factory()->create(['email' => 'intruder@club.com']);
+
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Exclusivo',
+            'subdominio' => 'club-exclusivo',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $response = $this->actingAs($intruder, 'sanctum')
+            ->putJson('/api/clubs/club-exclusivo/horarios', [
+                'horarios' => [
+                    ['dia_semana' => 1, 'abierto' => true, 'hora_apertura' => '10:00', 'hora_cierre' => '20:00'],
+                ],
+            ]);
+
+        $response->assertStatus(403)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_validates_opening_time_before_closing_time(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner2@club.com']);
+
+        Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Horas Invalidas',
+            'subdominio' => 'club-invalid',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        // Apertura 22:00 y Cierre 08:00 (Invalido)
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/club-invalid/horarios', [
+                'horarios' => [
+                    ['dia_semana' => 1, 'abierto' => true, 'hora_apertura' => '22:00', 'hora_cierre' => '08:00', 'duracion_turno_minutos' => 60],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false);
+    }
 }

@@ -153,6 +153,25 @@ interface HorarioItem {
   duracion_turno_minutos: number;
 }
 
+interface HorarioDiaForm {
+  dia_semana: number;
+  nombre: string;
+  abierto: boolean;
+  hora_apertura: string;
+  hora_cierre: string;
+  duracion_turno_minutos: number;
+}
+
+const DIAS_CONFIG = [
+  { dia_semana: 1, nombre: "Lunes" },
+  { dia_semana: 2, nombre: "Martes" },
+  { dia_semana: 3, nombre: "Miércoles" },
+  { dia_semana: 4, nombre: "Jueves" },
+  { dia_semana: 5, nombre: "Viernes" },
+  { dia_semana: 6, nombre: "Sábado" },
+  { dia_semana: 0, nombre: "Domingo" },
+];
+
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
@@ -243,6 +262,19 @@ export default function ClubAdminPanel() {
   const [plan, setPlan] = useState<PlanData | null>(null);
   const [canchas, setCanchas] = useState<CanchaItem[]>([]);
   const [horarios, setHorarios] = useState<HorarioItem[]>([]);
+  const [horariosForm, setHorariosForm] = useState<HorarioDiaForm[]>(() =>
+    DIAS_CONFIG.map((d) => ({
+      dia_semana: d.dia_semana,
+      nombre: d.nombre,
+      abierto: true,
+      hora_apertura: "08:00",
+      hora_cierre: "23:00",
+      duracion_turno_minutos: 60,
+    }))
+  );
+  const [isSavingHorarios, setIsSavingHorarios] = useState(false);
+  const [horariosSuccessMsg, setHorariosSuccessMsg] = useState<string | null>(null);
+  const [horariosErrorMsg, setHorariosErrorMsg] = useState<string | null>(null);
   const [stats, setStats] = useState({ total_canchas: 0, total_turnos: 0, modulos_count: 0 });
 
   // Estados para Políticas de Cobro, Seña y Cancelación
@@ -429,7 +461,31 @@ export default function ClubAdminPanel() {
 
       setPlan(data.data.plan);
       setCanchas(canchasList);
-      setHorarios(data.data.horarios_atencion || []);
+      const rawHorarios: HorarioItem[] = data.data.horarios_atencion || [];
+      setHorarios(rawHorarios);
+      setHorariosForm(
+        DIAS_CONFIG.map((d) => {
+          const found = rawHorarios.find((h) => Number(h.dia_semana) === Number(d.dia_semana));
+          if (found) {
+            return {
+              dia_semana: d.dia_semana,
+              nombre: d.nombre,
+              abierto: true,
+              hora_apertura: (found.hora_apertura || "08:00").substring(0, 5),
+              hora_cierre: (found.hora_cierre || "23:00").substring(0, 5),
+              duracion_turno_minutos: Number(found.duracion_turno_minutos) || 60,
+            };
+          }
+          return {
+            dia_semana: d.dia_semana,
+            nombre: d.nombre,
+            abierto: false,
+            hora_apertura: "08:00",
+            hora_cierre: "23:00",
+            duracion_turno_minutos: 60,
+          };
+        })
+      );
       setStats(data.data.stats || { total_canchas: 0, total_turnos: 0, modulos_count: 0 });
     } catch (e: any) {
       setError(e.message || "Error al conectar con el servidor.");
@@ -478,6 +534,110 @@ export default function ClubAdminPanel() {
       setPoliticasErrorMsg(err.message || "Error al guardar.");
     } finally {
       setIsSavingPoliticas(false);
+    }
+  };
+
+  const updateDiaHorario = (dia_semana: number, fields: Partial<HorarioDiaForm>) => {
+    setHorariosForm((prev) =>
+      prev.map((item) => (item.dia_semana === dia_semana ? { ...item, ...fields } : item))
+    );
+  };
+
+  const aplicarLunesAViernes = () => {
+    const lunes = horariosForm.find((h) => h.dia_semana === 1);
+    if (!lunes) return;
+    setHorariosForm((prev) =>
+      prev.map((item) => {
+        if ([2, 3, 4, 5].includes(item.dia_semana)) {
+          return {
+            ...item,
+            abierto: lunes.abierto,
+            hora_apertura: lunes.hora_apertura,
+            hora_cierre: lunes.hora_cierre,
+            duracion_turno_minutos: lunes.duracion_turno_minutos,
+          };
+        }
+        return item;
+      })
+    );
+    setHorariosSuccessMsg("Horario del Lunes copiado a Martes, Miércoles, Jueves y Viernes.");
+  };
+
+  const aplicarTodaLaSemana = () => {
+    const lunes = horariosForm.find((h) => h.dia_semana === 1);
+    if (!lunes) return;
+    setHorariosForm((prev) =>
+      prev.map((item) => ({
+        ...item,
+        abierto: lunes.abierto,
+        hora_apertura: lunes.hora_apertura,
+        hora_cierre: lunes.hora_cierre,
+        duracion_turno_minutos: lunes.duracion_turno_minutos,
+      }))
+    );
+    setHorariosSuccessMsg("Horario del Lunes aplicado a los 7 días de la semana.");
+  };
+
+  const restablecerHorarios = () => {
+    setHorariosForm(
+      DIAS_CONFIG.map((d) => ({
+        dia_semana: d.dia_semana,
+        nombre: d.nombre,
+        abierto: true,
+        hora_apertura: "08:00",
+        hora_cierre: "23:00",
+        duracion_turno_minutos: 60,
+      }))
+    );
+    setHorariosSuccessMsg("Horarios restablecidos a valores estándar (08:00 a 23:00, 60 min).");
+  };
+
+  const handleSaveHorarios = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingHorarios(true);
+    setHorariosSuccessMsg(null);
+    setHorariosErrorMsg(null);
+
+    try {
+      // Validar cada día abierto
+      for (const item of horariosForm) {
+        if (item.abierto) {
+          if (item.hora_apertura >= item.hora_cierre) {
+            throw new Error(`En el día ${item.nombre}, la hora de apertura (${item.hora_apertura}) debe ser anterior a la hora de cierre (${item.hora_cierre}).`);
+          }
+        }
+      }
+
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/horarios`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+        body: JSON.stringify({
+          horarios: horariosForm.map((h) => ({
+            dia_semana: h.dia_semana,
+            abierto: h.abierto,
+            hora_apertura: h.hora_apertura,
+            hora_cierre: h.hora_cierre,
+            duracion_turno_minutos: h.duracion_turno_minutos,
+          })),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Error al actualizar los horarios de atención.");
+      }
+
+      setHorarios(data.horarios || []);
+      setHorariosSuccessMsg("¡Horarios de atención actualizados exitosamente!");
+    } catch (err: any) {
+      setHorariosErrorMsg(err.message || "Ocurrió un error al guardar los horarios.");
+    } finally {
+      setIsSavingHorarios(false);
     }
   };
 
@@ -1644,39 +1804,176 @@ export default function ClubAdminPanel() {
         {/* ========================================================================= */}
         {activeTab === "horarios" && (
           <div className="mt-8 space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">Horarios de Apertura y Cierre</h2>
-              <p className="text-xs text-slate-400">Días configurados para la generación automática de turnos</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Horarios de Atención del Club</h2>
+                <p className="text-xs text-slate-400">
+                  Configura los días y franjas horarias de apertura y cierre para la generación automática de turnos
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={aplicarLunesAViernes}
+                  className="rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 transition flex items-center gap-1.5"
+                  title="Copia la configuración del Lunes a Martes, Miércoles, Jueves y Viernes"
+                >
+                  <span>⚡ Copiar Lun a Vie</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={aplicarTodaLaSemana}
+                  className="rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 transition flex items-center gap-1.5"
+                  title="Aplica la configuración del Lunes a los 7 días de la semana"
+                >
+                  <span>⚡ Toda la Semana</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={restablecerHorarios}
+                  className="rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3 py-2 text-xs font-medium text-slate-400 hover:text-slate-200 transition"
+                  title="Restablece 08:00 a 23:00 para todos los días"
+                >
+                  <span>🔄 Predeterminados</span>
+                </button>
+              </div>
             </div>
 
-            <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-xs uppercase">
-                    <th className="p-4 font-bold">Día de la Semana</th>
-                    <th className="p-4 font-bold">Hora de Apertura</th>
-                    <th className="p-4 font-bold">Hora de Cierre</th>
-                    <th className="p-4 font-bold">Duración por Turno</th>
-                    <th className="p-4 font-bold text-center">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {horarios.map((h) => (
-                    <tr key={h.id} className="hover:bg-slate-800/30">
-                      <td className="p-4 font-bold text-white">{DIAS[h.dia_semana] || "Día"}</td>
-                      <td className="p-4">{h.hora_apertura} hs</td>
-                      <td className="p-4">{h.hora_cierre} hs</td>
-                      <td className="p-4">{h.duracion_turno_minutos} minutos</td>
-                      <td className="p-4 text-center">
-                        <span className="rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2.5 py-0.5">
-                          Abierto
+            {horariosSuccessMsg && (
+              <div role="alert" className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span>✓</span>
+                  <span>{horariosSuccessMsg}</span>
+                </div>
+                <button type="button" onClick={() => setHorariosSuccessMsg(null)} className="text-emerald-400 hover:text-white">✕</button>
+              </div>
+            )}
+
+            {horariosErrorMsg && (
+              <div role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span>⚠️</span>
+                  <span>{horariosErrorMsg}</span>
+                </div>
+                <button type="button" onClick={() => setHorariosErrorMsg(null)} className="text-rose-400 hover:text-white">✕</button>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveHorarios} className="space-y-4">
+              <div className="space-y-3">
+                {horariosForm.map((item) => (
+                  <div
+                    key={item.dia_semana}
+                    className={`rounded-2xl border p-4 sm:p-5 transition flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                      item.abierto
+                        ? "bg-slate-900/90 border-slate-800 hover:border-slate-700"
+                        : "bg-slate-950/40 border-slate-900/80 opacity-75"
+                    }`}
+                  >
+                    {/* Columna Izquierda: Nombre del Día & Switch */}
+                    <div className="flex items-center justify-between md:justify-start gap-4 min-w-[200px]">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">
+                          {item.dia_semana === 0 || item.dia_semana === 6 ? "🏖️" : "📅"}
                         </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white">{item.nombre}</h3>
+                          <p className="text-[11px] text-slate-400">
+                            {item.abierto ? "Turnos habilitados" : "Cerrado al público"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Switch Abierto/Cerrado */}
+                      <label className="relative inline-flex items-center cursor-pointer ml-auto md:ml-2">
+                        <input
+                          type="checkbox"
+                          checked={item.abierto}
+                          onChange={(e) => updateDiaHorario(item.dia_semana, { abierto: e.target.checked })}
+                          className="sr-only peer"
+                          aria-label={`Estado de atención ${item.nombre}`}
+                        />
+                        <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                        <span className="ml-2 text-xs font-semibold text-slate-300 hidden sm:inline">
+                          {item.abierto ? "Abierto" : "Cerrado"}
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Columna Derecha: Horas & Duración */}
+                    {item.abierto ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 max-w-xl">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                            Hora Apertura
+                          </label>
+                          <input
+                            type="time"
+                            value={item.hora_apertura}
+                            onChange={(e) => updateDiaHorario(item.dia_semana, { hora_apertura: e.target.value })}
+                            required={item.abierto}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs font-bold text-white focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                            Hora Cierre
+                          </label>
+                          <input
+                            type="time"
+                            value={item.hora_cierre}
+                            onChange={(e) => updateDiaHorario(item.dia_semana, { hora_cierre: e.target.value })}
+                            required={item.abierto}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs font-bold text-white focus:border-emerald-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                            Duración Base
+                          </label>
+                          <select
+                            value={item.duracion_turno_minutos}
+                            onChange={(e) => updateDiaHorario(item.dia_semana, { duracion_turno_minutos: Number(e.target.value) })}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs font-bold text-white focus:border-emerald-500 focus:outline-none"
+                          >
+                            <option value={30}>30 min</option>
+                            <option value={60}>60 min (1 hora)</option>
+                            <option value={90}>90 min (1h 30m)</option>
+                            <option value={120}>120 min (2 horas)</option>
+                          </select>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 py-2 text-xs text-slate-500 italic">
+                        <span>🚫 No se generarán turnos públicos ni reservas para este día.</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Botón Guardar */}
+              <div className="pt-4 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isSavingHorarios}
+                  className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-6 py-3.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition flex items-center gap-2"
+                >
+                  {isSavingHorarios ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <span>Guardando Horarios...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>💾 Guardar Horarios de Atención</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 

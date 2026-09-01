@@ -11,6 +11,8 @@ describe("Componente Reactivo GrillaHoraria", () => {
   ];
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-01T07:00:00"));
     vi.resetAllMocks();
     localStorage.clear();
     global.fetch = vi.fn().mockImplementation(() =>
@@ -23,6 +25,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 

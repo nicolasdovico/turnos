@@ -56,6 +56,9 @@ class DisponibilidadServiceTest extends TestCase
             'estado' => 'activo',
         ]);
 
+        // Set deterministic test time
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-31 07:00:00', 'America/Argentina/Buenos_Aires'));
+
         // Monday schedule: 08:00 to 12:00, 60-minute duration (Slots: 08:00, 09:00, 10:00, 11:00)
         HorarioAtencion::create([
             'dia_semana' => 1, // Lunes
@@ -67,6 +70,7 @@ class DisponibilidadServiceTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Carbon\Carbon::setTestNow();
         Redis::flushdb();
         parent::tearDown();
     }

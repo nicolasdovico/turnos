@@ -69,10 +69,13 @@ class AtomicLockTest extends TestCase
 
         $this->userA = User::factory()->create(['name' => 'Usuario A', 'email' => 'a@example.com']);
         $this->userB = User::factory()->create(['name' => 'Usuario B', 'email' => 'b@example.com']);
+
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-09-01 07:00:00', 'America/Argentina/Buenos_Aires'));
     }
 
     protected function tearDown(): void
     {
+        \Carbon\Carbon::setTestNow();
         Redis::flushdb();
         parent::tearDown();
     }
