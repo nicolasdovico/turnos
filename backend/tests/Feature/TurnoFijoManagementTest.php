@@ -423,4 +423,66 @@ class TurnoFijoManagementTest extends TestCase
         $this->assertCount(1, $data);
         $this->assertEquals('Gonzalo Higuain', $data[0]['name']);
     }
+
+    public function test_register_payment_updates_disponibilidad_occupied_turnos_status_to_pagado(): void
+    {
+        // 1. Create a regular reserved turno (pending payment)
+        $turno = Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'fecha' => '2026-09-01',
+            'hora_inicio' => '11:00',
+            'hora_fin' => '12:30',
+            'precio' => 8000,
+            'cliente_nombre' => 'Cliente Presencial Mostrador',
+            'cliente_telefono' => '1133445566',
+            'metodo_pago' => 'mostrador',
+            'estado_pago' => 'pendiente',
+            'monto_pagado' => 0,
+            'saldo_pendiente' => 8000,
+            'estado' => 'reservado',
+            'es_fijo' => false,
+        ]);
+
+        // 2. Query disponibilidad before payment: should be 'pendiente'
+        $dispBefore = $this->actingAs($this->owner, 'sanctum')
+            ->getJson("/api/canchas/{$this->cancha->id}/disponibilidad?fecha=2026-09-01", [
+                'X-Tenant-ID' => $this->complejo->subdominio,
+            ]);
+
+        $dispBefore->assertStatus(200);
+        $ocupadosBefore = $dispBefore->json('turnos_ocupados');
+        $turnoBefore = collect($ocupadosBefore)->firstWhere('id', $turno->id);
+        $this->assertNotNull($turnoBefore);
+        $this->assertEquals('pendiente', $turnoBefore['estado_pago']);
+
+        // 3. Register full payment at the desk
+        $payResponse = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos/{$turno->id}/registrar-pago", [
+                'metodo_pago' => 'mostrador',
+                'monto' => 8000,
+            ]);
+
+        $payResponse->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'estado_pago' => 'pagado',
+                'monto_pagado' => 8000,
+                'saldo_pendiente' => 0,
+            ]);
+
+        // 4. Query disponibilidad after payment: must return 'pagado' and saldo_pendiente = 0
+        $dispAfter = $this->actingAs($this->owner, 'sanctum')
+            ->getJson("/api/canchas/{$this->cancha->id}/disponibilidad?fecha=2026-09-01", [
+                'X-Tenant-ID' => $this->complejo->subdominio,
+            ]);
+
+        $dispAfter->assertStatus(200);
+        $ocupadosAfter = $dispAfter->json('turnos_ocupados');
+        $turnoAfter = collect($ocupadosAfter)->firstWhere('id', $turno->id);
+        $this->assertNotNull($turnoAfter);
+        $this->assertEquals('pagado', $turnoAfter['estado_pago']);
+        $this->assertEquals(8000, $turnoAfter['monto_pagado']);
+        $this->assertEquals(0, $turnoAfter['saldo_pendiente']);
+    }
 }

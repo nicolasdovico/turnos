@@ -1045,4 +1045,89 @@ describe("Componente Reactivo GrillaHoraria", () => {
       );
     });
   });
+
+  it("actualiza el estado a Pagado y oculta el botón Cobrar tras confirmar el cobro en mostrador", async () => {
+    const regularTurno = {
+      id: 88,
+      cancha_id: 1,
+      fecha: "2026-09-01",
+      hora_inicio: "11:00",
+      hora_fin: "12:30",
+      precio: 8000,
+      monto_pagado: 0,
+      saldo_pendiente: 8000,
+      cliente_nombre: "Cliente Presencial",
+      cliente_telefono: "1122334455",
+      es_fijo: false,
+      estado: "reservado",
+      estado_pago: "pendiente",
+      metodo_pago: "mostrador",
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/turnos/88/registrar-pago")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              turno_id: 88,
+              metodo_pago: "mostrador",
+              monto_pagado: 8000,
+              saldo_pendiente: 0,
+              estado_pago: "pagado",
+            }),
+        });
+      }
+      if (urlStr.includes("/canchas/1/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              cancha_id: 1,
+              fecha: "2026-09-01",
+              turnos_ocupados: [regularTurno],
+              slots: [],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    expect(await screen.findByText("Cliente Presencial")).toBeDefined();
+    expect(screen.getByText(/⏳ Pendiente/i)).toBeDefined();
+    const btnCobrar = screen.getByRole("button", { name: /Cobrar/i });
+    expect(btnCobrar).toBeDefined();
+
+    // Abrir modal y confirmar cobro
+    fireEvent.click(btnCobrar);
+    expect(await screen.findByText(/Registrar Cobro de Turno/i)).toBeDefined();
+
+    const btnConfirmarCobro = screen.getByRole("button", { name: /Confirmar Cobro/i });
+    fireEvent.click(btnConfirmarCobro);
+
+    // Debe reflejarse inmediatamente el estado ✓ Pagado y ocultarse el botón de Cobrar
+    await waitFor(() => {
+      expect(screen.getByText(/✓ Pagado/i)).toBeDefined();
+      expect(screen.queryByRole("button", { name: /Cobrar/i })).toBeNull();
+    });
+  });
 });

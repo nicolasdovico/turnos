@@ -85,6 +85,7 @@ export interface TurnoOcupado {
   metodo_pago?: string;
   estado_pago?: string;
   monto_pagado?: number;
+  saldo_pendiente?: number;
   estado: string;
   es_fijo?: boolean;
   cliente_id?: number | null;
@@ -493,6 +494,8 @@ export default function GrillaHoraria({
   const handleRegistrarPago = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!turnoToPay) return;
+    const targetTurno = turnoToPay;
+    const montoCobrado = pagoMonto ? parseFloat(pagoMonto) : (targetTurno.saldo_pendiente ?? targetTurno.precio);
     try {
       setIsProcessingPago(true);
       const token = getAuthToken(propToken);
@@ -503,12 +506,12 @@ export default function GrillaHoraria({
       };
       if (subdomain) headers["X-Tenant-ID"] = subdomain;
 
-      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/turnos/${turnoToPay.id}/registrar-pago`, {
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/turnos/${targetTurno.id}/registrar-pago`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           metodo_pago: pagoMetodo,
-          monto: pagoMonto ? parseFloat(pagoMonto) : turnoToPay.precio,
+          monto: montoCobrado,
           estado_pago: "pagado",
         }),
       });
@@ -518,10 +521,26 @@ export default function GrillaHoraria({
         throw new Error(data.message || "Error al registrar el pago.");
       }
 
+      // Actualización optimista inmediata en la grilla
+      setTurnosOcupados((prev) =>
+        prev.map((t) =>
+          t.id === targetTurno.id
+            ? {
+                ...t,
+                estado_pago: data.estado_pago || "pagado",
+                estado: "pagado",
+                monto_pagado: data.monto_pagado !== undefined ? data.monto_pagado : targetTurno.precio,
+                saldo_pendiente: data.saldo_pendiente !== undefined ? data.saldo_pendiente : 0,
+                metodo_pago: pagoMetodo,
+              }
+            : t
+        )
+      );
+
       addToast("success", `¡Pago registrado exitosamente con ${pagoMetodo.toUpperCase()}!`);
       setTurnoToPay(null);
       setPagoMonto("");
-      fetchDisponibilidad(fecha);
+      await fetchDisponibilidad(fecha);
       fetchWalletBalance();
     } catch (err: any) {
       addToast("error", err.message || "Error al registrar el pago.");
@@ -1588,7 +1607,18 @@ export default function GrillaHoraria({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {turnosOcupados.map((turno) => {
                 const isFixed = Boolean(turno.es_fijo);
-                const isPagado = turno.estado_pago === "pagado" || turno.estado === "pagado" || turno.estado === "completado";
+                const isPagado =
+                  turno.estado_pago === "pagado" ||
+                  turno.estado_pago === "pagado_total" ||
+                  turno.estado === "pagado" ||
+                  turno.estado === "completado" ||
+                  (turno.saldo_pendiente !== undefined && turno.saldo_pendiente <= 0 && (turno.monto_pagado || 0) > 0);
+
+                const isSenado =
+                  !isPagado &&
+                  (turno.estado_pago === "senado" ||
+                    turno.estado_pago === "sena_pagada" ||
+                    ((turno.monto_pagado || 0) > 0 && (turno.saldo_pendiente || 0) > 0));
 
                 return (
                   <div
@@ -1615,10 +1645,12 @@ export default function GrillaHoraria({
                             className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
                               isPagado
                                 ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                : isSenado
+                                ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
                                 : "bg-amber-500/15 text-amber-400 border-amber-500/30"
                             }`}
                           >
-                            {isPagado ? "✓ Pagado" : "⏳ Pendiente"}
+                            {isPagado ? "✓ Pagado" : isSenado ? "💳 Seña Pagada" : "⏳ Pendiente"}
                           </span>
                         </div>
                       </div>
@@ -1676,20 +1708,33 @@ export default function GrillaHoraria({
                     </div>
 
                     <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
-                      <span className="font-bold text-emerald-400 font-mono text-sm">
-                        ${turno.precio ? turno.precio.toLocaleString() : "0"}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-emerald-400 font-mono text-sm">
+                          ${turno.precio ? turno.precio.toLocaleString() : "0"}
+                        </span>
+                        {isSenado && turno.saldo_pendiente !== undefined && (
+                          <span className="text-[10px] text-amber-400 font-mono">
+                            Resta: ${turno.saldo_pendiente.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1.5">
                         {!isPagado && (
                           <button
                             type="button"
                             onClick={() => {
                               setTurnoToPay(turno);
-                              setPagoMonto(turno.precio ? String(turno.precio) : "");
+                              setPagoMonto(
+                                turno.saldo_pendiente !== undefined && turno.saldo_pendiente > 0
+                                  ? String(turno.saldo_pendiente)
+                                  : turno.precio
+                                  ? String(turno.precio)
+                                  : ""
+                              );
                             }}
                             className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 text-[11px] font-bold transition flex items-center gap-1"
                           >
-                            <span>💵</span> Cobrar
+                            <span>💵</span> {isSenado ? "Cobrar Saldo" : "Cobrar"}
                           </button>
                         )}
                         <button
@@ -1833,15 +1878,27 @@ export default function GrillaHoraria({
             </div>
 
             <form onSubmit={handleRegistrarPago} className="space-y-4 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
                 <div className="flex justify-between text-slate-400">
                   <span>Titular:</span>
                   <span className="font-bold text-white">{turnoToPay.cliente_nombre || "Cliente Mostrador"}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Precio Acordado:</span>
-                  <span className="font-bold text-emerald-400 font-mono">${turnoToPay.precio?.toLocaleString()}</span>
+                  <span className="font-bold text-slate-200 font-mono">${turnoToPay.precio?.toLocaleString()}</span>
                 </div>
+                {turnoToPay.monto_pagado !== undefined && turnoToPay.monto_pagado > 0 && (
+                  <div className="flex justify-between text-emerald-400">
+                    <span>Seña Ya Pagada:</span>
+                    <span className="font-bold font-mono">-${turnoToPay.monto_pagado.toLocaleString()}</span>
+                  </div>
+                )}
+                {turnoToPay.saldo_pendiente !== undefined && turnoToPay.saldo_pendiente > 0 && (
+                  <div className="flex justify-between text-amber-400 font-bold border-t border-slate-800/80 pt-1">
+                    <span>Saldo Restante a Cobrar:</span>
+                    <span className="font-mono">${turnoToPay.saldo_pendiente.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1880,7 +1937,7 @@ export default function GrillaHoraria({
                   value={pagoMonto}
                   onChange={(e) => setPagoMonto(e.target.value)}
                   className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none"
-                  placeholder={String(turnoToPay.precio || 0)}
+                  placeholder={String(turnoToPay.saldo_pendiente !== undefined && turnoToPay.saldo_pendiente > 0 ? turnoToPay.saldo_pendiente : turnoToPay.precio || 0)}
                   min="0"
                   step="100"
                 />

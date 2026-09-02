@@ -1095,12 +1095,28 @@ class ClubDashboardController extends Controller
         $validated = $request->validate([
             'metodo_pago' => 'required|string|in:mostrador,transferencia,billetera,online',
             'monto' => 'nullable|numeric|min:0',
-            'estado_pago' => 'nullable|string|in:pagado,sena_pagada,pendiente',
+            'estado_pago' => 'nullable|string|in:pagado,pagado_total,sena_pagada,senado,pendiente',
         ]);
 
-        $monto = isset($validated['monto']) ? (float) $validated['monto'] : (float) $turno->precio;
+        $precioTurno = (float) $turno->precio;
+        $montoCobrado = isset($validated['monto']) ? (float) $validated['monto'] : $precioTurno;
         $metodoPago = $validated['metodo_pago'];
-        $estadoPago = $validated['estado_pago'] ?? 'pagado';
+
+        $montoPagadoAnterior = (float) ($turno->monto_pagado ?? 0);
+
+        // Si el monto cobrado es igual o mayor al precio total del turno
+        if ($montoCobrado >= $precioTurno) {
+            $montoPagadoTotal = $montoCobrado;
+        } else {
+            // Si el cobro es parcial o acumulado
+            $montoPagadoTotal = min($precioTurno, $montoPagadoAnterior + $montoCobrado);
+        }
+
+        $saldoPendiente = max(0.0, round($precioTurno - $montoPagadoTotal, 2));
+        $estadoPago = $validated['estado_pago'] ?? ($saldoPendiente <= 0 ? 'pagado' : 'senado');
+        if ($saldoPendiente <= 0 && $estadoPago === 'senado') {
+            $estadoPago = 'pagado';
+        }
 
         if ($metodoPago === 'billetera') {
             if (!$turno->cliente_id) {
@@ -1113,7 +1129,7 @@ class ClubDashboardController extends Controller
             $debitado = $this->walletService->debitar(
                 $turno->cliente_id,
                 $complejo->id,
-                $monto,
+                $montoCobrado,
                 'pago_turno',
                 $turno->id,
                 "Pago de turno {$turno->fecha} {$turno->hora_inicio}"
@@ -1129,10 +1145,10 @@ class ClubDashboardController extends Controller
 
         $turno->update([
             'metodo_pago' => $metodoPago,
-            'monto_pagado' => $monto,
-            'saldo_pendiente' => max(0, (float) $turno->precio - $monto),
+            'monto_pagado' => $montoPagadoTotal,
+            'saldo_pendiente' => $saldoPendiente,
             'estado_pago' => $estadoPago,
-            'estado' => 'confirmado',
+            'estado' => $estadoPago === 'pagado' ? 'pagado' : 'confirmado',
         ]);
 
         return response()->json([
@@ -1141,6 +1157,7 @@ class ClubDashboardController extends Controller
             'turno_id' => $turno->id,
             'metodo_pago' => $turno->metodo_pago,
             'monto_pagado' => (float) $turno->monto_pagado,
+            'saldo_pendiente' => (float) $turno->saldo_pendiente,
             'estado_pago' => $turno->estado_pago,
         ]);
     }
