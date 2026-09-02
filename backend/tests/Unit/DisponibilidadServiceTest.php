@@ -352,4 +352,81 @@ class DisponibilidadServiceTest extends TestCase
 
         \Carbon\Carbon::setTestNow();
     }
+
+    /**
+     * Test Anti-Baches gap calculation formats reasons with correct local timezone times (e.g. 08:00 not 11:00 UTC).
+     */
+    public function test_optimizacion_anti_baches_formatea_motivos_con_timezone_local_correcto(): void
+    {
+        $this->complejo->update(['timezone' => 'America/Argentina/Buenos_Aires']);
+        $this->cancha->update([
+            'permite_duracion_flexible' => true,
+            'anti_baches_activo' => true,
+            'duracion_minutos' => 60,
+        ]);
+
+        // Schedule: 08:00 to 23:00
+        HorarioAtencion::where('complejo_id', $this->complejo->id)->where('dia_semana', 1)->delete();
+        HorarioAtencion::create([
+            'complejo_id' => $this->complejo->id,
+            'dia_semana' => 1, // Lunes
+            'hora_apertura' => '08:00',
+            'hora_cierre' => '23:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        // Occupied Turno at 11:00 to 12:00 and 19:00 to 20:00
+        Turno::create([
+            'cancha_id' => $this->cancha->id,
+            'fecha' => $this->fechaLunes,
+            'hora_inicio' => '11:00',
+            'hora_fin' => '12:00',
+            'precio' => 12000.00,
+            'estado' => 'reservado',
+        ]);
+
+        Turno::create([
+            'cancha_id' => $this->cancha->id,
+            'fecha' => $this->fechaLunes,
+            'hora_inicio' => '19:00',
+            'hora_fin' => '20:00',
+            'precio' => 12000.00,
+            'estado' => 'reservado',
+        ]);
+
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-08-31 07:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $res = $this->service->obtenerDisponibilidadCompleta($this->cancha->id, $this->fechaLunes, 60, true);
+
+        $this->assertTrue($res['optimizacion_anti_baches']['activa']);
+        $horariosProtegidos = $res['optimizacion_anti_baches']['horarios_protegidos'];
+
+        $this->assertNotEmpty($horariosProtegidos);
+
+        // Verify slot 08:30 has correct opening gap (08:00 a 08:30), not UTC shifted (11:00 a 08:30)
+        $prot0830 = collect($horariosProtegidos)->firstWhere('hora_inicio', '08:30');
+        $this->assertNotNull($prot0830);
+        $this->assertStringContainsString('08:00 a 08:30', $prot0830['motivo']);
+        $this->assertStringNotContainsString('11:00 a 08:30', $prot0830['motivo']);
+
+        // Verify slot 09:30 has correct next-turno gap (10:30 a 11:00), not UTC shifted (10:30 a 14:00)
+        $prot0930 = collect($horariosProtegidos)->firstWhere('hora_inicio', '09:30');
+        $this->assertNotNull($prot0930);
+        $this->assertStringContainsString('10:30 a 11:00', $prot0930['motivo']);
+        $this->assertStringNotContainsString('10:30 a 14:00', $prot0930['motivo']);
+
+        // Verify slot 12:30 has correct prev-turno gap (12:00 a 12:30), not UTC shifted (15:00 a 12:30)
+        $prot1230 = collect($horariosProtegidos)->firstWhere('hora_inicio', '12:30');
+        $this->assertNotNull($prot1230);
+        $this->assertStringContainsString('12:00 a 12:30', $prot1230['motivo']);
+        $this->assertStringNotContainsString('15:00 a 12:30', $prot1230['motivo']);
+
+        // Verify slot 17:30 has correct next-turno gap (18:30 a 19:00), not UTC shifted (18:30 a 22:00)
+        $prot1730 = collect($horariosProtegidos)->firstWhere('hora_inicio', '17:30');
+        $this->assertNotNull($prot1730);
+        $this->assertStringContainsString('18:30 a 19:00', $prot1730['motivo']);
+        $this->assertStringNotContainsString('18:30 a 22:00', $prot1730['motivo']);
+
+        \Carbon\Carbon::setTestNow();
+    }
 }

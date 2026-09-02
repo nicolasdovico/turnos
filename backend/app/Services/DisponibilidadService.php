@@ -199,11 +199,26 @@ class DisponibilidadService
                 $dejaBache = false;
                 $motivoBache = null;
 
-                if ($cancha->permite_duracion_flexible && $antiBachesActivo && $turnosOcupados->isNotEmpty()) {
+                if ($cancha->permite_duracion_flexible && $antiBachesActivo) {
+                    // Combinar turnos ocupados en DB y bloqueos activos de Redis como intervalos ocupados
+                    $occupiedIntervals = [];
+                    foreach ($turnosOcupados as $t) {
+                        $occupiedIntervals[] = [
+                            'startTs' => Carbon::parse($fecha . ' ' . $t->hora_inicio, $timezone)->timestamp,
+                            'endTs' => Carbon::parse($fecha . ' ' . $t->hora_fin, $timezone)->timestamp,
+                        ];
+                    }
+                    foreach ($activeLocks as $lock) {
+                        $occupiedIntervals[] = [
+                            'startTs' => Carbon::parse($fecha . ' ' . $lock['hora_inicio'], $timezone)->timestamp,
+                            'endTs' => Carbon::parse($fecha . ' ' . $lock['hora_fin'], $timezone)->timestamp,
+                        ];
+                    }
+
                     // Espacio hacia el próximo turno ocupado o cierre
                     $proximoTurnoTs = $horaCierre->timestamp;
-                    foreach ($turnosOcupados as $t) {
-                        $tInicio = Carbon::parse($fecha . ' ' . $t->hora_inicio, $timezone)->timestamp;
+                    foreach ($occupiedIntervals as $interval) {
+                        $tInicio = $interval['startTs'];
                         if ($tInicio >= $endTs && $tInicio < $proximoTurnoTs) {
                             $proximoTurnoTs = $tInicio;
                         }
@@ -212,8 +227,8 @@ class DisponibilidadService
 
                     // Espacio desde el turno ocupado anterior o apertura
                     $anteriorTurnoFinTs = $horaApertura->timestamp;
-                    foreach ($turnosOcupados as $t) {
-                        $tFin = Carbon::parse($fecha . ' ' . $t->hora_fin, $timezone)->timestamp;
+                    foreach ($occupiedIntervals as $interval) {
+                        $tFin = $interval['endTs'];
                         if ($tFin <= $startTs && $tFin > $anteriorTurnoFinTs) {
                             $anteriorTurnoFinTs = $tFin;
                         }
@@ -222,11 +237,11 @@ class DisponibilidadService
 
                     if ($gapAfterMinutos > 0 && $gapAfterMinutos < 60) {
                         $dejaBache = true;
-                        $horaProxima = Carbon::createFromTimestamp($proximoTurnoTs)->format('H:i');
+                        $horaProxima = Carbon::createFromTimestamp($proximoTurnoTs, $timezone)->format('H:i');
                         $motivoBache = "Dejaría un hueco muerto de {$gapAfterMinutos} min ({$horaFinFormatted} a {$horaProxima})";
                     } elseif ($gapBeforeMinutos > 0 && $gapBeforeMinutos < 60) {
                         $dejaBache = true;
-                        $horaAnterior = Carbon::createFromTimestamp($anteriorTurnoFinTs)->format('H:i');
+                        $horaAnterior = Carbon::createFromTimestamp($anteriorTurnoFinTs, $timezone)->format('H:i');
                         $motivoBache = "Dejaría un hueco muerto de {$gapBeforeMinutos} min ({$horaAnterior} a {$horaInicioFormatted})";
                     }
                 }
