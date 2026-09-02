@@ -995,14 +995,17 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Revalidación en segundo plano cada 30 segundos (`silent = true`) sin activar spinners bloqueantes.
     - Revalidación instantánea al recuperar foco de ventana / pestaña (`window.onfocus` y `document.visibilitychange`).
     - Detección de nuevos turnos ocupados (`incomingTurnos` vs `turnosOcupadosRef`).
-    - Alerta visual flotante con Toast informativa (`🔔 Nueva Reserva: [Cliente] en [Cancha] ([Hora])`).
+    - Alerta visual flotante con Toast informativa (`🔔 Nueva Reserva: [Cliente] en [Cancha] ([Hora])`) con duración visible de 10 segundos.
+    - **Pausa Inteligente de Visibilidad (`Page Visibility API`):** Las alertas que ingresan mientras la pestaña está en segundo plano o minimizada congelan su temporizador y comienzan la cuenta regresiva de 10 segundos únicamente cuando el usuario enfoca y visualiza la pantalla.
     - Notificación sonora sintetizada con Web Audio API (`playChime()` bifónica armónica E5 -> A5) sin dependencias de archivos externos ni latencia.
   * `frontend/app/tenants/[subdomain]/panel/page.tsx`:
     - Polling silencioso de métricas de club, turnos fijos y estado de canchas cada 30 segundos y al cambiar de pestaña.
   * Suite de Tests Automatizados:
-    - `frontend/tests/GrillaHoraria.test.tsx`: nuevo test `emite alerta toast con icono de campana cuando detecta un nuevo turno reservado durante el polling silencioso en modo admin`.
+    - `frontend/tests/GrillaHoraria.test.tsx`:
+      * `emite alerta toast con icono de campana cuando detecta un nuevo turno reservado durante el polling silencioso en modo admin`.
+      * `pausa el temporizador de alerta toast cuando la pestaña está oculta y no lo descarta hasta que vuelve a ser visible`.
 - Verificación de Calidad:
-  * Suite Frontend (Vitest): 42 tests pasados al 100%.
+  * Suite Frontend (Vitest): 43 tests pasados al 100%.
   * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
 ===============================================================================
 

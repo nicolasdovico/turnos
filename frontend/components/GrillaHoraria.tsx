@@ -161,6 +161,9 @@ export default function GrillaHoraria({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const turnosOcupadosRef = useRef<TurnoOcupado[]>([]);
   const hasLoadedInitialRef = useRef<boolean>(false);
+  const toastTimersRef = useRef<
+    Map<number, { timerId: NodeJS.Timeout | null; remainingMs: number; startTs: number }>
+  >(new Map());
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
@@ -331,15 +334,40 @@ export default function GrillaHoraria({
     }
   };
 
-  const addToast = (type: "error" | "success" | "warning" | "info", text: string) => {
+  const addToast = (
+    type: "error" | "success" | "warning" | "info",
+    text: string,
+    durationMs: number = 10000
+  ) => {
     const newToast: ToastMessage = { id: Date.now() + Math.random(), type, text };
     setToasts((prev) => [...prev, newToast]);
-    setTimeout(() => {
-      removeToast(newToast.id);
-    }, 6000);
+
+    const isVisible = typeof document === "undefined" || document.visibilityState === "visible";
+    if (isVisible) {
+      const timerId = setTimeout(() => {
+        removeToast(newToast.id);
+      }, durationMs);
+      toastTimersRef.current.set(newToast.id, {
+        timerId,
+        remainingMs: durationMs,
+        startTs: Date.now(),
+      });
+    } else {
+      // Tab is currently hidden/in background: preserve full durationMs and do NOT start timer yet
+      toastTimersRef.current.set(newToast.id, {
+        timerId: null,
+        remainingMs: durationMs,
+        startTs: 0,
+      });
+    }
   };
 
   const removeToast = (id: number) => {
+    const entry = toastTimersRef.current.get(id);
+    if (entry && entry.timerId) {
+      clearTimeout(entry.timerId);
+    }
+    toastTimersRef.current.delete(id);
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
@@ -744,6 +772,53 @@ export default function GrillaHoraria({
       document.removeEventListener("visibilitychange", onWindowFocus);
     };
   }, [fecha, canchaId, duracion]);
+
+  // Smart Visibility Toast Manager: Pauses countdown when tab is hidden, resumes when visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (typeof document === "undefined") return;
+      const isVisible = document.visibilityState === "visible";
+      const now = Date.now();
+
+      if (isVisible) {
+        // Resume countdown for all paused toasts with their remainingMs
+        toastTimersRef.current.forEach((entry, id) => {
+          if (!entry.timerId && entry.remainingMs > 0) {
+            const timerId = setTimeout(() => {
+              removeToast(id);
+            }, entry.remainingMs);
+            entry.timerId = timerId;
+            entry.startTs = now;
+          }
+        });
+      } else {
+        // Pause all running toast timers and preserve remaining time
+        toastTimersRef.current.forEach((entry) => {
+          if (entry.timerId) {
+            clearTimeout(entry.timerId);
+            entry.timerId = null;
+            if (entry.startTs > 0) {
+              const elapsed = now - entry.startTs;
+              entry.remainingMs = Math.max(1000, entry.remainingMs - elapsed);
+              entry.startTs = 0;
+            }
+          }
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+      toastTimersRef.current.forEach((entry) => {
+        if (entry.timerId) clearTimeout(entry.timerId);
+      });
+      toastTimersRef.current.clear();
+    };
+  }, []);
 
   // Master visual countdown timer for all active and retained locks
   useEffect(() => {

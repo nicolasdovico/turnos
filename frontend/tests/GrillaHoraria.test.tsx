@@ -1197,4 +1197,91 @@ describe("Componente Reactivo GrillaHoraria", () => {
       ).toBeDefined();
     });
   });
+
+  it("pausa el temporizador de alerta toast cuando la pestaña está oculta y no lo descarta hasta que vuelve a ser visible", async () => {
+    // Mock document.visibilityState to 'hidden'
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "hidden",
+    });
+
+    let currentTurnos: any[] = [];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/canchas/1/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              cancha_id: 1,
+              fecha: "2026-09-01",
+              turnos_ocupados: currentTurnos,
+              slots: [],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    // New booking arrives in database while user was away
+    currentTurnos = [
+      {
+        id: 777,
+        cancha_id: 1,
+        fecha: "2026-09-01",
+        hora_inicio: "18:00",
+        hora_fin: "19:30",
+        precio: 14000,
+        cliente_nombre: "Marcos Rojo",
+        estado: "reservado",
+        estado_pago: "pagado",
+      },
+    ];
+
+    // User switches back to the tab -> visibility becomes 'visible'
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
+    fireEvent(document, new Event("visibilitychange"));
+    fireEvent(window, new Event("focus"));
+
+    // Toast alert with bell and player details appears and starts 10s countdown
+    expect(
+      await screen.findByText(/🔔 Nueva Reserva: Marcos Rojo en Cancha Central \(18:00 a 19:30 hs\)/i)
+    ).toBeDefined();
+
+    // Now user switches away to another tab
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "hidden",
+    });
+    fireEvent(document, new Event("visibilitychange"));
+
+    // Toast remains preserved and does not prematurely expire while away
+    expect(
+      screen.getByText(/🔔 Nueva Reserva: Marcos Rojo en Cancha Central \(18:00 a 19:30 hs\)/i)
+    ).toBeDefined();
+  });
 });
