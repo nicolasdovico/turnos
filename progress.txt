@@ -1007,5 +1007,27 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Suite Frontend (Vitest): 43 tests pasados al 100%.
   * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
+-------------------------------------------------------------------------------
+[2026-09-02] - CORRECCIÓN DE ESTADO DE PAGO PENDIENTE PARA RESERVAS CON PAGO EN MOSTRADOR
+-------------------------------------------------------------------------------
+- Diagnóstico y Causa Raíz:
+  * Al realizar una reserva como jugador/visitante eligiendo *"Pagar en el Club / Mostrador"*, el estado React inicial de `metodoPago` conservaba `"simulador_dev"`, lo cual provocaba que el backend calculara una simulación de cobro al 100% y marcara el turno como `pagado_total`.
+  * Adicionalmente, `DisponibilidadService.php` evaluaba `$t->saldo_pendiente ?? 0` (retornando 0 si el valor era `null`), y `GrillaHoraria.tsx` marcaba como pagados turnos con monto pagado nulo.
+- Solución Implementada:
+  * `backend/app/Http/Controllers/Api/TurnoConfirmarController.php`:
+    - Distinción estricta de contexto: en reservas online de jugadores/visitantes con método `"mostrador"`, `"pendiente"` o `"transferencia"`, `monto_pagado` es `0.0`, `saldo_pendiente` es el 100% del precio y `estado_pago` se fija en `'pendiente'`.
+    - Solo en reservas creadas directamente por el administrador del club con método `"mostrador"` se asume cobro inmediato en caja física.
+  * `backend/app/Services/DisponibilidadService.php`:
+    - Cálculo robusto de `saldo_pendiente`: si es `null` en DB, se computa dinámicamente como `$precio - $montoPagado`.
+    - Asignación precisa de `estado_pago`: `'pendiente'` cuando `monto_pagado === 0.0`.
+  * `frontend/components/GrillaHoraria.tsx`:
+    - Inicialización de `metodoPago` en `"mostrador"` para jugadores y reset automático al abrir el modal de confirmación.
+    - Condición `isPagado` reforzada: exige estrictamente `monto_pagado > 0` y `saldo_pendiente <= 0`.
+    - Muestra claramente la insignia **`⏳ Pendiente`** y el botón **`💵 Cobrar`** para el mostrador.
+  * Suite de Tests Automatizados:
+    - `frontend/tests/GrillaHoraria.test.tsx`: nuevo test `muestra como ⏳ Pendiente y con botón 💵 Cobrar un turno reservado online con opción Pagar en el Club`.
+- Verificación de Calidad:
+  * Suite Frontend (Vitest): 44 tests pasados al 100%.
+  * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
 ===============================================================================
 

@@ -180,7 +180,7 @@ export default function GrillaHoraria({
   const otpTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>("");
   const [clienteTelefono, setClienteTelefono] = useState<string>("");
-  const [metodoPago, setMetodoPago] = useState<string>("simulador_dev");
+  const [metodoPago, setMetodoPago] = useState<string>("mostrador");
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [useWalletCredit, setUseWalletCredit] = useState<boolean>(false);
   const [subscribedWaitlists, setSubscribedWaitlists] = useState<Set<string>>(new Set());
@@ -1074,10 +1074,11 @@ export default function GrillaHoraria({
     if (onConfirmSuccess && activeLock) {
       onConfirmSuccess(activeLock);
     }
+    setMetodoPago(isAdmin ? "pendiente" : "mostrador");
     setIsConfirmModalOpen(true);
   };
 
-  const handleConfirmReservation = async (e: React.FormEvent) => {
+  const handleConfirmReservation = async (e: React.FormEvent, overrideMetodoPago?: string) => {
     e.preventDefault();
     if (!activeLock) return;
 
@@ -1098,19 +1099,21 @@ export default function GrillaHoraria({
               throw new Error("Ingresa tu Nombre y Apellido para registrarte.");
             }
             if (!authEmail.trim()) {
-              throw new Error("Ingresa un correo electrónico válido.");
+              throw new Error("Ingresa tu correo electrónico.");
             }
             if (!authPassword || authPassword.length < 6) {
               throw new Error("La contraseña debe tener al menos 6 caracteres.");
             }
 
+            const regHeaders: Record<string, string> = {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            };
+            if (subdomain) regHeaders["X-Tenant-ID"] = subdomain;
+
             const regRes = await fetch(`${apiUrl}/auth/register`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
-              },
+              headers: regHeaders,
               body: JSON.stringify({
                 name: targetNombre,
                 email: authEmail.trim(),
@@ -1137,19 +1140,21 @@ export default function GrillaHoraria({
             return;
           }
 
-          // STEP 2: In-Modal OTP Verification submitted
+          // STEP 2: OTP verification step -> verify code and finalize reservation
           if (registrationStep === "otp") {
-            if (otpCode.trim().length !== 6) {
-              throw new Error("Ingresa el código de 6 dígitos enviado a tu correo.");
+            if (!otpCode || otpCode.trim().length !== 6) {
+              throw new Error("Ingresa el código numérico de 6 dígitos que recibiste en tu email.");
             }
+
+            const verifyHeaders: Record<string, string> = {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            };
+            if (subdomain) verifyHeaders["X-Tenant-ID"] = subdomain;
 
             const verifyRes = await fetch(`${apiUrl}/auth/verify-otp`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
-              },
+              headers: verifyHeaders,
               body: JSON.stringify({
                 email: authEmail.trim(),
                 codigo: otpCode.trim(),
@@ -1157,38 +1162,39 @@ export default function GrillaHoraria({
             });
 
             const verifyData = await verifyRes.json();
-            if (!verifyRes.ok || !verifyData.success) {
-              throw new Error(verifyData.message || "Código de verificación incorrecto o expirado.");
+            if (!verifyRes.ok) {
+              throw new Error(verifyData.message || verifyData.error || "Código de verificación inválido o expirado.");
             }
 
-            // OTP verified! Set authenticated user and token
-            if (pendingRegisteredUser?.token) {
-              activeToken = pendingRegisteredUser.token;
-              localStorage.setItem("saas_token", activeToken);
-              localStorage.setItem("token", activeToken);
+            // Successfully verified: store token & user
+            const validToken = verifyData.token || pendingRegisteredUser?.token;
+            const validUser = verifyData.user || pendingRegisteredUser?.user;
+            if (validToken) {
+              localStorage.setItem("saas_token", validToken);
+              activeToken = validToken;
             }
-            if (pendingRegisteredUser?.user) {
-              const fullUser = {
-                ...pendingRegisteredUser.user,
-                ...verifyData.user,
-              };
-              setCurrentUser(fullUser);
-              localStorage.setItem("saas_user", JSON.stringify(fullUser));
+            if (validUser) {
+              localStorage.setItem("saas_user", JSON.stringify(validUser));
+              setCurrentUser(validUser);
+              targetNombre = validUser.name;
+              targetTelefono = validUser.telefono || targetTelefono;
             }
           }
         } else {
-          // Login mode
+          // Login existing user
           if (!authEmail.trim() || !authPassword) {
-            throw new Error("Ingresa tu Email y Contraseña.");
+            throw new Error("Ingresa tu email y contraseña para continuar.");
           }
+
+          const loginHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          };
+          if (subdomain) loginHeaders["X-Tenant-ID"] = subdomain;
 
           const loginRes = await fetch(`${apiUrl}/auth/login`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
-            },
+            headers: loginHeaders,
             body: JSON.stringify({
               email: authEmail.trim(),
               password: authPassword,
@@ -1200,20 +1206,22 @@ export default function GrillaHoraria({
             throw new Error(loginData.message || loginData.error || "Credenciales incorrectas.");
           }
 
-          activeToken = loginData.token;
-          if (activeToken) {
-            localStorage.setItem("saas_token", activeToken);
-            localStorage.setItem("token", activeToken);
+          const loggedToken = loginData.token;
+          const loggedUser = loginData.user;
+          if (loggedToken) {
+            localStorage.setItem("saas_token", loggedToken);
+            activeToken = loggedToken;
           }
-          if (loginData.user) {
-            setCurrentUser(loginData.user);
-            localStorage.setItem("saas_user", JSON.stringify(loginData.user));
-            targetNombre = loginData.user.name || targetNombre;
-            targetTelefono = loginData.user.telefono || targetTelefono;
+          if (loggedUser) {
+            localStorage.setItem("saas_user", JSON.stringify(loggedUser));
+            setCurrentUser(loggedUser);
+            targetNombre = loggedUser.name;
+            targetTelefono = loggedUser.telefono || targetTelefono;
           }
         }
       }
 
+      // Execute final booking confirmation
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -1233,7 +1241,7 @@ export default function GrillaHoraria({
           token_reserva: activeLock.tokenReserva,
           cliente_nombre: targetNombre || undefined,
           cliente_telefono: targetTelefono || undefined,
-          metodo_pago: metodoPago,
+          metodo_pago: overrideMetodoPago || metodoPago,
           aplicar_credito_wallet: useWalletCredit,
         }),
       });
@@ -1774,11 +1782,12 @@ export default function GrillaHoraria({
               {turnosOcupados.map((turno) => {
                 const isFixed = Boolean(turno.es_fijo);
                 const isPagado =
-                  turno.estado_pago === "pagado" ||
-                  turno.estado_pago === "pagado_total" ||
-                  turno.estado === "pagado" ||
-                  turno.estado === "completado" ||
-                  (turno.saldo_pendiente !== undefined && turno.saldo_pendiente <= 0 && (turno.monto_pagado || 0) > 0);
+                  (turno.estado_pago === "pagado" ||
+                    turno.estado_pago === "pagado_total" ||
+                    turno.estado === "pagado" ||
+                    turno.estado === "completado") &&
+                  (turno.saldo_pendiente === undefined || turno.saldo_pendiente <= 0) &&
+                  (turno.monto_pagado || 0) > 0;
 
                 const isSenado =
                   !isPagado &&
@@ -2241,7 +2250,7 @@ export default function GrillaHoraria({
                         type="button"
                         onClick={(e) => {
                           setMetodoPago("simulador_dev");
-                          handleConfirmReservation(e);
+                          handleConfirmReservation(e, "simulador_dev");
                         }}
                         disabled={isConfirming}
                         className="flex-1 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow flex items-center justify-center gap-1.5"

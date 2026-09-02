@@ -293,6 +293,20 @@ class DisponibilidadService
 
         // Formatted occupied turnos list (with client details for admin view)
         $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($esAdmin) {
+            $precio = (float) $t->precio;
+            $montoPagado = (float) ($t->monto_pagado ?? 0);
+            $saldoPendiente = $t->saldo_pendiente !== null ? (float) $t->saldo_pendiente : max(0.0, $precio - $montoPagado);
+            $estadoPago = $t->estado_pago;
+            if (!$estadoPago) {
+                if ($saldoPendiente <= 0 && $montoPagado > 0) {
+                    $estadoPago = 'pagado_total';
+                } elseif ($montoPagado > 0) {
+                    $estadoPago = 'senado';
+                } else {
+                    $estadoPago = 'pendiente';
+                }
+            }
+
             $data = [
                 'id' => $t->id,
                 'cancha_id' => $t->cancha_id,
@@ -300,10 +314,10 @@ class DisponibilidadService
                 'hora_inicio' => Carbon::parse($t->hora_inicio)->format('H:i'),
                 'hora_fin' => Carbon::parse($t->hora_fin)->format('H:i'),
                 'duracion_minutos' => Carbon::parse($t->hora_inicio)->diffInMinutes(Carbon::parse($t->hora_fin)),
-                'precio' => (float) $t->precio,
-                'monto_pagado' => (float) ($t->monto_pagado ?? 0),
-                'saldo_pendiente' => (float) ($t->saldo_pendiente ?? 0),
-                'estado_pago' => $t->estado_pago ?? 'pendiente',
+                'precio' => $precio,
+                'monto_pagado' => $montoPagado,
+                'saldo_pendiente' => $saldoPendiente,
+                'estado_pago' => $estadoPago,
                 'metodo_pago' => $t->metodo_pago ?? 'mostrador',
                 'estado' => $t->estado,
                 'es_fijo' => (bool) $t->es_fijo,

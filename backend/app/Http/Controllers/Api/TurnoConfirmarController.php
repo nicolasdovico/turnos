@@ -86,21 +86,31 @@ class TurnoConfirmarController extends Controller
         $tipoCobro = $complejo?->tipo_cobro_reserva ?? 'sena';
         $porcentajeSena = (float) ($complejo?->porcentaje_sena ?? 50.0);
 
+        // Check if caller is club admin or owner
+        $esAdminClub = false;
+        if ($user) {
+            $esAdminClub = ($user->role === 'admin') || ($complejo && $complejo->user_id === $user->id);
+        }
+
         // Calculate required payment (seña vs full)
         $montoRequerido = $precio;
         if ($tipoCobro === 'sena') {
             $montoRequerido = round(($precio * $porcentajeSena) / 100, 2);
         }
 
-        $montoPagado = isset($validated['monto_pagado']) ? (float) $validated['monto_pagado'] : 0.0;
+        $montoPagado = 0.0;
         $aplicarWallet = (bool) ($validated['aplicar_credito_wallet'] ?? false);
 
-        // If user is simulating payment in dev mode or paying with wallet
-        if ($metodoPago === 'simulador_dev') {
-            $montoPagado = $montoRequerido;
+        if ($esAdminClub && $metodoPago === 'mostrador' && !isset($validated['monto_pagado'])) {
+            // Admin desk booking with immediate counter payment
+            $montoPagado = $precio;
         } elseif ($metodoPago === 'wallet_credito') {
             $montoPagado = $montoRequerido;
             $aplicarWallet = true;
+        } elseif ($metodoPago === 'simulador_dev') {
+            $montoPagado = $montoRequerido;
+        } elseif (isset($validated['monto_pagado'])) {
+            $montoPagado = (float) $validated['monto_pagado'];
         }
 
         if ($aplicarWallet && $user) {
@@ -121,7 +131,7 @@ class TurnoConfirmarController extends Controller
 
         $saldoPendiente = max(0.0, round($precio - $montoPagado, 2));
         $estadoPago = 'pendiente';
-        if ($saldoPendiente <= 0.0) {
+        if ($saldoPendiente <= 0.0 && $montoPagado > 0.0) {
             $estadoPago = 'pagado_total';
         } elseif ($montoPagado > 0.0) {
             $estadoPago = 'senado';

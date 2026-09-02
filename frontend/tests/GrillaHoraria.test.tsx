@@ -1277,11 +1277,67 @@ describe("Componente Reactivo GrillaHoraria", () => {
       configurable: true,
       get: () => "hidden",
     });
-    fireEvent(document, new Event("visibilitychange"));
-
     // Toast remains preserved and does not prematurely expire while away
     expect(
       screen.getByText(/🔔 Nueva Reserva: Marcos Rojo en Cancha Central \(18:00 a 19:30 hs\)/i)
     ).toBeDefined();
+  });
+
+  it("muestra como ⏳ Pendiente y con botón 💵 Cobrar un turno reservado online con opción Pagar en el Club", async () => {
+    const occupiedTurno = {
+      id: 888,
+      cancha_id: 1,
+      fecha: "2026-09-01",
+      hora_inicio: "21:00",
+      hora_fin: "22:00",
+      precio: 16000,
+      monto_pagado: 0,
+      saldo_pendiente: 16000,
+      cliente_nombre: "Esteban Andrada",
+      estado: "reservado",
+      estado_pago: "pendiente",
+      metodo_pago: "mostrador",
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/canchas/1/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              cancha_id: 1,
+              fecha: "2026-09-01",
+              turnos_ocupados: [occupiedTurno],
+              slots: [],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    // Debe mostrar la tarjeta del turno ocupado con estado Pendiente y botón Cobrar
+    expect(await screen.findByText("Esteban Andrada")).toBeDefined();
+    expect(screen.getByText(/⏳ Pendiente/i)).toBeDefined();
+    expect(screen.queryByText(/✓ Pagado/i)).toBeNull();
+
+    const btnCobrar = screen.getByRole("button", { name: /Cobrar/i });
+    expect(btnCobrar).toBeDefined();
   });
 });
