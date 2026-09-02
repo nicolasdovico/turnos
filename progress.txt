@@ -985,5 +985,24 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
   * Suite Frontend (Vitest): 41 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-09-02] - POLLING SILENCIOSO (SWR), REVALIDACIÓN AL ENFOCAR Y ALERTAS SONORAS DE TURNOS EN VIVO
+-------------------------------------------------------------------------------
+- Diagnóstico y Necesidad Operativa:
+  * El recepcionista y el administrador del club necesitan ver inmediatamente los turnos que se van reservando online sin tener que recargar la página manualmente ni sufrir recargas forzadas (`window.location.reload()`) que interrumpan formularios o cierren modales de cobro.
+- Solución Implementada:
+  * `frontend/components/GrillaHoraria.tsx`:
+    - Revalidación en segundo plano cada 30 segundos (`silent = true`) sin activar spinners bloqueantes.
+    - Revalidación instantánea al recuperar foco de ventana / pestaña (`window.onfocus` y `document.visibilitychange`).
+    - Detección de nuevos turnos ocupados (`incomingTurnos` vs `turnosOcupadosRef`).
+    - Alerta visual flotante con Toast informativa (`🔔 Nueva Reserva: [Cliente] en [Cancha] ([Hora])`).
+    - Notificación sonora sintetizada con Web Audio API (`playChime()` bifónica armónica E5 -> A5) sin dependencias de archivos externos ni latencia.
+  * `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+    - Polling silencioso de métricas de club, turnos fijos y estado de canchas cada 30 segundos y al cambiar de pestaña.
+  * Suite de Tests Automatizados:
+    - `frontend/tests/GrillaHoraria.test.tsx`: nuevo test `emite alerta toast con icono de campana cuando detecta un nuevo turno reservado durante el polling silencioso en modo admin`.
+- Verificación de Calidad:
+  * Suite Frontend (Vitest): 42 tests pasados al 100%.
+  * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
 ===============================================================================
 

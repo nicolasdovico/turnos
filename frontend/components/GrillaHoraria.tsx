@@ -45,7 +45,7 @@ export interface ActiveLock {
 
 export interface ToastMessage {
   id: number;
-  type: "error" | "success" | "warning";
+  type: "error" | "success" | "warning" | "info";
   text: string;
 }
 
@@ -159,6 +159,8 @@ export default function GrillaHoraria({
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const turnosOcupadosRef = useRef<TurnoOcupado[]>([]);
+  const hasLoadedInitialRef = useRef<boolean>(false);
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
@@ -291,7 +293,45 @@ export default function GrillaHoraria({
     }
   };
 
-  const addToast = (type: "error" | "success" | "warning", text: string) => {
+  const playChime = () => {
+    try {
+      const AudioCtx =
+        typeof window !== "undefined"
+          ? window.AudioContext || (window as any).webkitAudioContext
+          : null;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      // Note 1 (E5 / 659.25 Hz)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(659.25, now);
+      gain1.gain.setValueAtTime(0.12, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.3);
+
+      // Note 2 (A5 / 880 Hz)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(880, now + 0.12);
+      gain2.gain.setValueAtTime(0.15, now + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.5);
+    } catch {
+      // AudioContext may be blocked before first user interaction; ignore safely
+    }
+  };
+
+  const addToast = (type: "error" | "success" | "warning" | "info", text: string) => {
     const newToast: ToastMessage = { id: Date.now() + Math.random(), type, text };
     setToasts((prev) => [...prev, newToast]);
     setTimeout(() => {
@@ -304,9 +344,13 @@ export default function GrillaHoraria({
   };
 
   // Fetch slots availability
-  const fetchDisponibilidad = async (targetFecha: string, targetDuracion: number = duracion) => {
+  const fetchDisponibilidad = async (
+    targetFecha: string,
+    targetDuracion: number = duracion,
+    silent: boolean = false
+  ) => {
     if (initialSlots && targetFecha === fechaInicial && slots.length > 0 && !targetDuracion) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const token = getAuthToken(propToken);
       const headers: Record<string, string> = {
@@ -338,13 +382,32 @@ export default function GrillaHoraria({
       if (data.optimizacion_anti_baches) {
         setAntiBachesInfo(data.optimizacion_anti_baches);
       }
-      if (Array.isArray(data.turnos_ocupados)) {
-        setTurnosOcupados(data.turnos_ocupados);
-      } else if (Array.isArray(data.data?.turnos_ocupados)) {
-        setTurnosOcupados(data.data.turnos_ocupados);
-      } else {
-        setTurnosOcupados([]);
+
+      const incomingTurnos: TurnoOcupado[] = Array.isArray(data.turnos_ocupados)
+        ? data.turnos_ocupados
+        : Array.isArray(data.data?.turnos_ocupados)
+        ? data.data.turnos_ocupados
+        : [];
+
+      // Detect newly booked turnos during silent polling in admin/desk mode and notify
+      if (silent && isAdmin && hasLoadedInitialRef.current) {
+        const previousIds = new Set(turnosOcupadosRef.current.map((t) => t.id));
+        const newlyBooked = incomingTurnos.filter((t) => !previousIds.has(t.id));
+        if (newlyBooked.length > 0) {
+          playChime();
+          newlyBooked.forEach((nt) => {
+            addToast(
+              "info",
+              `🔔 Nueva Reserva: ${nt.cliente_nombre || "Cliente"} en ${canchaNombre} (${nt.hora_inicio} a ${nt.hora_fin} hs)`
+            );
+          });
+        }
       }
+
+      hasLoadedInitialRef.current = true;
+      turnosOcupadosRef.current = incomingTurnos;
+      setTurnosOcupados(incomingTurnos);
+
       if (Array.isArray(data.turnos_retenidos)) {
         setTurnosRetenidos(data.turnos_retenidos);
       } else if (Array.isArray(data.data?.turnos_retenidos)) {
@@ -376,9 +439,11 @@ export default function GrillaHoraria({
         setSlots([]);
       }
     } catch {
-      addToast("error", "Error al cargar la disponibilidad horaria.");
+      if (!silent) {
+        addToast("error", "Error al cargar la disponibilidad horaria.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -655,6 +720,29 @@ export default function GrillaHoraria({
     if (!initialSlots || fecha !== fechaInicial) {
       fetchDisponibilidad(fecha, duracion);
     }
+  }, [fecha, canchaId, duracion]);
+
+  // Smart background polling and window focus revalidation (SWR pattern)
+  useEffect(() => {
+    const POLL_INTERVAL = 30000; // 30 seconds
+    const intervalId = setInterval(() => {
+      fetchDisponibilidad(fecha, duracion, true);
+    }, POLL_INTERVAL);
+
+    const onWindowFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchDisponibilidad(fecha, duracion, true);
+      }
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("visibilitychange", onWindowFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("visibilitychange", onWindowFocus);
+    };
   }, [fecha, canchaId, duracion]);
 
   // Master visual countdown timer for all active and retained locks
@@ -1173,12 +1261,15 @@ export default function GrillaHoraria({
                 ? "bg-rose-950/90 border-rose-600/50 text-rose-200"
                 : toast.type === "success"
                 ? "bg-emerald-950/90 border-emerald-500/50 text-emerald-200"
+                : toast.type === "info"
+                ? "bg-sky-950/95 border-sky-500/60 text-sky-200 shadow-sky-900/40 animate-in fade-in slide-in-from-top-2"
                 : "bg-amber-950/90 border-amber-500/50 text-amber-200"
             }`}
           >
             {toast.type === "error" && <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />}
             {toast.type === "success" && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />}
             {toast.type === "warning" && <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />}
+            {toast.type === "info" && <span className="text-base shrink-0 select-none">🔔</span>}
             <span className="flex-1 leading-snug">{toast.text}</span>
             <button
               onClick={() => removeToast(toast.id)}

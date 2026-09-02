@@ -476,10 +476,12 @@ export default function ClubAdminPanel() {
     }
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (silent: boolean = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
 
       // Get active token from token prop, URL params (SSO transfer) or localStorage
       let activeToken = token;
@@ -499,7 +501,7 @@ export default function ClubAdminPanel() {
 
       if (!adminData.is_admin) {
         setIsAdmin(false);
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
       setIsAdmin(true);
@@ -508,7 +510,9 @@ export default function ClubAdminPanel() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || "No se pudo cargar la información del club.");
+        if (!silent) {
+          setError(data.message || "No se pudo cargar la información del club.");
+        }
         return;
       }
 
@@ -561,15 +565,17 @@ export default function ClubAdminPanel() {
       );
       setStats(data.data.stats || { total_canchas: 0, total_turnos: 0, modulos_count: 0 });
     } catch (e: any) {
-      setError(e.message || "Error al conectar con el servidor.");
+      if (!silent) {
+        setError(e.message || "Error al conectar con el servidor.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  const fetchTurnosFijos = async () => {
+  const fetchTurnosFijos = async (silent: boolean = false) => {
     try {
-      setLoadingTurnosFijos(true);
+      if (!silent) setLoadingTurnosFijos(true);
       const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
       const res = await fetch(`${API_BASE}/clubs/${subdomain}/turnos-fijos`, {
         headers: {
@@ -584,13 +590,38 @@ export default function ClubAdminPanel() {
     } catch {
       // ignore
     } finally {
-      setLoadingTurnosFijos(false);
+      if (!silent) setLoadingTurnosFijos(false);
     }
   };
 
   useEffect(() => {
     fetchDashboardData();
     fetchTurnosFijos();
+  }, [subdomain, token]);
+
+  // Smart background polling and window focus revalidation (SWR pattern)
+  useEffect(() => {
+    const POLL_INTERVAL = 30000; // 30 seconds
+    const intervalId = setInterval(() => {
+      fetchDashboardData(true);
+      fetchTurnosFijos(true);
+    }, POLL_INTERVAL);
+
+    const onWindowFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchDashboardData(true);
+        fetchTurnosFijos(true);
+      }
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("visibilitychange", onWindowFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("visibilitychange", onWindowFocus);
+    };
   }, [subdomain, token]);
 
   const fetchRegisteredUsers = async (query: string = "") => {

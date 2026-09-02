@@ -1130,4 +1130,71 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(screen.queryByRole("button", { name: /Cobrar/i })).toBeNull();
     });
   });
+
+  it("emite alerta toast con icono de campana cuando detecta un nuevo turno reservado durante el polling silencioso en modo admin", async () => {
+    let currentTurnos: any[] = [];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/canchas/1/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              cancha_id: 1,
+              fecha: "2026-09-01",
+              turnos_ocupados: currentTurnos,
+              slots: [],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    // Initial render finishes with 0 turnos
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    // Simulate new booking arriving from an online user
+    currentTurnos = [
+      {
+        id: 999,
+        cancha_id: 1,
+        fecha: "2026-09-01",
+        hora_inicio: "19:00",
+        hora_fin: "20:30",
+        precio: 15000,
+        cliente_nombre: "Lucía Gómez",
+        estado: "reservado",
+        estado_pago: "pagado",
+      },
+    ];
+
+    // Trigger window focus (SWR revalidation)
+    fireEvent(window, new Event("focus"));
+
+    // Toast alert with bell and player details must appear
+    await waitFor(() => {
+      expect(
+        screen.getByText(/🔔 Nueva Reserva: Lucía Gómez en Cancha Central \(19:00 a 20:30 hs\)/i)
+      ).toBeDefined();
+    });
+  });
 });
