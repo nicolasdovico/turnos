@@ -911,5 +911,79 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Backend (PHPUnit): 145 tests pasados al 100% (742 aserciones).
   * Frontend (Vitest): 39 tests pasados al 100%.
   * Frontend Build: Compilación Next.js 14 en producción exitosa (0 errores).
+-------------------------------------------------------------------------------
+[2026-09-02] - CORRECCIÓN DE TIMEZONE Y CÁLCULO DE HUECOS MUERTOS EN REGLA ANTI-BACHES
+-------------------------------------------------------------------------------
+- Diagnóstico del Problema:
+  * En canchas con duración flexible (`permite_duracion_flexible = true`) y algoritmo Anti-Baches activo (`anti_baches_activo = true`), el reporte de horarios protegidos para administradores arrojaba horas incoherentes o invertidas como `"08:30 a 09:30: Dejaría un hueco muerto de 30 min (11:00 a 08:30)"`, `"09:30 a 10:30: Dejaría un hueco muerto de 30 min (10:30 a 14:00)"`, y `"12:30 a 13:30: Dejaría un hueco muerto de 30 min (15:00 a 12:30)"`.
+  * Causa Raíz:
+    - En `DisponibilidadService.php`, las variables `$proximoTurnoTs` y `$anteriorTurnoFinTs` se convertían a formato string mediante `Carbon::createFromTimestamp($timestamp)->format('H:i')` SIN pasar el parámetro de zona horaria local `$timezone`.
+    - Al ejecutarse PHP con timezone por defecto UTC (+0), un horario local de Argentina (UTC-3) como las 08:00 se formateaba como 11:00 UTC, 11:00 local como 14:00 UTC, 12:00 local como 15:00 UTC, 19:00 local como 22:00 UTC, y 23:00 local como 02:00 UTC del día siguiente.
+    - Como los slots candidatos sí estaban formateados con la zona horaria local (`08:30`, `10:30`, `12:30`), el string resultante mezclaba horas UTC con horas locales.
+- Solución Implementada:
+  * Backend (`App\Services\DisponibilidadService.php`):
+    - Se incorporó `$timezone` explícito en todas las llamadas a `Carbon::createFromTimestamp($proximoTurnoTs, $timezone)->format('H:i')` y `Carbon::createFromTimestamp($anteriorTurnoFinTs, $timezone)->format('H:i')`.
+    - Se unificó la lista de intervalos ocupados combinando turnos registrados en base de datos (`$turnosOcupados`) y bloqueos temporales activos en Redis (`$activeLocks`), evaluando con precisión los límites de apertura y cierre del club.
+    - Los mensajes generados ahora reflejan con exactitud matemática el intervalo real:
+      * `08:30 a 09:30`: `"Dejaría un hueco muerto de 30 min (08:00 a 08:30)"` (contra la apertura de las 08:00).
+      * `09:30 a 10:30`: `"Dejaría un hueco muerto de 30 min (10:30 a 11:00)"` (contra el turno ocupado de las 11:00).
+      * `12:30 a 13:30`: `"Dejaría un hueco muerto de 30 min (12:00 a 12:30)"` (contra el turno que finaliza a las 12:00).
+      * `17:30 a 18:30`: `"Dejaría un hueco muerto de 30 min (18:30 a 19:00)"` (contra el turno ocupado de las 19:00).
+      * `20:30 a 21:30`: `"Dejaría un hueco muerto de 30 min (20:00 a 20:30)"` (contra el turno que finaliza a las 20:00).
+      * `21:30 a 22:30`: `"Dejaría un hueco muerto de 30 min (22:30 a 23:00)"` (contra el cierre de las 23:00).
+  * Suite de Tests Automatizados:
+    - Nuevo test unitario `test_optimizacion_anti_baches_formatea_motivos_con_timezone_local_correcto` en `tests/Unit/DisponibilidadServiceTest.php` validando los intervalos horarios y la ausencia de desfases UTC.
+- Verificación de Calidad y Suites de Tests:
+  * Suite Backend (PHPUnit): 147 tests pasados al 100% (766 aserciones).
+  * Suite Frontend (Vitest): 39 tests pasados al 100%.
+  * Suite Mobile (Jest): 18 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-09-02] - CORRECCIÓN DE ESTADO DE PAGO Y REFRESCADO REACTIVO DE COBRO EN PANEL DE TURNOS
+-------------------------------------------------------------------------------
+- Diagnóstico del Problema:
+  * Al registrar un turno en mostrador como pendiente de pago y posteriormente cobrarlo presencialmente mediante el modal "Cobrar", el panel administrativo continuaba mostrando el estado como "⏳ Pendiente" y el botón "💵 Cobrar" no desaparecía ni se actualizaba a "✓ Pagado".
+  * Causa Raíz:
+    1. En `DisponibilidadService.php`, la función `obtenerDisponibilidadCompleta` mapeaba `$turnosOcupadosData` sin incluir los campos financieros `estado_pago`, `monto_pagado` y `saldo_pendiente`.
+    2. Al volver a consultar la disponibilidad tras el cobro (`fetchDisponibilidad`), `turno.estado_pago` llegaba como `undefined`.
+    3. En `GrillaHoraria.tsx`, la condición `isPagado` evaluaba `undefined === "pagado"` resultando en `false`, por lo que el botón de cobro volvía a renderizarse indebidamente.
+- Solución Implementada:
+  * Backend:
+    - En `DisponibilidadService.php`, se agregaron `'estado_pago' => $t->estado_pago ?? 'pendiente'`, `'monto_pagado' => (float) ($t->monto_pagado ?? 0)` y `'saldo_pendiente' => (float) ($t->saldo_pendiente ?? 0)` al DTO de cada turno ocupado.
+    - En `ClubDashboardController.php`, se mejoró `registrarPagoTurno` para calcular de manera acumulativa y precisa `$montoPagadoTotal`, `$saldoPendiente`, y actualizar tanto `estado_pago = 'pagado'` como `estado = 'pagado'`.
+    - En `tests/Feature/TurnoFijoManagementTest.php`, se agregó el test `test_register_payment_updates_disponibilidad_occupied_turnos_status_to_pagado`.
+  * Frontend (`GrillaHoraria.tsx`):
+    - Se agregó `saldo_pendiente?: number` en la interfaz `TurnoOcupado`.
+    - En `handleRegistrarPago`, se añadió actualización optimista reactiva inmediata en el estado local `turnosOcupados` antes de sincronizar con el backend.
+    - Se mejoró la lógica de detección de estados (`isPagado` e `isSenado`), mostrando `✓ Pagado` (verde esmeralda), `💳 Seña Pagada` (azul con saldo restante) o `⏳ Pendiente` (ámbar), ocultando el botón `💵 Cobrar` automáticamente cuando el turno está 100% abonado.
+    - En el modal de cobro se añadió el desglose de precio acordado, seña ya abonada y saldo exacto restante a cobrar.
+    - En `tests/GrillaHoraria.test.tsx`, se añadió el test `actualiza el estado a Pagado y oculta el botón Cobrar tras confirmar el cobro en mostrador`.
+- Verificación de Calidad:
+  * Suite Backend (PHPUnit): 147 tests pasados al 100% (767 aserciones).
+  * Suite Frontend (Vitest): 40 tests pasados al 100%.
+  * Next.js 14 Production Build: Compilación exitosa (0 errores).
+-------------------------------------------------------------------------------
+[2026-09-02] - OPTIMIZACIÓN WHITE-LABEL Y SEPARACIÓN DE CONTEXTO EN NAVBAR DE TENANTS
+-------------------------------------------------------------------------------
+- Diagnóstico y Motivación de UX/Producto:
+  * Al visitar un subdominio de club (ej. `http://nico-tenis.localhost:8080/`), la barra de navegación mostraba enlaces B2B pensados para captación de dueños de clubes (`"🌐 Portal Central"`, `"Planes & Precios"`, `"Registrar mi Club"`, `"Reservar Canchas"` redundante).
+  * Para los jugadores y clientes del club, estos enlaces causaban distracción y fuga del embudo de reserva, mientras que para los dueños de clubes rompía la experiencia de marca blanca (white-label).
+- Solución Implementada:
+  * `frontend/components/Navbar.tsx`:
+    - Detección de subdominio tanto en SSR como en CSR utilizando `useParams()` (`params.subdomain`) y `window.location.hostname`.
+    - En subdominios de club (`isSubdomain = true`):
+      * Se ocultan los enlaces centrales de marketing B2B (`Portal Central`, `Planes & Precios`).
+      * Se oculta el botón `"Registrar mi Club"` y `"+ Crear Club"`.
+      * Para visitantes/jugadores solo se muestran `"Iniciar Sesión"` y `"Registrarse"`.
+      * Para el dueño del club logueado se mantiene el acceso directo a `"⚙️ Panel de Administrador"` y el selector multinegocio.
+      * El logo `⚡ Turnos [nombre-club]` enlaza limpiamente a la portada del club (`/`).
+    - En el dominio principal SaaS (`localhost:8080`):
+      * Se mantienen visibles todas las opciones de comercialización B2B (`Portal`, `Demo Club`, `Planes & Precios`, `Registrar mi Club`).
+  * `frontend/app/tenants/[subdomain]/page.tsx`:
+    - Se incorporó un pie de página (footer) minimalista y elegante de marca blanca con copyright del club y un crédito sutil *"Sistema de gestión con ⚡ Turnos SaaS ↗"* para crecimiento viral orgánico B2B sin interferir con la reserva.
+  * Suite de Tests Automatizados:
+    - `frontend/tests/authAndOnboarding.test.tsx`: nuevo test `renders clean tenant Navbar on club subdomain omitting central portal and B2B pricing links`.
+- Verificación de Calidad:
+  * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
+  * Suite Frontend (Vitest): 41 tests pasados al 100%.
 ===============================================================================
 

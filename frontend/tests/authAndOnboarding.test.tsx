@@ -7,6 +7,8 @@ import RegisterPage from "../app/registro/page";
 import RegistroClubPage from "../app/registro-club/page";
 import { AuthProvider } from "../context/AuthContext";
 
+let mockParams: Record<string, string> = {};
+
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -14,9 +16,7 @@ vi.mock("next/navigation", () => ({
     replace: vi.fn(),
     prefetch: vi.fn(),
   }),
-  useParams: () => ({
-    subdomain: "nico-padel",
-  }),
+  useParams: () => mockParams,
 }));
 
 import PlanesPage from "../app/planes/page";
@@ -26,7 +26,12 @@ import TenantPage from "../app/tenants/[subdomain]/page";
 import PortalPage from "../app/portal/page";
 
 describe("Frontend Auth & Club Onboarding Suite", () => {
-  it("renders Navbar with guest navigation buttons", () => {
+  beforeEach(() => {
+    mockParams = { subdomain: "nico-padel" };
+  });
+
+  it("renders Navbar on root domain with guest navigation buttons and pricing", () => {
+    mockParams = {};
     render(
       <AuthProvider>
         <Navbar />
@@ -39,6 +44,39 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Registrar mi Club/i)).toBeDefined();
     expect(screen.queryByText(/Panel de Administrador/i)).toBeNull();
     expect(screen.queryByText(/Panel Club/i)).toBeNull();
+  });
+
+  it("renders clean tenant Navbar on club subdomain omitting central portal and B2B pricing links", () => {
+    mockParams = { subdomain: "nico-tenis" };
+    const originalLocation = window.location;
+    // @ts-ignore
+    delete window.location;
+    // @ts-ignore
+    window.location = {
+      ...originalLocation,
+      hostname: "nico-tenis.localhost",
+      protocol: "http:",
+      port: "8080",
+    };
+
+    render(
+      <AuthProvider>
+        <Navbar />
+      </AuthProvider>
+    );
+
+    // Should display the tenant slug badge
+    expect(screen.getByText("nico-tenis")).toBeDefined();
+    expect(screen.getByText(/Iniciar Sesión/i)).toBeDefined();
+    expect(screen.getByText(/Registrarse/i)).toBeDefined();
+
+    // Must NOT display SaaS B2B links
+    expect(screen.queryByText(/Planes & Precios/i)).toBeNull();
+    expect(screen.queryByText(/Portal Central/i)).toBeNull();
+    expect(screen.queryByText(/Registrar mi Club/i)).toBeNull();
+
+    // Restore window.location
+    window.location = originalLocation;
   });
 
   it("renders Planes & Precios page with pricing cards, comparison matrix and FAQ", () => {

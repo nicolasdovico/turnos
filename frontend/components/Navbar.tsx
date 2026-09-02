@@ -2,18 +2,25 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
   const { user, token, isLoading, logout } = useAuth();
+  const params = useParams();
+  const routeSubdomain = (params?.subdomain as string) || "";
+
   const [currentHost, setCurrentHost] = useState("");
-  const [isSubdomain, setIsSubdomain] = useState(false);
-  const [tenantSlug, setTenantSlug] = useState("");
+  const [isSubdomain, setIsSubdomain] = useState(Boolean(routeSubdomain));
+  const [tenantSlug, setTenantSlug] = useState(routeSubdomain);
   const [mainDomainUrl, setMainDomainUrl] = useState("");
   const [demoClubUrl, setDemoClubUrl] = useState("http://padelpro.localhost:3000");
   const [isClubAdmin, setIsClubAdmin] = useState(false);
   const [showClubsDropdown, setShowClubsDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const effectiveIsSubdomain = Boolean(isSubdomain || routeSubdomain);
+  const effectiveTenantSlug = tenantSlug || routeSubdomain;
 
   // Click outside to close dropdown
   useEffect(() => {
@@ -44,11 +51,11 @@ export default function Navbar() {
         "app.turnos.com",
       ];
 
-      const onSubdomain = !rootDomains.includes(hostname.toLowerCase());
+      const onSubdomain = Boolean(routeSubdomain) || !rootDomains.includes(hostname.toLowerCase());
       setIsSubdomain(onSubdomain);
 
       if (onSubdomain) {
-        let slug = hostname.split(".")[0];
+        let slug = routeSubdomain || hostname.split(".")[0];
         setTenantSlug(slug);
 
         let mainHost = "localhost";
@@ -65,13 +72,14 @@ export default function Navbar() {
         setDemoClubUrl(`${protocol}//padelpro.${baseSubdomainHost}${port}`);
       }
     }
-  }, []);
+  }, [routeSubdomain]);
 
   // Check if logged in user is the owner/admin of this club
   useEffect(() => {
-    if (isSubdomain && tenantSlug && user) {
+    const slug = effectiveTenantSlug;
+    if (effectiveIsSubdomain && slug && user) {
       const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
-      fetch(`/api/clubs/${tenantSlug}/is-admin`, {
+      fetch(`/api/clubs/${slug}/is-admin`, {
         headers: {
           Accept: "application/json",
           ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
@@ -89,7 +97,7 @@ export default function Navbar() {
     } else {
       setIsClubAdmin(false);
     }
-  }, [isSubdomain, tenantSlug, user, token]);
+  }, [effectiveIsSubdomain, effectiveTenantSlug, user, token]);
 
   // User's owned club (if any)
   const userClubs = user?.complejos || [];
@@ -97,9 +105,9 @@ export default function Navbar() {
 
   // Instant ownership check on current subdomain
   const isOwnerOfCurrentTenant = Boolean(
-    isSubdomain &&
-    tenantSlug &&
-    userClubs.some((c: any) => c.subdominio.toLowerCase() === tenantSlug.toLowerCase())
+    effectiveIsSubdomain &&
+    effectiveTenantSlug &&
+    userClubs.some((c: any) => c.subdominio.toLowerCase() === effectiveTenantSlug.toLowerCase())
   );
 
   const isCurrentAdmin = isClubAdmin || isOwnerOfCurrentTenant;
@@ -124,7 +132,7 @@ export default function Navbar() {
 
   // Helper to build links: if on subdomain, global links point to mainDomainUrl
   const getGlobalLink = (path: string) => {
-    if (isSubdomain && mainDomainUrl) {
+    if (effectiveIsSubdomain && mainDomainUrl) {
       return `${mainDomainUrl}${path}`;
     }
     return path;
@@ -135,15 +143,15 @@ export default function Navbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
         {/* Brand Logo & Context */}
         <div className="flex items-center gap-3">
-          <Link href={getGlobalLink("/")} className="flex items-center gap-2 font-black text-xl tracking-tight text-slate-900">
+          <Link href={effectiveIsSubdomain ? "/" : getGlobalLink("/")} className="flex items-center gap-2 font-black text-xl tracking-tight text-slate-900">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold shadow-md shadow-emerald-500/20">
               ⚡
             </span>
             <span className="flex items-center gap-1.5">
               Turnos
-              {isSubdomain ? (
+              {effectiveIsSubdomain ? (
                 <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                  {tenantSlug}
+                  {effectiveTenantSlug}
                 </span>
               ) : (
                 <span className="text-xs font-semibold text-slate-500 hidden sm:inline">
@@ -156,21 +164,9 @@ export default function Navbar() {
 
         {/* Center Navigation */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-          {isSubdomain ? (
+          {!effectiveIsSubdomain && (
             <>
               <Link href="/" className="hover:text-emerald-600 transition font-semibold text-slate-900">
-                Reservar Canchas
-              </Link>
-              <a href={getGlobalLink("/")} className="hover:text-emerald-600 transition text-slate-500">
-                🌐 Portal Central
-              </a>
-              <a href={getGlobalLink("/planes")} className="hover:text-emerald-600 transition text-slate-500">
-                Planes & Precios
-              </a>
-            </>
-          ) : (
-            <>
-              <Link href="/" className="hover:text-emerald-600 transition">
                 Portal
               </Link>
               {!ownedClub && (
@@ -188,7 +184,7 @@ export default function Navbar() {
         {/* Right Auth & CTA Actions */}
         <div className="flex items-center gap-3">
           {/* Subdomain: Club Admin single button + Switcher if multiple */}
-          {isSubdomain && isCurrentAdmin && (
+          {effectiveIsSubdomain && isCurrentAdmin && (
             <div className="flex items-center gap-2">
               <Link
                 href="/panel"
@@ -214,7 +210,7 @@ export default function Navbar() {
                       </div>
                       <div className="py-1 space-y-1">
                         {userClubs.map((club: any) => {
-                          const isCurrent = club.subdominio.toLowerCase() === tenantSlug.toLowerCase();
+                          const isCurrent = club.subdominio.toLowerCase() === effectiveTenantSlug.toLowerCase();
                           const icon = club.tipo_negocio?.slug === "complejo" ? "🏟️" : club.tipo_negocio?.slug === "gimnasio" ? "💪" : "🏆";
                           return (
                             <a
@@ -251,7 +247,7 @@ export default function Navbar() {
           )}
 
           {/* Main Domain: Single club button OR Multi-business dropdown selector */}
-          {!isSubdomain && userClubs.length === 1 && (
+          {!effectiveIsSubdomain && userClubs.length === 1 && (
             <a
               href={getClubAdminUrl(userClubs[0].subdominio)}
               className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-bold shadow-md shadow-emerald-600/20 transition"
@@ -260,7 +256,7 @@ export default function Navbar() {
             </a>
           )}
 
-          {!isSubdomain && userClubs.length > 1 && (
+          {!effectiveIsSubdomain && userClubs.length > 1 && (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowClubsDropdown(!showClubsDropdown)}
@@ -330,7 +326,7 @@ export default function Navbar() {
                   {user.name}
                 </span>
               </div>
-              {!ownedClub && (
+              {!effectiveIsSubdomain && !ownedClub && (
                 <a
                   href={getGlobalLink("/registro-club")}
                   className="hidden sm:inline-flex items-center rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition"
@@ -359,12 +355,14 @@ export default function Navbar() {
               >
                 Registrarse
               </a>
-              <a
-                href={getGlobalLink("/registro-club")}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
-              >
-                Registrar mi Club
-              </a>
+              {!effectiveIsSubdomain && (
+                <a
+                  href={getGlobalLink("/registro-club")}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+                >
+                  Registrar mi Club
+                </a>
+              )}
             </div>
           )}
         </div>

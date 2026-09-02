@@ -366,6 +366,25 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
           </>
         )}
       </div>
+
+      {/* Subtle White-Label Footer */}
+      <footer className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 pt-8 border-t border-slate-900 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div>
+          <span>© {new Date().getFullYear()} {complejo.nombre}. Todos los derechos reservados.</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <span>Sistema de gestión con</span>
+          <a
+            href="http://localhost:8080"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-emerald-400 hover:text-emerald-300 font-semibold transition inline-flex items-center gap-0.5"
+          >
+            <span>⚡ Turnos SaaS</span>
+            <span>↗</span>
+          </a>
+        </div>
+      </footer>
     </main>
   );
 }
