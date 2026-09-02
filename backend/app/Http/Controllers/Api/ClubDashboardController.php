@@ -8,6 +8,7 @@ use App\Models\Complejo;
 use App\Models\HorarioAtencion;
 use App\Models\Turno;
 use App\Models\User;
+use App\Services\ClubReporteService;
 use App\Services\ReservaLockService;
 use App\Services\WalletService;
 use Carbon\Carbon;
@@ -19,7 +20,8 @@ class ClubDashboardController extends Controller
 {
     public function __construct(
         protected ReservaLockService $reservaLockService,
-        protected WalletService $walletService
+        protected WalletService $walletService,
+        protected ClubReporteService $reporteService
     ) {}
     /**
      * Verificar si el usuario autenticado es el administrador/dueño del club.
@@ -1198,6 +1200,57 @@ class ClubDashboardController extends Controller
         return response()->json([
             'success' => true,
             'data' => $usuarios,
+        ]);
+    }
+
+    /**
+     * Obtener el resumen diario y métricas financieras de turnos para el panel del club.
+     */
+    public function resumenDiario(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autenticado.',
+            ], 401);
+        }
+
+        $isAdmin = ($complejo->user_id && $complejo->user_id === $user->id) || ($user->role ?? '') === 'admin' || $user->email === 'admin@admin.com';
+        if (!$isAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos de administrador para este club.',
+            ], 403);
+        }
+
+        $fechaDesde = $request->query('fecha_desde');
+        $fechaHasta = $request->query('fecha_hasta');
+        $canchaId = $request->query('cancha_id') ? (int) $request->query('cancha_id') : null;
+
+        $resumen = $this->reporteService->obtenerResumenDiario(
+            $complejo,
+            $fechaDesde,
+            $fechaHasta,
+            $canchaId
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => $resumen,
         ]);
     }
 }

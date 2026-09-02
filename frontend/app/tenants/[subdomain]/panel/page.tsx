@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import ResumenDiarioTurnos from "@/components/ResumenDiarioTurnos";
 
 interface ComplejoData {
   id: number;
@@ -289,7 +290,7 @@ export default function ClubAdminPanel() {
   const subdomain = (params?.subdomain as string) || "demo";
   const { user, token } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"canchas" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "config">("canchas");
+  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "config">("canchas");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1272,6 +1273,16 @@ export default function ClubAdminPanel() {
             🎾 Canchas ({canchas.length})
           </button>
           <button
+            onClick={() => setActiveTab("resumen")}
+            className={`pb-4 transition border-b-2 flex items-center gap-1.5 ${
+              activeTab === "resumen"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            📊 Resumen Diario & Caja
+          </button>
+          <button
             onClick={() => setActiveTab("modulos")}
             className={`pb-4 transition border-b-2 ${
               activeTab === "modulos"
@@ -1322,6 +1333,19 @@ export default function ClubAdminPanel() {
             📋 Datos del Club
           </button>
         </div>
+
+        {/* ========================================================================= */}
+        {/* TAB 0: RESUMEN DIARIO & CAJA */}
+        {/* ========================================================================= */}
+        {activeTab === "resumen" && (
+          <div className="mt-8">
+            <ResumenDiarioTurnos
+              subdomain={subdomain}
+              token={token}
+              canchas={canchas}
+            />
+          </div>
+        )}
 
         {/* ========================================================================= */}
         {/* TAB 1: CANCHAS */}

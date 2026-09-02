@@ -1047,5 +1047,23 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Suite Frontend (Vitest): 45 tests pasados al 100%.
   * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
+-------------------------------------------------------------------------------
+[2026-09-02] - MÓDULO DE RESUMEN DIARIO, CONTROL DE CAJA Y ARQUEO DE TURNOS
+-------------------------------------------------------------------------------
+- Requerimiento:
+  * Diseñar y desarrollar en el panel de administrador del club una sección integral con el resumen día por día de los turnos, pagos cobrados, saldos pendientes y estado general del negocio.
+- Solución Implementada:
+  * Backend:
+    - `backend/app/Services/ClubReporteService.php`: Servicio de agregaciones financieras y cálculo de ocupación porcentual día por día según horarios de atención.
+    - `backend/app/Http/Controllers/Api/ClubDashboardController.php`: Endpoint `resumenDiario` con autenticación y validación de permisos de administrador/dueño.
+    - `backend/routes/api.php`: Ruta `GET /api/clubs/{subdomain}/resumen-diario`.
+    - `backend/tests/Feature/ClubResumenDiarioTest.php`: Tests de cálculo de KPIs, agregación diaria, filtro por cancha y seguridad de acceso.
+  * Frontend:
+    - `frontend/components/ResumenDiarioTurnos.tsx`: Componente modular con filtros de fecha (Hoy, Esta Semana, Este Mes, Mes Anterior, Rango Personalizado), filtro por cancha, tarjetas de KPIs (Facturado, Cobrado Real, Saldo Pendiente, Ocupación %), gráficos de canales de cobro (Mostrador vs Transferencia vs Online vs Billetera), tabla/tarjetas día a día con acordeón expandible de turnos y modal integrado para registrar cobros en mostrador directamente.
+    - `frontend/app/tenants/[subdomain]/panel/page.tsx`: Integración de la pestaña `"resumen"` en la barra de navegación del panel de administrador.
+    - `frontend/tests/authAndOnboarding.test.tsx`: Test de integración verificando renderizado de KPIs, desglose por día, apertura de detalles y cobro.
+- Verificación de Calidad:
+  * Suite Frontend (Vitest): 46 tests pasados al 100%.
+  * Suite Backend (PHPUnit): 151 tests pasados al 100% (805 aserciones).
 ===============================================================================
 

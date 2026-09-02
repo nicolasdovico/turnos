@@ -862,4 +862,196 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
       expect(postTurnoFijoPayload.cliente_nombre).toBe("Franco Colapinto");
     });
   });
+
+  it("renders Resumen Diario & Caja tab with financial KPIs, day by day cards and court filtering in club admin panel", async () => {
+    const mockResumenData = {
+      periodo: {
+        fecha_desde: "2026-09-01",
+        fecha_hasta: "2026-09-02",
+        total_dias: 2,
+        cancha_id: null,
+      },
+      kpis: {
+        total_facturado: 45000,
+        total_cobrado: 35000,
+        total_saldo_pendiente: 10000,
+        total_turnos: 4,
+        total_turnos_fijos: 1,
+        ocupacion_promedio: 75.5,
+        porcentaje_cobrado: 77.8,
+      },
+      dias: [
+        {
+          fecha: "2026-09-01",
+          dia_semana_numero: 2,
+          dia_nombre: "Martes",
+          total_turnos: 2,
+          turnos_fijos: 1,
+          monto_total: 25000,
+          monto_cobrado: 25000,
+          saldo_pendiente: 0,
+          estado_cobro: "al_dia",
+          ocupacion_porcentaje: 80.0,
+          minutos_ocupados: 180,
+          minutos_disponibles: 240,
+          desglose_metodos: {
+            mostrador: 25000,
+            transferencia: 0,
+            online: 0,
+            billetera: 0,
+            otro: 0,
+          },
+          turnos: [
+            {
+              id: 101,
+              cancha_id: 1,
+              cancha_nombre: "Cancha Central",
+              cliente_nombre: "Juan Román Riquelme",
+              cliente_telefono: "+5491112345678",
+              hora_inicio: "18:00",
+              hora_fin: "19:30",
+              duracion_minutos: 90,
+              precio: 15000,
+              monto_pagado: 15000,
+              saldo_pendiente: 0,
+              estado_pago: "pagado_total",
+              metodo_pago: "mostrador",
+              es_fijo: false,
+              estado: "reservado",
+            },
+          ],
+        },
+        {
+          fecha: "2026-09-02",
+          dia_semana_numero: 3,
+          dia_nombre: "Miércoles",
+          total_turnos: 2,
+          turnos_fijos: 0,
+          monto_total: 20000,
+          monto_cobrado: 10000,
+          saldo_pendiente: 10000,
+          estado_cobro: "pendiente",
+          ocupacion_porcentaje: 70.0,
+          minutos_ocupados: 120,
+          minutos_disponibles: 240,
+          desglose_metodos: {
+            mostrador: 0,
+            transferencia: 10000,
+            online: 0,
+            billetera: 0,
+            otro: 0,
+          },
+          turnos: [
+            {
+              id: 102,
+              cancha_id: 1,
+              cancha_nombre: "Cancha Central",
+              cliente_nombre: "Martín Palermo",
+              cliente_telefono: "+5491199998888",
+              hora_inicio: "20:00",
+              hora_fin: "21:30",
+              duracion_minutos: 90,
+              precio: 20000,
+              monto_pagado: 10000,
+              saldo_pendiente: 10000,
+              estado_pago: "senado",
+              metodo_pago: "transferencia",
+              es_fijo: false,
+              estado: "reservado",
+            },
+          ],
+        },
+      ],
+      canchas: [
+        {
+          cancha_id: 1,
+          nombre: "Cancha Central",
+          deporte: "padel",
+          turnos: 4,
+          total_facturado: 45000,
+          total_cobrado: 35000,
+          saldo_pendiente: 10000,
+        },
+      ],
+      metodos_pago: {
+        mostrador: 25000,
+        transferencia: 10000,
+        online: 0,
+        billetera: 0,
+        otro: 0,
+      },
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/is-admin")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ is_admin: true, is_authenticated: true }),
+        });
+      }
+      if (urlStr.includes("/resumen-diario")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, data: mockResumenData }),
+        });
+      }
+      if (urlStr.includes("/dashboard")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              complejo: {
+                id: 1,
+                nombre: "Club Pádel Pro",
+                subdominio: "padel-pro",
+                deporte_principal: "padel",
+                owner: { id: 1, name: "Nico Dueño", email: "nico@club.com" },
+              },
+              canchas: [{ id: 1, nombre: "Cancha Central", deporte: "padel", precio_base: 10000, activa: true }],
+              horarios: [],
+              turnos_fijos: [],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true }),
+      });
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Switch to Resumen Diario & Caja tab
+    const resumenTabBtn = await screen.findByRole("button", { name: /Resumen Diario & Caja/i });
+    fireEvent.click(resumenTabBtn);
+
+    // Verify Header & KPIs
+    expect(await screen.findByText(/Resumen Diario & Control de Caja/i)).toBeDefined();
+    expect(screen.getAllByText("$45,000").length).toBeGreaterThanOrEqual(1); // Total Facturado
+    expect(screen.getAllByText("$35,000").length).toBeGreaterThanOrEqual(1); // Cobrado
+    expect(screen.getAllByText("$10,000").length).toBeGreaterThanOrEqual(1); // Saldo Pendiente
+
+    // Verify Day Rows
+    expect(screen.getByText(/Martes/i)).toBeDefined();
+    expect(screen.getByText(/Miércoles/i)).toBeDefined();
+    expect(screen.getAllByText(/Al Día/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Pendiente/i).length).toBeGreaterThanOrEqual(1);
+
+    // Click to expand day details
+    const dayRow = screen.getByText(/Miércoles/i);
+    fireEvent.click(dayRow);
+
+    // Verify detailed turnos inside expanded accordion
+    expect(await screen.findByText(/Martín Palermo/i)).toBeDefined();
+    expect(screen.getByRole("button", { name: /Cobrar/i })).toBeDefined();
+  });
 });

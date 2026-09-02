@@ -126,6 +126,7 @@ Route::prefix('clubs')->group(function () {
     Route::put('/{subdomain}/configuracion', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateConfiguracion']);
     Route::put('/{subdomain}/horarios', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateHorarios']);
     Route::get('/{subdomain}/usuarios/buscar', [\App\Http\Controllers\Api\ClubDashboardController::class, 'buscarUsuarios']);
+    Route::get('/{subdomain}/resumen-diario', [\App\Http\Controllers\Api\ClubDashboardController::class, 'resumenDiario']);
 });
 
 Route::get('/complejos/cercanos', [\App\Http\Controllers\Api\ComplejoController::class, 'cercanos']);
