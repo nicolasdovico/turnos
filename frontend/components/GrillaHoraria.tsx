@@ -83,6 +83,8 @@ export interface TurnoOcupado {
   duracion_minutos?: number;
   precio: number;
   metodo_pago?: string;
+  estado_pago?: string;
+  monto_pagado?: number;
   estado: string;
   es_fijo?: boolean;
   cliente_id?: number | null;
@@ -145,6 +147,10 @@ export default function GrillaHoraria({
   const [turnosRetenidos, setTurnosRetenidos] = useState<RetainedLock[]>([]);
   const [turnoToCancel, setTurnoToCancel] = useState<TurnoOcupado | null>(null);
   const [isCancelingTurno, setIsCancelingTurno] = useState<boolean>(false);
+  const [turnoToPay, setTurnoToPay] = useState<TurnoOcupado | null>(null);
+  const [pagoMetodo, setPagoMetodo] = useState<"mostrador" | "transferencia" | "billetera" | "online">("mostrador");
+  const [pagoMonto, setPagoMonto] = useState<string>("");
+  const [isProcessingPago, setIsProcessingPago] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [lockingSlot, setLockingSlot] = useState<string | null>(null);
   const [activeLock, setActiveLock] = useState<ActiveLock | null>(null);
@@ -405,6 +411,122 @@ export default function GrillaHoraria({
       addToast("error", err.message || "Error al liberar el turno.");
     } finally {
       setIsCancelingTurno(false);
+    }
+  };
+
+  const handleLiberarFechaPuntual = async () => {
+    if (!turnoToCancel) return;
+    const targetTurno = turnoToCancel;
+    try {
+      setIsCancelingTurno(true);
+      const token = getAuthToken(propToken);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/turnos/${targetTurno.id}/liberar-fecha`, {
+        method: "DELETE",
+        headers,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al liberar la fecha puntual.");
+      }
+
+      addToast("success", `Fecha puntual del ${targetTurno.fecha} (${targetTurno.hora_inicio} hs) liberada. La recurrencia futura continúa.`);
+      setTurnoToCancel(null);
+      fetchDisponibilidad(fecha);
+    } catch (err: any) {
+      addToast("error", err.message || "Error al liberar la fecha puntual.");
+    } finally {
+      setIsCancelingTurno(false);
+    }
+  };
+
+  const handleDarDeBajaSerie = async () => {
+    if (!turnoToCancel) return;
+    const targetTurno = turnoToCancel;
+    try {
+      setIsCancelingTurno(true);
+      const token = getAuthToken(propToken);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const fechaDate = new Date(targetTurno.fecha + "T12:00:00");
+      const diaSemana = fechaDate.getDay();
+
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/turnos-fijos/serie`, {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({
+          cancha_id: targetTurno.cancha_id || canchaId,
+          dia_semana: diaSemana,
+          hora_inicio: targetTurno.hora_inicio,
+          cliente_id: targetTurno.cliente_id,
+          cliente_nombre: targetTurno.cliente_nombre,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al dar de baja la serie de turnos fijos.");
+      }
+
+      addToast("success", `Turno fijo dado de baja definitivamente (${data.turnos_cancelados ?? "todas las"} semanas futuras canceladas).`);
+      setTurnoToCancel(null);
+      fetchDisponibilidad(fecha);
+    } catch (err: any) {
+      addToast("error", err.message || "Error al dar de baja la serie.");
+    } finally {
+      setIsCancelingTurno(false);
+    }
+  };
+
+  const handleRegistrarPago = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!turnoToPay) return;
+    try {
+      setIsProcessingPago(true);
+      const token = getAuthToken(propToken);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/turnos/${turnoToPay.id}/registrar-pago`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          metodo_pago: pagoMetodo,
+          monto: pagoMonto ? parseFloat(pagoMonto) : turnoToPay.precio,
+          estado_pago: "pagado",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al registrar el pago.");
+      }
+
+      addToast("success", `¡Pago registrado exitosamente con ${pagoMetodo.toUpperCase()}!`);
+      setTurnoToPay(null);
+      setPagoMonto("");
+      fetchDisponibilidad(fecha);
+      fetchWalletBalance();
+    } catch (err: any) {
+      addToast("error", err.message || "Error al registrar el pago.");
+    } finally {
+      setIsProcessingPago(false);
     }
   };
 
@@ -1464,91 +1586,124 @@ export default function GrillaHoraria({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {turnosOcupados.map((turno) => (
-                <div
-                  key={turno.id}
-                  data-testid="admin-reserved-card"
-                  className="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 hover:border-slate-700 transition flex flex-col justify-between gap-3 shadow-sm"
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-sm font-extrabold text-white bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-800">
-                        ⏰ {turno.hora_inicio} - {turno.hora_fin}
-                      </span>
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">
-                        {turno.estado || "Ocupado"}
-                      </span>
-                    </div>
+              {turnosOcupados.map((turno) => {
+                const isFixed = Boolean(turno.es_fijo);
+                const isPagado = turno.estado_pago === "pagado" || turno.estado === "pagado" || turno.estado === "completado";
 
-                    <div className="text-xs space-y-2 pt-0.5">
-                      <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-1">
-                        <div className="font-bold text-white flex items-center justify-between gap-1.5">
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span className="text-emerald-400 font-bold text-sm">👤</span>
-                            <span className="truncate font-extrabold text-white text-[13px] tracking-tight">
-                              {turno.cliente_nombre || "Cliente Mostrador"}
+                return (
+                  <div
+                    key={turno.id}
+                    data-testid="admin-reserved-card"
+                    className={`p-4 rounded-2xl transition flex flex-col justify-between gap-3 shadow-sm ${
+                      isFixed
+                        ? "bg-amber-950/20 border border-amber-500/40 ring-1 ring-amber-500/20 hover:border-amber-400"
+                        : "bg-slate-950 border border-slate-800/90 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-sm font-extrabold text-white bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-800">
+                          ⏰ {turno.hora_inicio} - {turno.hora_fin}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {isFixed && (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm flex items-center gap-1">
+                              <span>🔁</span> Fijo
                             </span>
+                          )}
+                          <span
+                            className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                              isPagado
+                                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                : "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                            }`}
+                          >
+                            {isPagado ? "✓ Pagado" : "⏳ Pendiente"}
                           </span>
-                          {turno.es_fijo && (
-                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold shrink-0">
-                              🔁 Fijo
+                        </div>
+                      </div>
+
+                      <div className="text-xs space-y-2 pt-0.5">
+                        <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-1">
+                          <div className="font-bold text-white flex items-center justify-between gap-1.5">
+                            <span className="flex items-center gap-1.5 truncate">
+                              <span className="text-emerald-400 font-bold text-sm">👤</span>
+                              <span className="truncate font-extrabold text-white text-[13px] tracking-tight">
+                                {turno.cliente_nombre || "Cliente Mostrador"}
+                              </span>
                             </span>
+                          </div>
+
+                          {turno.cliente_email && (
+                            <div className="text-[11px] text-slate-400 flex items-center gap-1.5 truncate px-0.5">
+                              <span>✉️</span>
+                              <span className="truncate">{turno.cliente_email}</span>
+                            </div>
                           )}
                         </div>
 
-                        {turno.cliente_email && (
-                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 truncate px-0.5">
-                            <span>✉️</span>
-                            <span className="truncate">{turno.cliente_email}</span>
+                        {turno.cliente_telefono ? (
+                          <div className="flex items-center justify-between text-slate-300 text-[11px] bg-slate-900/80 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                            <span className="truncate font-mono">📱 {turno.cliente_telefono}</span>
+                            <a
+                              href={`https://wa.me/${turno.cliente_telefono.replace(/[^0-9]/g, "")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-400 hover:underline text-[11px] font-bold shrink-0 ml-2"
+                            >
+                              WhatsApp ↗
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="text-slate-500 text-[11px] italic px-1">
+                            Sin teléfono registrado
                           </div>
                         )}
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                          <span>Método:</span>
+                          <span className="text-slate-200 capitalize font-medium">
+                            {turno.metodo_pago === "online"
+                              ? "💳 Online"
+                              : turno.metodo_pago === "transferencia"
+                              ? "📲 Transferencia"
+                              : turno.metodo_pago === "billetera"
+                              ? "👛 Billetera"
+                              : "💵 Mostrador"}
+                          </span>
+                        </div>
                       </div>
+                    </div>
 
-                      {turno.cliente_telefono ? (
-                        <div className="flex items-center justify-between text-slate-300 text-[11px] bg-slate-900/80 px-2.5 py-1.5 rounded-xl border border-slate-800">
-                          <span className="truncate font-mono">📱 {turno.cliente_telefono}</span>
-                          <a
-                            href={`https://wa.me/${turno.cliente_telefono.replace(/[^0-9]/g, "")}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-emerald-400 hover:underline text-[11px] font-bold shrink-0 ml-2"
+                    <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
+                      <span className="font-bold text-emerald-400 font-mono text-sm">
+                        ${turno.precio ? turno.precio.toLocaleString() : "0"}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {!isPagado && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTurnoToPay(turno);
+                              setPagoMonto(turno.precio ? String(turno.precio) : "");
+                            }}
+                            className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 text-[11px] font-bold transition flex items-center gap-1"
                           >
-                            WhatsApp ↗
-                          </a>
-                        </div>
-                      ) : (
-                        <div className="text-slate-500 text-[11px] italic px-1">
-                          Sin teléfono registrado
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400 pt-0.5">
-                        <span>Pago:</span>
-                        <span className="text-slate-200 capitalize font-medium">
-                          {turno.metodo_pago === "online"
-                            ? "💳 Mercado Pago / Online"
-                            : turno.metodo_pago === "transferencia"
-                            ? "📲 Transferencia"
-                            : "💵 Mostrador / Efectivo"}
-                        </span>
+                            <span>💵</span> Cobrar
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setTurnoToCancel(turno)}
+                          className="px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 text-[11px] font-bold transition flex items-center gap-1"
+                        >
+                          <span>✕</span> Liberar Turno
+                        </button>
                       </div>
                     </div>
                   </div>
-
-                  <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                    <span className="font-bold text-emerald-400 font-mono text-sm">
-                      ${turno.precio ? turno.precio.toLocaleString() : "0"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setTurnoToCancel(turno)}
-                      className="px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 text-[11px] font-bold transition flex items-center gap-1"
-                    >
-                      <span>✕</span> Liberar Turno
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -1559,47 +1714,195 @@ export default function GrillaHoraria({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-left">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400 text-2xl border border-rose-500/20">
-                ⚠️
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-2xl border ${
+                turnoToCancel.es_fijo
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                  : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+              }`}>
+                {turnoToCancel.es_fijo ? "🔁" : "⚠️"}
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">¿Liberar este Turno?</h3>
-                <p className="text-xs text-slate-400">El horario volverá a estar disponible para el público</p>
+                <h3 className="text-base font-bold text-white">
+                  {turnoToCancel.es_fijo ? "Gestión de Turno Fijo" : "¿Liberar este Turno?"}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {turnoToCancel.es_fijo
+                    ? "Elige si deseas liberar sólo la fecha puntual o dar de baja la serie completa"
+                    : "El horario volverá a estar disponible para el público"}
+                </p>
               </div>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-slate-400">Horario:</span>
-                <span className="font-mono font-bold text-white">{turnoToCancel.hora_inicio} a {turnoToCancel.hora_fin} hs</span>
+                <span className="text-slate-400">Fecha y Horario:</span>
+                <span className="font-mono font-bold text-white">{turnoToCancel.fecha} ({turnoToCancel.hora_inicio} a {turnoToCancel.hora_fin} hs)</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Titular:</span>
                 <span className="font-bold text-slate-200">{turnoToCancel.cliente_nombre || "Cliente Mostrador"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Monto:</span>
-                <span className="font-bold text-emerald-400">${turnoToCancel.precio?.toLocaleString()}</span>
+                <span className="text-slate-400">Tipo de Reserva:</span>
+                <span className={`font-bold ${turnoToCancel.es_fijo ? "text-amber-400" : "text-slate-300"}`}>
+                  {turnoToCancel.es_fijo ? "🔁 Turno Fijo Recurrente" : "Turno Ocasional"}
+                </span>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-2">
+            {turnoToCancel.es_fijo ? (
+              <div className="space-y-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={isCancelingTurno}
+                  onClick={handleLiberarFechaPuntual}
+                  className="w-full rounded-xl bg-amber-600 hover:bg-amber-500 py-2.5 px-3 text-xs font-bold text-white shadow-lg shadow-amber-600/30 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span>🗓️</span> {isCancelingTurno ? "Liberando..." : "Liberar SOLO esta fecha puntual"}
+                </button>
+                <p className="text-[11px] text-slate-400 text-center">
+                  Conserva el turno fijo del cliente para todas las semanas siguientes.
+                </p>
+
+                <div className="border-t border-slate-800 my-2"></div>
+
+                <button
+                  type="button"
+                  disabled={isCancelingTurno}
+                  onClick={handleDarDeBajaSerie}
+                  className="w-full rounded-xl bg-rose-600/90 hover:bg-rose-500 py-2.5 px-3 text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <span>🚫</span> {isCancelingTurno ? "Cancelando..." : "Dar de BAJA Turno Fijo Definitivamente"}
+                </button>
+                <p className="text-[11px] text-rose-300/80 text-center">
+                  Cancela todas las semanas futuras de este horario.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setTurnoToCancel(null)}
+                  className="w-full rounded-xl bg-slate-800 hover:bg-slate-700 py-2 text-xs font-bold text-slate-300 transition mt-1"
+                >
+                  Volver sin cambios
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTurnoToCancel(null)}
+                  className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                >
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  disabled={isCancelingTurno}
+                  onClick={handleCancelTurno}
+                  className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isCancelingTurno ? "Liberando..." : "Sí, Liberar Turno"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registrar Pago de Turno (Admin) */}
+      {turnoToPay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-left">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 text-xl border border-emerald-500/20">
+                  💵
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Registrar Cobro de Turno</h3>
+                  <p className="text-xs text-slate-400">{turnoToPay.fecha} • {turnoToPay.hora_inicio} a {turnoToPay.hora_fin} hs</p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setTurnoToCancel(null)}
-                className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                onClick={() => setTurnoToPay(null)}
+                className="text-slate-400 hover:text-white transition rounded-lg p-1 text-sm font-bold"
               >
-                Volver
-              </button>
-              <button
-                type="button"
-                disabled={isCancelingTurno}
-                onClick={handleCancelTurno}
-                className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                {isCancelingTurno ? "Liberando..." : "Sí, Liberar Turno"}
+                ✕
               </button>
             </div>
+
+            <form onSubmit={handleRegistrarPago} className="space-y-4 text-xs">
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                <div className="flex justify-between text-slate-400">
+                  <span>Titular:</span>
+                  <span className="font-bold text-white">{turnoToPay.cliente_nombre || "Cliente Mostrador"}</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Precio Acordado:</span>
+                  <span className="font-bold text-emerald-400 font-mono">${turnoToPay.precio?.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1.5">
+                  Método de Pago:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "mostrador", label: "💵 Efectivo / Mostrador" },
+                    { id: "transferencia", label: "📲 Transferencia" },
+                    { id: "billetera", label: "👛 Billetera Virtual" },
+                    { id: "online", label: "💳 Online / Tarjeta" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPagoMetodo(m.id as any)}
+                      className={`p-2.5 rounded-xl border text-left font-bold transition text-xs ${
+                        pagoMetodo === m.id
+                          ? "bg-emerald-500/20 border-emerald-500 text-white"
+                          : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Monto a Cobrar ($):
+                </label>
+                <input
+                  type="number"
+                  value={pagoMonto}
+                  onChange={(e) => setPagoMonto(e.target.value)}
+                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                  placeholder={String(turnoToPay.precio || 0)}
+                  min="0"
+                  step="100"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setTurnoToPay(null)}
+                  className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessingPago}
+                  className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isProcessingPago ? "Procesando..." : "✓ Confirmar Cobro"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

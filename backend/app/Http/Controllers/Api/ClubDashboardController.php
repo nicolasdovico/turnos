@@ -5,12 +5,22 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Cancha;
 use App\Models\Complejo;
+use App\Models\HorarioAtencion;
 use App\Models\Turno;
+use App\Models\User;
+use App\Services\ReservaLockService;
+use App\Services\WalletService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ClubDashboardController extends Controller
 {
+    public function __construct(
+        protected ReservaLockService $reservaLockService,
+        protected WalletService $walletService
+    ) {}
     /**
      * Verificar si el usuario autenticado es el administrador/dueño del club.
      */
@@ -543,4 +553,635 @@ class ClubDashboardController extends Controller
             'horarios' => $horariosActualizados,
         ]);
     }
+
+    /**
+     * Listar las series de turnos fijos activas del club.
+     */
+    public function getTurnosFijos(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+        if (!$complejo) {
+            return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if ($user) {
+            $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+            $isAdmin = ($user->role ?? '') === 'admin';
+            if (!$isOwner && !$isAdmin) {
+                return response()->json(['success' => false, 'message' => 'No tienes permisos para ver los turnos fijos de este club.'], 403);
+            }
+        }
+
+        $turnosFijos = Turno::withoutGlobalScopes()
+            ->with(['cancha', 'cliente'])
+            ->where('complejo_id', $complejo->id)
+            ->where('es_fijo', true)
+            ->whereIn('estado', ['reservado', 'confirmado', 'completado', 'pagado'])
+            ->orderBy('fecha', 'asc')
+            ->orderBy('hora_inicio', 'asc')
+            ->get();
+
+        $hoy = Carbon::today()->format('Y-m-d');
+        $seriesMap = [];
+
+        foreach ($turnosFijos as $t) {
+            $fechaCarbon = Carbon::parse($t->fecha);
+            $diaSemana = $fechaCarbon->dayOfWeek; // 0=Dom, 1=Lun, ..., 6=Sab
+            $horaInicioFmt = Carbon::parse($t->hora_inicio)->format('H:i');
+            $clienteKey = $t->cliente_id ? "uid_{$t->cliente_id}" : "nom_" . md5($t->cliente_nombre ?? 'mostrador');
+            $serieKey = "{$t->cancha_id}_{$diaSemana}_{$horaInicioFmt}_{$clienteKey}";
+
+            if (!isset($seriesMap[$serieKey])) {
+                $seriesMap[$serieKey] = [
+                    'id' => $t->id,
+                    'cancha_id' => $t->cancha_id,
+                    'cancha_nombre' => $t->cancha?->nombre ?? 'Cancha',
+                    'deporte' => $t->cancha?->deporte ?? 'padel',
+                    'dia_semana' => $diaSemana,
+                    'hora_inicio' => $horaInicioFmt,
+                    'hora_fin' => Carbon::parse($t->hora_fin)->format('H:i'),
+                    'precio' => (float) $t->precio,
+                    'cliente_id' => $t->cliente_id,
+                    'cliente_nombre' => $t->cliente_nombre ?: ($t->cliente?->name ?: 'Cliente Mostrador'),
+                    'cliente_telefono' => $t->cliente_telefono ?: ($t->cliente?->telefono ?: null),
+                    'cliente_email' => $t->cliente?->email,
+                    'metodo_pago' => $t->metodo_pago ?? 'mostrador',
+                    'total_turnos' => 0,
+                    'proximas_fechas_count' => 0,
+                    'proxima_fecha' => null,
+                    'fecha_inicio' => $t->fecha instanceof Carbon ? $t->fecha->format('Y-m-d') : (string) $t->fecha,
+                    'fecha_fin' => $t->fecha instanceof Carbon ? $t->fecha->format('Y-m-d') : (string) $t->fecha,
+                    'proximas_fechas' => [],
+                ];
+            }
+
+            $seriesMap[$serieKey]['total_turnos']++;
+            $fechaStr = $t->fecha instanceof Carbon ? $t->fecha->format('Y-m-d') : (string) $t->fecha;
+            $seriesMap[$serieKey]['fecha_fin'] = $fechaStr;
+
+            if ($fechaStr >= $hoy) {
+                $seriesMap[$serieKey]['proximas_fechas_count']++;
+                if (!$seriesMap[$serieKey]['proxima_fecha']) {
+                    $seriesMap[$serieKey]['proxima_fecha'] = $fechaStr;
+                }
+                if (count($seriesMap[$serieKey]['proximas_fechas']) < 6) {
+                    $seriesMap[$serieKey]['proximas_fechas'][] = [
+                        'id' => $t->id,
+                        'fecha' => $fechaStr,
+                        'hora_inicio' => $horaInicioFmt,
+                        'hora_fin' => Carbon::parse($t->hora_fin)->format('H:i'),
+                        'estado' => $t->estado,
+                        'estado_pago' => $t->estado_pago ?? 'pendiente',
+                        'precio' => (float) $t->precio,
+                        'monto_pagado' => (float) $t->monto_pagado,
+                        'metodo_pago' => $t->metodo_pago ?? 'mostrador',
+                    ];
+                }
+            }
+        }
+
+        $series = array_values(array_map(function ($s) {
+            $s['requiere_renovacion'] = ($s['proximas_fechas_count'] <= 2);
+            $s['dias_restantes_aprox'] = $s['proximas_fechas_count'] * 7;
+            return $s;
+        }, $seriesMap));
+
+        return response()->json([
+            'success' => true,
+            'data' => $series,
+        ]);
+    }
+
+    /**
+     * Crear o registrar una nueva serie de turnos fijos (por defecto 26 semanas = 6 meses).
+     */
+    public function storeTurnoFijo(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+        if (!$complejo) {
+            return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if ($user) {
+            $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+            $isAdmin = ($user->role ?? '') === 'admin';
+            if (!$isOwner && !$isAdmin) {
+                return response()->json(['success' => false, 'message' => 'No tienes permisos.'], 403);
+            }
+        }
+
+        $validated = $request->validate([
+            'cancha_id' => 'required|integer|exists:canchas,id',
+            'dia_semana' => 'required|integer|between:0,6',
+            'hora_inicio' => 'required|string|max:5',
+            'hora_fin' => 'nullable|string|max:5',
+            'fecha_inicio' => 'nullable|date_format:Y-m-d',
+            'semanas' => 'nullable|integer|min:1|max:52',
+            'precio' => 'nullable|numeric|min:0',
+            'cliente_id' => 'nullable|integer|exists:users,id',
+            'cliente_nombre' => 'nullable|string|max:255',
+            'cliente_telefono' => 'nullable|string|max:50',
+            'metodo_pago' => 'nullable|string|in:mostrador,transferencia,billetera,online',
+        ]);
+
+        $cancha = Cancha::where('complejo_id', $complejo->id)->find($validated['cancha_id']);
+        if (!$cancha) {
+            return response()->json(['success' => false, 'message' => 'Cancha no encontrada en este complejo.'], 404);
+        }
+
+        $semanas = $validated['semanas'] ?? 26; // 6 meses estándar
+        $horaInicio = Carbon::parse($validated['hora_inicio'])->format('H:i');
+        $targetDiaSemana = (int) $validated['dia_semana'];
+
+        if (!empty($validated['fecha_inicio'])) {
+            $startDate = Carbon::parse($validated['fecha_inicio']);
+            if ($startDate->dayOfWeek !== $targetDiaSemana) {
+                $startDate->next($targetDiaSemana);
+            }
+        } else {
+            $startDate = Carbon::today();
+            if ($startDate->dayOfWeek !== $targetDiaSemana) {
+                $startDate->next($targetDiaSemana);
+            }
+        }
+
+        if (!empty($validated['hora_fin'])) {
+            $horaFin = Carbon::parse($validated['hora_fin'])->format('H:i');
+        } else {
+            $horario = HorarioAtencion::where('complejo_id', $complejo->id)
+                ->where('dia_semana', $targetDiaSemana)
+                ->first();
+            $duracion = $cancha->duracion_minutos ?: ($horario?->duracion_turno_minutos ?: 60);
+            $horaFin = Carbon::parse($startDate->format('Y-m-d') . ' ' . $horaInicio)
+                ->addMinutes($duracion)
+                ->format('H:i');
+        }
+
+        $precio = $validated['precio'] ?? (float) $cancha->precio_base;
+        $clienteId = $validated['cliente_id'] ?? null;
+        $clienteNombre = $validated['cliente_nombre'] ?? null;
+        $clienteTelefono = $validated['cliente_telefono'] ?? null;
+        $metodoPago = $validated['metodo_pago'] ?? 'mostrador';
+
+        if ($clienteId && !$clienteNombre) {
+            $u = User::find($clienteId);
+            $clienteNombre = $u?->name;
+            $clienteTelefono = $clienteTelefono ?: $u?->telefono;
+        }
+
+        $fechas = [];
+        $currentDate = $startDate->copy();
+        for ($i = 0; $i < $semanas; $i++) {
+            $fechas[] = $currentDate->format('Y-m-d');
+            $currentDate->addWeek();
+        }
+
+        return DB::transaction(function () use (
+            $complejo,
+            $cancha,
+            $fechas,
+            $horaInicio,
+            $horaFin,
+            $clienteId,
+            $clienteNombre,
+            $clienteTelefono,
+            $precio,
+            $metodoPago
+        ) {
+            // Comprobación de conflictos
+            foreach ($fechas as $f) {
+                $conflicto = Turno::withoutGlobalScopes()
+                    ->where('cancha_id', $cancha->id)
+                    ->where('fecha', $f)
+                    ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+                    ->where('hora_inicio', '<', $horaFin)
+                    ->where('hora_fin', '>', $horaInicio)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($conflicto) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'RECURRING_SLOT_CONFLICT',
+                        'message' => "Conflicto en la fecha {$f} {$horaInicio}: el horario ya se encuentra ocupado.",
+                        'fecha_conflicto' => $f,
+                    ], 409);
+                }
+            }
+
+            $turnosCreados = [];
+            foreach ($fechas as $f) {
+                $turno = Turno::withoutGlobalScopes()
+                    ->where('cancha_id', $cancha->id)
+                    ->where('fecha', $f)
+                    ->where('hora_inicio', $horaInicio)
+                    ->first();
+
+                if ($turno) {
+                    $turno->update([
+                        'complejo_id' => $complejo->id,
+                        'cliente_id' => $clienteId,
+                        'cliente_nombre' => $clienteNombre,
+                        'cliente_telefono' => $clienteTelefono,
+                        'hora_fin' => $horaFin,
+                        'precio' => $precio,
+                        'metodo_pago' => $metodoPago,
+                        'estado' => 'reservado',
+                        'es_fijo' => true,
+                    ]);
+                    $turnosCreados[] = $turno;
+                } else {
+                    $turnosCreados[] = Turno::create([
+                        'complejo_id' => $complejo->id,
+                        'cancha_id' => $cancha->id,
+                        'cliente_id' => $clienteId,
+                        'cliente_nombre' => $clienteNombre,
+                        'cliente_telefono' => $clienteTelefono,
+                        'fecha' => $f,
+                        'hora_inicio' => $horaInicio,
+                        'hora_fin' => $horaFin,
+                        'precio' => $precio,
+                        'metodo_pago' => $metodoPago,
+                        'estado' => 'reservado',
+                        'es_fijo' => true,
+                    ]);
+                }
+
+                $this->reservaLockService->liberarBloqueo($cancha->id, $f, $horaInicio);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Turnos fijos generados exitosamente.',
+                'cantidad' => count($turnosCreados),
+            ], 201);
+        });
+    }
+
+    /**
+     * Renovar una serie de turnos fijos por 26 semanas (6 meses) adicionales.
+     */
+    public function renovarTurnoFijo(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+        if (!$complejo) {
+            return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if ($user) {
+            $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+            $isAdmin = ($user->role ?? '') === 'admin';
+            if (!$isOwner && !$isAdmin) {
+                return response()->json(['success' => false, 'message' => 'No tienes permisos.'], 403);
+            }
+        }
+
+        $validated = $request->validate([
+            'cancha_id' => 'required|integer|exists:canchas,id',
+            'dia_semana' => 'required|integer|between:0,6',
+            'hora_inicio' => 'required|string|max:5',
+            'hora_fin' => 'nullable|string|max:5',
+            'cliente_id' => 'nullable|integer',
+            'cliente_nombre' => 'nullable|string|max:255',
+            'semanas' => 'nullable|integer|min:1|max:52',
+            'precio' => 'nullable|numeric|min:0',
+        ]);
+
+        $semanas = $validated['semanas'] ?? 26;
+        $horaInicio = Carbon::parse($validated['hora_inicio'])->format('H:i');
+
+        $query = Turno::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->where('cancha_id', $validated['cancha_id'])
+            ->where('hora_inicio', $horaInicio)
+            ->where('es_fijo', true)
+            ->whereIn('estado', ['reservado', 'confirmado', 'completado', 'pagado']);
+
+        if (!empty($validated['cliente_id'])) {
+            $query->where('cliente_id', $validated['cliente_id']);
+        } elseif (!empty($validated['cliente_nombre'])) {
+            $query->where('cliente_nombre', $validated['cliente_nombre']);
+        }
+
+        $lastTurno = $query->orderBy('fecha', 'desc')->first();
+
+        if ($lastTurno) {
+            $startDate = Carbon::parse($lastTurno->fecha)->addWeek();
+            $horaFin = $validated['hora_fin'] ?? Carbon::parse($lastTurno->hora_fin)->format('H:i');
+            $precio = $validated['precio'] ?? (float) $lastTurno->precio;
+            $clienteId = $lastTurno->cliente_id;
+            $clienteNombre = $lastTurno->cliente_nombre;
+            $clienteTelefono = $lastTurno->cliente_telefono;
+            $metodoPago = $lastTurno->metodo_pago ?? 'mostrador';
+        } else {
+            $startDate = Carbon::today()->next((int) $validated['dia_semana']);
+            $cancha = Cancha::find($validated['cancha_id']);
+            $horaFin = $validated['hora_fin'] ?? Carbon::parse($validated['hora_inicio'])->addMinutes($cancha->duracion_minutos ?: 60)->format('H:i');
+            $precio = $validated['precio'] ?? (float) $cancha->precio_base;
+            $clienteId = $validated['cliente_id'] ?? null;
+            $clienteNombre = $validated['cliente_nombre'] ?? null;
+            $clienteTelefono = null;
+            $metodoPago = 'mostrador';
+        }
+
+        $fechas = [];
+        $currentDate = $startDate->copy();
+        for ($i = 0; $i < $semanas; $i++) {
+            $fechas[] = $currentDate->format('Y-m-d');
+            $currentDate->addWeek();
+        }
+
+        return DB::transaction(function () use (
+            $complejo,
+            $validated,
+            $fechas,
+            $horaInicio,
+            $horaFin,
+            $clienteId,
+            $clienteNombre,
+            $clienteTelefono,
+            $precio,
+            $metodoPago,
+            $semanas
+        ) {
+            $canchaId = $validated['cancha_id'];
+
+            foreach ($fechas as $f) {
+                $conflicto = Turno::withoutGlobalScopes()
+                    ->where('cancha_id', $canchaId)
+                    ->where('fecha', $f)
+                    ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+                    ->where('hora_inicio', '<', $horaFin)
+                    ->where('hora_fin', '>', $horaInicio)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($conflicto) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'RECURRING_SLOT_CONFLICT',
+                        'message' => "Conflicto en la fecha {$f} {$horaInicio}: el horario ya se encuentra ocupado.",
+                        'fecha_conflicto' => $f,
+                    ], 409);
+                }
+            }
+
+            $turnosNuevos = [];
+            foreach ($fechas as $f) {
+                $turnosNuevos[] = Turno::create([
+                    'complejo_id' => $complejo->id,
+                    'cancha_id' => $canchaId,
+                    'cliente_id' => $clienteId,
+                    'cliente_nombre' => $clienteNombre,
+                    'cliente_telefono' => $clienteTelefono,
+                    'fecha' => $f,
+                    'hora_inicio' => $horaInicio,
+                    'hora_fin' => $horaFin,
+                    'precio' => $precio,
+                    'metodo_pago' => $metodoPago,
+                    'estado' => 'reservado',
+                    'es_fijo' => true,
+                ]);
+
+                $this->reservaLockService->liberarBloqueo($canchaId, $f, $horaInicio);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Turno fijo renovado exitosamente por {$semanas} semanas más.",
+                'cantidad_nuevos' => count($turnosNuevos),
+            ]);
+        });
+    }
+
+    /**
+     * Liberar únicamente la fecha puntual de un turno fijo (conserva las demás semanas).
+     */
+    public function liberarFechaPuntual(Request $request, string $subdomain, int $turnoId): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+        if (!$complejo) {
+            return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if ($user) {
+            $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+            $isAdmin = ($user->role ?? '') === 'admin';
+            if (!$isOwner && !$isAdmin) {
+                return response()->json(['success' => false, 'message' => 'No tienes permisos.'], 403);
+            }
+        }
+
+        $turno = Turno::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->find($turnoId);
+
+        if (!$turno) {
+            return response()->json(['success' => false, 'message' => 'Turno no encontrado.'], 404);
+        }
+
+        $canchaId = $turno->cancha_id;
+        $fecha = is_string($turno->fecha) ? $turno->fecha : $turno->fecha->format('Y-m-d');
+        $horaInicio = Carbon::parse($turno->hora_inicio)->format('H:i');
+
+        $turno->delete();
+
+        $this->reservaLockService->liberarBloqueo($canchaId, $fecha, $horaInicio);
+
+        try {
+            \App\Models\ListaEspera::where('cancha_id', $canchaId)
+                ->where('fecha', $fecha)
+                ->where('hora_inicio', $horaInicio)
+                ->where('notificado', false)
+                ->update(['notificado' => true]);
+        } catch (\Throwable $e) {}
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Fecha puntual liberada exitosamente. El horario vuelve a estar disponible para reservas.',
+        ]);
+    }
+
+    /**
+     * Dar de baja una serie de turnos fijos completa a futuro.
+     */
+    public function destroySerieTurnoFijo(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+        if (!$complejo) {
+            return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if ($user) {
+            $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+            $isAdmin = ($user->role ?? '') === 'admin';
+            if (!$isOwner && !$isAdmin) {
+                return response()->json(['success' => false, 'message' => 'No tienes permisos.'], 403);
+            }
+        }
+
+        $validated = $request->validate([
+            'cancha_id' => 'required|integer',
+            'dia_semana' => 'required|integer|between:0,6',
+            'hora_inicio' => 'required|string',
+            'cliente_id' => 'nullable|integer',
+            'cliente_nombre' => 'nullable|string',
+        ]);
+
+        $horaInicio = Carbon::parse($validated['hora_inicio'])->format('H:i');
+        $hoy = Carbon::today()->format('Y-m-d');
+
+        $query = Turno::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->where('cancha_id', $validated['cancha_id'])
+            ->where('hora_inicio', $horaInicio)
+            ->where('fecha', '>=', $hoy)
+            ->where('es_fijo', true);
+
+        if (!empty($validated['cliente_id'])) {
+            $query->where('cliente_id', $validated['cliente_id']);
+        } elseif (!empty($validated['cliente_nombre'])) {
+            $query->where('cliente_nombre', $validated['cliente_nombre']);
+        }
+
+        $count = $query->count();
+        $query->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Serie de turnos fijos dada de baja exitosamente ({$count} fechas futuras canceladas).",
+            'turnos_cancelados' => $count,
+        ]);
+    }
+
+    /**
+     * Registrar el pago de un turno (mostrador, transferencia, billetera, online).
+     */
+    public function registrarPagoTurno(Request $request, string $subdomain, int $turnoId): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+        if (!$complejo) {
+            return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if ($user) {
+            $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+            $isAdmin = ($user->role ?? '') === 'admin';
+            if (!$isOwner && !$isAdmin) {
+                return response()->json(['success' => false, 'message' => 'No tienes permisos.'], 403);
+            }
+        }
+
+        $turno = Turno::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->find($turnoId);
+
+        if (!$turno) {
+            return response()->json(['success' => false, 'message' => 'Turno no encontrado.'], 404);
+        }
+
+        $validated = $request->validate([
+            'metodo_pago' => 'required|string|in:mostrador,transferencia,billetera,online',
+            'monto' => 'nullable|numeric|min:0',
+            'estado_pago' => 'nullable|string|in:pagado,sena_pagada,pendiente',
+        ]);
+
+        $monto = isset($validated['monto']) ? (float) $validated['monto'] : (float) $turno->precio;
+        $metodoPago = $validated['metodo_pago'];
+        $estadoPago = $validated['estado_pago'] ?? 'pagado';
+
+        if ($metodoPago === 'billetera') {
+            if (!$turno->cliente_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Para pagar con Billetera Virtual, el turno debe estar asignado a un usuario registrado.',
+                ], 422);
+            }
+
+            $debitado = $this->walletService->debitar(
+                $turno->cliente_id,
+                $complejo->id,
+                $monto,
+                'pago_turno',
+                $turno->id,
+                "Pago de turno {$turno->fecha} {$turno->hora_inicio}"
+            );
+
+            if (!$debitado) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Saldo insuficiente en la billetera virtual del cliente.',
+                ], 422);
+            }
+        }
+
+        $turno->update([
+            'metodo_pago' => $metodoPago,
+            'monto_pagado' => $monto,
+            'saldo_pendiente' => max(0, (float) $turno->precio - $monto),
+            'estado_pago' => $estadoPago,
+            'estado' => 'confirmado',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pago registrado exitosamente.',
+            'turno_id' => $turno->id,
+            'metodo_pago' => $turno->metodo_pago,
+            'monto_pagado' => (float) $turno->monto_pagado,
+            'estado_pago' => $turno->estado_pago,
+        ]);
+    }
+
+    /**
+     * Buscar usuarios registrados en la base de datos para autocompletar titulares de turnos.
+     */
+    public function buscarUsuarios(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json(['message' => 'Complejo no encontrado.'], 404);
+        }
+
+        $user = $request->user('sanctum') ?? $request->user();
+        if (!$user || ($complejo->user_id !== $user->id && $user->email !== 'admin@admin.com')) {
+            return response()->json(['message' => 'No autorizado para gestionar este club.'], 403);
+        }
+
+        $q = trim($request->query('q', ''));
+
+        $query = User::select('id', 'name', 'email', 'telefono');
+
+        if (!empty($q)) {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('email', 'like', "%{$q}%")
+                    ->orWhere('telefono', 'like', "%{$q}%");
+            });
+        }
+
+        $usuarios = $query->orderBy('name', 'asc')->limit(20)->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $usuarios,
+        ]);
+    }
 }
+

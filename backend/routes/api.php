@@ -117,8 +117,15 @@ Route::prefix('clubs')->group(function () {
     Route::put('/{subdomain}/canchas/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateCancha']);
     Route::delete('/{subdomain}/canchas/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyCancha']);
     Route::delete('/{subdomain}/turnos/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyTurno']);
+    Route::delete('/{subdomain}/turnos/{id}/liberar-fecha', [\App\Http\Controllers\Api\ClubDashboardController::class, 'liberarFechaPuntual']);
+    Route::post('/{subdomain}/turnos/{id}/registrar-pago', [\App\Http\Controllers\Api\ClubDashboardController::class, 'registrarPagoTurno']);
+    Route::get('/{subdomain}/turnos-fijos', [\App\Http\Controllers\Api\ClubDashboardController::class, 'getTurnosFijos']);
+    Route::post('/{subdomain}/turnos-fijos', [\App\Http\Controllers\Api\ClubDashboardController::class, 'storeTurnoFijo']);
+    Route::post('/{subdomain}/turnos-fijos/renovar', [\App\Http\Controllers\Api\ClubDashboardController::class, 'renovarTurnoFijo']);
+    Route::delete('/{subdomain}/turnos-fijos/serie', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroySerieTurnoFijo']);
     Route::put('/{subdomain}/configuracion', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateConfiguracion']);
     Route::put('/{subdomain}/horarios', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateHorarios']);
+    Route::get('/{subdomain}/usuarios/buscar', [\App\Http\Controllers\Api\ClubDashboardController::class, 'buscarUsuarios']);
 });
 
 Route::get('/complejos/cercanos', [\App\Http\Controllers\Api\ComplejoController::class, 'cercanos']);

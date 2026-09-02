@@ -194,19 +194,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const fallbackAuth: AuthContextType = {
+  user: null,
+  token: null,
+  isLoading: false,
+  login: async () => ({ success: false, error: undefined }),
+  register: async () => ({ success: false, error: undefined }),
+  logout: async () => {},
+  setAuthSession: () => {},
+  markEmailAsVerified: () => {},
+};
+
 export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-  if (!context) {
-    return {
-      user: null,
-      token: null,
-      isLoading: false,
-      login: async () => ({ success: false, error: undefined }),
-      register: async () => ({ success: false, error: undefined }),
-      logout: async () => {},
-      setAuthSession: () => {},
-      markEmailAsVerified: () => {},
-    };
+  try {
+    if (typeof useContext === "function" && AuthContext) {
+      const context = useContext(AuthContext);
+      if (context) return context;
+    }
+  } catch {
+    // Safe SSR fallback when ReactCurrentDispatcher is null
   }
-  return context;
+  return fallbackAuth;
 }

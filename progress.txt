@@ -870,5 +870,46 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Backend (PHPUnit): 136 tests pasados al 100% (691 aserciones).
   * Frontend (Vitest): 37 tests pasados al 100%.
   * Mobile (Jest): 18 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-09-01] - SISTEMA INTEGRAL DE GESTIÓN DE TURNOS FIJOS & ABONADOS (HORIZONTE 6 MESES)
+-------------------------------------------------------------------------------
+- Requerimiento del Usuario:
+  * Desarrollar interfaz integral para fijar y gestionar turnos recurrentes/semanales (abonados).
+  * Horizonte predeterminado de 6 meses (26 semanas).
+  * Alerta visual de expiración cuando queden <= 2 semanas para que el administrador pueda renovar con 1 clic por otros 6 meses o dar de baja.
+  * Liberación puntual de una sola fecha de la serie sin cancelar las semanas futuras (disparando lista de espera y reincorporando el slot a la grilla pública).
+  * Baja definitiva de la serie de turnos fijos (cancelando en cascada todas las fechas futuras >= hoy).
+  * Cobro universal de turnos fijos con cualquiera de los métodos disponibles: Efectivo/Mostrador, Billetera Virtual (debitando saldo de WalletService), Transferencia Bancaria, o Mercado Pago/Online.
+  * Diferenciación visual en la grilla de turnos del panel de administración (estilos ámbar, badge "🔁 Fijo", estado de pago "✓ Pagado" / "⏳ Pendiente", botón rápido "💵 Cobrar").
+- Backend (Laravel 11):
+  * `app/Http/Controllers/Api/ClubDashboardController.php`:
+    - `getTurnosFijos`: Agrupa turnos con `es_fijo = true` por serie recurrente (cancha, día de la semana, hora inicio/fin, titular). Calcula total de semanas, próximas fechas futuras (`fecha >= hoy`), flag de alerta de expiración (`requiere_renovacion = proximas_fechas_count <= 2`), y lista de fechas agendadas individuales.
+    - `storeTurnoFijo`: Genera series recurrentes fijas de 26 semanas (6 meses) con comprobación pesimista de colisiones bajo transacción y liberación de locks en Redis.
+    - `renovarTurnoFijo`: Extiende 26 semanas adicionales (6 meses) a partir de la última fecha registrada de la serie.
+    - `liberarFechaPuntual`: Elimina únicamente el turno de ese día puntual y notifica a los jugadores en lista de espera (`ListaEspera`).
+    - `destroySerieTurnoFijo`: Cancela en cascada todas las fechas futuras (`fecha >= hoy`) de la serie del titular.
+    - `registrarPagoTurno`: Registra cobros en cualquier turno con soporte para `mostrador`, `transferencia`, `billetera` (debitando de `WalletService`), u `online`.
+  * `routes/api.php`:
+    - Registradas rutas bajo `/api/clubs/{subdomain}/`: `GET /turnos-fijos`, `POST /turnos-fijos`, `POST /turnos-fijos/renovar`, `DELETE /turnos/{id}/liberar-fecha`, `DELETE /turnos-fijos/serie`, `POST /turnos/{id}/registrar-pago`.
+  * `tests/Feature/TurnoFijoManagementTest.php`:
+    - Suite de 9 tests PHPUnit verificando alta a 6 meses, clientes manuales vs registrados, listado y agrupación, alerta de expiración (<= 2 semanas), renovación por 26 semanas más, liberación puntual, baja en serie, pagos con débito de billetera virtual y efectivo, y protección RBAC.
+- Frontend Web (Next.js 14):
+  * `components/GrillaHoraria.tsx`:
+    - Identificación visual de turnos fijos en vista de administración con borde y fondo ámbar (`bg-amber-950/20 border-amber-500/40`) y badge `🔁 Fijo`.
+    - Modal de liberación dual para turnos fijos: `🗓️ Liberar SOLO esta fecha puntual` vs `🚫 Dar de BAJA Turno Fijo Definitivamente`.
+    - Modal interactivo de cobro rápido (`💵 Cobrar`) con selectores de Efectivo, Transferencia, Billetera Virtual y Online.
+  * `app/tenants/[subdomain]/panel/page.tsx`:
+    - Nueva solapa **"🔁 Turnos Fijos"** con resumen numérico (Series Activas, Próximos a Vencer, Fechas Agendadas Futuras).
+    - Banner de alerta cuando existen turnos fijos próximos a vencer sus 6 meses.
+    - Barra de filtros interactivos por día de la semana y por cancha.
+    - Tarjetas de series fijas con datos del titular, acceso directo a WhatsApp, expansión de próximas fechas agendadas, botón `⚡ Renovar 6 Meses Más`, botón de liberación individual por fecha y botón de baja definitiva de serie.
+    - Modal de alta de turnos fijos con selector de cancha, día, horario, titular manual o registrado, precio acordado, método de pago y horizonte de 26 semanas (6 meses).
+    - Modales de confirmación para liberación puntual y cancelación de serie.
+  * `tests/authAndOnboarding.test.tsx` & `tests/GrillaHoraria.test.tsx`:
+    - Tests de integración en Vitest verificando la navegación a la solapa, creación de serie fija a 6 meses, alerta de renovación, extensión de 26 semanas, liberación puntual y cobro de turno.
+- Suites de Tests y Verificación:
+  * Backend (PHPUnit): 145 tests pasados al 100% (742 aserciones).
+  * Frontend (Vitest): 39 tests pasados al 100%.
+  * Frontend Build: Compilación Next.js 14 en producción exitosa (0 errores).
 ===============================================================================
 

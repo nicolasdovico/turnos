@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import Navbar from "../components/Navbar";
 import LoginPage from "../app/login/page";
 import RegisterPage from "../app/registro/page";
@@ -589,5 +589,198 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(await screen.findByText(/¡Horarios de atención actualizados exitosamente!/i)).toBeDefined();
     expect(putHorariosPayload).toBeDefined();
     expect(putHorariosPayload.horarios).toHaveLength(7);
+  });
+
+  it("renders and manages fixed bookings (turnos fijos) for 6 months with renewal alert in club admin panel", async () => {
+    let postTurnoFijoPayload: any = null;
+    let renewPayload: any = null;
+
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: any) => {
+      const urlStr = url.toString();
+
+      if (urlStr.includes("/is-admin")) {
+        return { ok: true, json: async () => ({ is_admin: true }) } as any;
+      }
+      if (urlStr.includes("/dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Padel Club Central",
+                subdominio: "padel-central",
+                deporte_principal: "padel",
+                tipo_negocio: { nombre: "Club Deportivo" },
+                owner: { name: "Dueño Central" },
+              },
+              plan: {
+                nombre: "Oro",
+                modulos: [{ slug: "reservas" }, { slug: "turnos_fijos" }],
+              },
+              canchas: [
+                {
+                  id: 1,
+                  nombre: "Cancha 1 Panorámica",
+                  deporte: "padel",
+                  precio_base: 8000,
+                  estado: "activo",
+                },
+              ],
+              stats: { total_canchas: 1, total_turnos: 26, modulos_count: 2 },
+            },
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/turnos-fijos/renovar")) {
+        renewPayload = JSON.parse(init?.body || "{}");
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            message: "Turno fijo renovado exitosamente por 26 semanas más.",
+            cantidad_nuevos: 26,
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/turnos-fijos") && init?.method === "POST") {
+        postTurnoFijoPayload = JSON.parse(init?.body || "{}");
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            message: "Turnos fijos generados exitosamente.",
+            cantidad: 26,
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/turnos-fijos")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [
+              {
+                id: 101,
+                cancha_id: 1,
+                cancha_nombre: "Cancha 1 Panorámica",
+                deporte: "padel",
+                dia_semana: 1, // Lunes
+                hora_inicio: "19:00",
+                hora_fin: "20:30",
+                precio: 8000,
+                cliente_id: null,
+                cliente_nombre: "Esteban Abonado",
+                cliente_telefono: "1133445566",
+                metodo_pago: "mostrador",
+                total_turnos: 26,
+                proximas_fechas_count: 2, // Expiring soon!
+                proxima_fecha: "2026-09-07",
+                fecha_inicio: "2026-09-01",
+                fecha_fin: "2027-02-28",
+                requiere_renovacion: true,
+                proximas_fechas: [
+                  {
+                    id: 101,
+                    fecha: "2026-09-07",
+                    hora_inicio: "19:00",
+                    hora_fin: "20:30",
+                    estado: "reservado",
+                    estado_pago: "pendiente",
+                    precio: 8000,
+                    monto_pagado: 0,
+                  },
+                ],
+              },
+            ],
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/usuarios/buscar")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [
+              {
+                id: 88,
+                name: "Franco Colapinto",
+                email: "franco@f1.com",
+                telefono: "1144778899",
+              },
+            ],
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Switch to Turnos Fijos tab
+    const turnosFijosTabBtn = await screen.findByRole("button", { name: /Turnos Fijos/i });
+    fireEvent.click(turnosFijosTabBtn);
+
+    expect(await screen.findByText(/Gestión de Turnos Fijos & Abonados/i)).toBeDefined();
+    expect(screen.getByText(/Esteban Abonado/i)).toBeDefined();
+    expect(screen.getByText(/Por Vencer \(2 sem\)/i)).toBeDefined();
+
+    // Click "⚡ Renovar 6 Meses Más"
+    const btnRenovar = screen.getByRole("button", { name: /Renovar 6 Meses Más/i });
+    fireEvent.click(btnRenovar);
+
+    await waitFor(() => {
+      expect(renewPayload).toBeDefined();
+      expect(renewPayload.semanas).toBe(26);
+    });
+
+    // 1. Open "➕ Asignar Nuevo Turno Fijo" modal with manual client
+    const btnNuevoFijo = screen.getByRole("button", { name: /Asignar Nuevo Turno Fijo/i });
+    fireEvent.click(btnNuevoFijo);
+
+    expect(screen.getByText(/Horizonte estándar de 6 meses \(26 semanas\)/i)).toBeDefined();
+
+    // Fill client name
+    const inputNombre = screen.getByPlaceholderText(/Ej: Marcelo Gómez/i);
+    fireEvent.change(inputNombre, { target: { value: "Carlos Pádel Fijo" } });
+
+    // Submit form
+    const btnSubmit = screen.getByRole("button", { name: /Asignar Turno Fijo/i });
+    fireEvent.click(btnSubmit);
+
+    await waitFor(() => {
+      expect(postTurnoFijoPayload).toBeDefined();
+      expect(postTurnoFijoPayload.cliente_nombre).toBe("Carlos Pádel Fijo");
+      expect(postTurnoFijoPayload.semanas).toBe(26);
+    });
+
+    // 2. Open modal and test search & select for registered user
+    fireEvent.click(btnNuevoFijo);
+    const btnUsuarioRegistrado = screen.getByRole("button", { name: /Usuario Registrado/i });
+    fireEvent.click(btnUsuarioRegistrado);
+
+    expect(await screen.findByText(/Buscar y Seleccionar Usuario en BD/i)).toBeDefined();
+    const searchInput = screen.getByPlaceholderText(/Escribe nombre, email o teléfono para buscar/i);
+    fireEvent.focus(searchInput);
+    fireEvent.change(searchInput, { target: { value: "Franco" } });
+
+    // Click matching user from dropdown
+    const userOption = await screen.findByText(/Franco Colapinto/i);
+    fireEvent.click(userOption);
+
+    expect(screen.getByText(/Vinculado/i)).toBeDefined();
+    expect(screen.getByText(/#88/i)).toBeDefined();
+
+    // Submit form for registered user
+    fireEvent.click(screen.getByRole("button", { name: /Asignar Turno Fijo/i }));
+
+    await waitFor(() => {
+      expect(postTurnoFijoPayload.cliente_id).toBe(88);
+      expect(postTurnoFijoPayload.cliente_nombre).toBe("Franco Colapinto");
+    });
   });
 });

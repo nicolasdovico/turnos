@@ -162,6 +162,42 @@ interface HorarioDiaForm {
   duracion_turno_minutos: number;
 }
 
+interface TurnoFijoFecha {
+  id: number;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  estado: string;
+  estado_pago: string;
+  precio: number;
+  monto_pagado: number;
+  metodo_pago?: string;
+}
+
+interface TurnoFijoSerie {
+  id: number;
+  cancha_id: number;
+  cancha_nombre: string;
+  deporte: string;
+  dia_semana: number;
+  hora_inicio: string;
+  hora_fin: string;
+  precio: number;
+  cliente_id: number | null;
+  cliente_nombre: string;
+  cliente_telefono: string | null;
+  cliente_email: string | null;
+  metodo_pago: string;
+  total_turnos: number;
+  proximas_fechas_count: number;
+  proxima_fecha: string | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  requiere_renovacion: boolean;
+  dias_restantes_aprox: number;
+  proximas_fechas: TurnoFijoFecha[];
+}
+
 const DIAS_CONFIG = [
   { dia_semana: 1, nombre: "Lunes" },
   { dia_semana: 2, nombre: "Martes" },
@@ -253,7 +289,7 @@ export default function ClubAdminPanel() {
   const subdomain = (params?.subdomain as string) || "demo";
   const { user, token } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"canchas" | "modulos" | "horarios" | "politicas" | "config">("canchas");
+  const [activeTab, setActiveTab] = useState<"canchas" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "config">("canchas");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -276,6 +312,43 @@ export default function ClubAdminPanel() {
   const [horariosSuccessMsg, setHorariosSuccessMsg] = useState<string | null>(null);
   const [horariosErrorMsg, setHorariosErrorMsg] = useState<string | null>(null);
   const [stats, setStats] = useState({ total_canchas: 0, total_turnos: 0, modulos_count: 0 });
+
+  // Estados para Turnos Fijos
+  const [turnosFijos, setTurnosFijos] = useState<TurnoFijoSerie[]>([]);
+  const [loadingTurnosFijos, setLoadingTurnosFijos] = useState(false);
+  const [filtroDiaFijo, setFiltroDiaFijo] = useState<number | "todos">("todos");
+  const [filtroCanchaFijo, setFiltroCanchaFijo] = useState<number | "todos">("todos");
+  const [showNewTurnoFijoModal, setShowNewTurnoFijoModal] = useState(false);
+  const [isSavingTurnoFijo, setIsSavingTurnoFijo] = useState(false);
+  const [isRenewingSerieKey, setIsRenewingSerieKey] = useState<string | null>(null);
+  const [turnosFijosSuccessMsg, setTurnosFijosSuccessMsg] = useState<string | null>(null);
+  const [turnosFijosErrorMsg, setTurnosFijosErrorMsg] = useState<string | null>(null);
+  const [expandedSerieKey, setExpandedSerieKey] = useState<string | null>(null);
+
+  // Formulario de Alta Turno Fijo
+  const [tfCanchaId, setTfCanchaId] = useState<number | "">("");
+  const [tfDiaSemana, setTfDiaSemana] = useState<number>(1); // Lunes
+  const [tfHoraInicio, setTfHoraInicio] = useState<string>("19:00");
+  const [tfHoraFin, setTfHoraFin] = useState<string>("");
+  const [tfTipoCliente, setTfTipoCliente] = useState<"manual" | "registrado">("manual");
+  const [tfClienteNombre, setTfClienteNombre] = useState<string>("");
+  const [tfClienteTelefono, setTfClienteTelefono] = useState<string>("");
+  const [tfClienteId, setTfClienteId] = useState<number | "">("");
+  const [tfPrecio, setTfPrecio] = useState<string>("");
+  const [tfSemanas, setTfSemanas] = useState<number>(26); // 6 meses estándar
+  const [tfMetodoPago, setTfMetodoPago] = useState<string>("mostrador");
+
+  // Búsqueda de Usuarios Registrados (Select Editable / Combobox)
+  const [searchUserQuery, setSearchUserQuery] = useState<string>("");
+  const [searchedUsers, setSearchedUsers] = useState<Array<{ id: number; name: string; email: string; telefono?: string | null }>>([]);
+  const [loadingSearchUsers, setLoadingSearchUsers] = useState<boolean>(false);
+  const [showUserDropdown, setShowUserDropdown] = useState<boolean>(false);
+  const [selectedUserObj, setSelectedUserObj] = useState<{ id: number; name: string; email: string; telefono?: string | null } | null>(null);
+
+  // Modales de Liberación / Baja
+  const [serieToCancel, setSerieToCancel] = useState<TurnoFijoSerie | null>(null);
+  const [fechaPuntualToRelease, setFechaPuntualToRelease] = useState<{ id: number; fecha: string; hora_inicio: string } | null>(null);
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   // Estados para Políticas de Cobro, Seña y Cancelación
   const [tipoCobroReserva, setTipoCobroReserva] = useState<string>("sena");
@@ -494,9 +567,259 @@ export default function ClubAdminPanel() {
     }
   };
 
+  const fetchTurnosFijos = async () => {
+    try {
+      setLoadingTurnosFijos(true);
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/turnos-fijos`, {
+        headers: {
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTurnosFijos(data.data || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingTurnosFijos(false);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    fetchTurnosFijos();
   }, [subdomain, token]);
+
+  const fetchRegisteredUsers = async (query: string = "") => {
+    try {
+      setLoadingSearchUsers(true);
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const url = `${API_BASE}/clubs/${subdomain}/usuarios/buscar${query ? `?q=${encodeURIComponent(query)}` : ""}`;
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSearchedUsers(data.data || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingSearchUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tfTipoCliente === "registrado" && showNewTurnoFijoModal) {
+      const timeout = setTimeout(() => {
+        fetchRegisteredUsers(searchUserQuery);
+      }, 250);
+      return () => clearTimeout(timeout);
+    }
+  }, [searchUserQuery, tfTipoCliente, showNewTurnoFijoModal]);
+
+  const handleSelectRegisteredUser = (u: { id: number; name: string; email: string; telefono?: string | null }) => {
+    setSelectedUserObj(u);
+    setTfClienteId(u.id);
+    setTfClienteNombre(u.name);
+    setTfClienteTelefono(u.telefono || "");
+    setSearchUserQuery(u.name);
+    setShowUserDropdown(false);
+  };
+
+  const handleClearSelectedUser = () => {
+    setSelectedUserObj(null);
+    setTfClienteId("");
+    setTfClienteNombre("");
+    setTfClienteTelefono("");
+    setSearchUserQuery("");
+    fetchRegisteredUsers("");
+  };
+
+  const handleOpenNewTurnoFijoModal = () => {
+    setTfCanchaId(canchas.length > 0 ? canchas[0].id : "");
+    setTfDiaSemana(1); // Lunes
+    setTfHoraInicio("19:00");
+    setTfHoraFin("");
+    setTfTipoCliente("manual");
+    setTfClienteNombre("");
+    setTfClienteTelefono("");
+    setTfClienteId("");
+    setSearchUserQuery("");
+    setSelectedUserObj(null);
+    setShowUserDropdown(false);
+    setTfPrecio(canchas.length > 0 ? String(canchas[0].precio_base || 8000) : "8000");
+    setTfSemanas(26); // 6 meses estándar
+    setTfMetodoPago("mostrador");
+    setTurnosFijosSuccessMsg(null);
+    setTurnosFijosErrorMsg(null);
+    setShowNewTurnoFijoModal(true);
+    fetchRegisteredUsers("");
+  };
+
+  const handleCreateTurnoFijo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingTurnoFijo(true);
+    setTurnosFijosSuccessMsg(null);
+    setTurnosFijosErrorMsg(null);
+
+    try {
+      if (!tfCanchaId) {
+        throw new Error("Selecciona una cancha para el turno fijo.");
+      }
+      if (tfTipoCliente === "manual" && !tfClienteNombre.trim()) {
+        throw new Error("Ingresa el nombre del cliente titular.");
+      }
+      if (tfTipoCliente === "registrado" && !tfClienteId) {
+        throw new Error("Selecciona un usuario registrado de la lista.");
+      }
+
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/turnos-fijos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+        body: JSON.stringify({
+          cancha_id: tfCanchaId,
+          dia_semana: tfDiaSemana,
+          hora_inicio: tfHoraInicio,
+          hora_fin: tfHoraFin || undefined,
+          semanas: tfSemanas || 26,
+          precio: tfPrecio ? parseFloat(tfPrecio) : undefined,
+          cliente_id: tfTipoCliente === "registrado" && tfClienteId ? Number(tfClienteId) : null,
+          cliente_nombre: tfTipoCliente === "manual" ? tfClienteNombre.trim() : (selectedUserObj?.name || tfClienteNombre.trim() || undefined),
+          cliente_telefono: tfTipoCliente === "manual" ? tfClienteTelefono.trim() : (selectedUserObj?.telefono || tfClienteTelefono.trim() || undefined),
+          metodo_pago: tfMetodoPago,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al generar los turnos fijos.");
+      }
+
+      setTurnosFijosSuccessMsg(`¡Turno fijo de ${tfSemanas} semanas (6 meses) fijado exitosamente (${data.cantidad} turnos agendados)!`);
+      setShowNewTurnoFijoModal(false);
+      fetchTurnosFijos();
+    } catch (err: any) {
+      setTurnosFijosErrorMsg(err.message || "Error al crear turno fijo.");
+    } finally {
+      setIsSavingTurnoFijo(false);
+    }
+  };
+
+  const handleRenewTurnoFijo = async (serie: TurnoFijoSerie) => {
+    const serieKey = `${serie.cancha_id}_${serie.dia_semana}_${serie.hora_inicio}`;
+    try {
+      setIsRenewingSerieKey(serieKey);
+      setTurnosFijosSuccessMsg(null);
+      setTurnosFijosErrorMsg(null);
+
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/turnos-fijos/renovar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+        body: JSON.stringify({
+          cancha_id: serie.cancha_id,
+          dia_semana: serie.dia_semana,
+          hora_inicio: serie.hora_inicio,
+          hora_fin: serie.hora_fin,
+          cliente_id: serie.cliente_id,
+          cliente_nombre: serie.cliente_nombre,
+          semanas: 26, // 6 meses adicionales
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al renovar el turno fijo.");
+      }
+
+      setTurnosFijosSuccessMsg(`¡Turno fijo de los ${DIAS[serie.dia_semana]} ${serie.hora_inicio} hs renovado por 6 meses adicionales (${data.cantidad_nuevos || 26} semanas)!`);
+      fetchTurnosFijos();
+    } catch (err: any) {
+      setTurnosFijosErrorMsg(err.message || "Error al renovar el turno fijo.");
+    } finally {
+      setIsRenewingSerieKey(null);
+    }
+  };
+
+  const handleLiberarFechaPuntualSerie = async () => {
+    if (!fechaPuntualToRelease) return;
+    try {
+      setIsProcessingAction(true);
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/turnos/${fechaPuntualToRelease.id}/liberar-fecha`, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al liberar la fecha.");
+      }
+
+      setTurnosFijosSuccessMsg(`Fecha puntual del ${fechaPuntualToRelease.fecha} liberada correctamente. El turno vuelve a estar disponible.`);
+      setFechaPuntualToRelease(null);
+      fetchTurnosFijos();
+    } catch (err: any) {
+      setTurnosFijosErrorMsg(err.message || "Error al liberar la fecha.");
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  const handleDestroySerieFija = async () => {
+    if (!serieToCancel) return;
+    try {
+      setIsProcessingAction(true);
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/turnos-fijos/serie`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+        body: JSON.stringify({
+          cancha_id: serieToCancel.cancha_id,
+          dia_semana: serieToCancel.dia_semana,
+          hora_inicio: serieToCancel.hora_inicio,
+          cliente_id: serieToCancel.cliente_id,
+          cliente_nombre: serieToCancel.cliente_nombre,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al dar de baja el turno fijo.");
+      }
+
+      setTurnosFijosSuccessMsg(`Serie de turnos fijos cancelada exitosamente (${data.turnos_cancelados || "todas las"} semanas futuras dadas de baja).`);
+      setSerieToCancel(null);
+      fetchTurnosFijos();
+    } catch (err: any) {
+      setTurnosFijosErrorMsg(err.message || "Error al dar de baja el turno fijo.");
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
 
   const handleSavePoliticas = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -936,6 +1259,16 @@ export default function ClubAdminPanel() {
             }`}
           >
             🕒 Horarios de Atención
+          </button>
+          <button
+            onClick={() => setActiveTab("turnos-fijos")}
+            className={`pb-4 transition border-b-2 ${
+              activeTab === "turnos-fijos"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            🔁 Turnos Fijos ({turnosFijos.length})
           </button>
           <button
             onClick={() => setActiveTab("politicas")}
@@ -1978,7 +2311,811 @@ export default function ClubAdminPanel() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: POLÍTICAS DE SEÑA & CANCELACIÓN */}
+        {/* TAB 4: TURNOS FIJOS */}
+        {/* ========================================================================= */}
+        {activeTab === "turnos-fijos" && (
+          <div className="mt-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">🔁 Gestión de Turnos Fijos & Abonados</h2>
+                <p className="text-xs text-slate-400">
+                  Administra los turnos semanales fijos asignados por 6 meses. Configura días, horarios, titulares, tarifas y controla las alertas de renovación.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenNewTurnoFijoModal}
+                className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2 self-start sm:self-auto shrink-0"
+              >
+                <span>➕</span> Asignar Nuevo Turno Fijo
+              </button>
+            </div>
+
+            {turnosFijosSuccessMsg && (
+              <div role="alert" className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span>✓</span>
+                  <span>{turnosFijosSuccessMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTurnosFijosSuccessMsg(null)}
+                  className="text-emerald-400 hover:text-white text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {turnosFijosErrorMsg && (
+              <div role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span>⚠️</span>
+                  <span>{turnosFijosErrorMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTurnosFijosErrorMsg(null)}
+                  className="text-rose-400 hover:text-white text-xs font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Series Fijas Activas</span>
+                  <div className="mt-1 text-2xl font-black text-white">{turnosFijos.length}</div>
+                </div>
+                <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
+                  🔁
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Próximos a Vencer</span>
+                  <div className="mt-1 text-2xl font-black text-amber-400">
+                    {turnosFijos.filter((t) => t.requiere_renovacion).length}
+                  </div>
+                </div>
+                <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl">
+                  ⚠️
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Fechas Agendadas Futuras</span>
+                  <div className="mt-1 text-2xl font-black text-white">
+                    {turnosFijos.reduce((sum, s) => sum + s.proximas_fechas_count, 0)}
+                  </div>
+                </div>
+                <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl">
+                  📅
+                </div>
+              </div>
+            </div>
+
+            {/* Expiration warning banner */}
+            {turnosFijos.some((t) => t.requiere_renovacion) && (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">⚠️</span>
+                  <div>
+                    <strong className="font-bold text-amber-200">
+                      Hay {turnosFijos.filter((t) => t.requiere_renovacion).length} turnos fijos próximos a vencer (quedan 2 semanas o menos de recurrencia).
+                    </strong>
+                    <p className="text-[11px] text-amber-300/80">
+                      Renueva sus 6 meses de forma anticipada o coordina con el titular para liberar el espacio.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Filters Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setFiltroDiaFijo("todos")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                    filtroDiaFijo === "todos"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-white"
+                  }`}
+                >
+                  Todos los Días
+                </button>
+                {DIAS_CONFIG.map((d) => (
+                  <button
+                    key={d.dia_semana}
+                    type="button"
+                    onClick={() => setFiltroDiaFijo(d.dia_semana)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                      filtroDiaFijo === d.dia_semana
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                        : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-white"
+                    }`}
+                  >
+                    {d.nombre}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={filtroCanchaFijo}
+                  onChange={(e) => setFiltroCanchaFijo(e.target.value === "todos" ? "todos" : Number(e.target.value))}
+                  className="rounded-xl bg-slate-950 border border-slate-800 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="todos">Todas las Canchas</option>
+                  {canchas.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* List of Turnos Fijos */}
+            {(() => {
+              const filteredSeries = turnosFijos.filter((s) => {
+                if (filtroDiaFijo !== "todos" && s.dia_semana !== filtroDiaFijo) return false;
+                if (filtroCanchaFijo !== "todos" && s.cancha_id !== filtroCanchaFijo) return false;
+                return true;
+              });
+
+              if (loadingTurnosFijos) {
+                return (
+                  <div className="p-12 text-center rounded-3xl bg-slate-900 border border-slate-800">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent mx-auto mb-3" />
+                    <p className="text-xs text-slate-400 font-bold">Cargando turnos fijos...</p>
+                  </div>
+                );
+              }
+
+              if (filteredSeries.length === 0) {
+                return (
+                  <div className="p-12 text-center rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+                    <div className="text-4xl">🔁</div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">No hay turnos fijos registrados</h3>
+                      <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                        Fija horarios semanales para tus clientes y abonados habituales por 6 meses con renovación automática.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleOpenNewTurnoFijoModal}
+                      className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition inline-flex items-center gap-1.5"
+                    >
+                      <span>➕</span> Asignar Primer Turno Fijo
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {filteredSeries.map((serie) => {
+                    const serieKey = `${serie.cancha_id}_${serie.dia_semana}_${serie.hora_inicio}`;
+                    const isExpanded = expandedSerieKey === serieKey;
+                    const isRenewing = isRenewingSerieKey === serieKey;
+
+                    return (
+                      <div
+                        key={serieKey}
+                        data-testid="turno-fijo-card"
+                        className={`rounded-3xl p-5 border transition flex flex-col justify-between gap-4 shadow-sm ${
+                          serie.requiere_renovacion
+                            ? "bg-amber-950/15 border-amber-500/40 ring-1 ring-amber-500/20"
+                            : "bg-slate-900 border-slate-800 hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="space-y-3">
+                          {/* Card Header */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-extrabold uppercase tracking-wide">
+                                  {DIAS[serie.dia_semana]}
+                                </span>
+                                <span className="font-mono text-sm font-extrabold text-white">
+                                  {serie.hora_inicio} a {serie.hora_fin} hs
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-slate-300">
+                                <span className="font-bold text-white">{serie.cancha_nombre}</span>
+                                <span className="text-slate-500">•</span>
+                                <span className="text-slate-400 capitalize">{serie.deporte}</span>
+                              </div>
+                            </div>
+
+                            <div>
+                              {serie.requiere_renovacion ? (
+                                <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold flex items-center gap-1 shadow-sm">
+                                  <span>⚠️</span> Por Vencer ({serie.proximas_fechas_count} sem)
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1">
+                                  <span>✓</span> Activo ({serie.proximas_fechas_count} sem)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Titular Details */}
+                          <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/90 text-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-emerald-400 font-bold">👤</span>
+                                <span className="font-extrabold text-white text-[13px]">{serie.cliente_nombre}</span>
+                              </div>
+                              {serie.cliente_id ? (
+                                <span className="text-[10px] bg-blue-500/15 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-bold">
+                                  Usuario App
+                                </span>
+                              ) : (
+                                <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-bold">
+                                  Mostrador / WhatsApp
+                                </span>
+                              )}
+                            </div>
+
+                            {serie.cliente_telefono && (
+                              <div className="flex items-center justify-between text-[11px] bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                                <span className="font-mono text-slate-300">📱 {serie.cliente_telefono}</span>
+                                <a
+                                  href={`https://wa.me/${serie.cliente_telefono.replace(/[^0-9]/g, "")}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-400 hover:underline font-bold text-[11px]"
+                                >
+                                  WhatsApp ↗
+                                </a>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">
+                              <span>Tarifa por Turno:</span>
+                              <span className="font-bold text-emerald-400 font-mono text-xs">
+                                ${serie.precio?.toLocaleString()}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] text-slate-400">
+                              <span>Horizonte 6 Meses:</span>
+                              <span className="text-slate-300 font-mono">
+                                {serie.fecha_inicio} al {serie.fecha_fin}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Expansion: Upcoming scheduled dates */}
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedSerieKey(isExpanded ? null : serieKey)}
+                              className="w-full text-left text-xs font-bold text-slate-400 hover:text-white flex items-center justify-between py-1 transition"
+                            >
+                              <span>📅 Próximas Fechas Generadas ({serie.proximas_fechas?.length || 0})</span>
+                              <span>{isExpanded ? "▲ Ocultar" : "▼ Ver Fechas"}</span>
+                            </button>
+
+                            {isExpanded && serie.proximas_fechas && (
+                              <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                {serie.proximas_fechas.map((f) => (
+                                  <div
+                                    key={f.id}
+                                    className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs"
+                                  >
+                                    <div className="flex items-center gap-2 font-mono">
+                                      <span className="text-slate-300">{f.fecha}</span>
+                                      <span className="text-slate-500">|</span>
+                                      <span className="text-slate-400">{f.hora_inicio} hs</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                                          f.estado_pago === "pagado"
+                                            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                                            : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                                        }`}
+                                      >
+                                        {f.estado_pago === "pagado" ? "✓ Pagado" : "⏳ Pendiente"}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setFechaPuntualToRelease({ id: f.id, fecha: f.fecha, hora_inicio: f.hora_inicio })}
+                                        className="text-[11px] px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 font-bold transition"
+                                      >
+                                        Liberar
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Actions */}
+                        <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <button
+                            type="button"
+                            disabled={isRenewing}
+                            onClick={() => handleRenewTurnoFijo(serie)}
+                            className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-3.5 py-2 font-bold text-white shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5"
+                          >
+                            {isRenewing ? (
+                              <>
+                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                <span>Renovando...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>⚡</span> Renovar 6 Meses Más
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSerieToCancel(serie)}
+                            className="rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 px-3 py-2 font-bold transition flex items-center gap-1"
+                          >
+                            <span>🚫</span> Dar de Baja Serie
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Modal: Asignar Nuevo Turno Fijo */}
+        {showNewTurnoFijoModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 text-left max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 text-xl border border-emerald-500/20">
+                    🔁
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Asignar Nuevo Turno Fijo</h3>
+                    <p className="text-xs text-slate-400">Horizonte estándar de 6 meses (26 semanas)</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNewTurnoFijoModal(false)}
+                  className="text-slate-400 hover:text-white transition rounded-lg p-1 text-sm font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateTurnoFijo} className="space-y-4 text-xs">
+                {/* Field 1: Cancha */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Cancha:
+                  </label>
+                  <select
+                    value={tfCanchaId}
+                    onChange={(e) => {
+                      const cid = Number(e.target.value);
+                      setTfCanchaId(cid);
+                      const sel = canchas.find((c) => c.id === cid);
+                      if (sel && !tfPrecio) {
+                        setTfPrecio(String(sel.precio_base || 8000));
+                      }
+                    }}
+                    required
+                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-white font-medium focus:border-emerald-500 focus:outline-none"
+                  >
+                    <option value="">Selecciona una Cancha</option>
+                    {canchas.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} • {c.deporte?.toUpperCase()} (${c.precio_base?.toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Field 2 & 3: Día de la semana y Horario */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">
+                      Día de la Semana:
+                    </label>
+                    <select
+                      value={tfDiaSemana}
+                      onChange={(e) => setTfDiaSemana(Number(e.target.value))}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-white font-medium focus:border-emerald-500 focus:outline-none"
+                    >
+                      {DIAS_CONFIG.map((d) => (
+                        <option key={d.dia_semana} value={d.dia_semana}>
+                          {d.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">
+                      Hora de Inicio:
+                    </label>
+                    <input
+                      type="time"
+                      value={tfHoraInicio}
+                      onChange={(e) => setTfHoraInicio(e.target.value)}
+                      required
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Field 4: Tipo de Titular */}
+                <div className="space-y-2 pt-1">
+                  <label className="block text-slate-300 font-bold">
+                    Tipo de Titular:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTfTipoCliente("manual")}
+                      className={`p-2.5 rounded-xl border text-center font-bold transition text-xs ${
+                        tfTipoCliente === "manual"
+                          ? "bg-emerald-500/20 border-emerald-500 text-white"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      📝 Cliente Mostrador / WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTfTipoCliente("registrado")}
+                      className={`p-2.5 rounded-xl border text-center font-bold transition text-xs ${
+                        tfTipoCliente === "registrado"
+                          ? "bg-emerald-500/20 border-emerald-500 text-white"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      👤 Usuario Registrado
+                    </button>
+                  </div>
+
+                  {tfTipoCliente === "manual" ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <label className="block text-slate-400 font-medium mb-1">
+                          Nombre y Apellido:
+                        </label>
+                        <input
+                          type="text"
+                          value={tfClienteNombre}
+                          onChange={(e) => setTfClienteNombre(e.target.value)}
+                          required
+                          placeholder="Ej: Marcelo Gómez"
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 font-medium mb-1">
+                          Teléfono / WhatsApp:
+                        </label>
+                        <input
+                          type="tel"
+                          value={tfClienteTelefono}
+                          onChange={(e) => setTfClienteTelefono(e.target.value)}
+                          placeholder="Ej: 11 4455-6677"
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pt-2 space-y-2 relative">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-slate-400 font-medium">
+                          Buscar y Seleccionar Usuario en BD:
+                        </label>
+                        {selectedUserObj && (
+                          <button
+                            type="button"
+                            onClick={handleClearSelectedUser}
+                            className="text-[11px] text-rose-400 hover:underline font-bold"
+                          >
+                            ✕ Cambiar Usuario
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Searchable input / Editable Select */}
+                      <div className="relative">
+                        <div className="flex items-center">
+                          <input
+                            type="text"
+                            value={searchUserQuery}
+                            onFocus={() => {
+                              setShowUserDropdown(true);
+                              if (searchedUsers.length === 0) fetchRegisteredUsers("");
+                            }}
+                            onChange={(e) => {
+                              setSearchUserQuery(e.target.value);
+                              setShowUserDropdown(true);
+                              if (selectedUserObj && e.target.value !== selectedUserObj.name) {
+                                setSelectedUserObj(null);
+                                setTfClienteId("");
+                              }
+                            }}
+                            placeholder="Escribe nombre, email o teléfono para buscar..."
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 pl-9 pr-9 py-2 text-white focus:border-emerald-500 focus:outline-none placeholder:text-slate-600"
+                          />
+                          <span className="absolute left-3 text-slate-500 text-sm pointer-events-none">🔍</span>
+                          {loadingSearchUsers && (
+                            <div className="absolute right-3 h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+                          )}
+                          {!loadingSearchUsers && searchUserQuery && (
+                            <button
+                              type="button"
+                              onClick={handleClearSelectedUser}
+                              className="absolute right-3 text-slate-400 hover:text-white text-xs font-bold"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Dropdown list of users */}
+                        {showUserDropdown && (
+                          <div className="absolute z-20 top-full mt-1.5 left-0 right-0 max-h-56 overflow-y-auto rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl divide-y divide-slate-800/60 animate-in fade-in zoom-in-95 duration-100">
+                            {loadingSearchUsers ? (
+                              <div className="p-3 text-center text-xs text-slate-400">
+                                Buscando en la base de datos...
+                              </div>
+                            ) : searchedUsers.length === 0 ? (
+                              <div className="p-3 text-center text-xs text-slate-500">
+                                No se encontraron usuarios con ese criterio.
+                              </div>
+                            ) : (
+                              searchedUsers.map((u) => (
+                                <button
+                                  key={u.id}
+                                  type="button"
+                                  onClick={() => handleSelectRegisteredUser(u)}
+                                  className={`w-full text-left p-2.5 hover:bg-emerald-500/10 transition flex items-center justify-between gap-2 text-xs ${
+                                    tfClienteId === u.id ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300"
+                                  }`}
+                                >
+                                  <div>
+                                    <div className="font-bold text-white flex items-center gap-1.5">
+                                      <span>👤 {u.name}</span>
+                                      <span className="text-[10px] text-slate-500 font-mono">#{u.id}</span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                                      <span>✉️ {u.email}</span>
+                                      {u.telefono && <span>📱 {u.telefono}</span>}
+                                    </div>
+                                  </div>
+                                  {tfClienteId === u.id && (
+                                    <span className="text-emerald-400 font-bold text-sm">✓</span>
+                                  )}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Selected user summary badge */}
+                      {selectedUserObj ? (
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-emerald-400 font-bold">✓</span>
+                            <div>
+                              <strong className="font-bold text-white">{selectedUserObj.name}</strong>
+                              <span className="text-[11px] text-emerald-300/80 ml-2">
+                                (ID: #{selectedUserObj.id} • {selectedUserObj.email})
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                            Vinculado
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-500 italic">
+                          💡 Busca y selecciona un usuario registrado de la lista para vincular su cuenta y billetera virtual.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Field 5: Tarifa y Semanas */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">
+                      Precio Acordado ($):
+                    </label>
+                    <input
+                      type="number"
+                      value={tfPrecio}
+                      onChange={(e) => setTfPrecio(e.target.value)}
+                      placeholder="8000"
+                      min="0"
+                      step="100"
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">
+                      Horizonte de Reserva:
+                    </label>
+                    <select
+                      value={tfSemanas}
+                      onChange={(e) => setTfSemanas(Number(e.target.value))}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-white font-medium focus:border-emerald-500 focus:outline-none"
+                    >
+                      <option value="12">12 Semanas (3 Meses)</option>
+                      <option value="26">26 Semanas (6 Meses - Recomendado)</option>
+                      <option value="52">52 Semanas (1 Año)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Field 6: Método de Pago */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Método de Pago Habitual:
+                  </label>
+                  <select
+                    value={tfMetodoPago}
+                    onChange={(e) => setTfMetodoPago(e.target.value)}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-white font-medium focus:border-emerald-500 focus:outline-none"
+                  >
+                    <option value="mostrador">💵 Efectivo en Mostrador (por partido)</option>
+                    <option value="transferencia">📲 Transferencia Bancaria</option>
+                    <option value="billetera">👛 Débito de Billetera Virtual</option>
+                    <option value="online">💳 Mercado Pago / Online</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewTurnoFijoModal(false)}
+                    className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingTurnoFijo}
+                    className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {isSavingTurnoFijo ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Generando Turnos...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>✓</span> Asignar Turno Fijo ({tfSemanas} Semanas)
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Liberar Fecha Puntual */}
+        {fechaPuntualToRelease && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-left">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 text-2xl border border-amber-500/30">
+                  🗓️
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">¿Liberar Fecha Puntual?</h3>
+                  <p className="text-xs text-slate-400">{fechaPuntualToRelease.fecha} • {fechaPuntualToRelease.hora_inicio} hs</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Esta acción cancela <strong>únicamente la fecha seleccionada</strong>, permitiendo que otro jugador reserve el turno o se venda en mostrador. La serie de turno fijo para las semanas posteriores <strong>se mantendrá intacta</strong>.
+              </p>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setFechaPuntualToRelease(null)}
+                  className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                >
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  disabled={isProcessingAction}
+                  onClick={handleLiberarFechaPuntualSerie}
+                  className="flex-1 rounded-xl bg-amber-600 hover:bg-amber-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-amber-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isProcessingAction ? "Liberando..." : "Sí, Liberar Esta Fecha"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Dar de Baja Serie Recurrente */}
+        {serieToCancel && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-left">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400 text-2xl border border-rose-500/20">
+                  🚫
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">¿Dar de Baja Turno Fijo?</h3>
+                  <p className="text-xs text-slate-400">
+                    {DIAS[serieToCancel.dia_semana]} • {serieToCancel.hora_inicio} hs • {serieToCancel.cancha_nombre}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-1">
+                <div className="flex justify-between text-slate-400">
+                  <span>Titular:</span>
+                  <span className="font-bold text-white">{serieToCancel.cliente_nombre}</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Fechas Futuras a Cancelar:</span>
+                  <span className="font-bold text-rose-400">{serieToCancel.proximas_fechas_count} fechas</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-rose-300/90 leading-relaxed">
+                ⚠️ Al confirmar, se eliminarán todas las reservas futuras de este titular en este horario. El espacio quedará disponible para que otros jugadores lo reserven.
+              </p>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSerieToCancel(null)}
+                  className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
+                >
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  disabled={isProcessingAction}
+                  onClick={handleDestroySerieFija}
+                  className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isProcessingAction ? "Cancelando..." : "Sí, Dar de Baja Definitivamente"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 5: POLÍTICAS DE SEÑA & CANCELACIÓN */}
         {/* ========================================================================= */}
         {activeTab === "politicas" && (
           <div className="mt-8 space-y-6">

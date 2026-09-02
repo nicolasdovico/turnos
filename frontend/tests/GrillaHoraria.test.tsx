@@ -940,4 +940,109 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(screen.getByText("✓ Notificación Activa")).toBeDefined();
     });
   });
+
+  it("diferencia turnos fijos en grilla admin y permite liberar fecha puntual o dar de baja serie y registrar pagos", async () => {
+    const fixedTurno = {
+      id: 55,
+      cancha_id: 1,
+      fecha: "2026-09-01",
+      hora_inicio: "19:00",
+      hora_fin: "20:30",
+      precio: 8000,
+      cliente_nombre: "Lucas Titular Fijo",
+      cliente_telefono: "1199887766",
+      es_fijo: true,
+      estado: "reservado",
+      estado_pago: "pendiente",
+      metodo_pago: "mostrador",
+    };
+
+    let paymentPayload: any = null;
+
+    global.fetch = vi.fn().mockImplementation((url: string, init?: any) => {
+      const urlStr = url.toString();
+
+      if (urlStr.includes("/turnos/55/registrar-pago")) {
+        paymentPayload = JSON.parse(init?.body || "{}");
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, estado_pago: "pagado" }),
+        });
+      }
+      if (urlStr.includes("/turnos/55/liberar-fecha")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, message: "Fecha puntual liberada." }),
+        });
+      }
+      if (urlStr.includes("/canchas/1/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              cancha_id: 1,
+              fecha: "2026-09-01",
+              turnos_ocupados: [fixedTurno],
+              slots: [],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    expect(await screen.findByText("Lucas Titular Fijo")).toBeDefined();
+    expect(screen.getAllByText(/Fijo/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/⏳ Pendiente/i)).toBeDefined();
+    expect(screen.getByRole("button", { name: /Cobrar/i })).toBeDefined();
+
+    // 1. Probar modal de Cobro
+    const btnCobrar = screen.getByRole("button", { name: /Cobrar/i });
+    fireEvent.click(btnCobrar);
+
+    expect(await screen.findByText(/Registrar Cobro de Turno/i)).toBeDefined();
+    const btnConfirmarCobro = screen.getByRole("button", { name: /Confirmar Cobro/i });
+    fireEvent.click(btnConfirmarCobro);
+
+    await waitFor(() => {
+      expect(paymentPayload).toBeDefined();
+      expect(paymentPayload.metodo_pago).toBe("mostrador");
+    });
+
+    // 2. Probar modal de Liberación para turno fijo
+    const btnLiberar = screen.getByRole("button", { name: /Liberar Turno/i });
+    fireEvent.click(btnLiberar);
+
+    expect(await screen.findByText(/Gestión de Turno Fijo/i)).toBeDefined();
+    expect(screen.getByText(/Liberar SOLO esta fecha puntual/i)).toBeDefined();
+    expect(screen.getByText(/Dar de BAJA Turno Fijo Definitivamente/i)).toBeDefined();
+
+    // Click liberar fecha puntual
+    const btnLiberarPuntual = screen.getByRole("button", { name: /Liberar SOLO esta fecha puntual/i });
+    fireEvent.click(btnLiberarPuntual);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/55/liberar-fecha"),
+        expect.objectContaining({ method: "DELETE" })
+      );
+    });
+  });
 });
