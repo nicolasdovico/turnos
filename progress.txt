@@ -1029,5 +1029,23 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Suite Frontend (Vitest): 44 tests pasados al 100%.
   * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
+-------------------------------------------------------------------------------
+[2026-09-02] - SINCRONIZACIÓN REACTIVA DE SESIÓN Y NAVBAR EN TIEMPO REAL TRAS REGISTRO/LOGIN RÁPIDO
+-------------------------------------------------------------------------------
+- Diagnóstico y Causa Raíz:
+  * Cuando un visitante completaba un registro o login rápido dentro del modal de reserva en `GrillaHoraria.tsx`, la sesión se persistía en `localStorage` y en el estado interno de la grilla, pero el `Navbar` superior (que consume `AuthContext`) no se enteraba de los cambios en tiempo real sin un refresco manual de página (F5).
+- Solución Implementada:
+  * `frontend/context/AuthContext.tsx`:
+    - Incorporación de listener reactivo para eventos globales `"saas-auth-changed"` y `"storage"` entre componentes y pestañas.
+    - Emisión del evento en `setAuthSession` y `logout` con payload `{ user, token }`.
+  * `frontend/components/GrillaHoraria.tsx`:
+    - Integración con `useAuth()` (`setGlobalAuthSession` y `globalAuthUser`).
+    - Despacho de `"saas-auth-changed"` al verificar OTP, registrarse o iniciar sesión, actualizando instantáneamente el `Navbar` con el avatar y nombre del usuario.
+    - Sincronización bidireccional automática de `currentUser`.
+  * Suite de Tests Automatizados:
+    - `frontend/tests/authAndOnboarding.test.tsx`: nuevo test `reactively updates Navbar without page reload when a user completes quick registration or login`.
+- Verificación de Calidad:
+  * Suite Frontend (Vitest): 45 tests pasados al 100%.
+  * Suite Backend (PHPUnit): 148 tests pasados al 100% (776 aserciones).
 ===============================================================================
 

@@ -27,6 +27,7 @@ import PortalPage from "../app/portal/page";
 
 describe("Frontend Auth & Club Onboarding Suite", () => {
   beforeEach(() => {
+    localStorage.clear();
     mockParams = { subdomain: "nico-padel" };
   });
 
@@ -77,6 +78,46 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
 
     // Restore window.location
     window.location = originalLocation;
+  });
+
+  it("reactively updates Navbar without page reload when a user completes quick registration or login", async () => {
+    localStorage.clear();
+    render(
+      <AuthProvider>
+        <Navbar />
+      </AuthProvider>
+    );
+
+    // Initial state: Guest buttons visible
+    expect(screen.getByText(/Iniciar Sesión/i)).toBeDefined();
+    expect(screen.queryByText("Agustín Rossi")).toBeNull();
+
+    // Simulate in-page quick registration / login emitting custom auth event
+    const newUser = { id: 55, name: "Agustín Rossi", email: "agustin@boca.com" };
+    localStorage.setItem("saas_token", "fake-token-rossi");
+    localStorage.setItem("saas_user", JSON.stringify(newUser));
+
+    fireEvent(
+      window,
+      new CustomEvent("saas-auth-changed", {
+        detail: { user: newUser, token: "fake-token-rossi" },
+      })
+    );
+
+    // Navbar must reactively update immediately
+    await waitFor(() => {
+      expect(screen.getByText("Agustín Rossi")).toBeDefined();
+      expect(screen.queryByText(/Iniciar Sesión/i)).toBeNull();
+    });
+
+    // Cleanup session for subsequent test cases
+    localStorage.clear();
+    fireEvent(
+      window,
+      new CustomEvent("saas-auth-changed", {
+        detail: { user: null, token: null },
+      })
+    );
   });
 
   it("renders Planes & Precios page with pricing cards, comparison matrix and FAQ", () => {

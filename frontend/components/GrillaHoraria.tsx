@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export interface Slot {
   hora_inicio: string;
@@ -138,6 +139,7 @@ export default function GrillaHoraria({
   initialSlots,
   onConfirmSuccess,
 }: GrillaHorariaProps) {
+  const { setAuthSession: setGlobalAuthSession, user: globalAuthUser } = useAuth();
   const getTodayString = () => getLocalDateString();
   const [fecha, setFecha] = useState<string>(fechaInicial || getTodayString());
   const [duracion, setDuracion] = useState<number>(duracionInicial || (deporte?.toLowerCase() === "padel" ? 90 : 60));
@@ -249,6 +251,19 @@ export default function GrillaHoraria({
       }
     }
   }, [apiUrl, subdomain, isAdmin, propToken]);
+
+  // Sync currentUser with globalAuthUser whenever AuthContext updates
+  useEffect(() => {
+    if (globalAuthUser) {
+      setCurrentUser(globalAuthUser as CurrentUser);
+      if (!isAdmin) {
+        setClienteNombre(globalAuthUser.name || "");
+        if ((globalAuthUser as any).telefono) {
+          setClienteTelefono((globalAuthUser as any).telefono);
+        }
+      }
+    }
+  }, [globalAuthUser, isAdmin]);
 
   // Cooldown countdown for OTP resend
   useEffect(() => {
@@ -1171,6 +1186,8 @@ export default function GrillaHoraria({
             const validUser = verifyData.user || pendingRegisteredUser?.user;
             if (validToken) {
               localStorage.setItem("saas_token", validToken);
+              localStorage.setItem("token", validToken);
+              document.cookie = `saas_auth_token=${validToken}; path=/; max-age=604800; SameSite=Lax`;
               activeToken = validToken;
             }
             if (validUser) {
@@ -1178,6 +1195,14 @@ export default function GrillaHoraria({
               setCurrentUser(validUser);
               targetNombre = validUser.name;
               targetTelefono = validUser.telefono || targetTelefono;
+              if (validToken && setGlobalAuthSession) {
+                setGlobalAuthSession(validUser as any, validToken);
+              }
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                  new CustomEvent("saas-auth-changed", { detail: { user: validUser, token: validToken } })
+                );
+              }
             }
           }
         } else {
@@ -1210,6 +1235,8 @@ export default function GrillaHoraria({
           const loggedUser = loginData.user;
           if (loggedToken) {
             localStorage.setItem("saas_token", loggedToken);
+            localStorage.setItem("token", loggedToken);
+            document.cookie = `saas_auth_token=${loggedToken}; path=/; max-age=604800; SameSite=Lax`;
             activeToken = loggedToken;
           }
           if (loggedUser) {
@@ -1217,6 +1244,14 @@ export default function GrillaHoraria({
             setCurrentUser(loggedUser);
             targetNombre = loggedUser.name;
             targetTelefono = loggedUser.telefono || targetTelefono;
+            if (loggedToken && setGlobalAuthSession) {
+              setGlobalAuthSession(loggedUser as any, loggedToken);
+            }
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("saas-auth-changed", { detail: { user: loggedUser, token: loggedToken } })
+              );
+            }
           }
         }
       }

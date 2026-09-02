@@ -99,6 +99,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     restoreSession();
   }, []);
 
+  // Reactive cross-component and cross-tab auth state synchronization
+  useEffect(() => {
+    const handleAuthChange = () => {
+      if (typeof window === "undefined") return;
+      const savedToken = localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const savedUser = localStorage.getItem("saas_user");
+      if (savedToken && savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          setToken(savedToken);
+          setUser(parsed);
+        } catch {}
+      } else if (!savedToken) {
+        setToken(null);
+        setUser(null);
+      }
+    };
+
+    window.addEventListener("saas-auth-changed", handleAuthChange);
+    window.addEventListener("storage", handleAuthChange);
+    return () => {
+      window.removeEventListener("saas-auth-changed", handleAuthChange);
+      window.removeEventListener("storage", handleAuthChange);
+    };
+  }, []);
+
   const setAuthSession = (newUser: User, newToken: string) => {
     setUser(newUser);
     setToken(newToken);
@@ -106,6 +132,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("token", newToken);
     localStorage.setItem("saas_user", JSON.stringify(newUser));
     document.cookie = `saas_auth_token=${newToken}; path=/; max-age=604800; SameSite=Lax`;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("saas-auth-changed", { detail: { user: newUser, token: newToken } })
+      );
+    }
   };
 
   const markEmailAsVerified = () => {
@@ -184,6 +215,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("token");
       localStorage.removeItem("saas_user");
       document.cookie = "saas_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("saas-auth-changed", { detail: { user: null, token: null } })
+        );
+      }
     }
   };
 
