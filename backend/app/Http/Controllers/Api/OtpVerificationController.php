@@ -141,9 +141,11 @@ class OtpVerificationController extends Controller
 
         // OTP is valid! Mark User as verified
         $user = User::where('email', $email)->first();
+        $token = null;
         if ($user) {
             $user->email_verified_at = now();
             $user->save();
+            $token = $user->createToken('saas_auth_token')->plainTextToken;
         }
 
         // Clean up OTP records for this email
@@ -152,11 +154,13 @@ class OtpVerificationController extends Controller
         return response()->json([
             'success' => true,
             'message' => '¡Correo electrónico verificado exitosamente!',
+            'token' => $token,
             'user' => $user ? [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'email_verified_at' => $user->email_verified_at,
+                'complejos' => $user->complejos()->with('tipoNegocio')->get(['id', 'user_id', 'nombre', 'subdominio', 'estado', 'deporte_principal', 'tipo_negocio_id']),
             ] : null,
         ]);
     }

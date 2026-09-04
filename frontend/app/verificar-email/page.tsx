@@ -10,13 +10,19 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 export default function VerificarEmailPage() {
   const router = useRouter();
-  const { user, markEmailAsVerified } = useAuth();
+  const { user, token, markEmailAsVerified, setAuthSession } = useAuth();
 
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Club context parameters from URL
+  const [clubName, setClubName] = useState<string | null>(null);
+  const [subdomainUrl, setSubdomainUrl] = useState<string | null>(null);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [verifiedToken, setVerifiedToken] = useState<string | null>(null);
 
   // Resend cooldown timer
   const [cooldown, setCooldown] = useState(60);
@@ -27,11 +33,19 @@ export default function VerificarEmailPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const emailParam = params.get("email");
+      const clubParam = params.get("club");
+      const subdomainUrlParam = params.get("subdomain_url");
+      const redirectParam = params.get("redirect");
+
       if (emailParam) {
         setEmail(emailParam);
       } else if (user?.email) {
         setEmail(user.email);
       }
+
+      if (clubParam) setClubName(clubParam);
+      if (subdomainUrlParam) setSubdomainUrl(subdomainUrlParam);
+      if (redirectParam) setRedirectUrl(redirectParam);
     }
   }, [user]);
 
@@ -78,6 +92,12 @@ export default function VerificarEmailPage() {
         return;
       }
 
+      // Establish authenticated session ONLY after OTP is validated
+      if (data.token && data.user) {
+        setAuthSession(data.user, data.token);
+        setVerifiedToken(data.token);
+      }
+
       markEmailAsVerified();
       setSuccess(true);
     } catch (err: any) {
@@ -121,6 +141,12 @@ export default function VerificarEmailPage() {
   };
 
   if (success) {
+    const destinationUrl = redirectUrl
+      ? `${redirectUrl}?auth_token=${verifiedToken || token || ""}`
+      : subdomainUrl
+      ? `${subdomainUrl}/panel?auth_token=${verifiedToken || token || ""}`
+      : null;
+
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
         <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl border border-slate-100">
@@ -128,27 +154,32 @@ export default function VerificarEmailPage() {
             🎉
           </div>
           <span className="inline-block rounded-full bg-emerald-50 px-4 py-1 text-xs font-bold text-emerald-700 border border-emerald-200 mb-3">
-            ¡Email Confirmado!
+            {clubName ? "¡Club y Cuenta Activados!" : "¡Email Confirmado!"}
           </span>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Cuenta Verificada
+            {clubName ? `¡Bienvenido a ${clubName}!` : "Cuenta Verificada"}
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            Tu correo <strong className="text-slate-900">{email}</strong> ha sido verificado con éxito. Ya puedes utilizar todas las funciones de la plataforma.
+            Tu correo <strong className="text-slate-900">{email}</strong> ha sido verificado con éxito.
+            {clubName
+              ? " Tu cuenta de administrador y tu club ya están listos para operar."
+              : " Ya puedes utilizar todas las funciones de la plataforma."}
           </p>
 
           <div className="mt-8 flex flex-col gap-3">
+            {destinationUrl ? (
+              <a
+                href={destinationUrl}
+                className="rounded-xl bg-emerald-600 py-3.5 px-6 text-sm font-extrabold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition block text-center"
+              >
+                🚀 Ir al Panel de mi Club
+              </a>
+            ) : null}
             <Link
               href="/"
-              className="rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-md hover:bg-emerald-700 transition"
-            >
-              Ir al Portal Principal
-            </Link>
-            <Link
-              href="/registro-club"
               className="rounded-xl bg-slate-100 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
             >
-              Registrar mi Club Deportivo
+              Ir al Portal Principal
             </Link>
           </div>
         </div>
@@ -168,6 +199,13 @@ export default function VerificarEmailPage() {
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Verifica tu Correo
           </h1>
+
+          {clubName && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-bold text-emerald-800 border border-emerald-200">
+              🏢 Activando: <strong>{clubName}</strong>
+            </div>
+          )}
+
           <p className="mt-2 text-sm text-slate-600">
             Hemos enviado un código de 6 dígitos a:
           </p>

@@ -216,6 +216,72 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Mailpit Activo/i)).toBeDefined();
   });
 
+  it("verifies OTP with club context, updates auth session and provides direct link to club panel", async () => {
+    const originalLocation = window.location;
+    delete (window as any).location;
+    window.location = {
+      search: "?email=gonzalo@olivos.test&club=Padel%20Park%20Olivos&subdomain_url=http://padel-olivos.localhost:8080&redirect=http://padel-olivos.localhost:8080/panel",
+      pathname: "/verificar-email",
+      hostname: "localhost",
+      protocol: "http:",
+      port: "8080",
+    } as any;
+
+    try {
+      vi.spyOn(global, "fetch").mockImplementation(async (url: any, opts: any) => {
+        const urlStr = String(url);
+        if (urlStr.includes("verify-otp")) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              message: "¡Correo electrónico verificado exitosamente!",
+              token: "valid-sanctum-token-gonzalo",
+              user: {
+                id: 99,
+                name: "Gonzalo Martínez",
+                email: "gonzalo@olivos.test",
+                email_verified_at: "2026-09-03T22:50:00Z",
+                complejos: [{ id: 10, nombre: "Padel Park Olivos", subdominio: "padel-olivos" }],
+              },
+            }),
+          } as any;
+        }
+        return { ok: true, json: async () => ({}) } as any;
+      });
+
+      render(
+        <AuthProvider>
+          <VerificarEmailPage />
+        </AuthProvider>
+      );
+
+      // Should display club name on the verification screen
+      expect(screen.getByText(/Padel Park Olivos/i)).toBeDefined();
+      expect(screen.getByText("gonzalo@olivos.test")).toBeDefined();
+
+      // Fill the 6-digit OTP
+      const inputs = screen.getAllByPlaceholderText("•");
+      expect(inputs.length).toBe(6);
+      fireEvent.change(inputs[0], { target: { value: "1" } });
+      fireEvent.change(inputs[1], { target: { value: "2" } });
+      fireEvent.change(inputs[2], { target: { value: "3" } });
+      fireEvent.change(inputs[3], { target: { value: "4" } });
+      fireEvent.change(inputs[4], { target: { value: "5" } });
+      fireEvent.change(inputs[5], { target: { value: "6" } });
+
+      await waitFor(() => {
+        expect(screen.getByText(/¡Club y Cuenta Activados!/i)).toBeDefined();
+        expect(screen.getByText(/Ir al Panel de mi Club/i)).toBeDefined();
+      });
+
+      // Verify session token was stored in localStorage
+      expect(localStorage.getItem("saas_token")).toBe("valid-sanctum-token-gonzalo");
+    } finally {
+      window.location = originalLocation;
+    }
+  });
+
   it("renders Club Admin Panel with sport-aware courts, attributes, and modal", async () => {
     vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
       const urlStr = String(url);

@@ -74,14 +74,30 @@ class ClubOnboardingTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonPath('success', true)
+            ->assertJsonPath('requires_verification', true)
+            ->assertJsonPath('token', null)
             ->assertJsonStructure(['token', 'user', 'complejo', 'subdomain_url'])
             ->assertJsonPath('complejo.subdominio', 'palermo-padel')
             ->assertJsonPath('complejo.nombre', 'Palermo Pádel Center');
 
-        // Verify User was created
+        // Verify User was created unverified
         $user = User::where('email', 'martin@palermopadel.com')->first();
         $this->assertNotNull($user);
         $this->assertEquals('Martín Palermo', $user->name);
+        $this->assertNull($user->email_verified_at);
+
+        // Verify OTP was dispatched and can be verified to issue Sanctum token
+        $otp = \App\Models\EmailVerification::where('email', 'martin@palermopadel.com')->first();
+        $this->assertNotNull($otp);
+
+        $verifyRes = $this->postJson('/api/auth/verify-otp', [
+            'email' => 'martin@palermopadel.com',
+            'codigo' => $otp->codigo,
+        ]);
+        $verifyRes->assertStatus(200)
+            ->assertJsonPath('success', true);
+        $this->assertNotNull($verifyRes->json('token'));
+        $this->assertNotNull($user->fresh()->email_verified_at);
 
         // Verify Complejo was created and linked
         $complejo = Complejo::where('subdominio', 'palermo-padel')->first();

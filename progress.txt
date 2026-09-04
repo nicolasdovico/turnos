@@ -1065,5 +1065,71 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Suite Frontend (Vitest): 46 tests pasados al 100%.
   * Suite Backend (PHPUnit): 151 tests pasados al 100% (805 aserciones).
+-------------------------------------------------------------------------------
+[2026-09-03] - SET DE DATOS INTEGRAL & GUÍA DE CASOS DE USO DE PRUEBA (TESTING)
+-------------------------------------------------------------------------------
+- Requerimiento:
+  * Generar un set de datos exhaustivo y casos de uso para probar el 100% de la funcionalidad desarrollada hasta el momento: usuarios con distintos roles, clubes y complejos multideporte (pádel, tenis, fútbol, gimnasio), canchas con diversas configuraciones deportivas, turnos con usuarios registrados y no registrados, cobros totales, parciales (señas) y saldos pendientes, abonados fijos a 6 meses, lista de espera, billetera virtual, buffet POS, torneos, split payment y domótica IoT.
+- Solución Implementada:
+  * Backend (Database Seeder Automatizado):
+    - `backend/database/seeders/FullTestingSeeder.php`: Seeder integral e idempotente que calcula fechas relativas en tiempo real (`America/Argentina/Buenos_Aires`).
+    - Carga 15 usuarios (Super Admin, dueños multi-club, staff de recepción y clientes con y sin billetera virtual).
+    - Carga 4 complejos/clubes de distintos tipos de negocio (`Club`, `Complejo`, `Gimnasio`) y planes (`Oro`, `Plata`, `Bronce`).
+    - Carga 14 canchas de pádel, tenis, fútbol 5/7 y crossfit con atributos específicos (indoor/outdoor, iluminación LED/halógena, cristal/muro, duraciones de 60/90/120 min, y algoritmo Anti-Baches activo).
+    - Carga 96 turnos en todos los estados financieros y operativos para el día de hoy y próximos días (100% pagado en mostrador, seña 50% online con saldo pendiente, 100% pendiente, walk-in no registrado, abonados recurrentes de 26 semanas, serie con alerta de vencimiento <= 2 semanas, turnos en lista de espera y cancelaciones con reembolso en billetera virtual).
+    - Carga catálogo de buffet con stock, sesión de caja abierta con fondo inicial, partido abierto con cuotas split payment, torneo con cuadro de 8 parejas y partidos de cuartos y semifinales, dispositivos de iluminación IoT y páginas CMS informativas.
+  * Documentación Centralizada:
+    - `TESTING_CASOS_DE_USO_Y_DATOS.md`: Documento maestro en la raíz del proyecto con mapa de URLs, credenciales maestras universales (`password123`), catálogo de entidades precargadas y 19 casos de uso paso a paso detallados con precondiciones, pasos interactivos y resultados esperados.
+- Verificación de Calidad:
+  * Ejecución exitosa del seeder: `docker compose exec backend php artisan db:seed --class=FullTestingSeeder` (100% éxito).
+  * Suite Backend (PHPUnit): 151 tests pasados al 100% (805 aserciones).
+  * Suite Frontend (Vitest): 46 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-09-03] - VISUALIZACIÓN Y GESTIÓN DE MÓDULOS EN FILAMENT (PLANRESOURCE & MODULORESOURCE)
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * Al ingresar a `/admin/plans` en el panel de Filament, la tabla no exhibía los módulos incluidos en cada plan.
+  * Tampoco se disponía de un campo selector en el formulario de alta/edición para asociar o desasociar módulos del plan.
+  * De forma análoga, en `/admin/modulos` no se mostraban los planes asociados a cada módulo.
+- Solución Implementada:
+  * Backend (`App\Filament\Resources\PlanResource.php`):
+    - Columna en tabla: `TextColumn::make('modulos.nombre')` con formato badge verde (`color('success')`), separador de coma y buscador/ordenador integrado.
+    - Filtro en tabla: `SelectFilter::make('modulos')` para filtrar planes por módulos incluidos.
+    - Formulario interactivo: Sección "Módulos Incluidos" con `CheckboxList::make('modulos')->relationship('modulos', 'nombre')` organizado en 3 columnas, con soporte para selección masiva (`bulkToggleable`) y búsqueda.
+  * Backend (`App\Filament\Resources\ModuloResource.php`):
+    - Columna en tabla: `TextColumn::make('planes.nombre')` con formato badge azul (`color('info')`).
+    - Filtro en tabla: `SelectFilter::make('planes')` para filtrar módulos por plan.
+    - Formulario: `CheckboxList::make('planes')->relationship('planes', 'nombre')` con `bulkToggleable`.
+  * Tests Automatizados (`tests/Feature/FilamentPlanResourceTest.php`):
+    - `test_admin_can_see_modules_in_plans_table`: valida visualización de la columna `modulos.nombre` en la tabla de planes.
+    - `test_admin_can_edit_plan_and_sync_modules`: valida la sincronización y persistencia de módulos en `plan_modulo` al guardar el formulario.
+    - `test_admin_can_see_plans_in_modulos_table`: valida visualización de planes en la tabla de módulos.
+- Verificación de Calidad:
+  * Suite Backend completa: 154 tests pasados al 100% (826 aserciones).
+-------------------------------------------------------------------------------
+[2026-09-03] - CORRECCIÓN DE FLUJO OTP Y PREVENCIÓN DE LOGIN PREMATURO EN ONBOARDING DE CLUBES
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * Al completar el registro de un nuevo club como usuario guest (`POST /api/clubs/registro`), el backend emitía inmediatamente un token Sanctum y el frontend guardaba la sesión en `localStorage` / cookies.
+  * La pantalla mostraba directamente la tarjeta de bienvenida sin redirigir a `/verificar-email`, impidiendo que el usuario ingrese el código OTP de 6 dígitos que llegaba por correo a Mailpit.
+  * El usuario quedaba autenticado antes de validar su correo electrónico, lo cual contravenía el flujo de verificación.
+- Solución Implementada:
+  * Backend (`App\Http\Controllers\Api\ClubOnboardingController.php`):
+    - Al registrar un nuevo usuario guest (`$isNewUser = true`), no se emite token Sanctum (`'token' => null`).
+    - Se devuelve `'requires_verification' => true` y se despacha el OTP a Mailpit con `OtpVerificationController::dispatchOtp()`.
+  * Backend (`App\Http\Controllers\Api\OtpVerificationController.php`):
+    - Al validar exitosamente el código de 6 dígitos en `verifyOtp()`, se marca `email_verified_at = now()`, se emite por primera vez el token Sanctum oficial (`saas_auth_token`) y se devuelven los complejos asociados para inicializar la sesión autenticada.
+  * Frontend (`frontend/app/registro-club/page.tsx`):
+    - Tras el registro exitoso de un club, si `data.requires_verification` es true, NO se guarda sesión y se redirige inmediatamente a:
+      `/verificar-email?email=...&club=...&subdomain_url=...&redirect=...`
+  * Frontend (`frontend/app/verificar-email/page.tsx`):
+    - Lee los parámetros contextuales de la URL (`club`, `subdomain_url`, `redirect`).
+    - Muestra la insignia del club que se está activando y los 6 casilleros interactivos para ingresar el código OTP.
+    - Al validar el código, llama a `setAuthSession(data.user, data.token)` y muestra pantalla de confirmación con botón directo: `"🚀 Ir al Panel de mi Club"` con soporte para Single Sign-On (`auth_token`).
+  * Tests Automatizados:
+    - Backend (`ClubOnboardingTest.php`): aserciones que validan que el usuario nace sin verificar, sin token y que al verificar OTP recibe el token y actualiza `email_verified_at`.
+    - Frontend (`authAndOnboarding.test.tsx`): test que valida la carga del contexto del club en `/verificar-email`, el llenado del OTP de 6 dígitos, la emisión de sesión en `localStorage` y el botón de acceso al panel.
+- Verificación de Calidad:
+  * Backend PHPUnit: 154 tests pasados al 100% (826 aserciones).
+  * Frontend Vitest: 47 tests pasados al 100%.
 ===============================================================================
-

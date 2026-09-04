@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import PasswordInput from "../../components/PasswordInput";
 
@@ -24,6 +25,7 @@ export interface TipoNegocioItem {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 export default function RegistroClubPage() {
+  const router = useRouter();
   const { user, token, setAuthSession, login } = useAuth();
 
   // Business Types state
@@ -286,11 +288,6 @@ export default function RegistroClubPage() {
         return;
       }
 
-      // Save auth session
-      if (data.token && data.user) {
-        setAuthSession(data.user, data.token);
-      }
-
       let finalSubdomainUrl = data.subdomain_url;
       if (typeof window !== "undefined") {
         const protocol = window.location.protocol;
@@ -301,6 +298,21 @@ export default function RegistroClubPage() {
           baseDomain = "turnos.com";
         }
         finalSubdomainUrl = `${protocol}//${data.complejo.subdominio}.${baseDomain}${port}`;
+      }
+
+      // Si el usuario requiere validación OTP (nuevo registro) NO iniciamos sesión todavía
+      if (data.requires_verification || !data.token) {
+        const redirectTarget = `${finalSubdomainUrl}/panel`;
+        const emailToVerify = payload.email_admin || emailAdmin;
+        router.push(
+          `/verificar-email?email=${encodeURIComponent(emailToVerify)}&club=${encodeURIComponent(data.complejo.nombre)}&subdomain_url=${encodeURIComponent(finalSubdomainUrl)}&redirect=${encodeURIComponent(redirectTarget)}`
+        );
+        return;
+      }
+
+      // Si el usuario ya estaba autenticado, guardamos/actualizamos la sesión
+      if (data.token && data.user) {
+        setAuthSession(data.user, data.token);
       }
 
       setSuccessData({

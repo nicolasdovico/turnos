@@ -12,9 +12,9 @@ export default function PortalPage() {
     if (typeof window !== "undefined") {
       const protocol = window.location.protocol;
       const port = window.location.port ? `:${window.location.port}` : "";
-      const hostname = window.location.hostname;
+      const hostname = window.location.hostname || "localhost";
       let base = "localhost";
-      if (hostname.endsWith("turnos.com")) {
+      if (hostname && hostname.endsWith("turnos.com")) {
         base = "turnos.com";
       }
       setDemoClubUrl(`${protocol}//padelpro.${base}${port}`);

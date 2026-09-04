@@ -190,8 +190,8 @@ class ClubOnboardingController extends Controller
                 ]);
             }
 
-            // F. Generate Sanctum token
-            $token = $user->createToken('saas_auth_token')->plainTextToken;
+            // F. Generate Sanctum token ONLY if user was already authenticated
+            $token = $currentUser ? $user->createToken('saas_auth_token')->plainTextToken : null;
 
             return [
                 'user' => $user,
@@ -201,7 +201,9 @@ class ClubOnboardingController extends Controller
             ];
         });
 
-        if ($result['is_new_user']) {
+        $isNewUser = $result['is_new_user'];
+
+        if ($isNewUser) {
             OtpVerificationController::dispatchOtp($result['user']->email, $result['user']->name);
         }
 
@@ -225,12 +227,16 @@ class ClubOnboardingController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => '¡Club registrado y configurado exitosamente!',
+            'message' => $isNewUser
+                ? '¡Club registrado! Por favor ingresa el código de 6 dígitos enviado a tu correo para activar tu cuenta y acceder a tu club.'
+                : '¡Club registrado y configurado exitosamente!',
+            'requires_verification' => $isNewUser,
             'token' => $result['token'],
             'user' => [
                 'id' => $result['user']->id,
                 'name' => $result['user']->name,
                 'email' => $result['user']->email,
+                'email_verified_at' => $result['user']->email_verified_at,
                 'complejos' => $result['user']->complejos()->with('tipoNegocio')->get(['id', 'user_id', 'nombre', 'subdominio', 'estado', 'deporte_principal', 'tipo_negocio_id']),
             ],
             'complejo' => $result['complejo']->load('tipoNegocio'),
