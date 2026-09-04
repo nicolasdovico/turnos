@@ -87,6 +87,7 @@ class DisponibilidadService
             return [
                 'slots' => [],
                 'turnos_ocupados' => [],
+                'complejo_cerrado' => true,
                 'optimizacion_anti_baches' => [
                     'activa' => false,
                     'total_horarios_protegidos' => 0,
@@ -337,6 +338,7 @@ class DisponibilidadService
             'slots' => $slotsDisponibles,
             'turnos_ocupados' => $turnosOcupadosData,
             'turnos_retenidos' => $turnosRetenidos,
+            'complejo_cerrado' => false,
             'optimizacion_anti_baches' => [
                 'activa' => $antiBachesActivo,
                 'total_horarios_protegidos' => count($horariosProtegidos),

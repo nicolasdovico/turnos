@@ -310,6 +310,8 @@ export default function ClubAdminPanel() {
     }))
   );
   const [isSavingHorarios, setIsSavingHorarios] = useState(false);
+  const [isHorariosDirty, setIsHorariosDirty] = useState(false);
+  const isHorariosDirtyRef = React.useRef<boolean>(false);
   const [horariosSuccessMsg, setHorariosSuccessMsg] = useState<string | null>(null);
   const [horariosErrorMsg, setHorariosErrorMsg] = useState<string | null>(null);
   const [stats, setStats] = useState({ total_canchas: 0, total_turnos: 0, modulos_count: 0 });
@@ -357,6 +359,8 @@ export default function ClubAdminPanel() {
   const [horasLimiteCancelacion, setHorasLimiteCancelacion] = useState<number>(4);
   const [permiteMostradorPublico, setPermiteMostradorPublico] = useState<boolean>(true);
   const [isSavingPoliticas, setIsSavingPoliticas] = useState(false);
+  const [isPoliticasDirty, setIsPoliticasDirty] = useState(false);
+  const isPoliticasDirtyRef = React.useRef<boolean>(false);
   const [politicasSuccessMsg, setPoliticasSuccessMsg] = useState<string | null>(null);
   const [politicasErrorMsg, setPoliticasErrorMsg] = useState<string | null>(null);
 
@@ -523,17 +527,20 @@ export default function ClubAdminPanel() {
 
       if (data.data?.complejo) {
         setComplejo(data.data.complejo);
-        if (data.data.complejo.tipo_cobro_reserva) {
-          setTipoCobroReserva(data.data.complejo.tipo_cobro_reserva);
-        }
-        if (typeof data.data.complejo.porcentaje_sena === "number") {
-          setPorcentajeSena(data.data.complejo.porcentaje_sena);
-        }
-        if (typeof data.data.complejo.horas_limite_cancelacion === "number") {
-          setHorasLimiteCancelacion(data.data.complejo.horas_limite_cancelacion);
-        }
-        if (data.data.complejo.permite_mostrador_publico !== undefined) {
-          setPermiteMostradorPublico(Boolean(data.data.complejo.permite_mostrador_publico));
+        // Si el usuario tiene cambios sin guardar en políticas, no los pisamos con el refresco en segundo plano
+        if (!isPoliticasDirtyRef.current) {
+          if (data.data.complejo.tipo_cobro_reserva) {
+            setTipoCobroReserva(data.data.complejo.tipo_cobro_reserva);
+          }
+          if (typeof data.data.complejo.porcentaje_sena === "number") {
+            setPorcentajeSena(data.data.complejo.porcentaje_sena);
+          }
+          if (typeof data.data.complejo.horas_limite_cancelacion === "number") {
+            setHorasLimiteCancelacion(data.data.complejo.horas_limite_cancelacion);
+          }
+          if (data.data.complejo.permite_mostrador_publico !== undefined) {
+            setPermiteMostradorPublico(Boolean(data.data.complejo.permite_mostrador_publico));
+          }
         }
       }
 
@@ -541,29 +548,33 @@ export default function ClubAdminPanel() {
       setCanchas(canchasList);
       const rawHorarios: HorarioItem[] = data.data.horarios_atencion || [];
       setHorarios(rawHorarios);
-      setHorariosForm(
-        DIAS_CONFIG.map((d) => {
-          const found = rawHorarios.find((h) => Number(h.dia_semana) === Number(d.dia_semana));
-          if (found) {
+
+      // Si el usuario tiene cambios sin guardar en horarios, no los pisamos con el refresco en segundo plano
+      if (!isHorariosDirtyRef.current) {
+        setHorariosForm(
+          DIAS_CONFIG.map((d) => {
+            const found = rawHorarios.find((h) => Number(h.dia_semana) === Number(d.dia_semana));
+            if (found) {
+              return {
+                dia_semana: d.dia_semana,
+                nombre: d.nombre,
+                abierto: true,
+                hora_apertura: (found.hora_apertura || "08:00").substring(0, 5),
+                hora_cierre: (found.hora_cierre || "23:00").substring(0, 5),
+                duracion_turno_minutos: Number(found.duracion_turno_minutos) || 60,
+              };
+            }
             return {
               dia_semana: d.dia_semana,
               nombre: d.nombre,
-              abierto: true,
-              hora_apertura: (found.hora_apertura || "08:00").substring(0, 5),
-              hora_cierre: (found.hora_cierre || "23:00").substring(0, 5),
-              duracion_turno_minutos: Number(found.duracion_turno_minutos) || 60,
+              abierto: false,
+              hora_apertura: "08:00",
+              hora_cierre: "23:00",
+              duracion_turno_minutos: 60,
             };
-          }
-          return {
-            dia_semana: d.dia_semana,
-            nombre: d.nombre,
-            abierto: false,
-            hora_apertura: "08:00",
-            hora_cierre: "23:00",
-            duracion_turno_minutos: 60,
-          };
-        })
-      );
+          })
+        );
+      }
       setStats(data.data.stats || { total_canchas: 0, total_turnos: 0, modulos_count: 0 });
     } catch (e: any) {
       if (!silent) {
@@ -624,6 +635,22 @@ export default function ClubAdminPanel() {
       document.removeEventListener("visibilitychange", onWindowFocus);
     };
   }, [subdomain, token]);
+
+  // Protección ante salida o recarga accidental con cambios pendientes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isHorariosDirtyRef.current || isPoliticasDirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   const fetchRegisteredUsers = async (query: string = "") => {
     try {
@@ -885,6 +912,8 @@ export default function ClubAdminPanel() {
       if (data.complejo) {
         setComplejo((prev) => (prev ? { ...prev, ...data.complejo } : prev));
       }
+      setIsPoliticasDirty(false);
+      isPoliticasDirtyRef.current = false;
     } catch (err: any) {
       setPoliticasErrorMsg(err.message || "Error al guardar.");
     } finally {
@@ -892,7 +921,54 @@ export default function ClubAdminPanel() {
     }
   };
 
+  const updateTipoCobroReserva = (val: string) => {
+    setTipoCobroReserva(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updatePorcentajeSena = (val: number) => {
+    setPorcentajeSena(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updateHorasLimiteCancelacion = (val: number) => {
+    setHorasLimiteCancelacion(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updatePermiteMostradorPublico = (val: boolean) => {
+    setPermiteMostradorPublico(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const descartarCambiosPoliticas = () => {
+    if (complejo) {
+      if (complejo.tipo_cobro_reserva) {
+        setTipoCobroReserva(complejo.tipo_cobro_reserva);
+      }
+      if (typeof complejo.porcentaje_sena === "number") {
+        setPorcentajeSena(complejo.porcentaje_sena);
+      }
+      if (typeof complejo.horas_limite_cancelacion === "number") {
+        setHorasLimiteCancelacion(complejo.horas_limite_cancelacion);
+      }
+      if (complejo.permite_mostrador_publico !== undefined) {
+        setPermiteMostradorPublico(Boolean(complejo.permite_mostrador_publico));
+      }
+    }
+    setIsPoliticasDirty(false);
+    isPoliticasDirtyRef.current = false;
+    setPoliticasSuccessMsg(null);
+    setPoliticasErrorMsg(null);
+  };
+
   const updateDiaHorario = (dia_semana: number, fields: Partial<HorarioDiaForm>) => {
+    setIsHorariosDirty(true);
+    isHorariosDirtyRef.current = true;
     setHorariosForm((prev) =>
       prev.map((item) => (item.dia_semana === dia_semana ? { ...item, ...fields } : item))
     );
@@ -901,6 +977,8 @@ export default function ClubAdminPanel() {
   const aplicarLunesAViernes = () => {
     const lunes = horariosForm.find((h) => h.dia_semana === 1);
     if (!lunes) return;
+    setIsHorariosDirty(true);
+    isHorariosDirtyRef.current = true;
     setHorariosForm((prev) =>
       prev.map((item) => {
         if ([2, 3, 4, 5].includes(item.dia_semana)) {
@@ -921,6 +999,8 @@ export default function ClubAdminPanel() {
   const aplicarTodaLaSemana = () => {
     const lunes = horariosForm.find((h) => h.dia_semana === 1);
     if (!lunes) return;
+    setIsHorariosDirty(true);
+    isHorariosDirtyRef.current = true;
     setHorariosForm((prev) =>
       prev.map((item) => ({
         ...item,
@@ -934,6 +1014,8 @@ export default function ClubAdminPanel() {
   };
 
   const restablecerHorarios = () => {
+    setIsHorariosDirty(true);
+    isHorariosDirtyRef.current = true;
     setHorariosForm(
       DIAS_CONFIG.map((d) => ({
         dia_semana: d.dia_semana,
@@ -945,6 +1027,36 @@ export default function ClubAdminPanel() {
       }))
     );
     setHorariosSuccessMsg("Horarios restablecidos a valores estándar (08:00 a 23:00, 60 min).");
+  };
+
+  const descartarCambiosHorarios = () => {
+    setHorariosForm(
+      DIAS_CONFIG.map((d) => {
+        const found = horarios.find((h) => Number(h.dia_semana) === Number(d.dia_semana));
+        if (found) {
+          return {
+            dia_semana: d.dia_semana,
+            nombre: d.nombre,
+            abierto: true,
+            hora_apertura: (found.hora_apertura || "08:00").substring(0, 5),
+            hora_cierre: (found.hora_cierre || "23:00").substring(0, 5),
+            duracion_turno_minutos: Number(found.duracion_turno_minutos) || 60,
+          };
+        }
+        return {
+          dia_semana: d.dia_semana,
+          nombre: d.nombre,
+          abierto: false,
+          hora_apertura: "08:00",
+          hora_cierre: "23:00",
+          duracion_turno_minutos: 60,
+        };
+      })
+    );
+    setIsHorariosDirty(false);
+    isHorariosDirtyRef.current = false;
+    setHorariosSuccessMsg(null);
+    setHorariosErrorMsg(null);
   };
 
   const handleSaveHorarios = async (e: React.FormEvent) => {
@@ -989,6 +1101,8 @@ export default function ClubAdminPanel() {
 
       setHorarios(data.horarios || []);
       setHorariosSuccessMsg("¡Horarios de atención actualizados exitosamente!");
+      setIsHorariosDirty(false);
+      isHorariosDirtyRef.current = false;
     } catch (err: any) {
       setHorariosErrorMsg(err.message || "Ocurrió un error al guardar los horarios.");
     } finally {
@@ -2342,24 +2456,42 @@ export default function ClubAdminPanel() {
                 ))}
               </div>
 
-              {/* Botón Guardar */}
-              <div className="pt-4 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isSavingHorarios}
-                  className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-6 py-3.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition flex items-center gap-2"
-                >
-                  {isSavingHorarios ? (
-                    <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      <span>Guardando Horarios...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>💾 Guardar Horarios de Atención</span>
-                    </>
+              {/* Botón Guardar & Alerta de cambios sin guardar */}
+              <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {isHorariosDirty ? (
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3.5 py-2 rounded-xl">
+                    <span>⚠️</span>
+                    <span>Tienes cambios pendientes de guardar en los horarios</span>
+                  </div>
+                ) : <div />}
+
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  {isHorariosDirty && (
+                    <button
+                      type="button"
+                      onClick={descartarCambiosHorarios}
+                      className="rounded-2xl bg-slate-800 hover:bg-slate-700 px-4 py-3.5 text-xs font-semibold text-slate-300 transition"
+                    >
+                      Descartar cambios
+                    </button>
                   )}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingHorarios}
+                    className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 px-6 py-3.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 transition flex items-center gap-2"
+                  >
+                    {isSavingHorarios ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Guardando Horarios...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>💾 Guardar Horarios de Atención</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -3225,7 +3357,7 @@ export default function ClubAdminPanel() {
                         name="tipo_cobro"
                         value="sena"
                         checked={tipoCobroReserva === "sena"}
-                        onChange={() => setTipoCobroReserva("sena")}
+                        onChange={() => updateTipoCobroReserva("sena")}
                         className="text-emerald-500 focus:ring-emerald-500"
                       />
                     </div>
@@ -3252,8 +3384,8 @@ export default function ClubAdminPanel() {
                         value="total"
                         checked={tipoCobroReserva === "total"}
                         onChange={() => {
-                          setTipoCobroReserva("total");
-                          setPorcentajeSena(100);
+                          updateTipoCobroReserva("total");
+                          updatePorcentajeSena(100);
                         }}
                         className="text-emerald-500 focus:ring-emerald-500"
                       />
@@ -3277,7 +3409,7 @@ export default function ClubAdminPanel() {
                         name="tipo_cobro"
                         value="ninguno"
                         checked={tipoCobroReserva === "ninguno"}
-                        onChange={() => setTipoCobroReserva("ninguno")}
+                        onChange={() => updateTipoCobroReserva("ninguno")}
                         className="text-emerald-500 focus:ring-emerald-500"
                       />
                     </div>
@@ -3310,7 +3442,7 @@ export default function ClubAdminPanel() {
                       step={5}
                       aria-label="Porcentaje de Seña"
                       value={porcentajeSena}
-                      onChange={(e) => setPorcentajeSena(Number(e.target.value))}
+                      onChange={(e) => updatePorcentajeSena(Number(e.target.value))}
                       className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                     />
 
@@ -3320,7 +3452,7 @@ export default function ClubAdminPanel() {
                         <button
                           key={val}
                           type="button"
-                          onClick={() => setPorcentajeSena(val)}
+                          onClick={() => updatePorcentajeSena(val)}
                           className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
                             porcentajeSena === val
                               ? "bg-emerald-500 text-slate-950 shadow"
@@ -3370,7 +3502,7 @@ export default function ClubAdminPanel() {
                     <button
                       key={hs}
                       type="button"
-                      onClick={() => setHorasLimiteCancelacion(hs)}
+                      onClick={() => updateHorasLimiteCancelacion(hs)}
                       className={`p-3 rounded-2xl border text-center transition ${
                         horasLimiteCancelacion === hs
                           ? "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500/50 shadow"
@@ -3415,20 +3547,38 @@ export default function ClubAdminPanel() {
                   type="checkbox"
                   aria-label="Permitir Pago en Mostrador"
                   checked={permiteMostradorPublico}
-                  onChange={(e) => setPermiteMostradorPublico(e.target.checked)}
+                  onChange={(e) => updatePermiteMostradorPublico(e.target.checked)}
                   className="w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-950 border-slate-700 cursor-pointer"
                 />
               </div>
 
-              {/* Submit Button */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSavingPoliticas}
-                  className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-emerald-600/20 transition disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-                >
-                  <span>{isSavingPoliticas ? "Guardando..." : "💾 Guardar Políticas de Reserva"}</span>
-                </button>
+              {/* Submit Button & Alerta de cambios sin guardar */}
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {isPoliticasDirty ? (
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3.5 py-2 rounded-xl">
+                    <span>⚠️</span>
+                    <span>Tienes cambios pendientes de guardar en las políticas</span>
+                  </div>
+                ) : <div />}
+
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  {isPoliticasDirty && (
+                    <button
+                      type="button"
+                      onClick={descartarCambiosPoliticas}
+                      className="rounded-2xl bg-slate-800 hover:bg-slate-700 px-4 py-3.5 text-xs font-semibold text-slate-300 transition"
+                    >
+                      Descartar cambios
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isSavingPoliticas}
+                    className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-emerald-600/20 transition disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>{isSavingPoliticas ? "Guardando..." : "💾 Guardar Políticas de Reserva"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

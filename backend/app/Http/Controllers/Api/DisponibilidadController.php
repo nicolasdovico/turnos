@@ -52,11 +52,13 @@ class DisponibilidadController extends Controller
         $turnosOcupados = $disponibilidad['turnos_ocupados'];
         $turnosRetenidos = $disponibilidad['turnos_retenidos'] ?? [];
         $antiBaches = $disponibilidad['optimizacion_anti_baches'];
+        $complejoCerrado = (bool) ($disponibilidad['complejo_cerrado'] ?? false);
 
         return response()->json([
             'cancha_id' => $id,
             'cancha_nombre' => $cancha->nombre,
             'fecha' => $validated['fecha'],
+            'complejo_cerrado' => $complejoCerrado,
             'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),
             'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
             'anti_baches_activo' => (bool) ($cancha->anti_baches_activo ?? true),
@@ -71,6 +73,7 @@ class DisponibilidadController extends Controller
             'is_admin' => $esAdmin,
             'data' => [
                 'slots' => $slots,
+                'complejo_cerrado' => $complejoCerrado,
                 'turnos_ocupados' => $turnosOcupados,
                 'turnos_retenidos' => $turnosRetenidos,
                 'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),

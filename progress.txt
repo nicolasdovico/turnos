@@ -1132,4 +1132,32 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Backend PHPUnit: 154 tests pasados al 100% (826 aserciones).
   * Frontend Vitest: 47 tests pasados al 100%.
+-------------------------------------------------------------------------------
+[2026-09-03] - PROTECCIÓN INTEGRAL DE EDICIÓN DE HORARIOS Y POLÍTICAS & AVISO DE COMPLEJO CERRADO
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * Al editar horarios de atención o políticas de reserva en el panel de administración del club (`/panel`), los cambios sin guardar se perdían en dos situaciones:
+    1. Al cambiar de pestaña en el navegador y regresar (`window focus` / `visibilitychange`).
+    2. Al cabo de aproximadamente 10 a 30 segundos sin cambiar de pestaña.
+  * Causa raíz: En `frontend/app/tenants/[subdomain]/panel/page.tsx`, tanto el polling periódico en segundo plano (`setInterval(..., 30000)`) como los listeners de `focus` y `visibilitychange` invocaban `fetchDashboardData(true)`. Dicha función sobrescribía incondicionalmente el estado local `horariosForm`, `tipoCobroReserva`, `porcentajeSena`, `horasLimiteCancelacion`, reseteando el formulario a los valores almacenados en el backend.
+  * Además, al consultar una fecha donde el complejo está cerrado según sus horarios de atención, la grilla horaria mostraba el mensaje genérico "No hay turnos disponibles para la fecha seleccionada" en lugar de un aviso formal de club cerrado.
+- Solución Implementada:
+  * Frontend (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+    - Control de estado sucio ("dirty tracking") para Horarios y Políticas combinando `useState` (para reactividad en UI) y `useRef` (`isHorariosDirtyRef`, `isPoliticasDirtyRef`) para garantizar lectura síncrona dentro de closures y callbacks de timers.
+    - Condicional en `fetchDashboardData`: si `isHorariosDirtyRef.current` es verdadero, no se sobreescribe `horariosForm`. Si `isPoliticasDirtyRef.current` es verdadero, no se sobreescriben las variables de políticas.
+    - Manejador de evento `beforeunload` para advertir al usuario con diálogo nativo del navegador si intenta recargar (F5) o cerrar la pestaña con cambios sin guardar.
+    - Aviso visual en UI: banner de advertencia (`⚠️ Tienes cambios pendientes de guardar`) y botón `"Descartar cambios"` en ambas solapas para permitir al usuario revertir sus cambios al estado guardado en el servidor si lo desea.
+    - Marcado de estado sucio en todos los controles: toggles de día, inputs de apertura/cierre, presets masivos ("Copiar Lun a Vie", "Copiar toda la semana", "Restablecer valores estándar"), radios de cobro y slider de seña.
+  * Backend & Grilla Horaria (`backend/app/Services/DisponibilidadService.php`, `backend/app/Http/Controllers/Api/DisponibilidadController.php`, `frontend/components/GrillaHoraria.tsx`):
+    - Detección de día cerrado en `DisponibilidadService` retornando `complejo_cerrado => true` cuando no existen horarios de atención configurados para el día de la semana consultado.
+    - Exposición de bandera `complejo_cerrado` en respuesta JSON de disponibilidad de cancha.
+    - Cartel visual en `GrillaHoraria.tsx`: muestra badge distintivo `"Complejo cerrado este día - El club no cuenta con horarios de atención habilitados para la fecha seleccionada"`.
+  * Tests Automatizados:
+    - Frontend (`tests/authAndOnboarding.test.tsx`): nuevo test `preserves unsaved changes in horarios against background polling and window focus revalidation` que modifica el toggle de Domingo, dispara revalidación de foco de ventana, confirma que el valor sucio no es alterado y prueba el botón "Descartar cambios".
+    - Frontend (`tests/GrillaHoraria.test.tsx`): nuevo test `renderiza mensaje distintivo de complejo cerrado cuando no hay atencion el dia seleccionado`.
+    - Documentación: actualización de CU-04 en `GUIA_DE_PRUEBAS_MANUALES.md`.
+- Verificación de Calidad:
+  * Suite Frontend (Vitest): 49 tests pasados al 100% (4 archivos de test).
+  * Suite Backend (PHPUnit): 154 tests pasados al 100% (834 aserciones).
 ===============================================================================
+

@@ -736,6 +736,88 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(putHorariosPayload.horarios).toHaveLength(7);
   });
 
+  it("preserves unsaved changes in horarios against background polling and window focus revalidation", async () => {
+    let fetchCount = 0;
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        fetchCount++;
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Nico Padel",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+              },
+              plan: { id: 1, nombre: "Oro", slug: "oro", modulos: [] },
+              canchas: [],
+              horarios_atencion: [
+                { id: 1, dia_semana: 0, hora_apertura: "08:00:00", hora_cierre: "23:00:00", duracion_turno_minutos: 60 },
+              ],
+              stats: { total_canchas: 0, total_turnos: 0, modulos_count: 0 },
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Switch to Horarios tab
+    const horariosTabBtn = await screen.findByRole("button", { name: /Horarios de Atención/i });
+    fireEvent.click(horariosTabBtn);
+
+    const toggleDomingo = (await screen.findByRole("checkbox", {
+      name: /Estado de atención Domingo/i,
+    })) as HTMLInputElement;
+
+    // Initially Domingo is open (checked = true because rawHorarios had dia_semana 0)
+    expect(toggleDomingo.checked).toBe(true);
+    expect(screen.queryByText(/Tienes cambios pendientes de guardar en los horarios/i)).toBeNull();
+
+    // User toggles Domingo to closed
+    fireEvent.click(toggleDomingo);
+    expect(toggleDomingo.checked).toBe(false);
+
+    // Dirty banner and Discard button should appear
+    expect(await screen.findByText(/Tienes cambios pendientes de guardar en los horarios/i)).toBeDefined();
+    const discardBtn = screen.getByRole("button", { name: /Descartar cambios/i });
+    expect(discardBtn).toBeDefined();
+
+    // Simulate background revalidation via window focus or polling
+    fireEvent(window, new Event("focus"));
+
+    // After revalidation, Domingo MUST remain closed (unsaved change preserved)
+    await waitFor(() => {
+      expect(fetchCount).toBeGreaterThanOrEqual(2);
+    });
+    expect(toggleDomingo.checked).toBe(false);
+    expect(screen.getByText(/Tienes cambios pendientes de guardar en los horarios/i)).toBeDefined();
+
+    // User clicks "Descartar cambios"
+    fireEvent.click(discardBtn);
+
+    // Form should revert to saved server state (Domingo checked = true) and dirty banner disappears
+    expect(toggleDomingo.checked).toBe(true);
+    expect(screen.queryByText(/Tienes cambios pendientes de guardar en los horarios/i)).toBeNull();
+  });
+
+
   it("renders and manages fixed bookings (turnos fijos) for 6 months with renewal alert in club admin panel", async () => {
     let postTurnoFijoPayload: any = null;
     let renewPayload: any = null;

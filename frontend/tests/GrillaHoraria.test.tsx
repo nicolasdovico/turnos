@@ -48,6 +48,29 @@ describe("Componente Reactivo GrillaHoraria", () => {
     expect(screen.queryByLabelText("Turno 11:00 a 12:00 Ocupado")).toBeNull();
   });
 
+  it("renderiza mensaje distintivo de complejo cerrado cuando no hay atencion el dia seleccionado", async () => {
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ complejo_cerrado: true, slots_disponibles: [], turnos_ocupados: [] }),
+      })
+    );
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Principal"
+        deporte="padel"
+        fechaInicial="2026-09-06"
+      />
+    );
+
+    expect(await screen.findByText("Complejo cerrado este día")).toBeDefined();
+    expect(screen.getByText(/El club no cuenta con horarios de atención habilitados/i)).toBeDefined();
+  });
+
+
 
   it("simula selección y bloqueo exitoso de turno con inicio del contador de 10 minutos", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {

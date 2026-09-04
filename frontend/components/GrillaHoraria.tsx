@@ -146,6 +146,7 @@ export default function GrillaHoraria({
   const [isFlexible, setIsFlexible] = useState<boolean>(Boolean(permiteDuracionFlexible));
   const [antiBachesInfo, setAntiBachesInfo] = useState<AntiBachesInfo | null>(null);
   const [slots, setSlots] = useState<Slot[]>(initialSlots || []);
+  const [isComplejoCerrado, setIsComplejoCerrado] = useState<boolean>(false);
   const [turnosOcupados, setTurnosOcupados] = useState<TurnoOcupado[]>([]);
   const [turnosRetenidos, setTurnosRetenidos] = useState<RetainedLock[]>([]);
   const [turnoToCancel, setTurnoToCancel] = useState<TurnoOcupado | null>(null);
@@ -419,6 +420,7 @@ export default function GrillaHoraria({
       }
 
       const data = await res.json();
+      setIsComplejoCerrado(Boolean(data.complejo_cerrado || data.data?.complejo_cerrado));
       if (data.permite_duracion_flexible !== undefined) {
         setIsFlexible(Boolean(data.permite_duracion_flexible));
       }
@@ -1671,6 +1673,12 @@ export default function GrillaHoraria({
                   {Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="h-20 bg-slate-800/40 rounded-2xl animate-pulse" />
                   ))}
+                </div>
+              ) : isComplejoCerrado ? (
+                <div className="text-center py-12 bg-amber-500/10 rounded-2xl border border-amber-500/20">
+                  <Clock className="w-10 h-10 text-amber-400 mx-auto mb-2" />
+                  <p className="text-amber-300 font-bold">Complejo cerrado este día</p>
+                  <p className="text-slate-400 text-sm mt-1">El club no cuenta con horarios de atención habilitados para la fecha seleccionada.</p>
                 </div>
               ) : availableSlots.length === 0 ? (
                 <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-800">

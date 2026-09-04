@@ -69,10 +69,10 @@ Esta guía contiene la especificación formal y práctica de **todos los Casos d
 * **Flujo Paso a Paso:**
   1. Completa los pasos 1 al 4. Observa cómo al escribir el subdominio `padel-olivos` se comprueba dinámicamente su disponibilidad con badge verde.
   2. Haz clic en **"Crear mi Club y Comenzar"**.
-  3. El sistema redirige a `/verificar-email`.   **NO REDIRIGE A VERIFICAR MAIL**
+  3. El sistema redirige a `/verificar-email`.   
   4. Abre Mailpit en [`http://localhost:8025/`], abre el correo recibido por `gonzalo@olivos.test`, copia el código de 6 dígitos.
   5. Pega el código en la pantalla de verificación.
-* **Resultado Esperado:** La cuenta marca `email_verified_at = now()`, se emite el token Sanctum de sesión y se redirige automáticamente al panel oficial del nuevo club: `http://padel-olivos.localhost:8080/panel`. HACERLO VARIAS VECES PORQUE TIENE }uN COMPORTAMIENTO RARO: MUESTRA BOTON DE LOGUEARSE PERO ESTA LA SESION ACTIVA
+* **Resultado Esperado:** La cuenta marca `email_verified_at = now()`, se emite el token Sanctum de sesión y se redirige automáticamente al panel oficial del nuevo club: `http://padel-olivos.localhost:8080/panel`. 
 
 ---
 
@@ -103,11 +103,11 @@ Esta guía contiene la especificación formal y práctica de **todos los Casos d
 * **URL:** Solapa **"🕒 Horarios de Atención"** del panel.
 * **Flujo Paso a Paso:**
   1. Visualiza las 7 tarjetas ordenadas estrictamente de Lunes (1) a Domingo (0).
-  2. En la tarjeta del **Domingo**, desactiva el switch toggle `Abierto/Cerrado` para marcarlo como `Cerrado`. **CUANDO HAGO LOS CAMBIOS Y NO GRABO Y CAMBIO DE PESTAÑA EN EL NAVEGADOR SE PIERDEN LOS CAMBIOS. ES CORRECTO?**
+  2. En la tarjeta del **Domingo**, desactiva el switch toggle `Abierto/Cerrado` para marcarlo como `Cerrado`. Observa cómo aparece el aviso de cambios pendientes ("⚠️ Tienes cambios pendientes de guardar...") y el botón "Descartar cambios". Si cambias de pestaña o navegas sin guardar, tus modificaciones se mantienen intactas y no se reinician.
   3. En el día **Sábado**, modifica la hora de apertura a las `08:00` y cierre a las `20:00`.
   4. Haz clic en el preset de productividad **"⚡ Copiar Lun a Vie"**.
-  5. Haz clic en **"Guardar Horarios Semanales"**.  **DESPUES DE APROX 10 SEGUNDOS LOS CAMBIOS QUE SE HACEN DESPUES DE APRETAR EL BOTON, SE PIERDEN**
-* **Resultado Esperado:** Al consultar la grilla horaria pública del club un día domingo, el sistema muestra el mensaje oficial de complejo cerrado impidiendo la reserva de turnos ese día. **SI ESTA CERRADO ESE DIA DEBERIA MOSTRAR CARTEL DE CERRADO. EN CAMBIO MUESTRA "No hay turnos disponibles para la fecha seleccionada."**
+  5. Haz clic en **"Guardar Horarios de Atención"**.
+* **Resultado Esperado:** Al consultar la grilla horaria pública del club un día domingo (en la página pública o panel de turnos), el sistema muestra el cartel distintivo **"Complejo cerrado este día"** ("El club no cuenta con horarios de atención habilitados para la fecha seleccionada"), impidiendo la reserva de turnos ese día.
 
 ---
 
