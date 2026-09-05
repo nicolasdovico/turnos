@@ -1157,7 +1157,201 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Frontend (`tests/GrillaHoraria.test.tsx`): nuevo test `renderiza mensaje distintivo de complejo cerrado cuando no hay atencion el dia seleccionado`.
     - Documentación: actualización de CU-04 en `GUIA_DE_PRUEBAS_MANUALES.md`.
 - Verificación de Calidad:
-  * Suite Frontend (Vitest): 49 tests pasados al 100% (4 archivos de test).
-  * Suite Backend (PHPUnit): 154 tests pasados al 100% (834 aserciones).
 ===============================================================================
-
+[2026-09-05] - RESOLUCIÓN INTEGRAL DE CU-07 (RESERVA PÚBLICA VISITANTE CON SEÑA ONLINE & OTP) Y PERSISTENCIA DE SESIÓN EN SUBDOMINIO (CU-08)
+-------------------------------------------------------------------------------
+- Diagnóstico de problemas reportados en CU-07:
+  1. Monto y estado de seña: Al seleccionar método de pago "Mercado Pago / Tarjeta Online" (`online`), el controlador `TurnoConfirmarController.php` solo contemplaba `simulador_dev`, dejando `$montoPagado` en $0.00 y `$estadoPago = 'pendiente'`, omitiendo el cobro de la seña configurada (50%).
+  2. Candado Redis persistente en UI: Al cerrar el modal tras la confirmación, el banner de bloqueo de turno con cuenta regresiva seguía mostrándose porque:
+     - `TurnoConfirmarController.php` condicionaba `liberarBloqueo` a `$tokenReserva`.
+     - `DisponibilidadService.php` agregaba llaves activas de Redis a `turnosRetenidos` sin verificar si ya existía un turno ocupado/confirmado en PostgreSQL para ese rango horario.
+     - `GrillaHoraria.tsx` mantenía `myLockedSlots` en `localStorage` y en el memo `allAdminRetainedLocks` no se verificaban los turnos confirmados locales (`confirmedTurnos`) ni se normalizaban los strings de hora (`HH:mm`).
+  3. Turno no visible como otorgado para el cliente: La grilla de turnos ocupados estaba condicionada exclusivamente a `{isAdmin && ...}`, por lo que los visitantes y clientes públicos no veían ninguna sección con sus reservas confirmadas ni el detalle de la seña abonada.
+  4. Redirección de login en subdominios (CU-08): Al hacer clic en "Iniciar Sesión" desde un subdominio de club (`http://nico-padel.localhost:8080/`), el middleware redirigía a `http://localhost:8080/login`, y tras el inicio de sesión exitoso se redirigía a `/` en lugar de regresar al subdominio con SSO.
+- Solución Implementada:
+  * Backend (`App\Http\Controllers\Api\TurnoConfirmarController.php`):
+    - Se contemplan los métodos `'online'`, `'tarjeta'`, `'mercadopago'` junto a `'simulador_dev'` para fijar `$montoPagado = $montoRequerido` ($6.000 de seña, $6.000 saldo pendiente, `estado_pago = 'senado'`).
+    - Se libera incondicionalmente el bloqueo en Redis (`liberarBloqueo` y `liberarBloqueosSolapados`) dentro de la transacción de DB una vez confirmado el turno.
+  * Backend (`App\Services\DisponibilidadService.php` & `DisponibilidadController.php`):
+    - Se purgan de Redis y se excluyen de `turnosRetenidos` los bloqueos huérfanos que solapen con turnos ya ocupados en base de datos.
+    - Se añade el parámetro `$currentUserId` a `obtenerDisponibilidadCompleta`: cuando el turno pertenece al usuario autenticado, se marca con `is_mine = true` y se proporcionan los datos de titular y pago, permitiendo que el cliente vea sus reservas incluso tras recargar la página.
+  * Frontend (`frontend/components/GrillaHoraria.tsx`):
+    - Al confirmarse la reserva, se añade el turno a `confirmedTurnos` (con persistencia en `sessionStorage`), se limpia `activeLock`, `myLockedSlots` en `localStorage` y `turnosRetenidos`.
+    - Normalización de strings horarios (5 caracteres `HH:mm`) en `allAdminRetainedLocks` para asegurar que ningún turno ya ocupado o confirmado figure como retenido ni active el banner de cuenta regresiva.
+    - Nueva sección visual para clientes `client-confirmed-turnos-section` (`{!isAdmin && clientConfirmedTurnos.length > 0}`), que muestra tarjetas con badge "Seña Abonada" o "100% Abonado", horario, cancha, titular, monto abonado online y saldo restante a pagar en el club.
+  * Frontend Subdomain Login & SSO (`frontend/components/Navbar.tsx`, `frontend/app/login/page.tsx`):
+    - `getGlobalLink("/login")` en `Navbar.tsx` adjunta el parámetro `?returnTo=` con la URL completa del subdominio actual.
+    - `LoginPage` (`frontend/app/login/page.tsx`) lee el parámetro `returnTo` y tras el login transfiere el token de autenticación mediante `?auth_token=` hacia el subdominio, manteniendo la sesión del usuario en su club.
+  * Tests Automatizados:
+    - Backend (`SenaYPagoSimuladoTest.php`): nuevo test `test_confirmar_reserva_con_metodo_online_calcula_sena_del_50_porciento_y_libera_lock` validando cobro de seña del 50%, liberación del candado Redis y presencia de `is_mine = true` en la API de disponibilidad.
+    - Frontend (`GrillaHoraria.test.tsx`): nuevo conjunto de aserciones en el test de checkout de visitante verificando renderizado de `client-confirmed-turnos-section`, tarjeta `client-reserved-card` con "Seña Abonada", y desaparición de `active-lock-banner`.
+- Verificación de Calidad:
+  * Backend PHPUnit: 154 tests pasados al 100% (834 aserciones).
+  * Frontend Vitest: 49 tests pasados al 100% (4 archivos de test).
+===============================================================================
+[2026-09-05] - EXCLUSIÓN DE PAGO EN MOSTRADOR PARA CLIENTES ONLINE Y OBLIGATORIEDAD DE SEÑA
+-------------------------------------------------------------------------------
+- Diagnóstico y Solicitud del Usuario:
+  * Al reservar online como cliente o visitante público, se permitía seleccionar la opción "💵 Pagar en el Club / Mostrador" (y figuraba como primera opción por defecto en el estado React `metodoPago`), lo cual permitía reservar online omitiendo el cobro de la seña pactada.
+- Solución Implementada:
+  * Frontend (`frontend/components/GrillaHoraria.tsx`):
+    - Se removió definitivamente la opción `<option value="mostrador">💵 Pagar en el Club / Mostrador</option>` de todas las vistas accesibles por clientes y visitantes (CASE 2: Cliente Registrado, CASE 3: Visitante Registro Paso 1 y CASE 3: Visitante Login).
+    - La opción "Cobrado en Mostrador / Efectivo" se reservó con exclusividad estricta para el modo recepción/administrador (`isAdmin === true`).
+    - El estado inicial de `metodoPago` ahora inicializa en `"online"` para clientes (`isAdmin ? "mostrador" : "online"`).
+    - En `handleOpenConfirmation`, el método de pago resetea a `"online"` para clientes (`isAdmin ? "pendiente" : "online"`).
+    - Se incorporó un hook reactivo `useEffect` para forzar `metodoPago = "online"` si en algún momento un cliente tuviera seteado `"mostrador"` o `"pendiente"`.
+  * Backend (`backend/app/Http/Controllers/Api/TurnoConfirmarController.php`):
+    - Validación de regla de negocio: si un cliente online (`!$esAdminClub`) envía `metodo_pago: 'mostrador'`, la API rechaza la petición con código HTTP 422 (`error: METODO_PAGO_INVALIDO`, "Para reservas online no está permitido el pago en mostrador. Debe abonar la seña mediante tarjeta online o saldo en billetera virtual.").
+    - Si el cliente online no envía `metodo_pago`, el sistema asume de forma predeterminada `'online'`, garantizando que siempre se calcule y aplique el cobro de la seña configurada en el complejo.
+    - Se mantiene intacta la capacidad del administrador/recepcionista del club (`$esAdminClub`) para registrar y confirmar turnos presenciales con `metodo_pago: 'mostrador'`.
+  * Tests Automatizados:
+    - Backend (`SenaYPagoSimuladoTest.php`):
+      * `test_cliente_online_no_puede_reservar_con_metodo_pago_mostrador`: verifica rechazo 422 con `METODO_PAGO_INVALIDO` ante intentos de pagar en mostrador online.
+      * `test_cliente_online_sin_especificar_metodo_pago_defaultea_a_online_con_sena`: verifica default `'online'`, cálculo de seña del 50% ($5.000) y estado `senado`.
+      * `test_admin_club_si_puede_confirmar_en_mostrador`: verifica que el administrador puede asignar en mostrador con cobro total directo.
+    - Frontend (`GrillaHoraria.test.tsx`):
+      * `no muestra la opción de 'Pagar en el Club / Mostrador' al reservar online y defaultea a online`: comprueba que `Pagar en el Club / Mostrador` no existe en el DOM para clientes y que `Mercado Pago / Tarjeta Online` está presente.
+      * `muestra la opción 'Cobrado en Mostrador / Efectivo' cuando isAdmin es true`: comprueba que la opción presencial sigue disponible para la recepción.
+- Verificación de Calidad:
+  * Backend PHPUnit: 158 tests pasados al 100% (851 aserciones).
+  * Frontend Vitest: 51 tests pasados al 100% (4 archivos de test).
+===============================================================================
+[2026-09-05] - SELECTOR INTERACTIVO DE MODALIDAD DE PAGO (SEÑA VS TOTAL 100%) Y CORRECCIÓN EN SIMULADOR
+-------------------------------------------------------------------------------
+- Diagnóstico y Solicitud del Usuario:
+  * Al probar el simulador de pago dev, el sistema cobraba el 100% de la tarifa del turno en lugar de la seña pactada.
+  * Causa raíz: En la base de datos de pruebas (`FullTestingSeeder.php`), complejos como `nico-padel` tenían configurado `tipo_cobro_reserva = 'sena_obligatoria'`. En `TurnoConfirmarController.php`, la condición evaluaba únicamente `$tipoCobro === 'sena'`, por lo que `'sena_obligatoria'` se interpretaba como cobro total ($montoRequerido = $precio).
+  * Requerimiento adicional: El usuario solicitó que el sistema consulte explícitamente al cliente si desea abonar únicamente la seña o el 100% del valor del turno.
+- Solución Implementada:
+  * Backend (`backend/app/Http/Controllers/Api/TurnoConfirmarController.php`):
+    - Normalización de políticas de seña: `$esModoSena = in_array($tipoCobro, ['sena', 'sena_obligatoria', 'sena_minima', 'flexible'])`.
+    - Validación y recepción de `modalidad_pago` ('sena' | 'total') y `pago_completo` (boolean).
+    - Lógica de cálculo: Si el cliente selecciona modalidad `'total'` o si el club exige pago íntegro (`tipo_cobro_reserva === 'total'`), `$montoRequerido` es el 100% del precio ($saldoPendiente = 0, $estadoPago = 'pagado_total'). Si elige `'sena'`, `$montoRequerido` es el porcentaje configurado (ej. 50%), debitando wallet si aplica y dejando el saldo restante pendiente para pago en el club ($estadoPago = 'senado').
+  * Backend API Disponibilidad (`backend/app/Http/Controllers/Api/DisponibilidadController.php`):
+    - Exposición de los atributos `tipo_cobro_reserva` y `porcentaje_sena` del complejo en el endpoint `/api/canchas/{cancha}/disponibilidad`.
+  * Base de Datos & Seeders (`backend/database/seeders/FullTestingSeeder.php`):
+    - Corrección de `sena_obligatoria` por `sena` en los complejos sembrados y actualización en base de datos PostgreSQL activa.
+  * Frontend (`frontend/components/GrillaHoraria.tsx`):
+    - Nuevos estados: `modalidadCobro` ('sena' | 'total'), `clubPorcentajeSena` y `clubTipoCobro`.
+    - Integración de selector interactivo en el modal de reserva:
+      * Tarjeta interactiva con dos opciones: **"💳 Seña (X%)"** (muestra monto de seña y saldo a pagar en el club) vs **"🎉 Total (100%)"** (muestra monto total y turno 100% saldado).
+    - Sincronización reactiva del simulador de pagos sandbox y botones de confirmación:
+      * Al alternar entre Seña y Total, el botón "💳 Simular Pago Aprobado ($...)" y los botones de acción del formulario ("✓ Confirmar y Pagar...", "✓ Verificar y Pagar...") recalculan y muestran en vivo el monto exacto a debitar.
+    - Envío de `modalidad_pago` y `pago_completo` en el cuerpo de `/api/turnos/confirmar`.
+  * Frontend Tenant Page (`frontend/app/tenants/[subdomain]/page.tsx`):
+    - Traspaso de props `porcentajeSena` y `tipoCobroReserva` hacia `GrillaHoraria`.
+  * Tests Automatizados:
+    - Backend (`SenaYPagoSimuladoTest.php`):
+      * `test_confirmar_reserva_con_simulador_dev_permitiendo_elegir_pago_total_del_100_porciento`: Valida cobro al 100% con `modalidad_pago = 'total'` y estado `pagado_total`.
+      * `test_disponibilidad_retorna_politicas_de_pago_y_sena`: Valida exposición de `tipo_cobro_reserva` y `porcentaje_sena`.
+    - Frontend (`GrillaHoraria.test.tsx`):
+      * `permite al usuario alternar entre pagar seña o el 100% del total y actualiza los montos a pagar`: Simula click en "Total (100%)", valida cambio reactivo de precio en el botón del simulador ($5.000 -> $10.000) y verifica envío de `modalidad_pago: 'total'`.
+- Verificación de Calidad:
+  * Backend PHPUnit: 160 tests pasados al 100% (856 aserciones).
+  * Frontend Vitest: 52 tests pasados al 100% (4 archivos de test).
+===============================================================================
+[2026-09-05] - CORRECCIÓN DE TARIFA EN CANCHAS DE DURACIÓN FIJA (90 MINUTOS / PÁDEL)
+-------------------------------------------------------------------------------
+- Diagnóstico y Solicitud del Usuario:
+  * Al reservar en una cancha con duración fija de 90 minutos ("Cancha 1 - Central Cristal" en Nico Pádel), configurada con precio base de $10.000, el sistema cobraba $15.000 (+50%) al cliente, anunciando $10.000 pero cobrando como si el valor base fuera por 60 minutos.
+  * Causa raíz: En `DisponibilidadService.php` y `DisponibilidadController.php`, el código asumía que `precio_base` siempre corresponde a 60 minutos. Al ser un turno de 90 minutos sin `precio_90_min` explícito, multiplicaba automáticamente `$cancha->precio_base * 1.5` ($10.000 * 1.5 = $15.000). Para canchas con duración estándar de 90 minutos, el precio base fijado por el club ya contempla los 90 minutos completos del turno.
+- Solución Implementada:
+  * Modelo `Cancha` (`backend/app/Models/Cancha.php`):
+    - Se creó el método de dominio `getPrecioParaDuracion(int $duracionMinutos): float`.
+    - Si la duración solicitada coincide con la duración estándar de la cancha (`duracion_minutos`), retorna `precio_base` (o la tarifa específica si existiera).
+    - Si la cancha es de duración base de 60 min y se solicita 90 min (flexible), prorratea por 1.5x (o usa `precio_90_min`).
+    - Si la cancha es de duración base de 90 min y se solicitara otra duración, prorratea proporcionalmente a 90 minutos.
+  * Servicio de Disponibilidad (`backend/app/Services/DisponibilidadService.php`):
+    - Se eliminó el cálculo hardcodeado inline `precio_base * 1.5`.
+    - Ahora invoca `$cancha->getPrecioParaDuracion($duracionMinutos)`, retornando slots con precio $10.000 exactos para la Cancha 1.
+  * Controlador de Disponibilidad (`backend/app/Http/Controllers/Api/DisponibilidadController.php`):
+    - Sincronización de `precio_90_min` y `precio_120_min` consumiendo `$cancha->getPrecioParaDuracion(90)` y `(120)`.
+  * Controlador de Confirmación (`backend/app/Http/Controllers/Api/TurnoConfirmarController.php`):
+    - Fallback dinámico de precio calculado mediante `$cancha->getPrecioParaDuracion($duracionCalculada)`.
+  * Tests Automatizados:
+    - Backend Unit (`CanchaPricingTest.php`): 5 tests unitarios cubriendo cancha fija de 90m, tarifa específica, flexible de 60m prorrateada a 90m (1.5x) y 120m (2.0x), precios personalizados y cancha fija de 120m.
+    - Backend Feature (`SenaYPagoSimuladoTest.php`): `test_cancha_90_minutos_precio_base_no_se_multiplica_por_1_5` validando que la API de disponibilidad retorna slots a $10.000 y que la confirmación de seña (50%) cobra exactamente $5.000 dejando $5.000 de saldo pendiente.
+- Verificación de Calidad:
+  * Backend PHPUnit: 166 tests pasados al 100% (874 aserciones).
+  * Frontend Vitest: 52 tests pasados al 100% (4 archivos de test).
+===============================================================================
+[2026-09-05] - CORRECCIÓN DE CIERRE DE SESIÓN & PERSISTENCIA DE RESERVAS EN GRILLA
+-------------------------------------------------------------------------------
+- Diagnóstico y Solicitud del Usuario:
+  * El usuario estaba logueado como `javo@gmail.com` en `http://nico-padel.localhost:8080/` y visualizaba su reserva confirmada para las 17:00 hs de hoy. Al hacer clic en "Cerrar sesión", la información de la reserva seguía visible como si continuara logueado. Al refrescar la pantalla (F5), la información persistía y no se cerraba la sesión visualmente.
+  * Análisis Causa Raíz:
+    1. **Persistencia en `sessionStorage`:** `GrillaHoraria.tsx` persistía las reservas confirmadas en `sessionStorage` (`confirmed_turnos_${canchaId}`). Al hacer clic en "Cerrar sesión", `logout()` en `AuthContext.tsx` borraba `localStorage` y cookies, pero NO ejecutaba `sessionStorage.clear()`. En el navegador, `sessionStorage` sobrevive a los reloads (`F5`) de la misma pestaña, por lo que al recargar la página, el estado inicial de `confirmedTurnos` volvía a leer la reserva guardada en la pestaña.
+    2. **Falta de filtrado por usuario autenticado:** `clientConfirmedTurnos` en `GrillaHoraria.tsx` incluía todas las reservas de `confirmedTurnos` sin validar si el usuario autenticado actual correspondía al `cliente_id` de la reserva.
+    3. **Ausencia de listener de cambio de autenticación:** `GrillaHoraria.tsx` no escuchaba el evento global `saas-auth-changed` ni limpiaba su estado interno al pasar de usuario autenticado a `null`.
+    4. **Falta de clave dependiente de usuario en React:** En `frontend/app/tenants/[subdomain]/page.tsx`, `<GrillaHoraria>` tenía una `key` fija que no dependía del usuario, impidiendo que React desmontara y limpiara limpiamente el estado al iniciar o cerrar sesión.
+    5. **Comportamiento del botón en Navbar:** En `Navbar.tsx`, el botón "Cerrar sesión" ejecutaba `logout()` asíncrono pero no recargaba la URL para purgar parámetros sucios o estados en memoria.
+- Solución Implementada:
+  * `frontend/context/AuthContext.tsx`:
+    - Se incorporó `sessionStorage.clear()` al ejecutar `logout()`.
+    - Se reforzó la expiración de cookies `saas_auth_token` cubriendo todas las variantes de dominio (`path=/`, `domain=localhost`, `domain=.localhost`, `domain=turnos.com`, `domain=.turnos.com`).
+    - Se asegura la remoción de todas las claves (`saas_token`, `token`, `auth_token`, `saas_user`).
+  * `frontend/components/Navbar.tsx`:
+    - En el botón "Cerrar sesión", tras ejecutar `await logout()`, se redirige forzando refresco limpio a `window.location.pathname` (o `/` si estaba en `/panel`), limpiando la URL de posibles query params remanentes (`auth_token`).
+  * `frontend/components/GrillaHoraria.tsx`:
+    - Se agregó `prevUserRef` para detectar transiciones de sesión activa a `null` y limpiar inmediatamente `currentUser`, `clienteNombre`, `clienteTelefono`, `walletBalance` y `confirmedTurnos`.
+    - Se implementó un listener del evento `saas-auth-changed`: ante logout (`user: null`), limpia el estado local de reservas confirmadas y re-consulta disponibilidad.
+    - Se protegió `clientConfirmedTurnos`: si la reserva tiene un `cliente_id` registrado, sólo se muestra si coincide con `currentUser?.id`. Cuando no hay usuario autenticado, ninguna reserva de cliente registrado se muestra en la tarjeta privada "🎉 Tus Reservas Confirmadas".
+  * `frontend/app/tenants/[subdomain]/page.tsx`:
+    - La prop `key` de `<GrillaHoraria>` ahora incorpora el ID del usuario (`user ? user.id : 'anon'`), forzando el ciclo de vida completo de desmontaje y montaje ante login/logout.
+  * Tests Automatizados (`frontend/tests/GrillaHoraria.test.tsx`):
+    - Se añadió test unitario `al disparar evento de logout saas-auth-changed limpia las reservas confirmadas del usuario y oculta la tarjeta de mis reservas`.
+    - Simula carga inicial con turno confirmado en `sessionStorage` y usuario autenticado, despacha evento `saas-auth-changed` con `user: null`, y verifica que `client-confirmed-turnos-section` y "Tus Reservas Confirmadas" desaparecen de forma reactiva e inmediata.
+- Verificación de Calidad:
+  * Backend PHPUnit: 166 tests pasados al 100% (874 aserciones).
+  * Frontend Vitest: 53 tests pasados al 100% (4 archivos de test).
+===============================================================================
+[2026-09-05] - SIMPLIFICACIÓN VISUAL DEL CHECKOUT Y RECORDATORIO DISCRETO DE MODO PRUEBAS (OPCIÓN 1)
+-------------------------------------------------------------------------------
+- Diagnóstico y Solicitud del Usuario:
+  * El usuario expresó disconformidad con el bloque visual amarillo chillón `🎮 Simulador de Pasarela (Modo Desarrollo)` con botones gigantes de `[ 💳 Simular Pago Aprobado ]` y `[ ❌ Simular Rechazo ]` en el modal de reserva, que generaba saturación visual y confusión (especialmente para visitantes no logueados que aún no completaban sus datos).
+  * Requerimiento: Mantener la capacidad de probar pagos simulados en desarrollo sin tarjetas reales, eliminar el ruido visual invasivo y disponer de un recordatorio claro pero discreto que advierta que se está operando en desarrollo para reemplazarlo por las pasarelas reales (Mercado Pago / Stripe) al pasar a producción.
+- Solución Implementada (Opción 1):
+  * `frontend/components/GrillaHoraria.tsx`:
+    - Se eliminó la caja amarilla chillona y sus botones pesados en el cuerpo central del modal.
+    - Se incorporó una tarjeta de recordatorio discreta y elegante (`data-testid="dev-mode-reminder"`) estilizada en tonos sobrios (slate-900 y borde slate-800) con ícono de matraz `🧪 Modo Pruebas Activo`, explicando que las reservas online se confirman automáticamente sin cobro real y recordando la integración de Mercado Pago / Stripe en producción.
+    - Se incluyó un enlace de texto minimalista y discreto (`Probar rechazo de pago`) para permitir a los desarrolladores/testers simular rechazos bancarios o fondos insuficientes sin romper la estética del formulario.
+    - Se sincronizó el botón oficial de envío del formulario (`✓ Confirmar Turno ($X)` / `✓ Verificar & Confirmar ($X)`) para mostrar dinámicamente en vivo el monto exacto a pagar (según se elija seña o total), unificando el flujo de checkout al comportamiento estándar de producción.
+  * Tests Automatizados (`frontend/tests/GrillaHoraria.test.tsx`):
+    - Actualización de los tests de seña y pago total para interactuar directamente con el botón oficial de confirmación (`Confirmar Turno ($5.000)` / `($10.000)`) y validar la presencia de `data-testid="dev-mode-reminder"` y el flujo del enlace de rechazo.
+- Verificación de Calidad:
+  * Backend PHPUnit: 166 tests pasados al 100% (874 aserciones).
+  * Frontend Vitest: 53 tests pasados al 100% (4 archivos de test).
+===============================================================================
+[2026-09-05] - FLEXIBILIDAD DE COBRO EN MOSTRADOR: OPCIONES DE SIN COBRO, SEÑA Y TOTAL PARA RECEPCIÓN
+-------------------------------------------------------------------------------
+- Diagnóstico y Solicitud del Usuario:
+  * Al reservar un turno de forma presencial en recepción (como empleado/administrador), si se seleccionaba una modalidad de cobro online o mostrador, el sistema aplicaba reglas rígidas automáticamente (cobrando siempre la seña al 50% o el 100% total), sin permitir al empleado decidir si correspondía cobrar la seña, el total o no cobrar nada en ese momento (ej. clientes de confianza que pagan al presentarse a jugar).
+- Solución Implementada:
+  * Backend API (`TurnoConfirmarController.php`):
+    - Se amplió la validación de `modalidad_pago` para admitir `ninguno`, `sin_cobro` y `pendiente`.
+    - Se preservó la restricción para clientes online regulares (quienes deben abonar la seña obligatoria fijada por el club), otorgando total discrecionalidad a los administradores y recepcionistas del club (`$esAdminClub`).
+    - Si el empleado selecciona `modalidad_pago: 'ninguno'` (o canal `pendiente`), se genera el turno con `$montoPagado = 0.0`, `$saldoPendiente = $precio` y `$estadoPago = 'pendiente'`, sin debitar seña ni forzar pago simulado.
+    - Si el empleado selecciona `modalidad_pago: 'sena'`, calcula y registra exactamente la seña requerida con saldo pendiente, tanto en mostrador como con pasarela online/transferencia.
+    - Si el empleado selecciona `modalidad_pago: 'total'`, liquida el 100% con saldo cero y estado `pagado_total`.
+  * Frontend (`GrillaHoraria.tsx`):
+    - Se integró en el modal de recepción un selector interactivo de 3 columnas para el empleado:
+      * `🕒 Sin cobro ($0) - Paga al jugar`
+      * `💳 Seña ($X - 50%) - Resta saldo en club`
+      * `🎉 Total ($X - 100%) - 100% saldado`
+    - Sincronización con el selector de medio de cobro (Efectivo en caja, Transferencia, Tarjeta/Online, Pendiente de pago).
+    - Botón de confirmación dinámico adaptado al rol de recepcionista:
+      * `📝 Asignar en Mostrador (Sin Cobro)`
+      * `📝 Asignar en Mostrador (Seña: $X)`
+      * `📝 Asignar en Mostrador ($X)`
+    - Soporte completo de persistencia en `confirmedItem` incluyendo `cliente_id` y `cliente_email`.
+  * Tests Automatizados:
+    - Backend (`SenaYPagoSimuladoTest.php`):
+      * `test_admin_club_puede_elegir_no_cobrar_sena_con_modalidad_ninguno_dejando_pago_pendiente`
+      * `test_admin_club_puede_cobrar_sena_en_mostrador_dejando_saldo_pendiente`
+    - Frontend (`GrillaHoraria.test.tsx`):
+      * `permite al recepcionista elegir no cobrar seña con Sin Cobro o elegir Seña con método online`
+      * Se agregó `sessionStorage.clear()` en `beforeEach` para aislar turnos entre tests.
+- Verificación de Calidad:
+  * Backend PHPUnit: 168 tests pasados al 100% (878 aserciones).
+  * Frontend Vitest: 54 tests pasados al 100% (4 archivos de test).
+===============================================================================

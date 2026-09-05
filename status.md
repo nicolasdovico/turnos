@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Módulo Turnos Fijos & Horarios 100% Implementado)
-- **Última Actualización:** 2026-09-01
+- **Última Actualización:** 2026-09-05 (Flexibilidad de Cobro en Mostrador: Selector de Sin Cobro / Seña / Total para recepción, soporte en backend para modalidad_pago ninguno y mostrador señado; 168 tests backend y 54 frontend en verde)
 
 ---
 

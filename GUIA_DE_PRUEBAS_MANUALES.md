@@ -159,7 +159,7 @@ Esta guía contiene la especificación formal y práctica de **todos los Casos d
   4. En el Paso 2/2 (sin abandonar el modal), ve a Mailpit (`http://localhost:8025/`), consulta el código OTP de 6 dígitos enviado a `depaul@jugador.test`.
   5. Ingresa el código en los 6 casilleros.
   6. Haz clic en **"💳 Simular Pago Aprobado ($6.000)"**.
-* **Resultado Esperado:** El turno queda confirmado en estado `senado` ($6.000 pagados, $6.000 de saldo pendiente), se libera el candado Redis y el `Navbar` superior se actualiza reactivamente en tiempo real mostrando `👤 Rodrigo De Paul` sin recargar la página. **ALGO NO FUNCIONÓ. EL TURNO QUEDÓ RESERVADO SIN COBRAR LA SEÑA Y ESTA CONFIGURADO PARA RESERVAR CON 50% DE SEÑA. PUEDE SER QUE NO ANDE EL BOTON DE SANDBOX**. **ADEMAS, SI ESTA CONFIRMADA LA RESERVA, SE SIGUE MOSTRANDO EL TURNO RETENIDO CON LA CUENTA REGRESIVA**. **LE DI A "CANCELAR" AL TURNO RETENIDO Y NO LO MUESTRA COMO DISPONIBLE** . **TAMPOCO LO MUESTRA COMO OTORGADO EN LA PARTE DE ABAJO**
+* **Resultado Esperado:** El turno queda confirmado en estado `senado` ($6.000 pagados, $6.000 de saldo pendiente), se libera el candado Redis (desaparece el banner y contador de retención), y debajo de la grilla aparece la sección **"🎉 Tus Reservas Confirmadas"** con la tarjeta de la reserva mostrando el badge **"Seña Abonada"** ($6.000 abonados online, $6.000 saldo en club). El `Navbar` superior se actualiza reactivamente mostrando `👤 Rodrigo De Paul` sin recargar la página. *(Resuelto y verificado con tests automatizados)*.
 
 ---
 
@@ -168,7 +168,7 @@ Esta guía contiene la especificación formal y práctica de **todos los Casos d
 * **Precondición:** Jugador con créditos en `user_creditos` (ej. `bela@jugador.test` con $15.000 en `nico-padel`).
 * **URL:** [`http://nico-padel.localhost:8080/`](http://nico-padel.localhost:8080/)
 * **Flujo Paso a Paso:**
-  1. Inicia sesión como `bela@jugador.test` / `password123`.  **CUANDO ME LOGUEO COMO bela@gmail.com EN LA URL http://nico-padel.localhost:8080/ LOGUEA PERO ME REDIRIGE A http://localhost:8080/ DEBERIA MANTENERME EN EL SUBDOMINIO**
+  1. Inicia sesión como `bela@jugador.test` / `password123` *(el enlace de login transfiere `returnTo` y regresa automáticamente al subdominio `http://nico-padel.localhost:8080/` con Single Sign-On)*.
   2. Haz clic en un slot libre verde.
   3. En el modal de reserva, observa el desglose financiero (Total $10.000 / Seña $5.000).
   4. Observa el checkbox interactivo: **"💰 Usar saldo en Billetera Virtual ($15.000 disponibles)"**.
