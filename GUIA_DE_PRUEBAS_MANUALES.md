@@ -178,20 +178,22 @@ Esta guía contiene la especificación formal y práctica de **todos los Casos d
 
 ---
 
-### CU-09: Asignación Manual Directa en Mostrador / Recepción (Walk-in sin cuenta)
+### CU-09: Asignación Manual Directa en Mostrador / Recepción (Walk-in y Clientes Registrados)
 * **Actor:** Empleado de recepción o Dueño del club.
 * **Precondición:** Sesión iniciada como personal del club.
 * **URL:** Grilla horaria en portada o panel de club.
 * **Datos de Entrada:**
   * Nombre: `Marcelo Gallardo`
   * Teléfono: `1199881122`
-  * Estado del Cobro: `🕒 Pendiente de Pago`
+  * Correo Electrónico (opcional): `marcelo@river.test` *(o dejar vacío para walk-in anónimo)*
+  * Estado del Cobro: `🕒 Pendiente de Pago` (o `Cobrado en Mostrador / Efectivo`)
 * **Flujo Paso a Paso:**
   1. Haz clic en un slot disponible.
   2. En el modal de reserva, selecciona la pestaña **"🏢 Asignación Mostrador / Teléfono"**.
-  3. Ingresa el nombre y teléfono del cliente (sin exigirle email).
-  4. Selecciona el estado del cobro y haz clic en **"Asignar Turno en Mostrador"**.
-* **Resultado Esperado:** Turno reservado con éxito en la base de datos con `cliente_id = null`, `cliente_nombre = 'Marcelo Gallardo'` y visible en la grilla para control de recepción.
+  3. Ingresa el nombre, teléfono y opcionalmente el correo electrónico del cliente.
+  4. Si se elije **"Sin cobro"**, el selector de medio de pago se bloquea inteligentemente en **"Pendiente de pago / paga al jugar"**.
+  5. Haz clic en **"Asignar Turno en Mostrador"**.
+* **Resultado Esperado:** Turno reservado con éxito. Si se omitió el correo, se guarda con `cliente_id = null`. Si se especificó un email registrado, se asocia automáticamente a su cuenta `cliente_id`, permitiendo en el futuro cobrarle con su Billetera Virtual o reembolsarle ante cancelaciones.
 
 ---
 
@@ -202,25 +204,36 @@ Esta guía contiene la especificación formal y práctica de **todos los Casos d
 * **Flujo Paso a Paso:**
   1. Localiza un turno con badge azul **`💳 Seña Pagada`** o ámbar **`⏳ Pendiente`**.
   2. Haz clic en el botón verde **`💵 Cobrar`**.
-  3. En el diálogo modal, verifica el desglose (Precio acordado, Seña pagada y Saldo exacto restante).
-  4. Selecciona el método de cobro: `Efectivo en Mostrador` (o `Transferencia Bancaria`).
+  3. En el diálogo modal, el sistema consulta en tiempo real el saldo fresco de la Billetera Virtual del cliente:
+     - Si el cliente **no tiene saldo** a favor ($0), la opción `Billetera Virtual` permanece oculta para prevenir cobros fallidos.
+     - Si el cliente **tiene saldo** (ej. $20.000), aparece la opción `Billetera Virtual` indicando el saldo exacto disponible.
+  4. Selecciona el método de cobro: `Efectivo en Mostrador`, `Transferencia Bancaria` o `Billetera Virtual`.
   5. Haz clic en **"Confirmar Cobro"**.
-* **Resultado Esperado:** Actualización optimista reactiva inmediata. El badge cambia a **`✓ Pagado`** (verde esmeralda), el saldo pendiente pasa a `$0,00` y el botón `💵 Cobrar` desaparece automáticamente.
+* **Resultado Esperado:** Actualización optimista reactiva inmediata. El badge cambia a **`✓ Pagado`** (verde esmeralda), el saldo pendiente pasa a `$0,00`, el botón `💵 Cobrar` desaparece automáticamente y, en caso de pago con Billetera, se debita el saldo y se actualiza en cascada para cualquier otro turno pendiente del mismo cliente.
 
 ---
 
-### CU-11: Cancelación de Turno con Reembolso en Billetera Virtual vs Penalidad
-* **Actor:** Cliente titular de una reserva.
-* **Precondición:** Turno reservado con seña abonada.
-* **Flujo 1 (Con más de 4 horas de anticipación):**
-  1. El cliente cancela un turno programado para dentro de varios días.
+### CU-11: Cancelación de Turno con Reembolso en Billetera Virtual vs Devolución en Efectivo
+* **Actor:** Cliente titular de una reserva o Administrador / Recepcionista del club.
+* **Precondición:** Turno reservado con dinero o seña abonada (`monto_pagado > 0`).
+* **Flujo 1 (Autogestión por Cliente - Con más de 4 horas de anticipación):**
+  1. El cliente cancela un turno programado para dentro de varios días desde su perfil.
   2. El sistema valida `horas_restantes >= 4`.
   3. Se acredita el 100% de la seña pagada en su billetera virtual del club (`user_creditos`).
-* **Flujo 2 (Con menos de 4 horas de anticipación):**
+* **Flujo 2 (Autogestión por Cliente - Con menos de 4 horas de anticipación):**
   1. El cliente intenta cancelar un turno que inicia dentro de las próximas 2 horas.
   2. El sistema valida `horas_restantes < 4`.
   3. Se cancela el turno pero el club retiene la seña como penalidad (`estado_pago = 'retenido_penalidad'`) sin acreditar dinero en billetera.
-* **Resultado Esperado:** Aplicación exacta de la política configurada y despacho de evento para lista de espera.
+* **Flujo 3 (Cancelación en Mostrador por Administrador - Reembolso con Alta Express & OTP):**
+  1. El administrador hace clic en **"Liberar"** sobre un turno ocupado en el que el cliente ya había pagado (ej. seña de $20.000).
+  2. Se abre el modal de cancelación detectando el importe pagado y ofreciendo dos vías:
+     - **💰 Acreditar en Billetera Virtual del Cliente (Recomendado)**.
+     - **💵 Devolver en Caja / Efectivo**.
+  3. Si el cliente no estaba registrado en el sistema, el modal solicita su Correo Electrónico.
+  4. Al presionar **"Enviar Código OTP"**, el sistema despacha un código de 6 dígitos vía Mailpit ([`http://localhost:8025/`](http://localhost:8025/)).
+  5. El recepcionista introduce el código de 6 dígitos verificado por el cliente y presiona **"Liberar Turno y Acreditar Reembolso"**.
+  6. El sistema crea la cuenta verificada del cliente en el momento, le acredita el 100% del dinero abonado a su Billetera Virtual y libera la cancha.
+* **Resultado Esperado:** Transaccionalidad completa. La cancha queda libre para nuevas reservas, el cliente recibe el saldo en su cuenta para futuros turnos y se previene pérdida de fondos. Si se eligió devolución en efectivo, el turno se libera sin requerir cuenta ni código OTP.
 
 ---
 

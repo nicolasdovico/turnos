@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Módulo Turnos Fijos & Horarios 100% Implementado)
-- **Última Actualización:** 2026-09-05 (Visibilidad condicional de Billetera Virtual en cobro de mostrador: solo visible si el cliente tiene saldo > 0, autocalibrado de monto disponible y ocultamiento para clientes sin saldo; 169 tests backend y 55 frontend en verde)
+- **Última Actualización:** 2026-09-05 (Cancelación en mostrador con reembolso a Billetera Virtual y alta express de usuario validado con OTP de 6 dígitos vía Mailpit; opción de reembolso en efectivo; asignación de email opcional en mostrador y actualización reactiva de saldo de billetera; 174 tests backend y 56 frontend en verde)
 
 ---
 
