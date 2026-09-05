@@ -1372,5 +1372,31 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Backend PHPUnit: 168 tests pasados al 100% (878 aserciones).
   * Frontend Vitest: 54 tests pasados al 100% (4 archivos de test).
+-------------------------------------------------------------------------------
+[2026-09-05] - CONDICIONALIDAD DE BILLETERA VIRTUAL EN COBRO DE MOSTRADOR (SOLO VISIBLE CON SALDO > 0)
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * En el modal de "Cobro de Seña / Saldo en Mostrador", la opción "👛 Billetera Virtual" aparecía visible siempre, incluso para clientes no registrados (mostrador/guest) o clientes con $0 de saldo, lo cual provocaba errores 422 al intentar debitar saldo inexistente.
+- Solución Implementada:
+  * Backend:
+    - `DisponibilidadService.php`: Inyección de `WalletService` y exposición del campo `cliente_saldo_billetera` en cada turno ocupado consultado por administradores o por el titular del turno.
+    - `ClubReporteService.php`: Inyección de `WalletService` y adición de `cliente_id` y `cliente_saldo_billetera` en `listaTurnosFormateada` para el panel de resumen diario.
+    - `WalletController.php`: Habilitación para que usuarios administradores puedan consultar el saldo de billetera de un cliente específico pasando `?user_id=X`.
+  * Frontend:
+    - `GrillaHoraria.tsx`:
+      * Extensión de la interfaz `TurnoOcupado` con `cliente_saldo_billetera?: number`.
+      * Al abrir el modal de cobro, "👛 Billetera Virtual" se oculta completamente si el cliente no tiene saldo a favor (`saldo <= 0` o sin cuenta registrada).
+      * Si el cliente dispone de saldo a favor (> $0), la opción se muestra visible indicando el monto disponible: `👛 Billetera ($X disp.)`.
+      * Al seleccionar "Billetera", el input de monto se autocalibra automáticamente al menor valor entre el saldo pendiente y el saldo disponible del usuario, y se restablece al total al alternar a mostrador/transferencia.
+    - `ResumenDiarioTurnos.tsx`:
+      * Extensión de `TurnoDetalle` con `cliente_id` y `cliente_saldo_billetera`.
+      * Filtrado de la opción "Billetera Virtual" en el select de medio de cobro solo cuando `cliente_saldo_billetera > 0`, indicando el monto disponible.
+  * Tests Automatizados:
+    - Backend (`SenaYPagoSimuladoTest.php`): Nuevo test `test_disponibilidad_admin_retorna_saldo_billetera_del_cliente_ocupado`.
+    - Frontend (`GrillaHoraria.test.tsx`): Nuevo test `muestra la opción de Billetera Virtual en el modal de cobro únicamente si el cliente tiene saldo a favor`, y aserción de no renderizado de billetera para clientes sin saldo.
+- Verificación de Calidad:
+  * Backend PHPUnit: 169 tests pasados al 100% (882 aserciones).
+  * Frontend Vitest: 55 tests pasados al 100% (4 archivos de test).
 ===============================================================================
+
 

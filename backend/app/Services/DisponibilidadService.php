@@ -11,10 +11,14 @@ use Illuminate\Support\Facades\Redis;
 class DisponibilidadService
 {
     protected ReservaLockService $reservaLockService;
+    protected WalletService $walletService;
 
-    public function __construct(?ReservaLockService $reservaLockService = null)
-    {
+    public function __construct(
+        ?ReservaLockService $reservaLockService = null,
+        ?WalletService $walletService = null
+    ) {
         $this->reservaLockService = $reservaLockService ?? app(ReservaLockService::class);
+        $this->walletService = $walletService ?? app(WalletService::class);
     }
 
     /**
@@ -296,7 +300,7 @@ class DisponibilidadService
         }
 
         // Formatted occupied turnos list (with client details for admin view and current user view)
-        $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($esAdmin, $currentUserId) {
+        $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($cancha, $esAdmin, $currentUserId) {
             $precio = (float) $t->precio;
             $montoPagado = (float) ($t->monto_pagado ?? 0);
             $saldoPendiente = $t->saldo_pendiente !== null ? (float) $t->saldo_pendiente : max(0.0, $precio - $montoPagado);
@@ -333,6 +337,9 @@ class DisponibilidadService
                 $data['cliente_nombre'] = $t->cliente_nombre ?: ($t->cliente?->name ?: 'Cliente Mostrador');
                 $data['cliente_email'] = $t->cliente?->email;
                 $data['cliente_telefono'] = $t->cliente_telefono ?: ($t->cliente?->telefono ?: null);
+                $data['cliente_saldo_billetera'] = $t->cliente_id
+                    ? (float) $this->walletService->obtenerSaldo((int) $t->cliente_id, (int) $cancha->complejo_id)
+                    : 0.0;
                 if ($isMine) {
                     $data['is_mine'] = true;
                 }

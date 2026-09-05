@@ -95,6 +95,7 @@ export interface TurnoOcupado {
   cliente_nombre?: string;
   cliente_email?: string | null;
   cliente_telefono?: string | null;
+  cliente_saldo_billetera?: number;
 }
 
 export interface CurrentUser {
@@ -2271,6 +2272,7 @@ export default function GrillaHoraria({
                             type="button"
                             onClick={() => {
                               setTurnoToPay(turno);
+                              setPagoMetodo("mostrador");
                               setPagoMonto(
                                 turno.saldo_pendiente !== undefined && turno.saldo_pendiente > 0
                                   ? String(turno.saldo_pendiente)
@@ -2456,13 +2458,31 @@ export default function GrillaHoraria({
                   {[
                     { id: "mostrador", label: "💵 Efectivo / Mostrador" },
                     { id: "transferencia", label: "📲 Transferencia" },
-                    { id: "billetera", label: "👛 Billetera Virtual" },
+                    ...(Number(turnoToPay.cliente_saldo_billetera || 0) > 0
+                      ? [
+                          {
+                            id: "billetera",
+                            label: `👛 Billetera ($${Number(turnoToPay.cliente_saldo_billetera).toLocaleString()} disp.)`,
+                          },
+                        ]
+                      : []),
                     { id: "online", label: "💳 Online / Tarjeta" },
                   ].map((m) => (
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => setPagoMetodo(m.id as any)}
+                      onClick={() => {
+                        setPagoMetodo(m.id as any);
+                        const saldoPend = turnoToPay.saldo_pendiente !== undefined && turnoToPay.saldo_pendiente > 0
+                          ? turnoToPay.saldo_pendiente
+                          : turnoToPay.precio || 0;
+                        if (m.id === "billetera") {
+                          const saldoDisp = Number(turnoToPay.cliente_saldo_billetera || 0);
+                          setPagoMonto(String(Math.min(saldoPend, saldoDisp)));
+                        } else if (pagoMetodo === "billetera") {
+                          setPagoMonto(String(saldoPend));
+                        }
+                      }}
                       className={`p-2.5 rounded-xl border text-left font-bold transition text-xs ${
                         pagoMetodo === m.id
                           ? "bg-emerald-500/20 border-emerald-500 text-white"

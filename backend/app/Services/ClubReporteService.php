@@ -11,6 +11,12 @@ use Carbon\CarbonPeriod;
 
 class ClubReporteService
 {
+    protected WalletService $walletService;
+
+    public function __construct(?WalletService $walletService = null)
+    {
+        $this->walletService = $walletService ?? app(WalletService::class);
+    }
     /**
      * Genera el resumen diario y financiero de turnos para un club.
      *
@@ -174,6 +180,10 @@ class ClubReporteService
                     'id' => $t->id,
                     'cancha_id' => $t->cancha_id,
                     'cancha_nombre' => $t->cancha ? $t->cancha->nombre : 'Cancha',
+                    'cliente_id' => $t->cliente_id,
+                    'cliente_saldo_billetera' => $t->cliente_id
+                        ? (float) $this->walletService->obtenerSaldo((int) $t->cliente_id, (int) $complejo->id)
+                        : 0.0,
                     'cliente_nombre' => $t->cliente_nombre ?: ($t->user ? $t->user->name : 'Cliente Mostrador'),
                     'cliente_telefono' => $t->cliente_telefono ?: ($t->user ? $t->user->telefono : null),
                     'hora_inicio' => substr((string) $t->hora_inicio, 0, 5),

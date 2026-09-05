@@ -515,5 +515,50 @@ class SenaYPagoSimuladoTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    public function test_disponibilidad_admin_retorna_saldo_billetera_del_cliente_ocupado(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $adminUser = User::factory()->create([
+            'email' => 'admin_wallet_check@club.test',
+        ]);
+        $this->complejo->update(['user_id' => $adminUser->id]);
+
+        // Acreditar saldo en billetera al cliente
+        $walletService = app(\App\Services\WalletService::class);
+        $walletService->acreditar($this->cliente->id, $this->complejo->id, 3500.0, 'recarga_manual', null, 'Saldo de prueba');
+
+        // Crear turno ocupado asignado al cliente
+        \App\Models\Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'cliente_id' => $this->cliente->id,
+            'cliente_nombre' => $this->cliente->name,
+            'fecha' => '2026-08-31',
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:00',
+            'precio' => 10000.0,
+            'monto_pagado' => 5000.0,
+            'saldo_pendiente' => 5000.0,
+            'metodo_pago' => 'online',
+            'estado_pago' => 'senado',
+            'estado' => 'reservado',
+        ]);
+
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($adminUser)
+            ->getJson("/api/canchas/{$this->cancha->id}/disponibilidad?fecha=2026-08-31");
+
+        $response->assertStatus(200);
+        $turnosOcupados = $response->json('turnos_ocupados');
+        $this->assertNotEmpty($turnosOcupados);
+
+        $turno = collect($turnosOcupados)->firstWhere('hora_inicio', '18:00');
+        $this->assertNotNull($turno);
+        $this->assertEquals(3500.0, $turno['cliente_saldo_billetera']);
+
+        Carbon::setTestNow();
+    }
 }
 

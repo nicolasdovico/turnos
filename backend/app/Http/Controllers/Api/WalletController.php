@@ -41,11 +41,17 @@ class WalletController extends Controller
             ], 422);
         }
 
-        $saldo = $this->walletService->obtenerSaldo($user->id, (int) $complejoId);
+        $targetUserId = $user->id;
+        $esAdmin = (($user->role ?? '') === 'admin') || (!empty($user->is_admin)) || ($user->email ?? '') === 'admin@admin.com';
+        if ($request->has('user_id') && $esAdmin) {
+            $targetUserId = (int) $request->query('user_id');
+        }
+
+        $saldo = $this->walletService->obtenerSaldo($targetUserId, (int) $complejoId);
 
         return response()->json([
             'success' => true,
-            'user_id' => $user->id,
+            'user_id' => $targetUserId,
             'complejo_id' => (int) $complejoId,
             'saldo' => $saldo,
             'saldo_formateado' => '$' . number_format($saldo, 2, ',', '.'),

@@ -1271,6 +1271,9 @@ describe("Componente Reactivo GrillaHoraria", () => {
     fireEvent.click(btnCobrar);
     expect(await screen.findByText(/Registrar Cobro de Turno/i)).toBeDefined();
 
+    // Como es cliente presencial sin saldo en billetera, no debe figurar la opción de Billetera Virtual
+    expect(screen.queryByText(/Billetera/i)).toBeNull();
+
     const btnConfirmarCobro = screen.getByRole("button", { name: /Confirmar Cobro/i });
     fireEvent.click(btnConfirmarCobro);
 
@@ -1279,6 +1282,71 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(screen.getByText(/✓ Pagado/i)).toBeDefined();
       expect(screen.queryByRole("button", { name: /Cobrar/i })).toBeNull();
     });
+  });
+
+  it("muestra la opción de Billetera Virtual en el modal de cobro únicamente si el cliente tiene saldo a favor", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/canchas/1/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              slots_disponibles: [],
+              turnos_ocupados: [
+                {
+                  id: 101,
+                  cancha_id: 1,
+                  fecha: "2026-09-01",
+                  hora_inicio: "18:00",
+                  hora_fin: "19:30",
+                  precio: 10000,
+                  monto_pagado: 5000,
+                  saldo_pendiente: 5000,
+                  estado_pago: "senado",
+                  metodo_pago: "online",
+                  estado: "reservado",
+                  cliente_id: 25,
+                  cliente_nombre: "Luciano Saldo",
+                  cliente_saldo_billetera: 3500,
+                },
+              ],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    expect(await screen.findByText("Luciano Saldo")).toBeDefined();
+    const btnCobrar = screen.getByRole("button", { name: /Cobrar/i });
+    fireEvent.click(btnCobrar);
+
+    // Debe mostrarse el botón de Billetera con su saldo disponible
+    expect(await screen.findByText(/👛 Billetera/i)).toBeDefined();
+    expect(screen.getByText(/disp\./i)).toBeDefined();
+
+    // Hacemos click en el botón de Billetera
+    const btnBilletera = screen.getByText(/👛 Billetera/i);
+    fireEvent.click(btnBilletera);
+
+    // El input de monto a cobrar se debe autoajustar al máximo disponible ($3500)
+    const inputMonto = screen.getByPlaceholderText("5000") as HTMLInputElement;
+    expect(inputMonto.value).toBe("3500");
   });
 
   it("emite alerta toast con icono de campana cuando detecta un nuevo turno reservado durante el polling silencioso en modo admin", async () => {

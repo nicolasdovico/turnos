@@ -28,6 +28,8 @@ export interface TurnoDetalle {
   cancha_nombre: string;
   cliente_nombre: string;
   cliente_telefono?: string | null;
+  cliente_id?: number | null;
+  cliente_saldo_billetera?: number;
   hora_inicio: string;
   hora_fin: string;
   duracion_minutos: number;
@@ -937,13 +939,24 @@ export default function ResumenDiarioTurnos({
                 </label>
                 <select
                   value={pagoMetodo}
-                  onChange={(e) => setPagoMetodo(e.target.value as any)}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setPagoMetodo(val);
+                    if (val === "billetera") {
+                      const saldoDisp = Number(turnoToPay.cliente_saldo_billetera || 0);
+                      setPagoMonto(String(Math.min(turnoToPay.saldo_pendiente, saldoDisp)));
+                    } else if (pagoMetodo === "billetera") {
+                      setPagoMonto(String(turnoToPay.saldo_pendiente));
+                    }
+                  }}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                 >
                   <option value="mostrador">💵 Efectivo / Mostrador</option>
                   <option value="transferencia">📲 Transferencia Bancaria (Alias / CBU)</option>
                   <option value="online">💳 Tarjeta / MercadoPago</option>
-                  <option value="billetera">👛 Billetera Virtual del Cliente</option>
+                  {Number(turnoToPay.cliente_saldo_billetera || 0) > 0 && (
+                    <option value="billetera">👛 Billetera Virtual (${Number(turnoToPay.cliente_saldo_billetera).toLocaleString()} disp.)</option>
+                  )}
                 </select>
               </div>
 

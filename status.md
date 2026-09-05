@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Módulo Turnos Fijos & Horarios 100% Implementado)
-- **Última Actualización:** 2026-09-05 (Filtro dinámico de canal de pago en mostrador: al elegir "Sin cobro" solo está disponible "Pendiente de pago / paga al jugar"; al elegir Seña/Total se habilitan Efectivo/Transferencia/Tarjeta; 168 tests backend y 54 frontend en verde)
+- **Última Actualización:** 2026-09-05 (Visibilidad condicional de Billetera Virtual en cobro de mostrador: solo visible si el cliente tiene saldo > 0, autocalibrado de monto disponible y ocultamiento para clientes sin saldo; 169 tests backend y 55 frontend en verde)
 
 ---
 
