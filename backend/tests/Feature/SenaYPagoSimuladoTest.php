@@ -177,4 +177,342 @@ class SenaYPagoSimuladoTest extends TestCase
             'saldo_formateado' => '$7.500,00',
         ]);
     }
+
+    public function test_confirmar_reserva_con_metodo_online_calcula_sena_del_50_porciento_y_libera_lock(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        // Simular un bloqueo previo en Redis
+        $lockKey = "lock:cancha:{$this->cancha->id}:2026-08-31:21:00";
+        Redis::setex($lockKey, 600, json_encode([
+            'cancha_id' => $this->cancha->id,
+            'fecha' => '2026-08-31',
+            'hora_inicio' => '21:00',
+            'hora_fin' => '22:00',
+            'token' => 'test-token-123',
+            'user_id' => $this->cliente->id,
+        ]));
+
+        $this->assertNotEmpty(Redis::get($lockKey));
+
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '21:00',
+                'precio' => 10000.00,
+                'metodo_pago' => 'online',
+                'token_reserva' => 'test-token-123',
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'turno' => [
+                'monto_pagado' => '5000.00',
+                'saldo_pendiente' => '5000.00',
+                'estado_pago' => 'senado',
+                'estado' => 'reservado',
+                'metodo_pago' => 'online',
+            ],
+        ]);
+
+        // El candado en Redis debe haberse eliminado
+        $this->assertEmpty(Redis::get($lockKey));
+
+        // Al consultar disponibilidad como el cliente, el turno ocupado debe incluir is_mine = true
+        $dispResponse = $this->actingAs($this->cliente)
+            ->getJson("/api/canchas/{$this->cancha->id}/disponibilidad?fecha=2026-08-31");
+
+        $dispResponse->assertStatus(200);
+        $turnosOcupados = $dispResponse->json('turnos_ocupados');
+        $this->assertNotEmpty($turnosOcupados);
+        $miTurno = collect($turnosOcupados)->firstWhere('hora_inicio', '21:00');
+        $this->assertNotNull($miTurno);
+        $this->assertTrue($miTurno['is_mine']);
+        $this->assertEquals('senado', $miTurno['estado_pago']);
+        $this->assertEquals(5000.0, (float) $miTurno['monto_pagado']);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_cliente_online_no_puede_reservar_con_metodo_pago_mostrador(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '22:00',
+                'precio' => 10000.00,
+                'metodo_pago' => 'mostrador',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJson([
+            'error' => 'METODO_PAGO_INVALIDO',
+        ]);
+
+        $this->assertDatabaseMissing('turnos', [
+            'cancha_id' => $this->cancha->id,
+            'fecha' => '2026-08-31',
+            'hora_inicio' => '22:00:00',
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_cliente_online_sin_especificar_metodo_pago_defaultea_a_online_con_sena(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '22:00',
+                'precio' => 10000.00,
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'turno' => [
+                'metodo_pago' => 'online',
+                'monto_pagado' => '5000.00',
+                'saldo_pendiente' => '5000.00',
+                'estado_pago' => 'senado',
+            ],
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_admin_club_si_puede_confirmar_en_mostrador(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $adminUser = User::factory()->create([
+            'email' => 'admin@club.test',
+        ]);
+        $this->complejo->update(['user_id' => $adminUser->id]);
+
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($adminUser)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '22:00',
+                'precio' => 10000.00,
+                'metodo_pago' => 'mostrador',
+                'cliente_nombre' => 'Jugador Mostrador',
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'turno' => [
+                'metodo_pago' => 'mostrador',
+                'monto_pagado' => '10000.00',
+                'saldo_pendiente' => '0.00',
+                'estado_pago' => 'pagado_total',
+            ],
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_confirmar_reserva_con_simulador_dev_permitiendo_elegir_pago_total_del_100_porciento(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '23:00',
+                'precio' => 10000.00,
+                'metodo_pago' => 'simulador_dev',
+                'modalidad_pago' => 'total',
+                'pago_completo' => true,
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'turno' => [
+                'metodo_pago' => 'simulador_dev',
+                'monto_pagado' => '10000.00',
+                'saldo_pendiente' => '0.00',
+                'estado_pago' => 'pagado_total',
+                'estado' => 'reservado',
+            ],
+        ]);
+
+        $this->assertDatabaseHas('turnos', [
+            'cancha_id' => $this->cancha->id,
+            'fecha' => '2026-08-31',
+            'hora_inicio' => '23:00:00',
+            'monto_pagado' => 10000.00,
+            'saldo_pendiente' => 0.00,
+            'estado_pago' => 'pagado_total',
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_disponibilidad_retorna_politicas_de_pago_y_sena(): void
+    {
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->getJson("/api/canchas/{$this->cancha->id}/disponibilidad?fecha=2026-08-31");
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'tipo_cobro_reserva' => 'sena',
+            'porcentaje_sena' => 50.0,
+        ]);
+    }
+
+    public function test_cancha_90_minutos_precio_base_no_se_multiplica_por_1_5(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 08:00:00', 'America/Argentina/Buenos_Aires'));
+
+        // Cancha configurada a 90 minutos fija con precio base $10000
+        $cancha90 = Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha 1 - Central Cristal 90m',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 10000.00,
+            'duracion_minutos' => 90,
+            'permite_duracion_flexible' => false,
+            'precio_90_min' => null,
+            'estado' => 'activo',
+        ]);
+
+        // Verificar endpoint de disponibilidad
+        $responseDisp = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->getJson("/api/canchas/{$cancha90->id}/disponibilidad?fecha=2026-08-31");
+
+        $responseDisp->assertStatus(200);
+        $responseDisp->assertJsonPath('precio_base', 10000);
+        $responseDisp->assertJsonPath('precio_90_min', 10000); // No debe ser 15000!
+
+        $slots = $responseDisp->json('slots_disponibles');
+        $this->assertNotEmpty($slots);
+        $this->assertEquals(90, $slots[0]['duracion_minutos']);
+        $this->assertEquals(10000, $slots[0]['precio']); // No debe ser 15000!
+
+        // Confirmar reserva pagando seña (50%)
+        $horaInicio = $slots[0]['hora_inicio'];
+        $horaFin = $slots[0]['hora_fin'];
+
+        $responseConfirmar = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $cancha90->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => $horaInicio,
+                'hora_fin' => $horaFin,
+                'precio' => $slots[0]['precio'],
+                'metodo_pago' => 'simulador_dev',
+                'modalidad_pago' => 'sena',
+            ]);
+
+        $responseConfirmar->assertStatus(200);
+        $responseConfirmar->assertJson([
+            'success' => true,
+            'turno' => [
+                'precio' => '10000.00',
+                'monto_pagado' => '5000.00',
+                'saldo_pendiente' => '5000.00',
+                'estado_pago' => 'senado',
+                'estado' => 'reservado',
+            ],
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_admin_club_puede_elegir_no_cobrar_sena_con_modalidad_ninguno_dejando_pago_pendiente(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $adminUser = User::factory()->create([
+            'email' => 'admin_flex@club.test',
+        ]);
+        $this->complejo->update(['user_id' => $adminUser->id]);
+
+        // El empleado elige modalidad online o mostrador, pero modalidad_pago = ninguno (sin cobro)
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($adminUser)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '21:00',
+                'precio' => 10000.00,
+                'metodo_pago' => 'online',
+                'modalidad_pago' => 'ninguno',
+                'cliente_nombre' => 'Amigo del Club',
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'turno' => [
+                'precio' => '10000.00',
+                'monto_pagado' => '0.00',
+                'saldo_pendiente' => '10000.00',
+                'estado_pago' => 'pendiente',
+                'estado' => 'reservado',
+            ],
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_admin_club_puede_cobrar_sena_en_mostrador_dejando_saldo_pendiente(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $adminUser = User::factory()->create([
+            'email' => 'admin_sena@club.test',
+        ]);
+        $this->complejo->update(['user_id' => $adminUser->id]);
+
+        // El empleado cobra seña (50%) en efectivo en mostrador
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($adminUser)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '22:00',
+                'precio' => 10000.00,
+                'metodo_pago' => 'mostrador',
+                'modalidad_pago' => 'sena',
+                'cliente_nombre' => 'Cliente Seña Mostrador',
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'turno' => [
+                'precio' => '10000.00',
+                'monto_pagado' => '5000.00',
+                'saldo_pendiente' => '5000.00',
+                'estado_pago' => 'senado',
+                'estado' => 'reservado',
+            ],
+        ]);
+
+        Carbon::setTestNow();
+    }
 }
+

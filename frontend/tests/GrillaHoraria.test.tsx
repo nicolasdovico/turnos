@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import GrillaHoraria, { Slot, getLocalDateString } from "../components/GrillaHoraria";
 
 describe("Componente Reactivo GrillaHoraria", () => {
@@ -15,6 +15,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
     vi.setSystemTime(new Date("2026-09-01T07:00:00"));
     vi.resetAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
     global.fetch = vi.fn().mockImplementation(() =>
       Promise.resolve({
         ok: true,
@@ -482,6 +483,100 @@ describe("Componente Reactivo GrillaHoraria", () => {
     });
   });
 
+  it("permite al recepcionista elegir no cobrar seña con Sin Cobro o elegir Seña con método online", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, token_reserva: "admin-flex-lock", ttl: 600 }),
+        });
+      }
+      if (url.includes("/turnos/confirmar")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              turno: {
+                id: 88,
+                cancha_id: 1,
+                fecha: "2026-09-01",
+                hora_inicio: "15:00:00",
+                hora_fin: "16:30:00",
+                precio: 12000,
+                monto_pagado: 0,
+                saldo_pendiente: 12000,
+                estado_pago: "pendiente",
+                metodo_pago: "online",
+              },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            slots_disponibles: [{ hora_inicio: "15:00", hora_fin: "16:30", disponible: true, precio: 12000 }],
+            turnos_ocupados: [],
+          }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 15:00 a 16:30 Disponible")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByLabelText("Turno 15:00 a 16:30 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // Selector de 3 opciones en mostrador
+    expect(screen.getByText(/¿Cuánto se cobra ahora en mostrador\?/i)).toBeDefined();
+    expect(screen.getByText("🕒 Sin cobro")).toBeDefined();
+    expect(screen.getByText(/💳 Seña/i)).toBeDefined();
+    expect(screen.getByText(/🎉 Total/i)).toBeDefined();
+
+    // Hacemos click en "Sin cobro"
+    fireEvent.click(screen.getByText("🕒 Sin cobro"));
+
+    // El botón debe actualizarse a "Asignar en Mostrador (Sin Cobro)"
+    expect(screen.getByRole("button", { name: /Asignar en Mostrador \(Sin Cobro\)/i })).toBeDefined();
+
+    // Completar datos
+    fireEvent.change(screen.getByPlaceholderText(/Mariano Werner/i), { target: { value: "Juan Amigo" } });
+
+    // Confirmar
+    fireEvent.click(screen.getByRole("button", { name: /Asignar en Mostrador \(Sin Cobro\)/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/confirmar"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"modalidad_pago":"ninguno"'),
+        })
+      );
+    });
+  });
+
   it("permite a un visitante público crear su cuenta rápida en el checkout y confirmar su turno", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("/turnos/bloquear-temporal")) {
@@ -526,6 +621,13 @@ describe("Componente Reactivo GrillaHoraria", () => {
                 cancha_id: 1,
                 cliente_id: 77,
                 cliente_nombre: "Lucas Martínez",
+                fecha: "2026-09-01",
+                hora_inicio: "17:00",
+                hora_fin: "18:30",
+                precio: 10000,
+                monto_pagado: 5000,
+                saldo_pendiente: 5000,
+                estado_pago: "senado",
               },
             }),
         });
@@ -620,6 +722,15 @@ describe("Componente Reactivo GrillaHoraria", () => {
           body: expect.stringContaining("Lucas Martínez"),
         })
       );
+    });
+
+    // 5. Debe mostrar la tarjeta de reserva confirmada al visitante y remover el banner con cuenta regresiva
+    await waitFor(() => {
+      expect(screen.getByTestId("client-confirmed-turnos-section")).toBeDefined();
+      expect(screen.getByTestId("client-reserved-card")).toBeDefined();
+      expect(screen.getByText(/Seña Abonada/i)).toBeDefined();
+      expect(screen.getByText(/Saldo en Club/i)).toBeDefined();
+      expect(screen.queryByTestId("active-lock-banner")).toBeNull();
     });
   });
 
@@ -872,24 +983,26 @@ describe("Componente Reactivo GrillaHoraria", () => {
     // 2. Abrir modal
     fireEvent.click(screen.getByText("Confirmar Reserva"));
 
-    // 3. Verificar desglose financiero de seña
+    // 3. Verificar desglose financiero de seña y recordatorio de modo pruebas
     await waitFor(() => {
       expect(screen.getByTestId("sena-breakdown")).toBeDefined();
       expect(screen.getByText(/Saldo a pagar en el club/i)).toBeDefined();
+      expect(screen.getByTestId("dev-mode-reminder")).toBeDefined();
+      expect(screen.getByText(/Modo Pruebas Activo/i)).toBeDefined();
     });
 
-    // 4. Click en Simular Pago Aprobado
-    const botonSimular = screen.getByRole("button", { name: /Simular Pago Aprobado/i });
-    expect(botonSimular).toBeDefined();
+    // 4. Click en Confirmar Turno (en desarrollo se aprueba automáticamente con la seña)
+    const botonConfirmar = screen.getByRole("button", { name: /Confirmar Turno.*5/i });
+    expect(botonConfirmar).toBeDefined();
 
-    fireEvent.click(botonSimular);
+    fireEvent.click(botonConfirmar);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining("/turnos/confirmar"),
         expect.objectContaining({
           method: "POST",
-          body: expect.stringContaining('"metodo_pago":"simulador_dev"'),
+          body: expect.stringContaining('"modalidad_pago":"sena"'),
         })
       );
     });
@@ -1362,5 +1475,297 @@ describe("Componente Reactivo GrillaHoraria", () => {
 
     const btnCobrar = screen.getByRole("button", { name: /Cobrar/i });
     expect(btnCobrar).toBeDefined();
+  });
+
+  it("no muestra la opción de 'Pagar en el Club / Mostrador' al reservar online y defaultea a online", async () => {
+    const availableSlots: Slot[] = [
+      { hora_inicio: "18:00", hora_fin: "19:00", disponible: true, precio: 10000 },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, ttl: 600, token_reserva: "lock-token-123" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ slots: availableSlots }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        initialSlots={availableSlots}
+        isAdmin={false}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText("Turno 18:00 a 19:00 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Crear Cuenta Rápida/i)).toBeDefined();
+    });
+
+    // La opción de mostrador no debe existir para clientes online
+    expect(screen.queryByText(/Pagar en el Club \/ Mostrador/i)).toBeNull();
+
+    // Debe existir la opción de Mercado Pago / Tarjeta Online
+    expect(screen.getByText(/Mercado Pago \/ Tarjeta Online/i)).toBeDefined();
+  });
+
+  it("muestra la opción 'Cobrado en Mostrador / Efectivo' cuando isAdmin es true", async () => {
+    const availableSlots: Slot[] = [
+      { hora_inicio: "18:00", hora_fin: "19:00", disponible: true, precio: 10000 },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, ttl: 600, token_reserva: "lock-token-123" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ slots: availableSlots }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        initialSlots={availableSlots}
+        isAdmin={true}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText("Turno 18:00 a 19:00 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Modo Recepción: Asignación directa a cliente en el club o por llamada/i)).toBeDefined();
+    });
+
+    expect(screen.getByText(/Cobrado en Mostrador \/ Efectivo/i)).toBeDefined();
+  });
+
+  it("permite al usuario alternar entre pagar seña o el 100% del total y actualiza los montos a pagar", async () => {
+    localStorage.setItem("saas_token", "fake-token-payment-test");
+
+    const availableSlots: Slot[] = [
+      { hora_inicio: "18:00", hora_fin: "19:00", disponible: true, precio: 10000 },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ user: { id: 1, name: "Max Verstappen", email: "max@redbull.com" } }),
+        });
+      }
+      if (urlStr.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, ttl: 600, token_reserva: "lock-token-123" }),
+        });
+      }
+      if (urlStr.includes("/turnos/confirmar")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              turno: {
+                id: 99,
+                monto_pagado: 10000,
+                saldo_pendiente: 0,
+                estado_pago: "pagado_total",
+                metodo_pago: "simulador_dev",
+              },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ slots: availableSlots }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        initialSlots={availableSlots}
+        isAdmin={false}
+        porcentajeSena={50}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText("Turno 18:00 a 19:00 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/¿Cuánto deseas abonar ahora\?/i)).toBeDefined();
+    });
+
+    // Por defecto es Seña ($5.000 o $5,000) en el botón de confirmación
+    expect(screen.getByRole("button", { name: /Confirmar Turno.*5/i })).toBeDefined();
+
+    // Verificamos presencia del recordatorio de desarrollo y probamos el rechazo de pago simulado
+    expect(screen.getByTestId("dev-mode-reminder")).toBeDefined();
+    const btnRechazo = screen.getByText(/Probar rechazo de pago/i);
+    fireEvent.click(btnRechazo);
+    expect(screen.getByText(/Pago simulado rechazado por la pasarela/i)).toBeDefined();
+
+    // Hacemos clic en "Total (100%)"
+    const btnTotal = screen.getByRole("button", { name: /Total.*100%/i });
+    fireEvent.click(btnTotal);
+
+    // Ahora el botón principal debe actualizarse a $10.000 ($10,000)
+    const btnConfirmarTotal = screen.getByRole("button", { name: /Confirmar Turno.*10/i });
+    expect(btnConfirmarTotal).toBeDefined();
+
+    // Confirmamos el pago total
+    fireEvent.click(btnConfirmarTotal);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/confirmar"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"modalidad_pago":"total"'),
+        })
+      );
+    });
+  });
+
+  it("al disparar evento de logout saas-auth-changed limpia las reservas confirmadas del usuario y oculta la tarjeta de mis reservas", async () => {
+    localStorage.setItem("saas_token", "fake-javo-token");
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 91, name: "javo", email: "javo@gmail.com" })
+    );
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      const urlStr = typeof url === "string" ? url : "";
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ user: { id: 91, name: "javo", email: "javo@gmail.com" } }),
+        });
+      }
+      if (urlStr.includes("/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              slots_disponibles: [
+                { hora_inicio: "18:00", hora_fin: "19:30", disponible: true, precio: 10000, duracion_minutos: 90 },
+              ],
+              turnos_ocupados: [],
+              turnos_retenidos: [],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    const initialConfirmed = [
+      {
+        id: 141,
+        hora_inicio: "17:00",
+        hora_fin: "18:30",
+        fecha: "2026-09-05",
+        precio: 10000,
+        monto_pagado: 5000,
+        saldo_pendiente: 5000,
+        estado_pago: "senado",
+        cliente_id: 91,
+        cliente_nombre: "javo",
+        cliente_email: "javo@gmail.com",
+      },
+    ];
+
+    sessionStorage.setItem("confirmed_turnos_1", JSON.stringify(initialConfirmed));
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1 - Central Cristal"
+        deporte="padel"
+        subdomain="nico-padel"
+        fechaInicial="2026-09-05"
+        duracionInicial={90}
+        precioBase={10000}
+        isAdmin={false}
+      />
+    );
+
+    // Como está logueado como javo (cliente_id: 91), se muestra la reserva confirmada
+    await waitFor(() => {
+      expect(screen.getByTestId("client-confirmed-turnos-section")).toBeDefined();
+      expect(screen.getByText(/Tus Reservas Confirmadas/i)).toBeDefined();
+      expect(screen.getByText(/17:00 - 18:30 hs/i)).toBeDefined();
+    });
+
+    // Simulamos el cierre de sesión (evento saas-auth-changed con user: null)
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent("saas-auth-changed", { detail: { user: null, token: null } })
+      );
+    });
+
+    // La sección debe desaparecer inmediatamente al cerrar sesión
+    await waitFor(() => {
+      expect(screen.queryByTestId("client-confirmed-turnos-section")).toBeNull();
+      expect(screen.queryByText(/Tus Reservas Confirmadas/i)).toBeNull();
+    });
   });
 });

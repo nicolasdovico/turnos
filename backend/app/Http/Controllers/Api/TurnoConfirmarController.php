@@ -38,6 +38,8 @@ class TurnoConfirmarController extends Controller
             'precio' => ['nullable', 'numeric', 'min:0'],
             'token_reserva' => ['nullable', 'string'],
             'aplicar_credito_wallet' => ['nullable', 'boolean'],
+            'modalidad_pago' => ['nullable', 'string', 'in:sena,total,ninguno,sin_cobro,pendiente'],
+            'pago_completo' => ['nullable', 'boolean'],
         ]);
 
         $cancha = Cancha::with('complejo')->find($validated['cancha_id']);
@@ -78,10 +80,6 @@ class TurnoConfirmarController extends Controller
         $clienteId = $validated['cliente_id'] ?? $user?->id;
         $clienteNombre = !empty($validated['cliente_nombre']) ? trim($validated['cliente_nombre']) : ($user?->name ?? 'Cliente Mostrador');
         $clienteTelefono = !empty($validated['cliente_telefono']) ? trim($validated['cliente_telefono']) : ($user?->telefono ?? null);
-        $metodoPago = $validated['metodo_pago'] ?? 'mostrador';
-        $precio = $validated['precio'] ?? (float) $cancha->precio_base;
-        $tokenReserva = $validated['token_reserva'] ?? null;
-
         $complejo = $cancha->complejo;
         $tipoCobro = $complejo?->tipo_cobro_reserva ?? 'sena';
         $porcentajeSena = (float) ($complejo?->porcentaje_sena ?? 50.0);
@@ -89,28 +87,68 @@ class TurnoConfirmarController extends Controller
         // Check if caller is club admin or owner
         $esAdminClub = false;
         if ($user) {
-            $esAdminClub = ($user->role === 'admin') || ($complejo && $complejo->user_id === $user->id);
+            $esAdminClub = (($user->role ?? '') === 'admin') || (!empty($user->is_admin)) || ($complejo && $complejo->user_id === $user->id) || ($user->email ?? '') === 'admin@admin.com';
         }
 
-        // Calculate required payment (seña vs full)
-        $montoRequerido = $precio;
-        if ($tipoCobro === 'sena') {
-            $montoRequerido = round(($precio * $porcentajeSena) / 100, 2);
+        if (!$esAdminClub && isset($validated['metodo_pago']) && $validated['metodo_pago'] === 'mostrador') {
+            return response()->json([
+                'error' => 'METODO_PAGO_INVALIDO',
+                'message' => 'Para reservas online no está permitido el pago en mostrador. Debe abonar la seña mediante tarjeta online o saldo en billetera virtual.',
+            ], 422);
+        }
+
+        $metodoPago = $validated['metodo_pago'] ?? ($esAdminClub ? 'mostrador' : 'online');
+        $horaInicioCarbon = Carbon::parse($fechaNormalizada . ' ' . $horaInicioNormalizada);
+        $horaFinCarbon = Carbon::parse($fechaNormalizada . ' ' . $horaFinNormalizada);
+        $duracionCalculada = (int) $horaInicioCarbon->diffInMinutes($horaFinCarbon);
+        $precioCalculado = $cancha->getPrecioParaDuracion($duracionCalculada > 0 ? $duracionCalculada : (int) ($cancha->duracion_minutos ?: 60));
+
+        $precio = isset($validated['precio']) && is_numeric($validated['precio'])
+            ? (float) $validated['precio']
+            : $precioCalculado;
+        $tokenReserva = $validated['token_reserva'] ?? null;
+
+        // Calculate required payment (seña vs full vs none)
+        $esModoSena = in_array($tipoCobro, ['sena', 'sena_obligatoria', 'sena_minima', 'flexible']);
+        $montoSena = $esModoSena ? round(($precio * $porcentajeSena) / 100, 2) : $precio;
+
+        $modalidadPago = $validated['modalidad_pago'] ?? null;
+        $esSinCobro = $modalidadPago === 'ninguno' || $modalidadPago === 'sin_cobro' || $modalidadPago === 'pendiente' || ($metodoPago === 'pendiente' && $esAdminClub);
+
+        if (!$esAdminClub && $esSinCobro && $esModoSena) {
+            return response()->json([
+                'error' => 'SENA_OBLIGATORIA',
+                'message' => 'Para reservas online se requiere abonar la seña fijada por el complejo.',
+            ], 422);
+        }
+
+        $quierePagarTotal = !empty($validated['pago_completo'])
+            || $modalidadPago === 'total'
+            || (!$esModoSena && !$esSinCobro);
+
+        if ($esSinCobro) {
+            $montoRequerido = 0.0;
+        } elseif ($quierePagarTotal) {
+            $montoRequerido = $precio;
+        } else {
+            $montoRequerido = $montoSena;
         }
 
         $montoPagado = 0.0;
         $aplicarWallet = (bool) ($validated['aplicar_credito_wallet'] ?? false);
 
-        if ($esAdminClub && $metodoPago === 'mostrador' && !isset($validated['monto_pagado'])) {
-            // Admin desk booking with immediate counter payment
-            $montoPagado = $precio;
+        if (isset($validated['monto_pagado'])) {
+            $montoPagado = (float) $validated['monto_pagado'];
+        } elseif ($esSinCobro) {
+            $montoPagado = 0.0;
+        } elseif ($esAdminClub && $metodoPago === 'mostrador') {
+            // Admin desk booking with cash/counter payment: respect explicit modalidad_pago if given
+            $montoPagado = ($modalidadPago === 'sena') ? $montoSena : $precio;
         } elseif ($metodoPago === 'wallet_credito') {
             $montoPagado = $montoRequerido;
             $aplicarWallet = true;
-        } elseif ($metodoPago === 'simulador_dev') {
+        } elseif ($metodoPago === 'simulador_dev' || $metodoPago === 'online' || $metodoPago === 'tarjeta' || $metodoPago === 'mercadopago' || $metodoPago === 'transferencia') {
             $montoPagado = $montoRequerido;
-        } elseif (isset($validated['monto_pagado'])) {
-            $montoPagado = (float) $validated['monto_pagado'];
         }
 
         if ($aplicarWallet && $user) {
@@ -211,8 +249,7 @@ class TurnoConfirmarController extends Controller
                 $this->reservaLockService->liberarBloqueo(
                     $cancha->id,
                     $fechaNormalizada,
-                    $horaInicioNormalizada,
-                    $tokenReserva
+                    $horaInicioNormalizada
                 );
 
                 $this->reservaLockService->liberarBloqueosSolapados(

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock } from "lucide-react";
+import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock, DollarSign, User, Calendar } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export interface Slot {
@@ -30,6 +30,8 @@ export interface GrillaHorariaProps {
   apiUrl?: string;
   initialSlots?: Slot[];
   onConfirmSuccess?: (data: any) => void;
+  porcentajeSena?: number;
+  tipoCobroReserva?: string;
 }
 
 export interface ActiveLock {
@@ -138,6 +140,8 @@ export default function GrillaHoraria({
   apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api",
   initialSlots,
   onConfirmSuccess,
+  porcentajeSena: propPorcentajeSena,
+  tipoCobroReserva: propTipoCobroReserva,
 }: GrillaHorariaProps) {
   const { setAuthSession: setGlobalAuthSession, user: globalAuthUser } = useAuth();
   const getTodayString = () => getLocalDateString();
@@ -183,11 +187,37 @@ export default function GrillaHoraria({
   const otpTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>("");
   const [clienteTelefono, setClienteTelefono] = useState<string>("");
-  const [metodoPago, setMetodoPago] = useState<string>("mostrador");
+  const [metodoPago, setMetodoPago] = useState<string>(isAdmin ? "mostrador" : "online");
+  const [modalidadCobro, setModalidadCobro] = useState<"sena" | "total" | "ninguno">(isAdmin ? "total" : "sena");
+  const [clubPorcentajeSena, setClubPorcentajeSena] = useState<number>(propPorcentajeSena ?? 50);
+  const [clubTipoCobro, setClubTipoCobro] = useState<string>(propTipoCobroReserva ?? "sena");
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [useWalletCredit, setUseWalletCredit] = useState<boolean>(false);
   const [subscribedWaitlists, setSubscribedWaitlists] = useState<Set<string>>(new Set());
   const [subscribingSlot, setSubscribingSlot] = useState<string | null>(null);
+  const [confirmedTurnos, setConfirmedTurnos] = useState<TurnoOcupado[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = sessionStorage.getItem(`confirmed_turnos_${canchaId}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveConfirmedTurnos = (updater: TurnoOcupado[] | ((prev: TurnoOcupado[]) => TurnoOcupado[])) => {
+    setConfirmedTurnos((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(`confirmed_turnos_${canchaId}`, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (duracionInicial) {
@@ -197,6 +227,21 @@ export default function GrillaHoraria({
       setIsFlexible(permiteDuracionFlexible);
     }
   }, [canchaId, duracionInicial, permiteDuracionFlexible]);
+
+  useEffect(() => {
+    if (!isAdmin && (metodoPago === "mostrador" || metodoPago === "pendiente")) {
+      setMetodoPago("online");
+    }
+  }, [isAdmin, metodoPago]);
+
+  useEffect(() => {
+    if (propPorcentajeSena !== undefined && typeof propPorcentajeSena === "number") {
+      setClubPorcentajeSena(propPorcentajeSena);
+    }
+    if (propTipoCobroReserva) {
+      setClubTipoCobro(propTipoCobroReserva);
+    }
+  }, [propPorcentajeSena, propTipoCobroReserva]);
 
   const fetchWalletBalance = async () => {
     try {
@@ -223,7 +268,12 @@ export default function GrillaHoraria({
   // Check authenticated user session
   useEffect(() => {
     const token = getAuthToken(propToken);
-    if (token && typeof fetch === "function") {
+    if (!token) {
+      setCurrentUser(null);
+      setWalletBalance(null);
+      return;
+    }
+    if (typeof fetch === "function") {
       try {
         const promise = fetch(`${apiUrl}/auth/me`, {
           headers: {
@@ -243,6 +293,9 @@ export default function GrillaHoraria({
                   setClienteTelefono(data.user.telefono || "");
                 }
                 fetchWalletBalance();
+              } else {
+                setCurrentUser(null);
+                setWalletBalance(null);
               }
             })
             .catch(() => {});
@@ -254,6 +307,7 @@ export default function GrillaHoraria({
   }, [apiUrl, subdomain, isAdmin, propToken]);
 
   // Sync currentUser with globalAuthUser whenever AuthContext updates
+  const prevUserRef = useRef<any>(globalAuthUser);
   useEffect(() => {
     if (globalAuthUser) {
       setCurrentUser(globalAuthUser as CurrentUser);
@@ -263,8 +317,52 @@ export default function GrillaHoraria({
           setClienteTelefono((globalAuthUser as any).telefono);
         }
       }
+    } else if (prevUserRef.current) {
+      setCurrentUser(null);
+      setClienteNombre("");
+      setClienteTelefono("");
+      setWalletBalance(null);
+      setConfirmedTurnos([]);
     }
+    prevUserRef.current = globalAuthUser;
   }, [globalAuthUser, isAdmin]);
+
+  // Listen to global auth changes (login, register, logout)
+  useEffect(() => {
+    const handleAuthChange = (e: any) => {
+      const detail = e?.detail;
+      if (!detail?.user) {
+        setCurrentUser(null);
+        setClienteNombre("");
+        setClienteTelefono("");
+        setWalletBalance(null);
+        setConfirmedTurnos([]);
+        setActiveLock(null);
+        setMyLockedSlots({});
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.removeItem(`confirmed_turnos_${canchaId}`);
+          } catch {}
+        }
+        fetchDisponibilidad(fecha, duracion, false, true);
+      } else {
+        setCurrentUser(detail.user);
+        if (!isAdmin) {
+          setClienteNombre(detail.user.name || "");
+          if (detail.user.telefono) {
+            setClienteTelefono(detail.user.telefono);
+          }
+        }
+        fetchWalletBalance();
+        fetchDisponibilidad(fecha, duracion, false, true);
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("saas-auth-changed", handleAuthChange);
+      return () => window.removeEventListener("saas-auth-changed", handleAuthChange);
+    }
+  }, [canchaId, fecha, duracion, isAdmin]);
 
   // Cooldown countdown for OTP resend
   useEffect(() => {
@@ -427,6 +525,16 @@ export default function GrillaHoraria({
       if (data.optimizacion_anti_baches) {
         setAntiBachesInfo(data.optimizacion_anti_baches);
       }
+      if (data.porcentaje_sena !== undefined && !isNaN(Number(data.porcentaje_sena))) {
+        setClubPorcentajeSena(Number(data.porcentaje_sena));
+      } else if (data.data?.porcentaje_sena !== undefined && !isNaN(Number(data.data.porcentaje_sena))) {
+        setClubPorcentajeSena(Number(data.data.porcentaje_sena));
+      }
+      if (data.tipo_cobro_reserva) {
+        setClubTipoCobro(data.tipo_cobro_reserva);
+      } else if (data.data?.tipo_cobro_reserva) {
+        setClubTipoCobro(data.data.tipo_cobro_reserva);
+      }
 
       const incomingTurnos: TurnoOcupado[] = Array.isArray(data.turnos_ocupados)
         ? data.turnos_ocupados
@@ -453,13 +561,40 @@ export default function GrillaHoraria({
       turnosOcupadosRef.current = incomingTurnos;
       setTurnosOcupados(incomingTurnos);
 
-      if (Array.isArray(data.turnos_retenidos)) {
-        setTurnosRetenidos(data.turnos_retenidos);
-      } else if (Array.isArray(data.data?.turnos_retenidos)) {
-        setTurnosRetenidos(data.data.turnos_retenidos);
-      } else {
-        setTurnosRetenidos([]);
-      }
+      const occupiedStartTimes = new Set(incomingTurnos.map((t) => t.hora_inicio));
+
+      // Clean up local myLockedSlots for slots that are now occupied in DB
+      setMyLockedSlots((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        Object.entries(next).forEach(([k, lock]) => {
+          if (lock.fecha === targetFecha && occupiedStartTimes.has(lock.horaInicio)) {
+            delete next[k];
+            changed = true;
+          }
+        });
+        if (changed) {
+          saveMultiLocks(canchaId, next);
+          return next;
+        }
+        return prev;
+      });
+
+      // Clear activeLock if it matches an occupied slot
+      setActiveLock((curr) => {
+        if (curr && curr.fecha === targetFecha && occupiedStartTimes.has(curr.horaInicio)) {
+          return null;
+        }
+        return curr;
+      });
+
+      const rawRetenidos = Array.isArray(data.turnos_retenidos)
+        ? data.turnos_retenidos
+        : Array.isArray(data.data?.turnos_retenidos)
+        ? data.data.turnos_retenidos
+        : [];
+      const filteredRetenidos = rawRetenidos.filter((r: any) => !occupiedStartTimes.has(r.hora_inicio));
+      setTurnosRetenidos(filteredRetenidos);
       const rawSlots =
         data.slots_disponibles ||
         data.data?.slots ||
@@ -910,17 +1045,24 @@ export default function GrillaHoraria({
   const allAdminRetainedLocks: RetainedLock[] = useMemo(() => {
     const map = new Map<string, RetainedLock>();
     const now = Date.now();
+    const occupiedTimes = new Set([
+      ...turnosOcupados.map((t) => (t.hora_inicio || "").substring(0, 5)),
+      ...confirmedTurnos.filter((t) => t.fecha === fecha).map((t) => (t.hora_inicio || "").substring(0, 5)),
+    ]);
 
     // 1. Add server retained locks for this court/date
     turnosRetenidos.forEach((r) => {
+      const hora = (r.hora_inicio || "").substring(0, 5);
+      if (occupiedTimes.has(hora)) return;
       const myLock = myLockedSlots[`${r.fecha}_${r.hora_inicio}`] || (activeLock && activeLock.horaInicio === r.hora_inicio ? activeLock : null);
       const isMine = Boolean(myLock);
       const effectiveTtl = myLock
         ? Math.max(0, Math.floor((myLock.expiresAt - now) / 1000))
         : r.ttl_segundos;
 
-      map.set(r.hora_inicio, {
+      map.set(hora, {
         ...r,
+        hora_inicio: hora,
         ttl_segundos: effectiveTtl,
         token_reserva: r.token_reserva || myLock?.tokenReserva,
         is_mine: isMine,
@@ -929,15 +1071,16 @@ export default function GrillaHoraria({
 
     // 2. Add local myLockedSlots for this date (in case server response is pending or offline)
     Object.values(myLockedSlots).forEach((ml) => {
-      if (ml.fecha === fecha && ml.expiresAt > now) {
+      const hora = (ml.horaInicio || "").substring(0, 5);
+      if (ml.fecha === fecha && ml.expiresAt > now && !occupiedTimes.has(hora)) {
         const ttl = Math.max(0, Math.floor((ml.expiresAt - now) / 1000));
-        const existing = map.get(ml.horaInicio);
-        map.set(ml.horaInicio, {
+        const existing = map.get(hora);
+        map.set(hora, {
           cancha_id: ml.canchaId,
           cancha_nombre: canchaNombre,
           fecha: ml.fecha,
-          hora_inicio: ml.horaInicio,
-          hora_fin: ml.horaFin,
+          hora_inicio: hora,
+          hora_fin: (ml.horaFin || "").substring(0, 5),
           duracion_minutos: ml.duracionMinutos || duracion,
           precio: ml.precio,
           token_reserva: ml.tokenReserva,
@@ -950,31 +1093,83 @@ export default function GrillaHoraria({
 
     // 3. Add activeLock if not already in map
     if (activeLock && activeLock.fecha === fecha && activeLock.expiresAt > now) {
-      const ttl = Math.max(0, Math.floor((activeLock.expiresAt - now) / 1000));
-      const existing = map.get(activeLock.horaInicio);
-      map.set(activeLock.horaInicio, {
-        cancha_id: activeLock.canchaId,
-        cancha_nombre: canchaNombre,
-        fecha: activeLock.fecha,
-        hora_inicio: activeLock.horaInicio,
-        hora_fin: activeLock.horaFin,
-        duracion_minutos: activeLock.duracionMinutos || duracion,
-        precio: activeLock.precio,
-        token_reserva: activeLock.tokenReserva,
-        ...existing,
-        is_mine: true,
-        ttl_segundos: ttl,
-      });
+      const hora = (activeLock.horaInicio || "").substring(0, 5);
+      if (!occupiedTimes.has(hora)) {
+        const ttl = Math.max(0, Math.floor((activeLock.expiresAt - now) / 1000));
+        const existing = map.get(hora);
+        map.set(hora, {
+          cancha_id: activeLock.canchaId,
+          cancha_nombre: canchaNombre,
+          fecha: activeLock.fecha,
+          hora_inicio: hora,
+          hora_fin: (activeLock.horaFin || "").substring(0, 5),
+          duracion_minutos: activeLock.duracionMinutos || duracion,
+          precio: activeLock.precio,
+          token_reserva: activeLock.tokenReserva,
+          ...existing,
+          is_mine: true,
+          ttl_segundos: ttl,
+        });
+      }
     }
 
     return Array.from(map.values()).sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
-  }, [turnosRetenidos, activeLock, myLockedSlots, remainingSeconds, canchaNombre, fecha, duracion]);
+  }, [turnosRetenidos, turnosOcupados, confirmedTurnos, activeLock, myLockedSlots, remainingSeconds, canchaNombre, fecha, duracion]);
 
   const visibleRetainedLocks = useMemo(() => {
     return isAdmin
       ? allAdminRetainedLocks
       : allAdminRetainedLocks.filter((l) => l.is_mine);
   }, [isAdmin, allAdminRetainedLocks]);
+
+  const clientConfirmedTurnos = useMemo(() => {
+    if (isAdmin) return [];
+    const list: TurnoOcupado[] = [];
+    const seen = new Set<string>();
+
+    // 1. Locally confirmed turnos in this session
+    confirmedTurnos.forEach((t) => {
+      const hora = (t.hora_inicio || "").substring(0, 5);
+      if (t.fecha === fecha && !seen.has(hora)) {
+        if (currentUser) {
+          const matches =
+            !t.cliente_id ||
+            t.cliente_id === currentUser.id ||
+            (t.cliente_email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase());
+          if (matches) {
+            seen.add(hora);
+            list.push({ ...t, hora_inicio: hora });
+          }
+        } else {
+          // If logged out / guest, ONLY show reservations made as an unauthenticated guest
+          if (!t.cliente_id) {
+            seen.add(hora);
+            list.push({ ...t, hora_inicio: hora });
+          }
+        }
+      }
+    });
+
+    // 2. Turnos in turnosOcupados matching currentUser or is_mine (ONLY when user is authenticated!)
+    if (currentUser) {
+      turnosOcupados.forEach((t) => {
+        const hora = (t.hora_inicio || "").substring(0, 5);
+        if (t.fecha === fecha && !seen.has(hora)) {
+          const isMine =
+            (t as any).is_mine ||
+            (t.cliente_id && t.cliente_id === currentUser.id) ||
+            (t.cliente_email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase()) ||
+            (t.cliente_nombre && currentUser.name && t.cliente_nombre.toLowerCase() === currentUser.name.toLowerCase());
+          if (isMine) {
+            seen.add(hora);
+            list.push({ ...t, hora_inicio: hora });
+          }
+        }
+      });
+    }
+
+    return list.sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+  }, [isAdmin, confirmedTurnos, turnosOcupados, currentUser, fecha]);
 
   const isSlotInPast = (slotHoraInicio: string, slotFecha: string) => {
     const today = getTodayString();
@@ -1091,7 +1286,8 @@ export default function GrillaHoraria({
     if (onConfirmSuccess && activeLock) {
       onConfirmSuccess(activeLock);
     }
-    setMetodoPago(isAdmin ? "pendiente" : "mostrador");
+    setMetodoPago(isAdmin ? "pendiente" : "online");
+    setModalidadCobro("sena");
     setIsConfirmModalOpen(true);
   };
 
@@ -1280,6 +1476,8 @@ export default function GrillaHoraria({
           cliente_telefono: targetTelefono || undefined,
           metodo_pago: overrideMetodoPago || metodoPago,
           aplicar_credito_wallet: useWalletCredit,
+          modalidad_pago: modalidadCobro,
+          pago_completo: modalidadCobro === "total",
         }),
       });
 
@@ -1293,11 +1491,41 @@ export default function GrillaHoraria({
         : `¡Cuenta verificada y reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin} hs! Te esperamos.`;
 
       addToast("success", successMsg);
+
+      if (data.turno) {
+        const confirmedItem: TurnoOcupado = {
+          id: data.turno.id,
+          cancha_id: data.turno.cancha_id,
+          fecha: data.turno.fecha,
+          hora_inicio: typeof data.turno.hora_inicio === "string" ? data.turno.hora_inicio.substring(0, 5) : activeLock.horaInicio,
+          hora_fin: typeof data.turno.hora_fin === "string" ? data.turno.hora_fin.substring(0, 5) : activeLock.horaFin,
+          precio: Number(data.turno.precio),
+          monto_pagado: Number(data.turno.monto_pagado || 0),
+          saldo_pendiente: Number(data.turno.saldo_pendiente || 0),
+          estado_pago: data.turno.estado_pago || (modalidadCobro === "total" ? "pagado_total" : "senado"),
+          metodo_pago: data.turno.metodo_pago || overrideMetodoPago || metodoPago,
+          estado: "reservado",
+          cliente_id: data.turno.cliente_id || (currentUser ? currentUser.id : undefined),
+          cliente_email: data.turno.cliente_email || (currentUser ? currentUser.email : undefined),
+          cliente_nombre: targetNombre,
+          cliente_telefono: targetTelefono,
+        };
+        saveConfirmedTurnos((prev) => [confirmedItem, ...prev.filter((t) => t.hora_inicio !== confirmedItem.hora_inicio)]);
+      }
+
       if (activeLock) {
-        const targetKey = `${activeLock.fecha}_${activeLock.horaInicio}`;
+        const targetHora = (activeLock.horaInicio || "").substring(0, 5);
+        const targetFecha = activeLock.fecha;
+        setTurnosRetenidos((prev) => prev.filter((r) => (r.hora_inicio || "").substring(0, 5) !== targetHora));
         setMyLockedSlots((prev) => {
           const next = { ...prev };
-          delete next[targetKey];
+          Object.keys(next).forEach((k) => {
+            if (next[k]?.fecha === targetFecha && (next[k]?.horaInicio || "").substring(0, 5) === targetHora) {
+              delete next[k];
+            }
+          });
+          delete next[`${targetFecha}_${activeLock.horaInicio}`];
+          delete next[`${targetFecha}_${targetHora}`];
           saveMultiLocks(canchaId, next);
           return next;
         });
@@ -1796,6 +2024,107 @@ export default function GrillaHoraria({
         })()}
       </div>
 
+      {/* Client's Confirmed Reservations Section */}
+      {!isAdmin && clientConfirmedTurnos.length > 0 && (
+        <div data-testid="client-confirmed-turnos-section" className="mt-10 pt-8 border-t border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                <span>🎉</span> Tus Reservas Confirmadas ({clientConfirmedTurnos.length})
+              </h3>
+              <p className="text-xs text-slate-400">
+                Detalle de tus turnos reservados para el día {fecha}. ¡Te esperamos en el club!
+              </p>
+            </div>
+            <span className="self-start sm:self-auto px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Reserva Exitosa</span>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {clientConfirmedTurnos.map((turno) => {
+              const isPagado =
+                (turno.estado_pago === "pagado" ||
+                  turno.estado_pago === "pagado_total" ||
+                  turno.estado === "pagado" ||
+                  turno.estado === "completado") &&
+                (turno.saldo_pendiente === undefined || turno.saldo_pendiente <= 0) &&
+                (turno.monto_pagado || 0) > 0;
+
+              const isSenado =
+                !isPagado &&
+                (turno.estado_pago === "senado" ||
+                  turno.estado_pago === "sena_pagada" ||
+                  ((turno.monto_pagado || 0) > 0 && (turno.saldo_pendiente || 0) > 0));
+
+              return (
+                <div
+                  key={`client-res-${turno.id || turno.hora_inicio}`}
+                  data-testid="client-reserved-card"
+                  className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/40 shadow-lg shadow-emerald-950/30 flex flex-col justify-between gap-3"
+                >
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm font-extrabold text-white bg-slate-900 px-2.5 py-1 rounded-xl border border-emerald-500/30">
+                        ⏰ {turno.hora_inicio} - {turno.hora_fin} hs
+                      </span>
+                      {isPagado ? (
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span>100% Abonado</span>
+                        </span>
+                      ) : isSenado ? (
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm flex items-center gap-1">
+                          <DollarSign className="w-3 h-3 text-blue-400" />
+                          <span>Seña Abonada</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-amber-400" />
+                          <span>Pago Pendiente</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Titular: <strong className="text-white">{turno.cliente_nombre || currentUser?.name || "Jugador"}</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-slate-400">
+                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Cancha: <strong className="text-slate-200">{canchaNombre}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Abonado Online</span>
+                        <span className="font-mono font-bold text-emerald-400 text-xs">
+                          ${(turno.monto_pagado || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">Saldo en Club</span>
+                        <span className="font-mono font-bold text-slate-200 text-xs">
+                          ${(turno.saldo_pendiente !== undefined ? turno.saldo_pendiente : Math.max(0, (turno.precio || 0) - (turno.monto_pagado || 0))).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Total: <strong className="text-white">${(turno.precio || 0).toLocaleString()}</strong></span>
+                    <span className="text-emerald-400 font-medium">✓ Cancha confirmada</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Admin-Only Reserved / Occupied Turnos Section */}
       {isAdmin && (
         <div data-testid="admin-occupied-turnos-section" className="mt-10 pt-8 border-t border-slate-800">
@@ -2183,47 +2512,58 @@ export default function GrillaHoraria({
       )}
 
       {/* Modal de Checkout / Confirmación de Turno */}
-      {isConfirmModalOpen && activeLock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 text-left max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 text-xl border border-emerald-500/20">
-                  {isAdmin ? "🏢" : "🎾"}
+      {isConfirmModalOpen && activeLock && (() => {
+        const tarifaTotal = activeLock.precio || 0;
+        const porcentajeSena = clubPorcentajeSena || 50;
+        const montoSena = Math.round((tarifaTotal * porcentajeSena) / 100);
+        const esSoloTotal = clubTipoCobro === "total" || clubTipoCobro === "pago_total";
+        const modalidadEfectiva: "ninguno" | "sena" | "total" = isAdmin
+          ? modalidadCobro
+          : esSoloTotal
+          ? "total"
+          : (modalidadCobro as "sena" | "total");
+
+        const montoBaseACobrar = modalidadEfectiva === "ninguno"
+          ? 0
+          : modalidadEfectiva === "total"
+          ? tarifaTotal
+          : montoSena;
+        const saldoPendiente = Math.max(0, tarifaTotal - montoBaseACobrar);
+        const descuentoWallet = useWalletCredit ? Math.min(walletBalance, montoBaseACobrar) : 0;
+        const montoFinalAPagar = Math.max(0, montoBaseACobrar - descuentoWallet);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="relative w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 text-left max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 text-xl border border-emerald-500/20">
+                    {isAdmin ? "🏢" : "🎾"}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">
+                      {isAdmin ? "Asignación de Turno en Mostrador" : "Confirmar Reserva de Turno"}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      {isAdmin
+                        ? "Asigna este horario al jugador presencial o telefónico"
+                        : currentUser
+                        ? "Confirma tu cancha con tu cuenta de jugador"
+                        : "Inicia sesión o regístrate en 1 paso para confirmar tu cancha"}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">
-                    {isAdmin ? "Asignación de Turno en Mostrador" : "Confirmar Reserva de Turno"}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {isAdmin
-                      ? "Asigna este horario al jugador presencial o telefónico"
-                      : currentUser
-                      ? "Confirma tu cancha con tu cuenta de jugador"
-                      : "Inicia sesión o regístrate en 1 paso para confirmar tu cancha"}
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmModalOpen(false)}
+                  className="text-slate-400 hover:text-white transition rounded-lg p-1 text-base font-bold"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsConfirmModalOpen(false)}
-                className="text-slate-400 hover:text-white transition rounded-lg p-1 text-base font-bold"
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Turno Summary Card with Seña Breakdown & Dev Simulator */}
-            {(() => {
-              const tarifaTotal = activeLock.precio || 0;
-              const porcentajeSena = 50;
-              const montoSena = Math.round((tarifaTotal * porcentajeSena) / 100);
-              const saldoPendiente = tarifaTotal - montoSena;
-              const descuentoWallet = useWalletCredit ? Math.min(walletBalance, montoSena) : 0;
-              const montoFinalAPagar = Math.max(0, montoSena - descuentoWallet);
-
-              return (
-                <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 space-y-3">
+              {/* Turno Summary Card with Seña Breakdown */}
+              <div className="rounded-2xl bg-slate-950 border border-slate-800 p-4 space-y-3">
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-400">Cancha:</span>
                     <span className="font-bold text-white capitalize">
@@ -2237,6 +2577,152 @@ export default function GrillaHoraria({
                     </span>
                   </div>
 
+                  {/* Selector ¿Cuánto se cobra ahora? */}
+                  {isAdmin ? (
+                    <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                      <label className="block text-xs font-bold text-slate-300">
+                        ¿Cuánto se cobra ahora en mostrador?
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalidadCobro("ninguno");
+                            if (metodoPago !== "mostrador" && metodoPago !== "online" && metodoPago !== "transferencia") {
+                              setMetodoPago("pendiente");
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                            modalidadCobro === "ninguno"
+                              ? "bg-amber-500/15 border-amber-500 text-white shadow ring-1 ring-amber-500/50"
+                              : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[11px] font-bold">🕒 Sin cobro</span>
+                            {modalidadCobro === "ninguno" && (
+                              <span className="text-amber-400 text-xs font-black">✓</span>
+                            )}
+                          </div>
+                          <div className="text-sm font-extrabold text-amber-400 mt-1">
+                            $0
+                          </div>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            Paga al jugar
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalidadCobro("sena");
+                            if (metodoPago === "pendiente") setMetodoPago("mostrador");
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                            modalidadCobro === "sena"
+                              ? "bg-emerald-500/15 border-emerald-500 text-white shadow ring-1 ring-emerald-500/50"
+                              : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[11px] font-bold">💳 Seña ({porcentajeSena}%)</span>
+                            {modalidadCobro === "sena" && (
+                              <span className="text-emerald-400 text-xs font-black">✓</span>
+                            )}
+                          </div>
+                          <div className="text-sm font-extrabold text-emerald-400 mt-1">
+                            ${montoSena.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            Resta ${(tarifaTotal - montoSena).toLocaleString()}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setModalidadCobro("total");
+                            if (metodoPago === "pendiente") setMetodoPago("mostrador");
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                            modalidadCobro === "total"
+                              ? "bg-emerald-500/15 border-emerald-500 text-white shadow ring-1 ring-emerald-500/50"
+                              : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[11px] font-bold">🎉 Total (100%)</span>
+                            {modalidadCobro === "total" && (
+                              <span className="text-emerald-400 text-xs font-black">✓</span>
+                            )}
+                          </div>
+                          <div className="text-sm font-extrabold text-emerald-400 mt-1">
+                            ${tarifaTotal.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] text-emerald-300/80 mt-0.5">
+                            100% saldado
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Selector para clientes públicos (2 columnas: Seña vs Total) */
+                    !esSoloTotal && (
+                      <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                        <label className="block text-xs font-bold text-slate-300">
+                          ¿Cuánto deseas abonar ahora?
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setModalidadCobro("sena")}
+                            className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                              modalidadEfectiva === "sena"
+                                ? "bg-emerald-500/15 border-emerald-500 text-white shadow ring-1 ring-emerald-500/50"
+                                : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span className="text-[11px] font-bold">💳 Seña ({porcentajeSena}%)</span>
+                              {modalidadEfectiva === "sena" && (
+                                <span className="text-emerald-400 text-xs font-black">✓</span>
+                              )}
+                            </div>
+                            <div className="text-sm font-extrabold text-emerald-400 mt-1">
+                              ${montoSena.toLocaleString()}
+                            </div>
+                            <span className="text-[10px] text-slate-400 mt-0.5">
+                              Restan ${(tarifaTotal - montoSena).toLocaleString()} en el club
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setModalidadCobro("total")}
+                            className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                              modalidadEfectiva === "total"
+                                ? "bg-emerald-500/15 border-emerald-500 text-white shadow ring-1 ring-emerald-500/50"
+                                : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span className="text-[11px] font-bold">🎉 Total (100%)</span>
+                              {modalidadEfectiva === "total" && (
+                                <span className="text-emerald-400 text-xs font-black">✓</span>
+                              )}
+                            </div>
+                            <div className="text-sm font-extrabold text-emerald-400 mt-1">
+                              ${tarifaTotal.toLocaleString()}
+                            </div>
+                            <span className="text-[10px] text-emerald-300/80 mt-0.5">
+                              Turno 100% saldado
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )}
+
                   <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-400">Tarifa total del turno:</span>
@@ -2244,15 +2730,21 @@ export default function GrillaHoraria({
                     </div>
                     <div data-testid="sena-breakdown" className="flex justify-between items-center text-xs bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
                       <span className="font-bold text-emerald-300">
-                        {`💳 Seña Requerida Online (${porcentajeSena}%):`}
+                        {modalidadEfectiva === "ninguno"
+                          ? "🕒 Cobro ahora en mostrador:"
+                          : modalidadEfectiva === "total"
+                          ? "🎉 Pago Total (100%):"
+                          : `💳 Seña a Cobrar (${porcentajeSena}%):`}
                       </span>
-                      <span className="font-extrabold text-emerald-400 text-sm">
-                        ${montoSena.toLocaleString()}
+                      <span className={`font-extrabold text-sm ${modalidadEfectiva === "ninguno" ? "text-amber-400" : "text-emerald-400"}`}>
+                        ${montoBaseACobrar.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-xs px-1 text-slate-400">
                       <span>Saldo a pagar en el club:</span>
-                      <span className="font-medium text-slate-300">${saldoPendiente.toLocaleString()}</span>
+                      <span className={`font-medium ${saldoPendiente === 0 ? "text-emerald-400 font-bold" : "text-slate-300"}`}>
+                        ${saldoPendiente.toLocaleString()}
+                      </span>
                     </div>
                   </div>
 
@@ -2277,40 +2769,30 @@ export default function GrillaHoraria({
                     </div>
                   )}
 
-                  {/* DEV Payment Simulator Box */}
-                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-amber-300">
-                      <span>🎮 Simulador de Pasarela (Modo Desarrollo)</span>
-                      <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30 font-bold">
-                        DEV SANDBOX
+                  {/* Discrete Sandbox / Testing Reminder (Option 1) */}
+                  <div
+                    data-testid="dev-mode-reminder"
+                    className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-400 space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                      <span className="flex items-center gap-1.5 text-amber-400 font-bold">
+                        <span>🧪</span> Modo Pruebas Activo
                       </span>
-                    </div>
-                    <p className="text-[11px] text-amber-200/80">
-                      Prueba el flujo de cobro y reserva de turnos con seña sin requerir tarjetas reales.
-                    </p>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          setMetodoPago("simulador_dev");
-                          handleConfirmReservation(e, "simulador_dev");
-                        }}
-                        disabled={isConfirming}
-                        className="flex-1 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow flex items-center justify-center gap-1.5"
-                      >
-                        💳 Simular Pago Aprobado (${montoFinalAPagar.toLocaleString()})
-                      </button>
                       <button
                         type="button"
                         onClick={() => {
                           addToast("error", "Simulador: Pago rechazado por fondos insuficientes o rechazo bancario.");
                           setAuthError("Pago simulado rechazado por la pasarela de pagos.");
                         }}
-                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 border border-slate-700 text-xs font-bold transition"
+                        className="text-[10px] text-slate-500 hover:text-rose-400 transition underline underline-offset-2"
+                        title="Simular un error bancario para verificar el manejo de rechazos"
                       >
-                        ❌ Simular Rechazo
+                        Probar rechazo de pago
                       </button>
                     </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      En desarrollo, al confirmar la reserva el pago online se aprueba automáticamente sin cobro real. En producción se integrará la pasarela definitiva (Mercado Pago / Stripe).
+                    </p>
                   </div>
 
                   <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-amber-300 font-semibold">
@@ -2320,8 +2802,6 @@ export default function GrillaHoraria({
                     </span>
                   </div>
                 </div>
-              );
-            })()}
 
             {/* Error banner */}
             {authError && (
@@ -2369,17 +2849,25 @@ export default function GrillaHoraria({
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-1">
-                      Estado / Método de Cobro
+                      Medio / Canal de Cobro
                     </label>
                     <select
                       value={metodoPago}
-                      onChange={(e) => setMetodoPago(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setMetodoPago(val);
+                        if (val === "pendiente") {
+                          setModalidadCobro("ninguno");
+                        } else if (modalidadCobro === "ninguno") {
+                          setModalidadCobro("total");
+                        }
+                      }}
                       className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     >
                       <option value="mostrador">💵 Cobrado en Mostrador / Efectivo</option>
                       <option value="transferencia">📲 Cobrado por Transferencia Bancaria</option>
-                      <option value="pendiente">🕒 Pendiente de Pago (Paga al jugar)</option>
                       <option value="online">💳 Cobrado con Tarjeta / Online</option>
+                      <option value="pendiente">🕒 Pendiente de Pago (Paga al jugar)</option>
                     </select>
                   </div>
                 </>
@@ -2417,9 +2905,8 @@ export default function GrillaHoraria({
                       onChange={(e) => setMetodoPago(e.target.value)}
                       className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     >
-                      <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
-                      <option value="transferencia">📲 Transferencia Bancaria</option>
                       <option value="online">💳 Mercado Pago / Tarjeta Online</option>
+                      <option value="transferencia">📲 Transferencia Bancaria</option>
                     </select>
                   </div>
                 </>
@@ -2581,9 +3068,8 @@ export default function GrillaHoraria({
                             onChange={(e) => setMetodoPago(e.target.value)}
                             className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                           >
-                            <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
-                            <option value="transferencia">📲 Transferencia Bancaria</option>
                             <option value="online">💳 Mercado Pago / Tarjeta Online</option>
+                            <option value="transferencia">📲 Transferencia Bancaria</option>
                           </select>
                         </div>
                       </>
@@ -2627,9 +3113,8 @@ export default function GrillaHoraria({
                           onChange={(e) => setMetodoPago(e.target.value)}
                           className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                         >
-                          <option value="mostrador">💵 Pagar en el Club / Mostrador</option>
-                          <option value="transferencia">📲 Transferencia Bancaria</option>
                           <option value="online">💳 Mercado Pago / Tarjeta Online</option>
+                          <option value="transferencia">📲 Transferencia Bancaria</option>
                         </select>
                       </div>
                     </>
@@ -2671,20 +3156,25 @@ export default function GrillaHoraria({
                   {isConfirming
                     ? "Procesando..."
                     : isAdmin
-                    ? "📝 Asignar en Mostrador"
+                    ? modalidadCobro === "ninguno"
+                      ? "📝 Asignar en Mostrador (Sin Cobro)"
+                      : modalidadCobro === "sena"
+                      ? `📝 Asignar en Mostrador (Seña: $${montoFinalAPagar.toLocaleString()})`
+                      : `📝 Asignar en Mostrador ($${montoFinalAPagar.toLocaleString()})`
                     : currentUser
-                    ? "✓ Confirmar Turno"
+                    ? `✓ Confirmar Turno ($${montoFinalAPagar.toLocaleString()})`
                     : authMode === "register"
                     ? registrationStep === "otp"
-                      ? "✓ Verificar & Confirmar"
+                      ? `✓ Verificar & Confirmar ($${montoFinalAPagar.toLocaleString()})`
                       : "✨ Continuar (Paso 1/2)"
-                    : "🔑 Ingresar & Confirmar"}
+                    : `🔑 Ingresar & Confirmar ($${montoFinalAPagar.toLocaleString()})`}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      )}
+      );
+    })()}
     </div>
   );
 }
