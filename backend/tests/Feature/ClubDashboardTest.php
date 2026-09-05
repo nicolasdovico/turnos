@@ -522,4 +522,89 @@ class ClubDashboardTest extends TestCase
         $this->assertEquals('cancelado', $turno->estado);
         $this->assertEquals('reembolsado', $turno->estado_pago);
     }
+
+    public function test_verificar_email_cliente_retorna_existencia_y_datos_si_registrado(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_verif@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Verif',
+            'subdominio' => 'club-verif',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $cliente = User::factory()->create([
+            'name' => 'Claudio Magnano',
+            'email' => 'claudio@verif.com',
+            'telefono' => '1155667788',
+            'email_verified_at' => now(),
+        ]);
+
+        app(\App\Services\WalletService::class)->acreditar(
+            $cliente->id,
+            $complejo->id,
+            12000.0,
+            'carga_manual',
+            null,
+            'Saldo inicial'
+        );
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/clubs/club-verif/clientes/verificar-email?email=claudio@verif.com');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('exists', true)
+            ->assertJsonPath('cliente.id', $cliente->id)
+            ->assertJsonPath('cliente.name', 'Claudio Magnano')
+            ->assertJsonPath('cliente.email', 'claudio@verif.com')
+            ->assertJsonPath('cliente.saldo_billetera', 12000)
+            ->assertJsonPath('cliente.is_verified', true);
+    }
+
+    public function test_verificar_email_cliente_retorna_exists_false_si_no_registrado(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_verif2@club.com']);
+        Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Verif 2',
+            'subdominio' => 'club-verif-2',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/clubs/club-verif-2/clientes/verificar-email?email=noexiste@verif.com');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('exists', false)
+            ->assertJsonPath('email', 'noexiste@verif.com');
+    }
+
+    public function test_verificar_email_cliente_requiere_autenticacion_admin(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_verif3@club.com']);
+        $otherUser = User::factory()->create(['email' => 'other@club.com']);
+        Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Verif 3',
+            'subdominio' => 'club-verif-3',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        // Sin autenticación -> 403
+        $resGuest = $this->getJson('/api/clubs/club-verif-3/clientes/verificar-email?email=test@test.com');
+        $resGuest->assertStatus(403);
+
+        // Usuario no admin -> 403
+        $resOther = $this->actingAs($otherUser, 'sanctum')
+            ->getJson('/api/clubs/club-verif-3/clientes/verificar-email?email=test@test.com');
+        $resOther->assertStatus(403);
+    }
 }

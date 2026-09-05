@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Cancha;
+use App\Models\EmailVerification;
 use App\Models\HorarioAtencion;
 use App\Models\Turno;
 use App\Models\User;
@@ -13,6 +14,8 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class TurnoConfirmarController extends Controller
 {
@@ -35,6 +38,7 @@ class TurnoConfirmarController extends Controller
             'cliente_nombre' => ['nullable', 'string', 'max:255'],
             'cliente_telefono' => ['nullable', 'string', 'max:50'],
             'cliente_email' => ['nullable', 'string', 'email', 'max:255'],
+            'codigo_otp' => ['nullable', 'string', 'size:6'],
             'metodo_pago' => ['nullable', 'string', 'max:50'],
             'monto_pagado' => ['nullable', 'numeric', 'min:0'],
             'precio' => ['nullable', 'numeric', 'min:0'],
@@ -90,11 +94,83 @@ class TurnoConfirmarController extends Controller
         }
 
         if ($esAdminClub) {
+            $cleanEmail = !empty($validated['cliente_email']) ? Str::lower(trim($validated['cliente_email'])) : null;
+            $codigoOtp = !empty($validated['codigo_otp']) ? trim($validated['codigo_otp']) : null;
+
             if (!empty($validated['cliente_id'])) {
                 $clienteId = $validated['cliente_id'];
-            } elseif (!empty($validated['cliente_email'])) {
-                $foundUser = User::where('email', strtolower(trim($validated['cliente_email'])))->first();
-                $clienteId = $foundUser?->id;
+            } elseif ($cleanEmail) {
+                $foundUser = User::where('email', $cleanEmail)->first();
+                if ($foundUser) {
+                    if ($codigoOtp && !$foundUser->email_verified_at) {
+                        $verification = EmailVerification::where('email', $cleanEmail)->latest('created_at')->first();
+                        if (!$verification || $verification->isExpired()) {
+                            return response()->json([
+                                'error' => 'OTP_EXPIRED',
+                                'message' => 'El código OTP ha expirado o no existe. Solicita uno nuevo.',
+                            ], 422);
+                        }
+                        if ($verification->intentos >= 5) {
+                            return response()->json([
+                                'error' => 'OTP_MAX_ATTEMPTS',
+                                'message' => 'Has superado el límite de intentos permitidos para este código.',
+                            ], 429);
+                        }
+                        if ($verification->codigo !== $codigoOtp) {
+                            $verification->increment('intentos');
+                            $restantes = max(0, 5 - $verification->intentos);
+                            return response()->json([
+                                'error' => 'INVALID_OTP',
+                                'message' => "Código OTP incorrecto. Te quedan {$restantes} intento(s).",
+                            ], 422);
+                        }
+                        $foundUser->email_verified_at = now();
+                        $foundUser->save();
+                        EmailVerification::where('email', $cleanEmail)->delete();
+                    }
+                    $clienteId = $foundUser->id;
+                    if (empty($validated['cliente_nombre'])) {
+                        $validated['cliente_nombre'] = $foundUser->name;
+                    }
+                    if (empty($validated['cliente_telefono']) && $foundUser->telefono) {
+                        $validated['cliente_telefono'] = $foundUser->telefono;
+                    }
+                } elseif ($codigoOtp) {
+                    // Register client on the fly with OTP
+                    $verification = EmailVerification::where('email', $cleanEmail)->latest('created_at')->first();
+                    if (!$verification || $verification->isExpired()) {
+                        return response()->json([
+                            'error' => 'OTP_EXPIRED',
+                            'message' => 'El código OTP ha expirado o no existe. Solicita uno nuevo.',
+                        ], 422);
+                    }
+                    if ($verification->intentos >= 5) {
+                        return response()->json([
+                            'error' => 'OTP_MAX_ATTEMPTS',
+                            'message' => 'Has superado el límite de intentos permitidos para este código.',
+                        ], 429);
+                    }
+                    if ($verification->codigo !== $codigoOtp) {
+                        $verification->increment('intentos');
+                        $restantes = max(0, 5 - $verification->intentos);
+                        return response()->json([
+                            'error' => 'INVALID_OTP',
+                            'message' => "Código OTP incorrecto. Te quedan {$restantes} intento(s).",
+                        ], 422);
+                    }
+
+                    $newUser = User::create([
+                        'name' => trim($validated['cliente_nombre'] ?? '') ?: 'Cliente Mostrador',
+                        'email' => $cleanEmail,
+                        'telefono' => trim($validated['cliente_telefono'] ?? '') ?: null,
+                        'password' => Hash::make(Str::random(16)),
+                        'email_verified_at' => now(),
+                    ]);
+                    EmailVerification::where('email', $cleanEmail)->delete();
+                    $clienteId = $newUser->id;
+                } else {
+                    $clienteId = null;
+                }
             } else {
                 $clienteId = null;
             }
@@ -173,12 +249,13 @@ class TurnoConfirmarController extends Controller
             $montoPagado = $montoRequerido;
         }
 
-        if ($aplicarWallet && $user) {
-            $saldoDisponible = $this->walletService->obtenerSaldo($user->id, $cancha->complejo_id);
+        $walletUserId = $esAdminClub ? $clienteId : $user?->id;
+        if ($aplicarWallet && $walletUserId) {
+            $saldoDisponible = $this->walletService->obtenerSaldo($walletUserId, $cancha->complejo_id);
             $aDebitar = min($saldoDisponible, $montoRequerido);
             if ($aDebitar > 0) {
                 $this->walletService->debitar(
-                    $user->id,
+                    $walletUserId,
                     $cancha->complejo_id,
                     $aDebitar,
                     'uso_reserva',

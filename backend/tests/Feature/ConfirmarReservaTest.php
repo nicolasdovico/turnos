@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Cancha;
 use App\Models\Complejo;
+use App\Models\EmailVerification;
 use App\Models\HorarioAtencion;
 use App\Models\Plan;
 use App\Models\Turno;
@@ -365,5 +366,84 @@ class ConfirmarReservaTest extends TestCase
 
         $resConEmail->assertStatus(200);
         $this->assertEquals($clienteExistente->id, $resConEmail->json('turno.cliente_id'));
+    }
+
+    public function test_admin_booking_with_unregistered_email_and_valid_otp_creates_verified_user_and_links_cliente_id(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin_otp@admin.com',
+        ]);
+        $this->complejoPlata->update(['user_id' => $admin->id]);
+
+        $newEmail = 'nuevo.jugador@gmail.com';
+        $this->assertNull(User::where('email', $newEmail)->first());
+
+        // Create OTP verification record
+        EmailVerification::create([
+            'email' => $newEmail,
+            'codigo' => '789123',
+            'tipo' => 'email_verification',
+            'expires_at' => now()->addMinutes(10),
+            'intentos' => 0,
+        ]);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->canchaPlata->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '12:00',
+                'cliente_nombre' => 'Nuevo Jugador',
+                'cliente_telefono' => '1198765432',
+                'cliente_email' => $newEmail,
+                'codigo_otp' => '789123',
+                'metodo_pago' => 'mostrador',
+                'precio' => 10000,
+            ]);
+
+        $response->assertStatus(200);
+
+        $createdUser = User::where('email', $newEmail)->first();
+        $this->assertNotNull($createdUser);
+        $this->assertEquals('Nuevo Jugador', $createdUser->name);
+        $this->assertEquals('1198765432', $createdUser->telefono);
+        $this->assertNotNull($createdUser->email_verified_at);
+        $this->assertEquals($createdUser->id, $response->json('turno.cliente_id'));
+        $this->assertEquals(0, EmailVerification::where('email', $newEmail)->count());
+    }
+
+    public function test_admin_booking_with_unregistered_email_and_invalid_otp_fails(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin_otp2@admin.com',
+        ]);
+        $this->complejoPlata->update(['user_id' => $admin->id]);
+
+        $newEmail = 'fallo.otp@gmail.com';
+        EmailVerification::create([
+            'email' => $newEmail,
+            'codigo' => '789123',
+            'tipo' => 'email_verification',
+            'expires_at' => now()->addMinutes(10),
+            'intentos' => 0,
+        ]);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->canchaPlata->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '13:00',
+                'cliente_nombre' => 'Fallo OTP',
+                'cliente_email' => $newEmail,
+                'codigo_otp' => '000000',
+                'metodo_pago' => 'mostrador',
+                'precio' => 10000,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error', 'INVALID_OTP');
+
+        $this->assertNull(User::where('email', $newEmail)->first());
     }
 }

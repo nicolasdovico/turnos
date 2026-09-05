@@ -2076,4 +2076,161 @@ describe("Componente Reactivo GrillaHoraria", () => {
       );
     });
   });
+
+  it("valida existencia de correo en asignacion de mostrador y permite registrar con OTP si no existe", async () => {
+    localStorage.setItem("saas_token", "admin-token-123");
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 1, name: "Admin Club", email: "admin@club.com" })
+    );
+
+    const availableSlots = [
+      { hora_inicio: "18:00", hora_fin: "19:00", disponible: true, precio: 10000 },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url, options) => {
+      const urlStr = typeof url === "string" ? url : "";
+      if (urlStr.includes("/turnos/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              slots_disponibles: availableSlots,
+              turnos_ocupados: [],
+            }),
+        });
+      }
+      if (urlStr.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, ttl: 600, token_reserva: "lock-token-desk-otp" }),
+        });
+      }
+      if (urlStr.includes("/clientes/verificar-email")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, exists: false, message: "El correo no está registrado en el sistema." }),
+        });
+      }
+      if (urlStr.includes("/clientes/enviar-otp")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, message: "Código OTP enviado exitosamente a nuevo@gmail.com" }),
+        });
+      }
+      if (urlStr.includes("/turnos/confirmar")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              turno: {
+                id: 101,
+                cancha_id: 1,
+                fecha: "2026-09-05",
+                hora_inicio: "18:00",
+                hora_fin: "19:00",
+                precio: 10000,
+                monto_pagado: 10000,
+                saldo_pendiente: 0,
+                estado_pago: "pagado_total",
+                metodo_pago: "mostrador",
+                cliente_id: 99,
+                cliente_email: "nuevo@gmail.com",
+                cliente_nombre: "Mariano Werner",
+              },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ slots: availableSlots }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-05"
+        isAdmin={true}
+      />
+    );
+
+    // 1. Click en slot disponible
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 18:00 a 19:00 Disponible")).toBeDefined();
+    });
+    fireEvent.click(screen.getByLabelText("Turno 18:00 a 19:00 Disponible"));
+
+    // 2. Abrir modal
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // 3. Completar nombre y correo nuevo
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Ej. Mariano Werner")).toBeDefined();
+    });
+    fireEvent.change(screen.getByPlaceholderText("Ej. Mariano Werner"), {
+      target: { value: "Mariano Werner" },
+    });
+
+    const emailInput = screen.getByPlaceholderText("cliente@ejemplo.com (para vincular cuenta / billetera virtual)");
+    fireEvent.change(emailInput, { target: { value: "nuevo@gmail.com" } });
+
+    // 4. Click en botón Verificar
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Verificar" })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verificar" }));
+
+    // 5. Debe mostrar advertencia de no registrado y botón de enviar OTP
+    await waitFor(() => {
+      expect(screen.getByText("El correo no está registrado en el sistema")).toBeDefined();
+      expect(screen.getByRole("button", { name: /Registrar y Enviar OTP/i })).toBeDefined();
+    });
+
+    // 6. Click en Registrar y Enviar OTP
+    fireEvent.click(screen.getByRole("button", { name: /Registrar y Enviar OTP/i }));
+
+    // 7. Esperar a que se muestre el input del código OTP de 6 dígitos
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("000000")).toBeDefined();
+    });
+
+    // 8. Ingresar los 6 dígitos de OTP
+    fireEvent.change(screen.getByPlaceholderText("000000"), { target: { value: "654321" } });
+
+    // 9. Confirmar la reserva con OTP
+    const btnConfirmar = screen.getByRole("button", { name: /Verificar OTP & Asignar/i });
+    expect(btnConfirmar).toBeDefined();
+    fireEvent.click(btnConfirmar);
+
+    // 10. Validar que /turnos/confirmar fue invocado con cliente_email y codigo_otp
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/confirmar"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining('"codigo_otp":"654321"'),
+        })
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/confirmar"),
+        expect.objectContaining({
+          body: expect.stringContaining('"cliente_email":"nuevo@gmail.com"'),
+        })
+      );
+    });
+  });
 });

@@ -199,11 +199,27 @@ export default function GrillaHoraria({
   const [metodoPago, setMetodoPago] = useState<string>(isAdmin ? "mostrador" : "online");
   const [modalidadCobro, setModalidadCobro] = useState<"sena" | "total" | "ninguno">(isAdmin ? "total" : "sena");
 
+  // Desk client email validation & OTP states
+  const [deskEmailStatus, setDeskEmailStatus] = useState<"idle" | "checking" | "registered" | "unregistered">("idle");
+  const [deskRegisteredUser, setDeskRegisteredUser] = useState<{ id: number; name: string; email: string; telefono?: string; saldo_billetera?: number } | null>(null);
+  const [deskOtpStep, setDeskOtpStep] = useState<"none" | "prompt" | "otp" | "skipped">("none");
+  const [deskOtpCode, setDeskOtpCode] = useState<string>("");
+  const [deskOtpCountdown, setDeskOtpCountdown] = useState<number>(0);
+  const [isSendingDeskOtp, setIsSendingDeskOtp] = useState<boolean>(false);
+  const [isCheckingDeskEmail, setIsCheckingDeskEmail] = useState<boolean>(false);
+
   const resetDeskForm = () => {
     if (isAdmin) {
       setClienteNombre("");
       setClienteTelefono("");
       setClienteEmail("");
+      setDeskEmailStatus("idle");
+      setDeskRegisteredUser(null);
+      setDeskOtpStep("none");
+      setDeskOtpCode("");
+      setDeskOtpCountdown(0);
+      setWalletBalance(0);
+      setUseWalletCredit(false);
       setMetodoPago("mostrador");
       setModalidadCobro("total");
     }
@@ -416,6 +432,111 @@ export default function GrillaHoraria({
       return () => clearInterval(timer);
     }
   }, [cancelOtpCountdown]);
+
+  // Cooldown countdown for desk OTP resend
+  useEffect(() => {
+    if (deskOtpCountdown > 0) {
+      const timer = setInterval(() => {
+        setDeskOtpCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [deskOtpCountdown]);
+
+  const checkDeskEmail = async (emailToCheck: string) => {
+    const clean = emailToCheck.trim().toLowerCase();
+    if (!clean || !clean.includes("@") || !clean.includes(".")) {
+      setDeskEmailStatus("idle");
+      setDeskRegisteredUser(null);
+      setDeskOtpStep("none");
+      return;
+    }
+
+    setIsCheckingDeskEmail(true);
+    try {
+      const token = getAuthToken(propToken);
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/clientes/verificar-email?email=${encodeURIComponent(clean)}`, {
+        headers,
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.exists && data.cliente) {
+          setDeskEmailStatus("registered");
+          setDeskRegisteredUser(data.cliente);
+          setDeskOtpStep("none");
+          if (!clienteNombre.trim() && data.cliente.name) {
+            setClienteNombre(data.cliente.name);
+          }
+          if (!clienteTelefono.trim() && data.cliente.telefono) {
+            setClienteTelefono(data.cliente.telefono);
+          }
+          if (typeof data.cliente.saldo_billetera === "number") {
+            setWalletBalance(data.cliente.saldo_billetera);
+          }
+        } else {
+          setDeskEmailStatus("unregistered");
+          setDeskRegisteredUser(null);
+          setDeskOtpStep("prompt");
+          setWalletBalance(0);
+          setUseWalletCredit(false);
+        }
+      }
+    } catch (err) {
+      console.error("Error al verificar correo:", err);
+    } finally {
+      setIsCheckingDeskEmail(false);
+    }
+  };
+
+  const handleSendDeskOtp = async () => {
+    const clean = clienteEmail.trim().toLowerCase();
+    if (!clean || !clean.includes("@")) {
+      addToast("error", "Ingresa un correo electrónico válido.");
+      return;
+    }
+    setIsSendingDeskOtp(true);
+    try {
+      const token = getAuthToken(propToken);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/clientes/enviar-otp`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          email: clean,
+          nombre: clienteNombre.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al enviar código OTP.");
+      }
+      addToast("success", data.message || `Código OTP enviado exitosamente a ${clean}.`);
+      setDeskOtpStep("otp");
+      setDeskOtpCountdown(60);
+    } catch (err: any) {
+      addToast("error", err.message || "No se pudo enviar el código OTP.");
+    } finally {
+      setIsSendingDeskOtp(false);
+    }
+  };
 
   const handleResendOtp = async () => {
     if (!authEmail.trim() || otpCountdown > 0) return;
@@ -1587,6 +1708,55 @@ export default function GrillaHoraria({
         }
       }
 
+      // Desk booking email verification & OTP check
+      if (isAdmin && clienteEmail.trim()) {
+        const clean = clienteEmail.trim().toLowerCase();
+        if (deskEmailStatus === "idle") {
+          setIsCheckingDeskEmail(true);
+          try {
+            const token = getAuthToken(propToken);
+            const chkHeaders: Record<string, string> = {
+              Accept: "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            };
+            if (subdomain) chkHeaders["X-Tenant-ID"] = subdomain;
+
+            const chkRes = await fetch(
+              `${apiUrl}/clubs/${subdomain || "club"}/clientes/verificar-email?email=${encodeURIComponent(clean)}`,
+              { headers: chkHeaders }
+            );
+            const chkData = await chkRes.json();
+            if (chkRes.ok && chkData.success) {
+              if (chkData.exists && chkData.cliente) {
+                setDeskEmailStatus("registered");
+                setDeskRegisteredUser(chkData.cliente);
+                if (typeof chkData.cliente.saldo_billetera === "number") {
+                  setWalletBalance(chkData.cliente.saldo_billetera);
+                }
+              } else {
+                setDeskEmailStatus("unregistered");
+                setDeskRegisteredUser(null);
+                setDeskOtpStep("prompt");
+                setIsConfirming(false);
+                return;
+              }
+            }
+          } catch (err) {
+            console.error("Error al verificar correo:", err);
+          } finally {
+            setIsCheckingDeskEmail(false);
+          }
+        } else if (deskEmailStatus === "unregistered" && deskOtpStep === "prompt") {
+          setAuthError("El correo no está registrado. Selecciona si deseas registrarlo con código OTP o continuar sin cuenta.");
+          setIsConfirming(false);
+          return;
+        } else if (deskOtpStep === "otp" && deskOtpCode.trim().length !== 6) {
+          setAuthError("Debes ingresar el código OTP de 6 dígitos enviado al cliente para crear su cuenta o cancelar el registro.");
+          setIsConfirming(false);
+          return;
+        }
+      }
+
       // Execute final booking confirmation
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -1608,6 +1778,7 @@ export default function GrillaHoraria({
           cliente_nombre: targetNombre || undefined,
           cliente_telefono: targetTelefono || undefined,
           cliente_email: isAdmin ? (clienteEmail.trim() || undefined) : (authEmail.trim() || currentUser?.email || undefined),
+          codigo_otp: (isAdmin && deskOtpStep === "otp" && deskOtpCode.trim().length === 6) ? deskOtpCode.trim() : undefined,
           metodo_pago: overrideMetodoPago || (modalidadCobro === "ninguno" ? "pendiente" : metodoPago),
           aplicar_credito_wallet: useWalletCredit,
           modalidad_pago: modalidadCobro,
@@ -3208,14 +3379,159 @@ export default function GrillaHoraria({
                     <label className="block text-xs font-bold text-slate-300 mb-1">
                       Correo Electrónico (opcional)
                     </label>
-                    <input
-                      type="email"
-                      placeholder="cliente@ejemplo.com (para vincular cuenta / billetera virtual)"
-                      value={clienteEmail}
-                      onChange={(e) => setClienteEmail(e.target.value)}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
+                    <div className="relative">
+                      <input
+                        type="email"
+                        placeholder="cliente@ejemplo.com (para vincular cuenta / billetera virtual)"
+                        value={clienteEmail}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setClienteEmail(val);
+                          setDeskEmailStatus("idle");
+                          setDeskRegisteredUser(null);
+                          setDeskOtpStep("none");
+                          setDeskOtpCode("");
+                        }}
+                        onBlur={() => checkDeskEmail(clienteEmail)}
+                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                      {isCheckingDeskEmail ? (
+                        <div className="absolute right-3 top-2.5 text-xs text-slate-400 flex items-center gap-1">
+                          <span className="inline-block animate-spin">⏳</span>
+                          <span className="text-[10px]">Verificando...</span>
+                        </div>
+                      ) : (
+                        clienteEmail.trim().includes("@") && deskEmailStatus === "idle" && (
+                          <button
+                            type="button"
+                            onClick={() => checkDeskEmail(clienteEmail)}
+                            className="absolute right-2 top-1.5 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium transition"
+                          >
+                            Verificar
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
+
+                  {/* Registered client badge */}
+                  {deskEmailStatus === "registered" && deskRegisteredUser && (
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>
+                          Cliente registrado: <strong>{deskRegisteredUser.name}</strong> ({deskRegisteredUser.email})
+                        </span>
+                      </div>
+                      {typeof deskRegisteredUser.saldo_billetera === "number" && deskRegisteredUser.saldo_billetera > 0 && (
+                        <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-bold px-2 py-0.5 rounded-full font-mono">
+                          Billetera: ${deskRegisteredUser.saldo_billetera.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Unregistered client warning & OTP registration prompt */}
+                  {deskEmailStatus === "unregistered" && deskOtpStep === "prompt" && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2.5">
+                      <div className="flex items-start gap-2">
+                        <span className="text-base leading-none">⚠️</span>
+                        <div>
+                          <p className="font-bold text-amber-300">
+                            El correo no está registrado en el sistema
+                          </p>
+                          <p className="text-[11px] text-amber-200/80 mt-0.5">
+                            No se encontró ninguna cuenta asociada a <strong className="font-mono text-white">{clienteEmail.trim()}</strong>. ¿Deseas registrar al cliente ahora con validación por código OTP?
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={isSendingDeskOtp}
+                          onClick={handleSendDeskOtp}
+                          className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 text-xs transition shadow flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isSendingDeskOtp ? (
+                            <>
+                              <span className="animate-spin">⏳</span>
+                              <span>Enviando código...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>✉️</span>
+                              <span>Registrar y Enviar OTP</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeskOtpStep("skipped")}
+                          className="rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 px-3 text-xs transition"
+                        >
+                          Continuar sin cuenta
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Desk OTP code input */}
+                  {deskOtpStep === "otp" && (
+                    <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs space-y-3">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-300">Validando cuenta nueva:</span>
+                        <span className="font-mono font-bold text-emerald-400">{clienteEmail.trim()}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        Ingresa el código OTP de 6 dígitos que enviamos al correo del cliente para crear su cuenta verificada:
+                      </p>
+                      <div>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="000000"
+                          value={deskOtpCode}
+                          onChange={(e) => setDeskOtpCode(e.target.value.replace(/\D/g, ""))}
+                          className="w-full rounded-xl bg-slate-950 border border-emerald-500/50 px-3 py-2.5 text-center tracking-[0.35em] font-mono text-base font-bold text-white focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] text-slate-400">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeskOtpStep("skipped");
+                            setDeskOtpCode("");
+                          }}
+                          className="text-slate-400 hover:text-white underline"
+                        >
+                          Cancelar registro (continuar sin cuenta)
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deskOtpCountdown > 0 || isSendingDeskOtp}
+                          onClick={handleSendDeskOtp}
+                          className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50 font-medium"
+                        >
+                          {deskOtpCountdown > 0 ? `Reenviar en ${deskOtpCountdown}s` : "Reenviar código"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Skipped registration badge */}
+                  {deskOtpStep === "skipped" && (
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 text-[11px] flex items-center justify-between">
+                      <span>ℹ️ Se confirmará como cliente no registrado.</span>
+                      <button
+                        type="button"
+                        onClick={() => setDeskOtpStep("prompt")}
+                        className="text-emerald-400 hover:underline text-[10px]"
+                      >
+                        Registrar con OTP
+                      </button>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-1">
@@ -3531,13 +3847,19 @@ export default function GrillaHoraria({
                 </button>
                 <button
                   type="submit"
-                  disabled={isConfirming || (authMode === "register" && registrationStep === "otp" && otpCode.length !== 6)}
+                  disabled={
+                    isConfirming ||
+                    (authMode === "register" && registrationStep === "otp" && otpCode.length !== 6) ||
+                    (isAdmin && deskOtpStep === "otp" && deskOtpCode.length !== 6)
+                  }
                   className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   {isConfirming
                     ? "Procesando..."
                     : isAdmin
-                    ? modalidadCobro === "ninguno"
+                    ? deskOtpStep === "otp"
+                      ? `✓ Verificar OTP & Asignar ($${montoFinalAPagar.toLocaleString()})`
+                      : modalidadCobro === "ninguno"
                       ? "📝 Asignar en Mostrador (Sin Cobro)"
                       : modalidadCobro === "sena"
                       ? `📝 Asignar en Mostrador (Seña: $${montoFinalAPagar.toLocaleString()})`

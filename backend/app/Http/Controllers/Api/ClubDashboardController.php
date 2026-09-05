@@ -425,6 +425,78 @@ class ClubDashboardController extends Controller
     }
 
     /**
+     * Verificar si un correo electrónico pertenece a un usuario registrado en el sistema y retornar sus datos.
+     */
+    public function verificarEmailCliente(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = auth()->user() ?: ($request->user('sanctum') ?? $request->user());
+        if (!$user && $request->bearerToken()) {
+            $user = \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable;
+        }
+
+        $isAdmin = $user && (
+            ($complejo->user_id && $complejo->user_id === $user->id) ||
+            ($user->role ?? '') === 'admin' ||
+            !empty($user->is_admin) ||
+            ($user->email ?? '') === 'admin@admin.com'
+        );
+
+        if (!$isAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado para consultar clientes en este club.',
+            ], 403);
+        }
+
+        $email = Str::lower(trim($request->query('email', '')));
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El correo electrónico proporcionado no es válido.',
+            ], 422);
+        }
+
+        $cliente = User::where('email', $email)->first();
+
+        if (!$cliente) {
+            return response()->json([
+                'success' => true,
+                'exists' => false,
+                'message' => 'El correo no está registrado en el sistema.',
+                'email' => $email,
+            ]);
+        }
+
+        $saldo = (float) $this->walletService->obtenerSaldo($cliente->id, $complejo->id);
+
+        return response()->json([
+            'success' => true,
+            'exists' => true,
+            'message' => 'Cliente encontrado en el sistema.',
+            'cliente' => [
+                'id' => $cliente->id,
+                'name' => $cliente->name,
+                'email' => $cliente->email,
+                'telefono' => $cliente->telefono,
+                'saldo_billetera' => $saldo,
+                'is_verified' => (bool) $cliente->email_verified_at,
+            ],
+        ]);
+    }
+
+    /**
      * Cancelar o liberar un turno por parte del administrador con soporte de reembolso y alta de cliente con OTP.
      */
     public function destroyTurno(Request $request, string $subdomain, int $turnoId): JsonResponse

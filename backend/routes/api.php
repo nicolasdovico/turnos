@@ -118,6 +118,7 @@ Route::prefix('clubs')->group(function () {
     Route::delete('/{subdomain}/canchas/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyCancha']);
     Route::delete('/{subdomain}/turnos/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyTurno']);
     Route::post('/{subdomain}/turnos/{id}/cancelar', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyTurno']);
+    Route::get('/{subdomain}/clientes/verificar-email', [\App\Http\Controllers\Api\ClubDashboardController::class, 'verificarEmailCliente']);
     Route::post('/{subdomain}/clientes/enviar-otp', [\App\Http\Controllers\Api\ClubDashboardController::class, 'enviarOtpCliente']);
     Route::delete('/{subdomain}/turnos/{id}/liberar-fecha', [\App\Http\Controllers\Api\ClubDashboardController::class, 'liberarFechaPuntual']);
     Route::post('/{subdomain}/turnos/{id}/registrar-pago', [\App\Http\Controllers\Api\ClubDashboardController::class, 'registrarPagoTurno']);
