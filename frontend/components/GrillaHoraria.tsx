@@ -767,20 +767,26 @@ export default function GrillaHoraria({
         throw new Error(data.message || "Error al registrar el pago.");
       }
 
-      // Actualización optimista inmediata en la grilla
+      // Actualización optimista inmediata en la grilla (y en cascada para otros turnos del mismo cliente)
+      const nuevoSaldoRestante = Math.max(0, Number(targetTurno.cliente_saldo_billetera || 0) - montoCobrado);
       setTurnosOcupados((prev) =>
-        prev.map((t) =>
-          t.id === targetTurno.id
-            ? {
-                ...t,
-                estado_pago: data.estado_pago || "pagado",
-                estado: "pagado",
-                monto_pagado: data.monto_pagado !== undefined ? data.monto_pagado : targetTurno.precio,
-                saldo_pendiente: data.saldo_pendiente !== undefined ? data.saldo_pendiente : 0,
-                metodo_pago: pagoMetodo,
-              }
-            : t
-        )
+        prev.map((t) => {
+          if (t.id === targetTurno.id) {
+            return {
+              ...t,
+              estado_pago: data.estado_pago || "pagado",
+              estado: "pagado",
+              monto_pagado: data.monto_pagado !== undefined ? data.monto_pagado : targetTurno.precio,
+              saldo_pendiente: data.saldo_pendiente !== undefined ? data.saldo_pendiente : 0,
+              metodo_pago: pagoMetodo,
+              cliente_saldo_billetera: pagoMetodo === "billetera" ? nuevoSaldoRestante : t.cliente_saldo_billetera,
+            };
+          }
+          if (pagoMetodo === "billetera" && t.cliente_id && t.cliente_id === targetTurno.cliente_id) {
+            return { ...t, cliente_saldo_billetera: nuevoSaldoRestante };
+          }
+          return t;
+        })
       );
 
       addToast("success", `¡Pago registrado exitosamente con ${pagoMetodo.toUpperCase()}!`);
@@ -2280,6 +2286,25 @@ export default function GrillaHoraria({
                                   ? String(turno.precio)
                                   : ""
                               );
+                              if (turno.cliente_id) {
+                                const token = getAuthToken(propToken);
+                                fetch(`${apiUrl}/wallet/saldo?subdomain=${subdomain || "club"}&user_id=${turno.cliente_id}`, {
+                                  headers: {
+                                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                    Accept: "application/json",
+                                  },
+                                })
+                                  .then((r) => r.json())
+                                  .then((res) => {
+                                    if (res.success && typeof res.saldo === "number") {
+                                      setTurnoToPay((curr) => (curr && curr.id === turno.id ? { ...curr, cliente_saldo_billetera: res.saldo } : curr));
+                                      setTurnosOcupados((prev) =>
+                                        prev.map((t) => (t.cliente_id === turno.cliente_id ? { ...t, cliente_saldo_billetera: res.saldo } : t))
+                                      );
+                                    }
+                                  })
+                                  .catch(() => {});
+                              }
                             }}
                             className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 text-[11px] font-bold transition flex items-center gap-1"
                           >
