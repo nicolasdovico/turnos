@@ -47,7 +47,7 @@ class DisponibilidadController extends Controller
             }
         }
 
-        $disponibilidad = $this->disponibilidadService->obtenerDisponibilidadCompleta($id, $validated['fecha'], $duracion, $esAdmin);
+        $disponibilidad = $this->disponibilidadService->obtenerDisponibilidadCompleta($id, $validated['fecha'], $duracion, $esAdmin, $user?->id);
         $slots = $disponibilidad['slots'];
         $turnosOcupados = $disponibilidad['turnos_ocupados'];
         $turnosRetenidos = $disponibilidad['turnos_retenidos'] ?? [];
@@ -64,8 +64,10 @@ class DisponibilidadController extends Controller
             'anti_baches_activo' => (bool) ($cancha->anti_baches_activo ?? true),
             'duraciones_permitidas' => $cancha->duraciones_permitidas ?: [60, 90, 120],
             'precio_base' => (float) $cancha->precio_base,
-            'precio_90_min' => $cancha->precio_90_min !== null ? (float) $cancha->precio_90_min : round((float) $cancha->precio_base * 1.5, 2),
-            'precio_120_min' => $cancha->precio_120_min !== null ? (float) $cancha->precio_120_min : round((float) $cancha->precio_base * 2.0, 2),
+            'precio_90_min' => $cancha->getPrecioParaDuracion(90),
+            'precio_120_min' => $cancha->getPrecioParaDuracion(120),
+            'tipo_cobro_reserva' => $cancha->complejo?->tipo_cobro_reserva ?? 'sena',
+            'porcentaje_sena' => (float) ($cancha->complejo?->porcentaje_sena ?? 50.00),
             'slots_disponibles' => $slots,
             'turnos_ocupados' => $turnosOcupados,
             'turnos_retenidos' => $turnosRetenidos,
@@ -79,6 +81,8 @@ class DisponibilidadController extends Controller
                 'duracion_minutos' => $duracion ?: ($cancha->duracion_minutos ?: 60),
                 'permite_duracion_flexible' => (bool) $cancha->permite_duracion_flexible,
                 'optimizacion_anti_baches' => $antiBaches,
+                'tipo_cobro_reserva' => $cancha->complejo?->tipo_cobro_reserva ?? 'sena',
+                'porcentaje_sena' => (float) ($cancha->complejo?->porcentaje_sena ?? 50.00),
                 'is_admin' => $esAdmin,
             ],
         ]);

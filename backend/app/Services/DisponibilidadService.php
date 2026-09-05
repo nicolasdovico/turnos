@@ -37,7 +37,7 @@ class DisponibilidadService
     /**
      * Calculate full availability along with anti-bache audit details and occupied turnos for club administrators.
      */
-    public function obtenerDisponibilidadCompleta(int $canchaId, string $fecha, ?int $duracionSolicitada = null, bool $esAdmin = false): array
+    public function obtenerDisponibilidadCompleta(int $canchaId, string $fecha, ?int $duracionSolicitada = null, bool $esAdmin = false, ?int $currentUserId = null): array
     {
         $cancha = Cancha::find($canchaId);
         if (!$cancha || $cancha->estado !== 'activo') {
@@ -104,19 +104,7 @@ class DisponibilidadService
         }
 
         // Calculate price for this duration
-        if ($duracionMinutos === 90) {
-            $precio = $cancha->precio_90_min !== null
-                ? (float) $cancha->precio_90_min
-                : round((float) $cancha->precio_base * 1.5, 2);
-        } elseif ($duracionMinutos === 120) {
-            $precio = $cancha->precio_120_min !== null
-                ? (float) $cancha->precio_120_min
-                : round((float) $cancha->precio_base * 2.0, 2);
-        } elseif ($duracionMinutos === 30) {
-            $precio = round((float) $cancha->precio_base * 0.5, 2);
-        } else {
-            $precio = (float) $cancha->precio_base;
-        }
+        $precio = $cancha->getPrecioParaDuracion($duracionMinutos);
 
         $horaApertura = Carbon::parse($fecha . ' ' . $horario->hora_apertura, $timezone);
         $horaCierre = Carbon::parse($fecha . ' ' . $horario->hora_cierre, $timezone);
@@ -271,8 +259,23 @@ class DisponibilidadService
             $currentSlotStart->addMinutes($stepMinutos);
         }
 
-        // Add all active locks from Redis to turnosRetenidos
+        // Add all active locks from Redis to turnosRetenidos ONLY if they are not already occupied in DB
         foreach ($activeLocks as $lock) {
+            $lInicioTs = Carbon::parse($fecha . ' ' . $lock['hora_inicio'], $timezone)->timestamp;
+            $lFinTs = Carbon::parse($fecha . ' ' . $lock['hora_fin'], $timezone)->timestamp;
+
+            $estaOcupadoEnDbParaLock = $turnosOcupados->contains(function ($t) use ($fecha, $lInicioTs, $lFinTs, $timezone) {
+                $tInicio = Carbon::parse($fecha . ' ' . $t->hora_inicio, $timezone)->timestamp;
+                $tFin = Carbon::parse($fecha . ' ' . $t->hora_fin, $timezone)->timestamp;
+                return $tInicio < $lFinTs && $tFin > $lInicioTs;
+            });
+
+            if ($estaOcupadoEnDbParaLock) {
+                // Stale lock in Redis for an already confirmed turno in DB; purge it immediately
+                $this->reservaLockService->liberarBloqueo($canchaId, $fechaCarbon->format('Y-m-d'), $lock['hora_inicio']);
+                continue;
+            }
+
             $alreadyInRetenidos = collect($turnosRetenidos)->contains(fn ($r) => $r['hora_inicio'] === $lock['hora_inicio']);
             if (!$alreadyInRetenidos) {
                 $turnosRetenidos[] = [
@@ -292,8 +295,8 @@ class DisponibilidadService
             }
         }
 
-        // Formatted occupied turnos list (with client details for admin view)
-        $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($esAdmin) {
+        // Formatted occupied turnos list (with client details for admin view and current user view)
+        $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($esAdmin, $currentUserId) {
             $precio = (float) $t->precio;
             $montoPagado = (float) ($t->monto_pagado ?? 0);
             $saldoPendiente = $t->saldo_pendiente !== null ? (float) $t->saldo_pendiente : max(0.0, $precio - $montoPagado);
@@ -324,11 +327,15 @@ class DisponibilidadService
                 'es_fijo' => (bool) $t->es_fijo,
             ];
 
-            if ($esAdmin) {
+            $isMine = $currentUserId && (int) $t->cliente_id === (int) $currentUserId;
+            if ($esAdmin || $isMine) {
                 $data['cliente_id'] = $t->cliente_id;
                 $data['cliente_nombre'] = $t->cliente_nombre ?: ($t->cliente?->name ?: 'Cliente Mostrador');
                 $data['cliente_email'] = $t->cliente?->email;
                 $data['cliente_telefono'] = $t->cliente_telefono ?: ($t->cliente?->telefono ?: null);
+                if ($isMine) {
+                    $data['is_mine'] = true;
+                }
             }
 
             return $data;
