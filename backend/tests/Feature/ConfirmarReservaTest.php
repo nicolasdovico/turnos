@@ -321,4 +321,49 @@ class ConfirmarReservaTest extends TestCase
             'metodo_pago' => 'transferencia',
         ]);
     }
+
+    public function test_admin_booking_with_email_links_client_id_and_without_email_leaves_cliente_id_null(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin@admin.com',
+        ]);
+
+        $clienteExistente = User::factory()->create([
+            'email' => 'jugador.existente@gmail.com',
+            'name' => 'Jugador Existente',
+        ]);
+
+        $fecha = '2026-08-31';
+
+        // 1. Admin crea reserva sin email -> cliente_id debe ser null (NO el admin)
+        $resSinEmail = $this->actingAs($admin, 'sanctum')
+            ->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->canchaPlata->id,
+                'fecha' => $fecha,
+                'hora_inicio' => '10:00',
+                'cliente_nombre' => 'Cliente Anonimo Mostrador',
+                'metodo_pago' => 'mostrador',
+                'precio' => 10000,
+            ]);
+
+        $resSinEmail->assertStatus(200);
+        $this->assertNull($resSinEmail->json('turno.cliente_id'));
+
+        // 2. Admin crea reserva con email de usuario existente -> cliente_id debe ser el usuario existente
+        $resConEmail = $this->actingAs($admin, 'sanctum')
+            ->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->canchaPlata->id,
+                'fecha' => $fecha,
+                'hora_inicio' => '11:00',
+                'cliente_nombre' => 'Jugador Existente',
+                'cliente_email' => 'jugador.existente@gmail.com',
+                'metodo_pago' => 'mostrador',
+                'precio' => 10000,
+            ]);
+
+        $resConEmail->assertStatus(200);
+        $this->assertEquals($clienteExistente->id, $resConEmail->json('turno.cliente_id'));
+    }
 }

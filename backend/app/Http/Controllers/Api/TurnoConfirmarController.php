@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Cancha;
 use App\Models\HorarioAtencion;
 use App\Models\Turno;
+use App\Models\User;
 use App\Services\ReservaLockService;
 use App\Services\WalletService;
 use Carbon\Carbon;
@@ -33,6 +34,7 @@ class TurnoConfirmarController extends Controller
             'cliente_id' => ['nullable', 'integer', 'exists:users,id'],
             'cliente_nombre' => ['nullable', 'string', 'max:255'],
             'cliente_telefono' => ['nullable', 'string', 'max:50'],
+            'cliente_email' => ['nullable', 'string', 'email', 'max:255'],
             'metodo_pago' => ['nullable', 'string', 'max:50'],
             'monto_pagado' => ['nullable', 'numeric', 'min:0'],
             'precio' => ['nullable', 'numeric', 'min:0'],
@@ -77,9 +79,6 @@ class TurnoConfirmarController extends Controller
         }
 
         $user = auth()->user() ?: ($request->bearerToken() ? \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable : null);
-        $clienteId = $validated['cliente_id'] ?? $user?->id;
-        $clienteNombre = !empty($validated['cliente_nombre']) ? trim($validated['cliente_nombre']) : ($user?->name ?? 'Cliente Mostrador');
-        $clienteTelefono = !empty($validated['cliente_telefono']) ? trim($validated['cliente_telefono']) : ($user?->telefono ?? null);
         $complejo = $cancha->complejo;
         $tipoCobro = $complejo?->tipo_cobro_reserva ?? 'sena';
         $porcentajeSena = (float) ($complejo?->porcentaje_sena ?? 50.0);
@@ -88,6 +87,23 @@ class TurnoConfirmarController extends Controller
         $esAdminClub = false;
         if ($user) {
             $esAdminClub = (($user->role ?? '') === 'admin') || (!empty($user->is_admin)) || ($complejo && $complejo->user_id === $user->id) || ($user->email ?? '') === 'admin@admin.com';
+        }
+
+        if ($esAdminClub) {
+            if (!empty($validated['cliente_id'])) {
+                $clienteId = $validated['cliente_id'];
+            } elseif (!empty($validated['cliente_email'])) {
+                $foundUser = User::where('email', strtolower(trim($validated['cliente_email'])))->first();
+                $clienteId = $foundUser?->id;
+            } else {
+                $clienteId = null;
+            }
+            $clienteNombre = !empty($validated['cliente_nombre']) ? trim($validated['cliente_nombre']) : 'Cliente Mostrador';
+            $clienteTelefono = !empty($validated['cliente_telefono']) ? trim($validated['cliente_telefono']) : null;
+        } else {
+            $clienteId = $validated['cliente_id'] ?? $user?->id;
+            $clienteNombre = !empty($validated['cliente_nombre']) ? trim($validated['cliente_nombre']) : ($user?->name ?? 'Cliente Mostrador');
+            $clienteTelefono = !empty($validated['cliente_telefono']) ? trim($validated['cliente_telefono']) : ($user?->telefono ?? null);
         }
 
         if (!$esAdminClub && isset($validated['metodo_pago']) && $validated['metodo_pago'] === 'mostrador') {

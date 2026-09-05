@@ -2,13 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Mail\EmailVerificationOtpMail;
+use App\Models\Cancha;
 use App\Models\Complejo;
+use App\Models\EmailVerification;
 use App\Models\Modulo;
 use App\Models\Plan;
+use App\Models\Turno;
 use App\Models\User;
+use App\Models\UserCredito;
 use Database\Seeders\ModuloSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class ClubDashboardTest extends TestCase
@@ -314,5 +320,206 @@ class ClubDashboardTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonPath('success', false);
+    }
+
+    public function test_enviar_otp_cliente_desde_mostrador_dispatches_mail(): void
+    {
+        Mail::fake();
+
+        $owner = User::factory()->create(['email' => 'owner_otp@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Mostrador OTP',
+            'subdominio' => 'club-mostrador-otp',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/clubs/club-mostrador-otp/clientes/enviar-otp', [
+                'email' => 'claudio.nuevo@gmail.com',
+                'nombre' => 'Claudio Nuevo',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        Mail::assertSent(EmailVerificationOtpMail::class, function ($mail) {
+            return $mail->hasTo('claudio.nuevo@gmail.com');
+        });
+
+        $this->assertDatabaseHas('email_verifications', [
+            'email' => 'claudio.nuevo@gmail.com',
+        ]);
+    }
+
+    public function test_destroy_turno_con_reembolso_en_billetera_exige_otp_para_cliente_nuevo(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_dest1@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Cancelacion 1',
+            'subdominio' => 'club-cancel-1',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha 1',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 20000,
+        ]);
+
+        $turno = Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'fecha' => '2026-09-10',
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:00',
+            'cliente_nombre' => 'Claudio Anonimo',
+            'cliente_telefono' => '12345678',
+            'monto_pagado' => 20000,
+            'precio' => 20000,
+            'estado' => 'reservado',
+            'estado_pago' => 'pagado',
+        ]);
+
+        // Sin enviar código OTP -> debe retornar 422 con OTP_REQUIRED
+        $response = $this->actingAs($owner, 'sanctum')
+            ->deleteJson("/api/clubs/club-cancel-1/turnos/{$turno->id}", [
+                'accion_reembolso' => 'billetera',
+                'cliente_email' => 'claudio.nuevo2@gmail.com',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error', 'OTP_REQUIRED');
+    }
+
+    public function test_destroy_turno_con_reembolso_en_billetera_valida_otp_crea_usuario_y_acredita_billetera(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_dest2@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Cancelacion 2',
+            'subdominio' => 'club-cancel-2',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha 2',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 20000,
+        ]);
+
+        $turno = Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'fecha' => '2026-09-10',
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:00',
+            'cliente_nombre' => 'Claudio Test',
+            'cliente_telefono' => '1122334455',
+            'monto_pagado' => 20000,
+            'precio' => 20000,
+            'estado' => 'reservado',
+            'estado_pago' => 'pagado',
+        ]);
+
+        // Crear registro OTP
+        EmailVerification::create([
+            'email' => 'claudio.exitoso@gmail.com',
+            'codigo' => '654321',
+            'tipo' => 'email_verification',
+            'expires_at' => now()->addMinutes(10),
+            'intentos' => 0,
+        ]);
+
+        // Ejecutar cancelación con reembolso y OTP
+        $response = $this->actingAs($owner, 'sanctum')
+            ->postJson("/api/clubs/club-cancel-2/turnos/{$turno->id}/cancelar", [
+                'accion_reembolso' => 'billetera',
+                'cliente_email' => 'claudio.exitoso@gmail.com',
+                'cliente_nombre' => 'Claudio Test',
+                'cliente_telefono' => '1122334455',
+                'otp_codigo' => '654321',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('reembolso.monto', 20000)
+            ->assertJsonPath('reembolso.nuevo_saldo_billetera', 20000);
+
+        // Verificar que el usuario fue creado y marcado verificado
+        $user = User::where('email', 'claudio.exitoso@gmail.com')->first();
+        $this->assertNotNull($user);
+        $this->assertNotNull($user->email_verified_at);
+
+        // Verificar saldo de billetera virtual en user_creditos
+        $credito = UserCredito::where('user_id', $user->id)
+            ->where('complejo_id', $complejo->id)
+            ->first();
+        $this->assertNotNull($credito);
+        $this->assertEquals(20000, (float) $credito->saldo);
+
+        // Verificar que el turno fue actualizado
+        $turno->refresh();
+        $this->assertEquals('cancelado', $turno->estado);
+        $this->assertEquals('reembolsado', $turno->estado_pago);
+        $this->assertEquals($user->id, $turno->cliente_id);
+    }
+
+    public function test_destroy_turno_con_devolucion_efectivo_no_toca_billetera(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_dest3@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Cancelacion 3',
+            'subdominio' => 'club-cancel-3',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha 3',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 15000,
+        ]);
+
+        $turno = Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'fecha' => '2026-09-10',
+            'hora_inicio' => '19:00',
+            'hora_fin' => '20:00',
+            'cliente_nombre' => 'Pedro Mano',
+            'monto_pagado' => 15000,
+            'precio' => 15000,
+            'estado' => 'reservado',
+            'estado_pago' => 'pagado',
+        ]);
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->deleteJson("/api/clubs/club-cancel-3/turnos/{$turno->id}", [
+                'accion_reembolso' => 'efectivo',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('reembolso.metodo', 'efectivo');
+
+        $turno->refresh();
+        $this->assertEquals('cancelado', $turno->estado);
+        $this->assertEquals('reembolsado', $turno->estado_pago);
     }
 }

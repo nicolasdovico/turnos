@@ -25,6 +25,7 @@ class User extends Authenticatable implements FilamentUser
         'telefono',
         'password',
         'fcm_token',
+        'email_verified_at',
     ];
 
     /**

@@ -1850,4 +1850,124 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(screen.queryByText(/Tus Reservas Confirmadas/i)).toBeNull();
     });
   });
+
+  it("permite al administrador liberar un turno con dinero abonado enviando OTP para registrar al cliente y acreditar en billetera", async () => {
+    const mockTurnoConPago = {
+      id: 55,
+      cancha_id: 1,
+      fecha: "2026-09-05",
+      hora_inicio: "18:00",
+      hora_fin: "19:30",
+      cliente_nombre: "Claudio Magnano",
+      cliente_telefono: "12345678",
+      precio: 20000,
+      monto_pagado: 20000,
+      saldo_pendiente: 0,
+      estado_pago: "pagado",
+      estado: "reservado",
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string, opts: any) => {
+      if (url.includes("/clientes/enviar-otp")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, message: "Código OTP enviado exitosamente a claudio@gmail.com." }),
+        });
+      }
+      if (url.includes("/turnos/55/cancelar")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "Turno liberado. Se acreditaron $20.000 en la Billetera Virtual.",
+              reembolso: { monto: 20000, nuevo_saldo_billetera: 20000 },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            slots_disponibles: [],
+            turnos_ocupados: [mockTurnoConPago],
+          }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-05"
+        duracionInicial={90}
+        isAdmin={true}
+      />
+    );
+
+    // Esperar a que renderice la tarjeta del turno ocupado
+    await waitFor(() => {
+      expect(screen.getByText("Claudio Magnano")).toBeDefined();
+      expect(screen.getByText("$20,000")).toBeDefined();
+    });
+
+    // Abrir modal de liberación
+    const btnLiberar = screen.getByRole("button", { name: /Liberar Turno/i });
+    fireEvent.click(btnLiberar);
+
+    // Debe mostrar la sección de gestión de reembolso
+    expect(screen.getByText(/Gestión del Reembolso \(\$20,000\)/i)).toBeDefined();
+    expect(screen.getByText(/Billetera Virtual/i)).toBeDefined();
+    expect(screen.getByText(/Devolver en Caja/i)).toBeDefined();
+
+    // Completar el email del cliente
+    const inputEmail = screen.getByPlaceholderText("ejemplo@gmail.com");
+    fireEvent.change(inputEmail, { target: { value: "claudio@gmail.com" } });
+
+    // Enviar código OTP
+    const btnEnviarOtp = screen.getByRole("button", { name: /Enviar Código OTP al Cliente/i });
+    fireEvent.click(btnEnviarOtp);
+
+    // Esperar cambio al paso OTP
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/clientes/enviar-otp"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("claudio@gmail.com"),
+        })
+      );
+      expect(screen.getByPlaceholderText("123456")).toBeDefined();
+    });
+
+    // Ingresar código OTP de 6 dígitos
+    const inputOtp = screen.getByPlaceholderText("123456");
+    fireEvent.change(inputOtp, { target: { value: "654321" } });
+
+    // Confirmar verificación y acreditación
+    const btnConfirmar = screen.getByRole("button", { name: /Verificar OTP y Acreditar/i });
+    fireEvent.click(btnConfirmar);
+
+    // Validar llamada a endpoint de cancelación con datos de reembolso y OTP
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/55/cancelar"),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            accion_reembolso: "billetera",
+            cliente_email: "claudio@gmail.com",
+            cliente_nombre: "Claudio Magnano",
+            cliente_telefono: "12345678",
+            otp_codigo: "654321",
+          }),
+        })
+      );
+    });
+  });
 });

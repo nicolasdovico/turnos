@@ -156,6 +156,13 @@ export default function GrillaHoraria({
   const [turnosRetenidos, setTurnosRetenidos] = useState<RetainedLock[]>([]);
   const [turnoToCancel, setTurnoToCancel] = useState<TurnoOcupado | null>(null);
   const [isCancelingTurno, setIsCancelingTurno] = useState<boolean>(false);
+  const [cancelRefundOption, setCancelRefundOption] = useState<"billetera" | "efectivo">("billetera");
+  const [cancelClientEmail, setCancelClientEmail] = useState<string>("");
+  const [cancelOtpStep, setCancelOtpStep] = useState<"input" | "otp">("input");
+  const [cancelOtpCode, setCancelOtpCode] = useState<string>("");
+  const [cancelOtpCountdown, setCancelOtpCountdown] = useState<number>(0);
+  const [isSendingCancelOtp, setIsSendingCancelOtp] = useState<boolean>(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [turnoToPay, setTurnoToPay] = useState<TurnoOcupado | null>(null);
   const [pagoMetodo, setPagoMetodo] = useState<"mostrador" | "transferencia" | "billetera" | "online">("mostrador");
   const [pagoMonto, setPagoMonto] = useState<string>("");
@@ -188,6 +195,7 @@ export default function GrillaHoraria({
   const otpTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>("");
   const [clienteTelefono, setClienteTelefono] = useState<string>("");
+  const [clienteEmail, setClienteEmail] = useState<string>("");
   const [metodoPago, setMetodoPago] = useState<string>(isAdmin ? "mostrador" : "online");
   const [modalidadCobro, setModalidadCobro] = useState<"sena" | "total" | "ninguno">(isAdmin ? "total" : "sena");
   const [clubPorcentajeSena, setClubPorcentajeSena] = useState<number>(propPorcentajeSena ?? 50);
@@ -382,6 +390,22 @@ export default function GrillaHoraria({
       if (otpTimerRef.current) clearInterval(otpTimerRef.current);
     };
   }, [otpCountdown]);
+
+  // Cooldown countdown for cancel modal OTP resend
+  useEffect(() => {
+    if (cancelOtpCountdown > 0) {
+      const timer = setInterval(() => {
+        setCancelOtpCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [cancelOtpCountdown]);
 
   const handleResendOtp = async () => {
     if (!authEmail.trim() || otpCountdown > 0) return;
@@ -628,11 +652,24 @@ export default function GrillaHoraria({
     }
   };
 
-  const handleCancelTurno = async () => {
-    if (!turnoToCancel) return;
-    const targetTurno = turnoToCancel;
+  const openCancelModal = (turno: TurnoOcupado) => {
+    setTurnoToCancel(turno);
+    setCancelRefundOption("billetera");
+    setCancelClientEmail(turno.cliente_email || "");
+    setCancelOtpStep("input");
+    setCancelOtpCode("");
+    setCancelOtpCountdown(0);
+    setCancelError(null);
+  };
+
+  const handleSendCancelOtp = async () => {
+    if (!cancelClientEmail || !cancelClientEmail.includes("@")) {
+      setCancelError("Por favor ingresa un correo electrónico válido.");
+      return;
+    }
+    setIsSendingCancelOtp(true);
+    setCancelError(null);
     try {
-      setIsCancelingTurno(true);
       const token = getAuthToken(propToken);
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -641,20 +678,94 @@ export default function GrillaHoraria({
       };
       if (subdomain) headers["X-Tenant-ID"] = subdomain;
 
-      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/turnos/${targetTurno.id}`, {
-        method: "DELETE",
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/clientes/enviar-otp`, {
+        method: "POST",
         headers,
+        body: JSON.stringify({
+          email: cancelClientEmail.trim(),
+          nombre: turnoToCancel?.cliente_nombre || "Cliente Mostrador",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al enviar el código OTP.");
+      }
+
+      if (data.already_verified) {
+        addToast("info", "El cliente ya cuenta con usuario verificado en el sistema. Puedes confirmar el reembolso directamente.");
+      } else {
+        setCancelOtpStep("otp");
+        setCancelOtpCountdown(60);
+        addToast("success", `¡Código OTP enviado a ${cancelClientEmail.trim()}! Pídeselo al cliente.`);
+      }
+    } catch (err: any) {
+      setCancelError(err.message || "Error al solicitar código OTP.");
+      addToast("error", err.message || "Error al solicitar código OTP.");
+    } finally {
+      setIsSendingCancelOtp(false);
+    }
+  };
+
+  const handleCancelTurno = async () => {
+    if (!turnoToCancel) return;
+    const targetTurno = turnoToCancel;
+    const montoPagado = Number(targetTurno.monto_pagado || 0);
+
+    if (montoPagado > 0 && cancelRefundOption === "billetera") {
+      const emailAUsar = cancelClientEmail.trim() || targetTurno.cliente_email?.trim() || "";
+      if (!emailAUsar) {
+        setCancelError("Ingresa el correo electrónico del cliente para acreditar el saldo en su billetera virtual.");
+        return;
+      }
+      if (!targetTurno.cliente_email && cancelOtpStep === "input") {
+        setCancelError("Para dar de alta al nuevo cliente debes enviar y verificar el código OTP.");
+        return;
+      }
+      if (cancelOtpStep === "otp" && (!cancelOtpCode || cancelOtpCode.trim().length !== 6)) {
+        setCancelError("Ingresa el código numérico de 6 dígitos.");
+        return;
+      }
+    }
+
+    try {
+      setIsCancelingTurno(true);
+      setCancelError(null);
+      const token = getAuthToken(propToken);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const bodyPayload = {
+        accion_reembolso: montoPagado > 0 ? cancelRefundOption : "ninguno",
+        cliente_email: cancelClientEmail.trim() || targetTurno.cliente_email || undefined,
+        cliente_nombre: targetTurno.cliente_nombre || undefined,
+        cliente_telefono: targetTurno.cliente_telefono || undefined,
+        otp_codigo: cancelOtpStep === "otp" ? cancelOtpCode.trim() : undefined,
+      };
+
+      const endpoint = montoPagado > 0
+        ? `${apiUrl}/clubs/${subdomain || "club"}/turnos/${targetTurno.id}/cancelar`
+        : `${apiUrl}/clubs/${subdomain || "club"}/turnos/${targetTurno.id}`;
+
+      const res = await fetch(endpoint, {
+        method: montoPagado > 0 ? "POST" : "DELETE",
+        headers,
+        ...(montoPagado > 0 ? { body: JSON.stringify(bodyPayload) } : {}),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || "Error al cancelar el turno.");
+        throw new Error(data.message || data.error || "Error al cancelar el turno.");
       }
 
-      addToast("success", `Turno de las ${targetTurno.hora_inicio} hs liberado correctamente.`);
+      addToast("success", data.message || `Turno de las ${targetTurno.hora_inicio} hs liberado correctamente.`);
       setTurnoToCancel(null);
       fetchDisponibilidad(fecha);
     } catch (err: any) {
+      setCancelError(err.message || "Error al liberar el turno.");
       addToast("error", err.message || "Error al liberar el turno.");
     } finally {
       setIsCancelingTurno(false);
@@ -1295,6 +1406,7 @@ export default function GrillaHoraria({
     }
     setMetodoPago(isAdmin ? "mostrador" : "online");
     setModalidadCobro(isAdmin ? "total" : "sena");
+    setClienteEmail("");
     setIsConfirmModalOpen(true);
   };
 
@@ -1481,6 +1593,7 @@ export default function GrillaHoraria({
           token_reserva: activeLock.tokenReserva,
           cliente_nombre: targetNombre || undefined,
           cliente_telefono: targetTelefono || undefined,
+          cliente_email: isAdmin ? (clienteEmail.trim() || undefined) : (authEmail.trim() || currentUser?.email || undefined),
           metodo_pago: overrideMetodoPago || (modalidadCobro === "ninguno" ? "pendiente" : metodoPago),
           aplicar_credito_wallet: useWalletCredit,
           modalidad_pago: modalidadCobro,
@@ -2313,7 +2426,7 @@ export default function GrillaHoraria({
                         )}
                         <button
                           type="button"
-                          onClick={() => setTurnoToCancel(turno)}
+                          onClick={() => openCancelModal(turno)}
                           className="px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 text-[11px] font-bold transition flex items-center gap-1"
                         >
                           <span>✕</span> Liberar Turno
@@ -2361,6 +2474,18 @@ export default function GrillaHoraria({
                 <span className="text-slate-400">Titular:</span>
                 <span className="font-bold text-slate-200">{turnoToCancel.cliente_nombre || "Cliente Mostrador"}</span>
               </div>
+              {turnoToCancel.cliente_email && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Email:</span>
+                  <span className="font-mono text-slate-300">{turnoToCancel.cliente_email}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-slate-400">Monto Abonado:</span>
+                <span className={`font-bold ${Number(turnoToCancel.monto_pagado || 0) > 0 ? "text-emerald-400" : "text-slate-400"}`}>
+                  ${Number(turnoToCancel.monto_pagado || 0).toLocaleString()}
+                </span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Tipo de Reserva:</span>
                 <span className={`font-bold ${turnoToCancel.es_fijo ? "text-amber-400" : "text-slate-300"}`}>
@@ -2368,6 +2493,154 @@ export default function GrillaHoraria({
                 </span>
               </div>
             </div>
+
+            {/* Gestión de Reembolso si el turno tiene dinero abonado */}
+            {Number(turnoToCancel.monto_pagado || 0) > 0 && !turnoToCancel.es_fijo && (
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs">
+                <div className="font-bold text-slate-200 flex items-center gap-1.5">
+                  <span>💰</span>
+                  <span>Gestión del Reembolso (${Number(turnoToCancel.monto_pagado || 0).toLocaleString()})</span>
+                </div>
+
+                {/* Selector Billetera vs Devolución en Efectivo */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCancelRefundOption("billetera")}
+                    className={`p-2.5 rounded-xl border text-left transition ${
+                      cancelRefundOption === "billetera"
+                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-300 font-bold"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>💼</span>
+                      <span>Billetera Virtual</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-normal mt-0.5">
+                      Crédito a favor en el club
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCancelRefundOption("efectivo")}
+                    className={`p-2.5 rounded-xl border text-left transition ${
+                      cancelRefundOption === "efectivo"
+                        ? "bg-amber-500/10 border-amber-500 text-amber-300 font-bold"
+                        : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>💵</span>
+                      <span>Devolver en Caja</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-normal mt-0.5">
+                      Devolución física en efectivo
+                    </p>
+                  </button>
+                </div>
+
+                {/* Detalle Billetera Virtual */}
+                {cancelRefundOption === "billetera" && (
+                  <div className="space-y-2.5 pt-1">
+                    {turnoToCancel.cliente_email ? (
+                      <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] flex items-center gap-2">
+                        <span>ℹ️</span>
+                        <span>
+                          El saldo se acreditará automáticamente en la cuenta de <strong>{turnoToCancel.cliente_email}</strong>.
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] leading-relaxed">
+                          ⚠️ Cliente sin cuenta registrada. Para conservar el crédito, ingresa su correo y valida el código OTP de 6 dígitos que recibirá.
+                        </div>
+
+                        {cancelOtpStep === "input" ? (
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                                Correo Electrónico del Cliente *
+                              </label>
+                              <input
+                                type="email"
+                                placeholder="ejemplo@gmail.com"
+                                value={cancelClientEmail}
+                                onChange={(e) => setCancelClientEmail(e.target.value)}
+                                className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isSendingCancelOtp || !cancelClientEmail.includes("@")}
+                              onClick={handleSendCancelOtp}
+                              className="w-full rounded-xl bg-blue-600 hover:bg-blue-500 py-2 text-xs font-bold text-white shadow transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            >
+                              {isSendingCancelOtp ? "Enviando código..." : "✉️ Enviar Código OTP al Cliente"}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-400">Código enviado a:</span>
+                              <span className="font-mono font-bold text-emerald-400">{cancelClientEmail}</span>
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                                Código de 6 dígitos (OTP)
+                              </label>
+                              <input
+                                type="text"
+                                maxLength={6}
+                                placeholder="123456"
+                                value={cancelOtpCode}
+                                onChange={(e) => setCancelOtpCode(e.target.value.replace(/\D/g, ""))}
+                                className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-center tracking-[0.3em] font-mono text-sm text-white focus:border-emerald-500 focus:outline-none"
+                              />
+                            </div>
+                            <div className="flex justify-between items-center text-[11px] text-slate-400">
+                              <button
+                                type="button"
+                                onClick={() => setCancelOtpStep("input")}
+                                className="text-slate-400 hover:text-white underline"
+                              >
+                                Cambiar correo
+                              </button>
+                              <button
+                                type="button"
+                                disabled={cancelOtpCountdown > 0 || isSendingCancelOtp}
+                                onClick={handleSendCancelOtp}
+                                className="text-blue-400 hover:text-blue-300 disabled:opacity-50"
+                              >
+                                {cancelOtpCountdown > 0 ? `Reenviar en ${cancelOtpCountdown}s` : "Reenviar código"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Detalle Devolución Efectivo */}
+                {cancelRefundOption === "efectivo" && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] flex items-center gap-2">
+                    <span>💵</span>
+                    <span>
+                      Recuerda entregar <strong>${Number(turnoToCancel.monto_pagado || 0).toLocaleString()}</strong> en mano al cliente desde la caja.
+                    </span>
+                  </div>
+                )}
+
+                {cancelError && (
+                  <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[11px] flex items-center gap-1.5">
+                    <span>⚠️</span>
+                    <span>{cancelError}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {turnoToCancel.es_fijo ? (
               <div className="space-y-2.5 pt-2">
@@ -2416,11 +2689,29 @@ export default function GrillaHoraria({
                 </button>
                 <button
                   type="button"
-                  disabled={isCancelingTurno}
+                  disabled={
+                    isCancelingTurno ||
+                    (Number(turnoToCancel.monto_pagado || 0) > 0 &&
+                      cancelRefundOption === "billetera" &&
+                      !turnoToCancel.cliente_email &&
+                      cancelOtpStep !== "otp")
+                  }
                   onClick={handleCancelTurno}
-                  className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-rose-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className={`flex-1 rounded-xl py-2.5 text-xs font-bold text-white shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-1.5 ${
+                    Number(turnoToCancel.monto_pagado || 0) > 0 && cancelRefundOption === "billetera"
+                      ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30"
+                      : "bg-rose-600 hover:bg-rose-500 shadow-rose-600/30"
+                  }`}
                 >
-                  {isCancelingTurno ? "Liberando..." : "Sí, Liberar Turno"}
+                  {isCancelingTurno
+                    ? "Procesando..."
+                    : Number(turnoToCancel.monto_pagado || 0) > 0
+                    ? cancelRefundOption === "billetera"
+                      ? turnoToCancel.cliente_email
+                        ? "Acreditar en Billetera"
+                        : "✓ Verificar OTP y Acreditar"
+                      : "Liberar con Devolución Efectivo"
+                    : "Sí, Liberar Turno"}
                 </button>
               </div>
             )}
@@ -2886,6 +3177,19 @@ export default function GrillaHoraria({
                       placeholder="Ej. +54 9 11 4567-8901"
                       value={clienteTelefono}
                       onChange={(e) => setClienteTelefono(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                      Correo Electrónico (opcional)
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="cliente@ejemplo.com (para vincular cuenta / billetera virtual)"
+                      value={clienteEmail}
+                      onChange={(e) => setClienteEmail(e.target.value)}
                       className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>

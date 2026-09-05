@@ -11,10 +11,14 @@ use App\Models\User;
 use App\Services\ClubReporteService;
 use App\Services\ReservaLockService;
 use App\Services\WalletService;
+use App\Models\EmailVerification;
+use App\Http\Controllers\Api\OtpVerificationController;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class ClubDashboardController extends Controller
 {
@@ -359,7 +363,69 @@ class ClubDashboardController extends Controller
     }
 
     /**
-     * Cancelar o liberar un turno por parte del administrador.
+     * Enviar código OTP a un cliente para registrarlo y crear su cuenta desde el mostrador.
+     */
+    public function enviarOtpCliente(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'email' => 'required|email|max:255',
+            'nombre' => 'nullable|string|max:255',
+        ]);
+
+        $cleanEmail = Str::lower(trim($validated['email']));
+        $nombre = trim($validated['nombre'] ?? '') ?: 'Cliente';
+
+        $existingUser = User::where('email', $cleanEmail)->first();
+        if ($existingUser && $existingUser->email_verified_at) {
+            return response()->json([
+                'success' => true,
+                'already_verified' => true,
+                'message' => 'El cliente ya cuenta con usuario verificado en el sistema.',
+                'user' => [
+                    'id' => $existingUser->id,
+                    'name' => $existingUser->name,
+                    'email' => $existingUser->email,
+                ],
+            ]);
+        }
+
+        // Check 60-second cooldown rate limit
+        $lastVerification = EmailVerification::where('email', $cleanEmail)
+            ->latest('created_at')
+            ->first();
+
+        if ($lastVerification && $lastVerification->created_at->diffInSeconds(now()) < 60) {
+            $remaining = 60 - $lastVerification->created_at->diffInSeconds(now());
+            return response()->json([
+                'success' => false,
+                'cooldown' => true,
+                'remaining_seconds' => $remaining,
+                'message' => "Por favor espera {$remaining} segundos antes de solicitar otro código OTP.",
+            ], 429);
+        }
+
+        OtpVerificationController::dispatchOtp($cleanEmail, $nombre);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Código de verificación OTP enviado exitosamente a {$cleanEmail}.",
+        ]);
+    }
+
+    /**
+     * Cancelar o liberar un turno por parte del administrador con soporte de reembolso y alta de cliente con OTP.
      */
     public function destroyTurno(Request $request, string $subdomain, int $turnoId): JsonResponse
     {
@@ -376,6 +442,7 @@ class ClubDashboardController extends Controller
         }
 
         $turno = Turno::withoutGlobalScopes()
+            ->with(['cancha', 'cliente'])
             ->where('complejo_id', $complejo->id)
             ->where('id', $turnoId)
             ->first();
@@ -387,11 +454,161 @@ class ClubDashboardController extends Controller
             ], 404);
         }
 
-        $turno->update(['estado' => 'cancelado']);
+        $montoPagado = (float) ($turno->monto_pagado ?? 0);
+        $accionReembolso = $request->input('accion_reembolso', 'billetera'); // 'billetera', 'efectivo', 'ninguno'
+        $clienteEmail = $request->input('cliente_email');
+        $otpCodigo = $request->input('otp_codigo');
+        $nuevoSaldo = null;
+        $clienteDestino = null;
+
+        if ($montoPagado > 0 && $accionReembolso === 'billetera') {
+            if (!empty($clienteEmail)) {
+                $cleanEmail = Str::lower(trim($clienteEmail));
+                $userCliente = User::where('email', $cleanEmail)->first();
+
+                if (!$userCliente) {
+                    // Dar de alta al nuevo cliente exigiendo validación OTP
+                    if (empty($otpCodigo) || strlen(trim($otpCodigo)) !== 6) {
+                        return response()->json([
+                            'error' => 'OTP_REQUIRED',
+                            'message' => 'Se requiere el código OTP de 6 dígitos para dar de alta al cliente y crear su cuenta.',
+                        ], 422);
+                    }
+
+                    $verification = EmailVerification::where('email', $cleanEmail)
+                        ->latest('created_at')
+                        ->first();
+
+                    if (!$verification) {
+                        return response()->json([
+                            'error' => 'OTP_NOT_FOUND',
+                            'message' => 'No hay ninguna solicitud de verificación pendiente para este correo. Por favor solicita el código.',
+                        ], 422);
+                    }
+
+                    if ($verification->isExpired()) {
+                        return response()->json([
+                            'error' => 'OTP_EXPIRED',
+                            'message' => 'El código de verificación OTP ha expirado. Por favor solicita uno nuevo.',
+                        ], 422);
+                    }
+
+                    if ($verification->intentos >= 5) {
+                        return response()->json([
+                            'error' => 'MAX_ATTEMPTS',
+                            'message' => 'Has superado el límite de intentos permitidos. Por favor solicita un nuevo código.',
+                        ], 429);
+                    }
+
+                    if ($verification->codigo !== trim($otpCodigo)) {
+                        $verification->increment('intentos');
+                        $restantes = max(0, 5 - $verification->intentos);
+                        return response()->json([
+                            'error' => 'INVALID_OTP',
+                            'message' => "Código OTP incorrecto. Te quedan {$restantes} intento(s).",
+                        ], 422);
+                    }
+
+                    // OTP válido: Crear usuario cliente con email verificado
+                    $userCliente = User::create([
+                        'name' => trim($request->input('cliente_nombre')) ?: ($turno->cliente_nombre ?: 'Cliente Mostrador'),
+                        'email' => $cleanEmail,
+                        'telefono' => trim($request->input('cliente_telefono')) ?: ($turno->cliente_telefono ?: null),
+                        'password' => Hash::make(Str::random(16)),
+                        'email_verified_at' => now(),
+                    ]);
+
+                    EmailVerification::where('email', $cleanEmail)->delete();
+                } elseif (!$userCliente->email_verified_at) {
+                    if (empty($otpCodigo) || strlen(trim($otpCodigo)) !== 6) {
+                        return response()->json([
+                            'error' => 'OTP_REQUIRED',
+                            'message' => 'El cliente no está verificado. Se requiere el código OTP de 6 dígitos.',
+                        ], 422);
+                    }
+                    $verification = EmailVerification::where('email', $cleanEmail)->latest('created_at')->first();
+                    if ($verification && !$verification->isExpired() && $verification->codigo === trim($otpCodigo)) {
+                        $userCliente->email_verified_at = now();
+                        $userCliente->save();
+                        EmailVerification::where('email', $cleanEmail)->delete();
+                    } else {
+                        return response()->json([
+                            'error' => 'INVALID_OTP',
+                            'message' => 'Código OTP inválido o expirado.',
+                        ], 422);
+                    }
+                }
+
+                $clienteDestino = $userCliente;
+            } elseif ($turno->cliente_id) {
+                $clienteDestino = User::find($turno->cliente_id);
+            }
+
+            if (!$clienteDestino) {
+                return response()->json([
+                    'error' => 'CLIENT_NOT_IDENTIFIED',
+                    'message' => 'Para acreditar el saldo en billetera virtual debes indicar el correo electrónico del cliente.',
+                ], 422);
+            }
+
+            // Asociar el turno al cliente acreditado
+            $turno->cliente_id = $clienteDestino->id;
+
+            // Acreditar saldo en la billetera virtual del cliente
+            $this->walletService->acreditar(
+                $clienteDestino->id,
+                $complejo->id,
+                $montoPagado,
+                'reembolso_cancelacion',
+                $turno->id,
+                "Reembolso por cancelación de turno {$turno->hora_inicio} hs en {$turno->cancha?->nombre}"
+            );
+
+            $nuevoSaldo = $this->walletService->obtenerSaldo($clienteDestino->id, $complejo->id);
+            $turno->estado_pago = 'reembolsado';
+
+            // Actualizar en cascada otros turnos del mismo cliente que no tuvieran cliente_id asignado
+            Turno::where('complejo_id', $complejo->id)
+                ->where('estado', '!=', 'cancelado')
+                ->where(function ($q) use ($complejo) {
+                    $q->whereNull('cliente_id')
+                      ->orWhere('cliente_id', $complejo->user_id);
+                })
+                ->where(function ($q) use ($clienteDestino) {
+                    $applied = false;
+                    if ($clienteDestino->telefono) {
+                        $q->where('cliente_telefono', $clienteDestino->telefono);
+                        $applied = true;
+                    }
+                    if ($clienteDestino->name) {
+                        $applied ? $q->orWhere('cliente_nombre', $clienteDestino->name) : $q->where('cliente_nombre', $clienteDestino->name);
+                    }
+                })
+                ->update(['cliente_id' => $clienteDestino->id]);
+        } elseif ($montoPagado > 0 && $accionReembolso === 'efectivo') {
+            $turno->estado_pago = 'reembolsado';
+        } elseif ($montoPagado > 0) {
+            $turno->estado_pago = 'reembolsado';
+        }
+
+        $turno->estado = 'cancelado';
+        $turno->save();
+
+        $mensaje = $montoPagado > 0 && $accionReembolso === 'billetera' && $clienteDestino
+            ? "Turno liberado. Se acreditaron $" . number_format($montoPagado, 0, ',', '.') . " en la Billetera Virtual de {$clienteDestino->name} ({$clienteDestino->email})."
+            : ($montoPagado > 0 && $accionReembolso === 'efectivo'
+                ? "Turno liberado. Devolución de $" . number_format($montoPagado, 0, ',', '.') . " registrada en efectivo."
+                : "Turno liberado y cancelado exitosamente.");
 
         return response()->json([
             'success' => true,
-            'message' => 'Turno liberado y cancelado exitosamente.',
+            'message' => $mensaje,
+            'reembolso' => [
+                'monto' => $montoPagado,
+                'metodo' => $accionReembolso,
+                'cliente_id' => $turno->cliente_id,
+                'nuevo_saldo_billetera' => $nuevoSaldo,
+            ],
         ]);
     }
 
