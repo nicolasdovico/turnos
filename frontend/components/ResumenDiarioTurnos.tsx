@@ -863,6 +863,25 @@ export default function ResumenDiarioTurnos({
                                             setTurnoToPay(t);
                                             setPagoMonto(t.saldo_pendiente.toString());
                                             setPagoMetodo("mostrador");
+                                            const targetUserId = t.cliente_id;
+                                            const targetEmail = (t as any).cliente_email;
+                                            if (targetUserId || targetEmail) {
+                                              const token = getAuthToken();
+                                              const queryParam = targetUserId ? `user_id=${targetUserId}` : `email=${encodeURIComponent(targetEmail || "")}`;
+                                              fetch(`${apiUrl}/wallet/saldo?subdomain=${subdomain || "club"}&${queryParam}`, {
+                                                headers: {
+                                                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                                  Accept: "application/json",
+                                                },
+                                              })
+                                                .then((r) => r.json())
+                                                .then((res) => {
+                                                  if (res.success && typeof res.saldo === "number") {
+                                                    setTurnoToPay((curr) => (curr && curr.id === t.id ? { ...curr, cliente_saldo_billetera: res.saldo } : curr));
+                                                  }
+                                                })
+                                                .catch(() => {});
+                                            }
                                           }}
                                           className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow transition flex items-center gap-1 cursor-pointer"
                                         >
@@ -937,27 +956,45 @@ export default function ResumenDiarioTurnos({
                 <label className="text-xs font-semibold text-slate-300 block mb-1.5">
                   Medio de Pago:
                 </label>
-                <select
-                  value={pagoMetodo}
-                  onChange={(e) => {
-                    const val = e.target.value as any;
-                    setPagoMetodo(val);
-                    if (val === "billetera") {
-                      const saldoDisp = Number(turnoToPay.cliente_saldo_billetera || 0);
-                      setPagoMonto(String(Math.min(turnoToPay.saldo_pendiente, saldoDisp)));
-                    } else if (pagoMetodo === "billetera") {
-                      setPagoMonto(String(turnoToPay.saldo_pendiente));
-                    }
-                  }}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
-                >
-                  <option value="mostrador">💵 Efectivo / Mostrador</option>
-                  <option value="transferencia">📲 Transferencia Bancaria (Alias / CBU)</option>
-                  <option value="online">💳 Tarjeta / MercadoPago</option>
-                  {Number(turnoToPay.cliente_saldo_billetera || 0) > 0 && (
-                    <option value="billetera">👛 Billetera Virtual (${Number(turnoToPay.cliente_saldo_billetera).toLocaleString()} disp.)</option>
-                  )}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "mostrador", label: "💵 Efectivo / Mostrador" },
+                    { id: "transferencia", label: "📲 Transferencia" },
+                    ...(Number(turnoToPay.cliente_saldo_billetera || 0) > 0
+                      ? [
+                          {
+                            id: "billetera",
+                            label: `👛 Billetera Virtual ($${Number(turnoToPay.cliente_saldo_billetera).toLocaleString()} disp.)`,
+                          },
+                        ]
+                      : []),
+                    { id: "online", label: "💳 Online / Tarjeta" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        setPagoMetodo(m.id as any);
+                        const saldoPend = turnoToPay.saldo_pendiente !== undefined && turnoToPay.saldo_pendiente > 0
+                          ? turnoToPay.saldo_pendiente
+                          : turnoToPay.precio || 0;
+                        if (m.id === "billetera") {
+                          const saldoDisp = Number(turnoToPay.cliente_saldo_billetera || 0);
+                          setPagoMonto(String(Math.min(saldoPend, saldoDisp)));
+                        } else if (pagoMetodo === "billetera") {
+                          setPagoMonto(String(saldoPend));
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl border text-left font-bold transition text-xs ${
+                        pagoMetodo === m.id
+                          ? "bg-emerald-500/20 border-emerald-500 text-white"
+                          : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>

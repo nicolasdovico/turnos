@@ -2399,9 +2399,12 @@ export default function GrillaHoraria({
                                   ? String(turno.precio)
                                   : ""
                               );
-                              if (turno.cliente_id) {
+                              const targetUserId = turno.cliente_id;
+                              const targetEmail = turno.cliente_email;
+                              if (targetUserId || targetEmail) {
                                 const token = getAuthToken(propToken);
-                                fetch(`${apiUrl}/wallet/saldo?subdomain=${subdomain || "club"}&user_id=${turno.cliente_id}`, {
+                                const queryParam = targetUserId ? `user_id=${targetUserId}` : `email=${encodeURIComponent(targetEmail || "")}`;
+                                fetch(`${apiUrl}/wallet/saldo?subdomain=${subdomain || "club"}&${queryParam}`, {
                                   headers: {
                                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                                     Accept: "application/json",
@@ -2412,7 +2415,12 @@ export default function GrillaHoraria({
                                     if (res.success && typeof res.saldo === "number") {
                                       setTurnoToPay((curr) => (curr && curr.id === turno.id ? { ...curr, cliente_saldo_billetera: res.saldo } : curr));
                                       setTurnosOcupados((prev) =>
-                                        prev.map((t) => (t.cliente_id === turno.cliente_id ? { ...t, cliente_saldo_billetera: res.saldo } : t))
+                                        prev.map((t) => (
+                                          (targetUserId && t.cliente_id === targetUserId) ||
+                                          (targetEmail && t.cliente_email === targetEmail)
+                                            ? { ...t, cliente_saldo_billetera: res.saldo }
+                                            : t
+                                        ))
                                       );
                                     }
                                   })
@@ -2778,7 +2786,7 @@ export default function GrillaHoraria({
                       ? [
                           {
                             id: "billetera",
-                            label: `👛 Billetera ($${Number(turnoToPay.cliente_saldo_billetera).toLocaleString()} disp.)`,
+                            label: `👛 Billetera Virtual ($${Number(turnoToPay.cliente_saldo_billetera).toLocaleString()} disp.)`,
                           },
                         ]
                       : []),
