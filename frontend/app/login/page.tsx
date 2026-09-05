@@ -14,6 +14,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [returnUrl, setReturnUrl] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const target = params.get("returnTo") || params.get("redirect");
+      if (target) {
+        setReturnUrl(target);
+      }
+    }
+  }, []);
 
   // If already logged in
   if (user) {
@@ -28,9 +39,17 @@ export default function LoginPage() {
             Has iniciado sesión como <strong className="text-slate-900">{user.email}</strong>.
           </p>
           <div className="mt-6 flex flex-col gap-3">
+            {returnUrl ? (
+              <a
+                href={returnUrl}
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 transition"
+              >
+                Volver al Club / Reserva
+              </a>
+            ) : null}
             <Link
               href="/"
-              className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 transition"
+              className="rounded-xl bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200 transition"
             >
               Ir al Portal Principal
             </Link>
@@ -57,7 +76,15 @@ export default function LoginPage() {
       setError(res.error || "No se pudo iniciar sesión. Verifica tus datos.");
       setIsSubmitting(false);
     } else {
-      router.push("/");
+      const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const target = params?.get("returnTo") || params?.get("redirect") || returnUrl || "/";
+      if (target.startsWith("http://") || target.startsWith("https://")) {
+        const token = (res as any)?.token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : "") || "";
+        const sep = target.includes("?") ? "&" : "?";
+        window.location.href = `${target}${sep}auth_token=${encodeURIComponent(token)}`;
+      } else {
+        router.push(target);
+      }
     }
   };
 

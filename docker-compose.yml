@@ -79,6 +79,8 @@ services:
     image: postgres:16-alpine
     container_name: saas_database
     restart: unless-stopped
+    ports:
+      - "5433:5432"
     environment:
       POSTGRES_DB: saas_db
       POSTGRES_USER: saas_user

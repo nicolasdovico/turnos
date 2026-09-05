@@ -133,6 +133,10 @@ export default function Navbar() {
   // Helper to build links: if on subdomain, global links point to mainDomainUrl
   const getGlobalLink = (path: string) => {
     if (effectiveIsSubdomain && mainDomainUrl) {
+      if (typeof window !== "undefined" && (path === "/login" || path === "/registro")) {
+        const currentUrl = window.location.href;
+        return `${mainDomainUrl}${path}?returnTo=${encodeURIComponent(currentUrl)}`;
+      }
       return `${mainDomainUrl}${path}`;
     }
     return path;
@@ -335,7 +339,13 @@ export default function Navbar() {
                 </a>
               )}
               <button
-                onClick={logout}
+                onClick={async () => {
+                  await logout();
+                  if (typeof window !== "undefined") {
+                    const isPanel = window.location.pathname.includes("/panel");
+                    window.location.href = isPanel ? "/" : window.location.pathname;
+                  }
+                }}
                 className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-rose-600 transition"
               >
                 Cerrar Sesión

@@ -17,6 +17,8 @@ interface ComplejoData {
   ciudad: string | null;
   direccion: string | null;
   estado: string;
+  tipo_cobro_reserva?: string;
+  porcentaje_sena?: number;
 }
 
 interface CanchaItem {
@@ -346,7 +348,7 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
 
                 <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 sm:p-6 shadow-xl">
                   <GrillaHoraria
-                    key={`${selectedCancha.id}-${selectedCancha.duracion_minutos}-${selectedCancha.permite_duracion_flexible}`}
+                    key={`${selectedCancha.id}-${selectedCancha.duracion_minutos}-${selectedCancha.permite_duracion_flexible}-${user ? user.id : "anon"}`}
                     canchaId={selectedCancha.id}
                     canchaNombre={selectedCancha.nombre}
                     deporte={selectedCancha.deporte}
@@ -359,6 +361,8 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
                     precio120Min={selectedCancha.precio_120_min ? Number(selectedCancha.precio_120_min) : undefined}
                     isAdmin={isAdmin}
                     token={token}
+                    porcentajeSena={complejo?.porcentaje_sena}
+                    tipoCobroReserva={complejo?.tipo_cobro_reserva}
                   />
                 </div>
               </div>

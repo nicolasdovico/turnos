@@ -197,11 +197,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      if (token) {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
+      if (activeToken) {
         await fetch(`${API_BASE}/auth/logout`, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${token}`,
+            "Authorization": `Bearer ${activeToken}`,
             "Accept": "application/json",
           },
         });
@@ -211,11 +212,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setUser(null);
       setToken(null);
-      localStorage.removeItem("saas_token");
-      localStorage.removeItem("token");
-      localStorage.removeItem("saas_user");
-      document.cookie = "saas_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
       if (typeof window !== "undefined") {
+        localStorage.removeItem("saas_token");
+        localStorage.removeItem("token");
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("saas_user");
+        try {
+          sessionStorage.clear();
+        } catch {}
+
+        // Expire cookie across all possible domain permutations
+        const cookieDomains = [
+          "",
+          `domain=${window.location.hostname}; `,
+          "domain=localhost; ",
+          "domain=.localhost; ",
+          "domain=turnos.com; ",
+          "domain=.turnos.com; ",
+        ];
+        cookieDomains.forEach((cd) => {
+          document.cookie = `saas_auth_token=; ${cd}path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+        });
+
         window.dispatchEvent(
           new CustomEvent("saas-auth-changed", { detail: { user: null, token: null } })
         );
