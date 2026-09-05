@@ -471,6 +471,7 @@ class SenaYPagoSimuladoTest extends TestCase
                 'monto_pagado' => '0.00',
                 'saldo_pendiente' => '10000.00',
                 'estado_pago' => 'pendiente',
+                'metodo_pago' => 'pendiente',
                 'estado' => 'reservado',
             ],
         ]);

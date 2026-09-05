@@ -1354,4 +1354,23 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Backend PHPUnit: 168 tests pasados al 100% (878 aserciones).
   * Frontend Vitest: 54 tests pasados al 100% (4 archivos de test).
+-------------------------------------------------------------------------------
+[2026-09-05] - RESTRICCIÓN DINÁMICA DE CANAL DE PAGO EN RECEPCIÓN ("SIN COBRO" -> SOLO "PENDIENTE DE PAGO")
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * Si el empleado seleccionaba "Sin cobro ($0 - Paga al jugar)", el desplegable "Medio / Canal de Cobro" aún mostraba "Efectivo en mostrador", "Transferencia" o "Tarjeta online", lo cual era inconsistente ya que no se recaudaba dinero en el momento de la reserva.
+- Solución Implementada:
+  * Frontend (`GrillaHoraria.tsx`):
+    - Al seleccionar "Sin cobro", `modalidadCobro` se establece en `'ninguno'` y el select de canal de cobro muestra única y exclusivamente la opción `"🕒 Pendiente de Pago (Paga al jugar)"`, deshabilitándose para evitar selecciones erróneas y mostrando mensaje aclaratorio: *"No se registra cobro ahora. El saldo total ($X) quedará pendiente para cuando el cliente asista al club."*.
+    - Al alternar a "Seña" o "Total", el select oculta la opción "Pendiente de Pago" y habilita los medios reales de recaudación (*Efectivo / Mostrador*, *Transferencia*, *Tarjeta / Online*), restableciendo por defecto `metodoPago = 'mostrador'`.
+    - En el payload de confirmación, se garantiza que `metodo_pago` y `estado_pago` viajen como `'pendiente'` cuando la modalidad sea `'ninguno'`.
+  * Backend (`TurnoConfirmarController.php`):
+    - Se reforzó la lógica para que siempre que `$esSinCobro` sea verdadero, `$metodoPago` sea forzado a `'pendiente'` y `$montoRequerido = 0.0`, blindando la base de datos contra registros inconsistentes.
+  * Tests Automatizados:
+    - Frontend (`GrillaHoraria.test.tsx`): Se validó que al pulsar "Sin cobro", únicamente figure la opción "Pendiente de Pago" y no "Cobrado en Mostrador", y que al pulsar "Seña" se restablezcan los canales reales.
+    - Backend (`SenaYPagoSimuladoTest.php`): Se comprobó que el turno generado con modalidad ninguno persista `metodo_pago = 'pendiente'`, `estado_pago = 'pendiente'`, `monto_pagado = 0` y `saldo_pendiente = total`.
+- Verificación de Calidad:
+  * Backend PHPUnit: 168 tests pasados al 100% (878 aserciones).
+  * Frontend Vitest: 54 tests pasados al 100% (4 archivos de test).
 ===============================================================================
+

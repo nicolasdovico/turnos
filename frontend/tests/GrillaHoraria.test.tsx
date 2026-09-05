@@ -557,6 +557,20 @@ describe("Componente Reactivo GrillaHoraria", () => {
     // Hacemos click en "Sin cobro"
     fireEvent.click(screen.getByText("🕒 Sin cobro"));
 
+    // El select debe tener únicamente la opción "Pendiente de Pago (Paga al jugar)"
+    expect(screen.getByText("🕒 Pendiente de Pago (Paga al jugar)")).toBeDefined();
+    expect(screen.queryByText("💵 Cobrado en Mostrador / Efectivo")).toBeNull();
+    expect(screen.getByText(/No se registra cobro ahora/i)).toBeDefined();
+
+    // Si el empleado cambia a "Seña", se restablecen los medios reales de cobro
+    fireEvent.click(screen.getByText(/💳 Seña/i));
+    expect(screen.getByText("💵 Cobrado en Mostrador / Efectivo")).toBeDefined();
+    expect(screen.queryByText("🕒 Pendiente de Pago (Paga al jugar)")).toBeNull();
+
+    // Regresamos a "Sin cobro"
+    fireEvent.click(screen.getByText("🕒 Sin cobro"));
+    expect(screen.getByText("🕒 Pendiente de Pago (Paga al jugar)")).toBeDefined();
+
     // El botón debe actualizarse a "Asignar en Mostrador (Sin Cobro)"
     expect(screen.getByRole("button", { name: /Asignar en Mostrador \(Sin Cobro\)/i })).toBeDefined();
 

@@ -128,10 +128,16 @@ class TurnoConfirmarController extends Controller
 
         if ($esSinCobro) {
             $montoRequerido = 0.0;
-        } elseif ($quierePagarTotal) {
-            $montoRequerido = $precio;
+            $metodoPago = 'pendiente';
         } else {
-            $montoRequerido = $montoSena;
+            if ($metodoPago === 'pendiente') {
+                $metodoPago = $esAdminClub ? 'mostrador' : 'online';
+            }
+            if ($quierePagarTotal) {
+                $montoRequerido = $precio;
+            } else {
+                $montoRequerido = $montoSena;
+            }
         }
 
         $montoPagado = 0.0;

@@ -1286,8 +1286,8 @@ export default function GrillaHoraria({
     if (onConfirmSuccess && activeLock) {
       onConfirmSuccess(activeLock);
     }
-    setMetodoPago(isAdmin ? "pendiente" : "online");
-    setModalidadCobro("sena");
+    setMetodoPago(isAdmin ? "mostrador" : "online");
+    setModalidadCobro(isAdmin ? "total" : "sena");
     setIsConfirmModalOpen(true);
   };
 
@@ -1474,7 +1474,7 @@ export default function GrillaHoraria({
           token_reserva: activeLock.tokenReserva,
           cliente_nombre: targetNombre || undefined,
           cliente_telefono: targetTelefono || undefined,
-          metodo_pago: overrideMetodoPago || metodoPago,
+          metodo_pago: overrideMetodoPago || (modalidadCobro === "ninguno" ? "pendiente" : metodoPago),
           aplicar_credito_wallet: useWalletCredit,
           modalidad_pago: modalidadCobro,
           pago_completo: modalidadCobro === "total",
@@ -1502,8 +1502,8 @@ export default function GrillaHoraria({
           precio: Number(data.turno.precio),
           monto_pagado: Number(data.turno.monto_pagado || 0),
           saldo_pendiente: Number(data.turno.saldo_pendiente || 0),
-          estado_pago: data.turno.estado_pago || (modalidadCobro === "total" ? "pagado_total" : "senado"),
-          metodo_pago: data.turno.metodo_pago || overrideMetodoPago || metodoPago,
+          estado_pago: data.turno.estado_pago || (modalidadCobro === "ninguno" ? "pendiente" : modalidadCobro === "total" ? "pagado_total" : "senado"),
+          metodo_pago: data.turno.metodo_pago || overrideMetodoPago || (modalidadCobro === "ninguno" ? "pendiente" : metodoPago),
           estado: "reservado",
           cliente_id: data.turno.cliente_id || (currentUser ? currentUser.id : undefined),
           cliente_email: data.turno.cliente_email || (currentUser ? currentUser.email : undefined),
@@ -2588,9 +2588,7 @@ export default function GrillaHoraria({
                           type="button"
                           onClick={() => {
                             setModalidadCobro("ninguno");
-                            if (metodoPago !== "mostrador" && metodoPago !== "online" && metodoPago !== "transferencia") {
-                              setMetodoPago("pendiente");
-                            }
+                            setMetodoPago("pendiente");
                           }}
                           className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
                             modalidadCobro === "ninguno"
@@ -2853,22 +2851,31 @@ export default function GrillaHoraria({
                     </label>
                     <select
                       value={metodoPago}
+                      disabled={modalidadCobro === "ninguno"}
                       onChange={(e) => {
                         const val = e.target.value;
                         setMetodoPago(val);
-                        if (val === "pendiente") {
-                          setModalidadCobro("ninguno");
-                        } else if (modalidadCobro === "ninguno") {
-                          setModalidadCobro("total");
-                        }
                       }}
-                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className={`w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                        modalidadCobro === "ninguno" ? "opacity-90 cursor-not-allowed bg-slate-900/60" : ""
+                      }`}
                     >
-                      <option value="mostrador">💵 Cobrado en Mostrador / Efectivo</option>
-                      <option value="transferencia">📲 Cobrado por Transferencia Bancaria</option>
-                      <option value="online">💳 Cobrado con Tarjeta / Online</option>
-                      <option value="pendiente">🕒 Pendiente de Pago (Paga al jugar)</option>
+                      {modalidadCobro === "ninguno" ? (
+                        <option value="pendiente">🕒 Pendiente de Pago (Paga al jugar)</option>
+                      ) : (
+                        <>
+                          <option value="mostrador">💵 Cobrado en Mostrador / Efectivo</option>
+                          <option value="transferencia">📲 Cobrado por Transferencia Bancaria</option>
+                          <option value="online">💳 Cobrado con Tarjeta / Online</option>
+                        </>
+                      )}
                     </select>
+                    {modalidadCobro === "ninguno" && (
+                      <p className="text-[11px] text-amber-400/90 mt-1.5 flex items-center gap-1.5">
+                        <span>ℹ️</span>
+                        <span>No se registra cobro ahora. El saldo total (${tarifaTotal.toLocaleString()}) quedará pendiente para cuando el cliente asista al club.</span>
+                      </p>
+                    )}
                   </div>
                 </>
               ) : currentUser ? (
