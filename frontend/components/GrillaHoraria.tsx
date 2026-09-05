@@ -198,6 +198,16 @@ export default function GrillaHoraria({
   const [clienteEmail, setClienteEmail] = useState<string>("");
   const [metodoPago, setMetodoPago] = useState<string>(isAdmin ? "mostrador" : "online");
   const [modalidadCobro, setModalidadCobro] = useState<"sena" | "total" | "ninguno">(isAdmin ? "total" : "sena");
+
+  const resetDeskForm = () => {
+    if (isAdmin) {
+      setClienteNombre("");
+      setClienteTelefono("");
+      setClienteEmail("");
+      setMetodoPago("mostrador");
+      setModalidadCobro("total");
+    }
+  };
   const [clubPorcentajeSena, setClubPorcentajeSena] = useState<number>(propPorcentajeSena ?? 50);
   const [clubTipoCobro, setClubTipoCobro] = useState<string>(propTipoCobroReserva ?? "sena");
   const [walletBalance, setWalletBalance] = useState<number>(0);
@@ -969,6 +979,7 @@ export default function GrillaHoraria({
 
       if (activeLock && activeLock.horaInicio === horaInicio && (activeLock.canchaId === targetCanchaId || !activeLock.canchaId)) {
         setActiveLock(null);
+        resetDeskForm();
       }
 
       setTurnosRetenidos((prev) => prev.filter((r) => r.hora_inicio !== horaInicio));
@@ -1329,6 +1340,7 @@ export default function GrillaHoraria({
     }
     if (activeLock && activeLock.horaInicio === slot.hora_inicio) return;
 
+    resetDeskForm();
     setLockingSlot(slot.hora_inicio);
 
     try {
@@ -1404,9 +1416,11 @@ export default function GrillaHoraria({
     if (onConfirmSuccess && activeLock) {
       onConfirmSuccess(activeLock);
     }
-    setMetodoPago(isAdmin ? "mostrador" : "online");
-    setModalidadCobro(isAdmin ? "total" : "sena");
-    setClienteEmail("");
+    resetDeskForm();
+    if (!isAdmin) {
+      setMetodoPago("online");
+      setModalidadCobro("sena");
+    }
     setIsConfirmModalOpen(true);
   };
 
@@ -1654,10 +1668,7 @@ export default function GrillaHoraria({
       setIsConfirmModalOpen(false);
       setRegistrationStep("form");
       setOtpCode("");
-      if (isAdmin) {
-        setClienteNombre("");
-        setClienteTelefono("");
-      }
+      resetDeskForm();
       fetchDisponibilidad(fecha);
       fetchWalletBalance();
     } catch (err: any) {
@@ -1981,6 +1992,7 @@ export default function GrillaHoraria({
                           if (onConfirmSuccess) {
                             onConfirmSuccess(selectedLock);
                           }
+                          resetDeskForm();
                           setIsConfirmModalOpen(true);
                         }}
                         className="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 text-xs transition shadow flex items-center gap-1"
@@ -2899,7 +2911,10 @@ export default function GrillaHoraria({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsConfirmModalOpen(false)}
+                  onClick={() => {
+                    setIsConfirmModalOpen(false);
+                    resetDeskForm();
+                  }}
                   className="text-slate-400 hover:text-white transition rounded-lg p-1 text-base font-bold"
                 >
                   ✕
@@ -3494,6 +3509,7 @@ export default function GrillaHoraria({
                     setRegistrationStep("form");
                     setOtpCode("");
                     setAuthError(null);
+                    resetDeskForm();
                   }}
                   className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
                 >
@@ -3503,6 +3519,7 @@ export default function GrillaHoraria({
                   type="button"
                   onClick={() => {
                     setIsConfirmModalOpen(false);
+                    resetDeskForm();
                     if (activeLock) {
                       handleLiberarBloqueo(activeLock);
                     }

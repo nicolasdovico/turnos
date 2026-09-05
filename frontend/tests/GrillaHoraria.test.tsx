@@ -483,6 +483,112 @@ describe("Componente Reactivo GrillaHoraria", () => {
     });
   });
 
+  it("limpia el formulario de asignación en mostrador (nombre, teléfono y email) para la siguiente reserva", async () => {
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/turnos/bloquear-temporal")) {
+        callCount++;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, token_reserva: `admin-lock-${callCount}`, ttl: 600 }),
+        });
+      }
+      if (url.includes("/turnos/confirmar")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              turno: {
+                id: 99,
+                cancha_id: 1,
+                cliente_nombre: "Claudio Magnano",
+                cliente_telefono: "234234",
+                cliente_email: "claudio@gmail.com",
+              },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            slots_disponibles: [
+              { hora_inicio: "15:00", hora_fin: "16:00", disponible: true, precio: 10000 },
+              { hora_inicio: "16:00", hora_fin: "17:00", disponible: true, precio: 10000 },
+            ],
+            turnos_ocupados: [],
+          }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        isAdmin={true}
+      />
+    );
+
+    // 1. Primera reserva para claudio@gmail.com en el turno de las 15:00
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 15:00 a 16:00 Disponible")).toBeDefined();
+    });
+    fireEvent.click(screen.getByLabelText("Turno 15:00 a 16:00 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    const inputNombre = screen.getByPlaceholderText(/Mariano Werner/i) as HTMLInputElement;
+    const inputTelefono = screen.getByPlaceholderText(/4567-8901/i) as HTMLInputElement;
+    const inputEmail = screen.getByPlaceholderText(/cliente@ejemplo.com/i) as HTMLInputElement;
+
+    fireEvent.change(inputNombre, { target: { value: "Claudio Magnano" } });
+    fireEvent.change(inputTelefono, { target: { value: "234234" } });
+    fireEvent.change(inputEmail, { target: { value: "claudio@gmail.com" } });
+
+    const btnAsignar = screen.getByRole("button", { name: /Asignar en Mostrador/i });
+    fireEvent.click(btnAsignar);
+
+    // Esperar que se confirme la primera reserva
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/confirmar"),
+        expect.objectContaining({
+          body: expect.stringContaining("claudio@gmail.com"),
+        })
+      );
+    });
+
+    // 2. Segunda reserva en el turno de las 16:00
+    await waitFor(() => {
+      expect(screen.getByLabelText("Turno 16:00 a 17:00 Disponible")).toBeDefined();
+    });
+    fireEvent.click(screen.getByLabelText("Turno 16:00 a 17:00 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // 3. Verificar que los campos aparezcan completamente vacíos y sin datos precargados del cliente anterior
+    const inputEmail2 = screen.getByPlaceholderText(/cliente@ejemplo.com/i) as HTMLInputElement;
+    const inputNombre2 = screen.getByPlaceholderText(/Mariano Werner/i) as HTMLInputElement;
+    const inputTelefono2 = screen.getByPlaceholderText(/4567-8901/i) as HTMLInputElement;
+
+    expect(inputEmail2.value).toBe("");
+    expect(inputNombre2.value).toBe("");
+    expect(inputTelefono2.value).toBe("");
+  });
+
   it("permite al recepcionista elegir no cobrar seña con Sin Cobro o elegir Seña con método online", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes("/turnos/bloquear-temporal")) {
