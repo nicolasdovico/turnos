@@ -15,6 +15,15 @@ import { getCurrentCoordinates, fetchNearbyComplejos } from '../services/locatio
 import { registerForPushNotificationsAsync } from '../services/notificationService';
 import { fetchMisTurnosApi, cancelarTurnoClienteApi } from '../services/api';
 
+export const formatFechaDDMMAAAA = (fechaStr?: string): string => {
+  if (!fechaStr) return '';
+  const parts = fechaStr.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
+  }
+  return fechaStr;
+};
+
 export function HomeScreen() {
   const { user, logout, isLoading } = useAuth();
   const [nearbyClubs, setNearbyClubs] = useState<Complejo[]>([]);
@@ -51,7 +60,7 @@ export function HomeScreen() {
       ? `Faltan aproximadamente ${horas} horas para tu partido (mínimo del club: ${limite} hs).\n\nSe reembolsarán $${turno.monto_pagado.toLocaleString()} de forma automática a tu Billetera Virtual en este club.`
       : turno.monto_pagado > 0
       ? `Faltan menos de ${limite} horas para tu partido.\n\nPor cancelación fuera de término, la seña abonada de $${turno.monto_pagado.toLocaleString()} no será reembolsable y quedará retenida en concepto de penalidad.`
-      : `¿Estás seguro de que deseas cancelar tu reserva para el ${turno.fecha} a las ${turno.hora_inicio} hs?`;
+      : `¿Estás seguro de que deseas cancelar tu reserva para el ${formatFechaDDMMAAAA(turno.fecha)} a las ${turno.hora_inicio} hs?`;
 
     Alert.alert(
       '¿Cancelar Turno?',
@@ -241,7 +250,7 @@ export function HomeScreen() {
                 {/* Fecha y Horario */}
                 <View className="flex-row items-center justify-between py-2 border-t border-slate-800/80 my-1">
                   <Text className="text-xs text-slate-300 font-medium">
-                    📅 {turno.fecha}
+                    📅 {formatFechaDDMMAAAA(turno.fecha)}
                   </Text>
                   <Text className="text-xs font-mono font-bold text-emerald-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
                     ⏰ {turno.hora_inicio} - {turno.hora_fin} hs

@@ -113,6 +113,15 @@ export const getLocalDateString = (d: Date = new Date()): string => {
   return `${year}-${month}-${day}`;
 };
 
+export const formatFechaDDMMAAAA = (fechaStr?: string): string => {
+  if (!fechaStr) return "";
+  const parts = fechaStr.split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2].padStart(2, "0")}-${parts[1].padStart(2, "0")}-${parts[0]}`;
+  }
+  return fechaStr;
+};
+
 export const getAuthToken = (explicitToken?: string | null): string | null => {
   if (explicitToken) return explicitToken;
   if (typeof window === "undefined") return null;
@@ -2739,7 +2748,7 @@ export default function GrillaHoraria({
                 <div>
                   <h3 className="text-base font-bold text-white">¿Cancelar tu Reserva?</h3>
                   <p className="text-xs text-slate-400">
-                    {canchaNombre} • {clientCancelModalTurno.fecha}
+                    {canchaNombre} • {formatFechaDDMMAAAA(clientCancelModalTurno.fecha || fecha)}
                   </p>
                 </div>
               </div>

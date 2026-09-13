@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import GrillaHoraria, { Slot, getLocalDateString } from "../components/GrillaHoraria";
+import GrillaHoraria, { Slot, getLocalDateString, formatFechaDDMMAAAA } from "../components/GrillaHoraria";
 
 describe("Componente Reactivo GrillaHoraria", () => {
   const mockSlots: Slot[] = [
@@ -2330,6 +2330,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
     await waitFor(() => {
       expect(screen.getByTestId("client-cancel-modal")).toBeDefined();
       expect(screen.getByText("¿Cancelar tu Reserva?")).toBeDefined();
+      expect(screen.getByText(/Cancha 1 • 01-09-2026/)).toBeDefined();
       expect(screen.getByTestId("confirm-client-cancel-btn")).toBeDefined();
     });
 
@@ -2349,6 +2350,13 @@ describe("Componente Reactivo GrillaHoraria", () => {
       );
       expect(screen.queryByTestId("client-cancel-modal")).toBeNull();
     });
+  });
+
+  it("formatea correctamente las fechas de YYYY-MM-DD a DD-MM-YYYY (dd-mm-aaaa)", () => {
+    expect(formatFechaDDMMAAAA("2026-09-14")).toBe("14-09-2026");
+    expect(formatFechaDDMMAAAA("2026-01-05")).toBe("05-01-2026");
+    expect(formatFechaDDMMAAAA("2026-12-31")).toBe("31-12-2026");
+    expect(formatFechaDDMMAAAA("")).toBe("");
   });
 });
 

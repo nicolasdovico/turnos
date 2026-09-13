@@ -1442,6 +1442,23 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend Web Vitest: 59 tests pasados al 100% (4 archivos de test).
   * Frontend Web Build: `next build` producción exitoso (11/11 páginas estáticas generadas, 0 errores).
   * Frontend Mobile Jest: 20 tests pasados al 100% (4 archivos de test).
+-------------------------------------------------------------------------------
+[2026-09-13] - FORMATEO DE FECHA DD-MM-AAAA EN MODAL DE CANCELACIÓN DE TURNO (WEB & MOBILE)
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * En el modal "¿Cancelar tu Reserva?", la fecha se mostraba en formato ISO YYYY-MM-DD (ej: "Cancha 1 • 2026-09-14").
+  * Se requirió presentar la fecha en formato legible estándar "dd-mm-aaaa" (ej: "Cancha 1 • 14-09-2026").
+- Solución Implementada:
+  * Frontend Web (`GrillaHoraria.tsx`):
+    - Se creó y exportó la función utilitaria `formatFechaDDMMAAAA(fechaStr?: string): string` que convierte strings 'YYYY-MM-DD' en 'DD-MM-YYYY' preservando valores formateados y controlando nulos.
+    - Se aplicó en el encabezado del modal de confirmación de cancelación del cliente (`¿Cancelar tu Reserva? -> {canchaNombre} • {formatFechaDDMMAAAA(clientCancelModalTurno.fecha || fecha)}`).
+    - Se agregaron tests unitarios y de integración en `GrillaHoraria.test.tsx` comprobando el formateo de fecha tanto en casos unitarios como en el renderizado del modal.
+  * Frontend Mobile (`HomeScreen.tsx`):
+    - Se implementó `formatFechaDDMMAAAA` y se aplicó al diálogo nativo de confirmación (`Alert.alert`) y a las tarjetas de turnos reservados.
+- Verificación de Calidad:
+  * Frontend Web Vitest: 60 tests pasados al 100% (4 archivos de test).
+  * Frontend Web Build: `next build` producción exitoso (11/11 páginas generadas, 0 errores).
+  * Mobile Jest: 20 tests pasados al 100% (4 archivos de test).
 ===============================================================================
 
 
