@@ -328,4 +328,61 @@ class ClubResumenDiarioTest extends TestCase
         $this->assertEquals(4000, $turnoReporte['monto_pagado']);
         $this->assertEquals(0, $turnoReporte['saldo_pendiente']);
     }
+
+    public function test_turnos_fijos_sin_pagos_figuran_como_pendientes_en_resumen_diario(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner-fijos@padel.com']);
+
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Tenis Fijos Club',
+            'subdominio' => 'tenis-fijos-club',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'tenis',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha Central',
+            'deporte' => 'tenis',
+            'superficie' => 'polvo',
+            'precio_base' => 8000,
+            'activa' => true,
+        ]);
+
+        // Turno fijo sin pago registrado
+        $turnoFijo = Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'fecha' => '2026-09-14',
+            'hora_inicio' => '11:00:00',
+            'hora_fin' => '12:00:00',
+            'precio' => 8000,
+            'monto_pagado' => 0,
+            'saldo_pendiente' => 8000,
+            'estado' => 'reservado',
+            'estado_pago' => 'pendiente',
+            'es_fijo' => true,
+            'metodo_pago' => 'mostrador',
+            'cliente_nombre' => 'Carlos Alcaraz',
+        ]);
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/clubs/tenis-fijos-club/resumen-diario?fecha_desde=2026-09-14&fecha_hasta=2026-09-14');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.kpis.total_facturado', 8000)
+            ->assertJsonPath('data.kpis.total_cobrado', 0)
+            ->assertJsonPath('data.kpis.total_saldo_pendiente', 8000)
+            ->assertJsonPath('data.kpis.total_turnos_fijos', 1)
+            ->assertJsonPath('data.dias.0.saldo_pendiente', 8000)
+            ->assertJsonPath('data.dias.0.estado_cobro', 'pendiente')
+            ->assertJsonPath('data.dias.0.turnos.0.id', $turnoFijo->id)
+            ->assertJsonPath('data.dias.0.turnos.0.es_fijo', true)
+            ->assertJsonPath('data.dias.0.turnos.0.monto_pagado', 0)
+            ->assertJsonPath('data.dias.0.turnos.0.saldo_pendiente', 8000)
+            ->assertJsonPath('data.dias.0.turnos.0.estado_pago', 'pendiente');
+    }
 }

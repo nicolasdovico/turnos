@@ -303,9 +303,18 @@ class DisponibilidadService
         $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($cancha, $esAdmin, $currentUserId) {
             $precio = (float) $t->precio;
             $montoPagado = (float) ($t->monto_pagado ?? 0);
-            $saldoPendiente = $t->saldo_pendiente !== null ? (float) $t->saldo_pendiente : max(0.0, $precio - $montoPagado);
+            if (in_array($t->estado_pago, ['pagado', 'pagado_total']) || in_array($t->estado, ['pagado', 'completado'])) {
+                $saldoPendiente = 0.0;
+            } else {
+                $saldoCalculado = max(0.0, round($precio - $montoPagado, 2));
+                if ($t->saldo_pendiente !== null && (float) $t->saldo_pendiente > 0) {
+                    $saldoPendiente = (float) $t->saldo_pendiente;
+                } else {
+                    $saldoPendiente = $saldoCalculado;
+                }
+            }
             $estadoPago = $t->estado_pago;
-            if (!$estadoPago) {
+            if (!$estadoPago || ($estadoPago === 'pagado_total' && $saldoPendiente > 0 && $montoPagado <= 0)) {
                 if ($saldoPendiente <= 0 && $montoPagado > 0) {
                     $estadoPago = 'pagado_total';
                 } elseif ($montoPagado > 0) {

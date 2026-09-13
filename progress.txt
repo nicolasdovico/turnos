@@ -1518,5 +1518,43 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - GET `/api/clubs/nico-tenis/resumen-diario?fecha_desde=2026-09-13&fecha_hasta=2026-09-13` retorna HTTP 200 con `total_facturado: 4000`, `total_cobrado: 4000`, `total_senas_retenidas: 4000`, `metodos_pago.online: 4000` y el Turno 156 catalogado con `es_penalidad: true`.
 ===============================================================================
 
+-------------------------------------------------------------------------------
+[2026-09-14] - CORRECCIÓN DE CONSISTENCIA FINANCIERA DE TURNOS FIJOS EN RESUMEN DIARIO & CAJA
+-------------------------------------------------------------------------------
+- Diagnóstico del Problema:
+  * En el complejo `nico-tenis` para la fecha 2026-09-14, existían reservas de turnos fijos recurrentes (ej. Turnos 44 y 70, Cancha 1, $8.000 c/u, $0 pagado).
+  * En la grilla de turnos (`GrillaHoraria`), figuraban correctamente como "🔁 Fijo" y "⏳ Pendiente".
+  * Sin embargo, en el panel de administración (`ResumenDiarioTurnos`), la rendición diaria mostraba:
+    - "Sin pagos" en el detalle de cobro a la izquierda.
+    - Pero con la oblea "✓ Pagado" a la derecha, sin mostrar el saldo pendiente a cobrar ($8.000) ni el botón "💵 Cobrar".
+    - A nivel de día y KPIs, el saldo pendiente figuraba en $0 y el estado de cobro en "al_dia".
+  * Causa Raíz 1: En la migración `2026_08_30_200221_add_financial_fields_to_turnos_table.php`, la columna `saldo_pendiente` tenía `default(0.00)`. Al crear o renovar turnos fijos en `TurnoFijoController` y `ClubDashboardController`, no se seteaba explícitamente `saldo_pendiente`, por lo que la base de datos asignó 0.00 a turnos sin pagar.
+  * Causa Raíz 2: En `ClubReporteService.php`, la verificación de `$saldoPend = $t->saldo_pendiente !== null ? (float) $t->saldo_pendiente : ...` tomaba `0.00` porque no era null, calculando deuda $0.
+  * Causa Raíz 3: En `ResumenDiarioTurnos.tsx`, `const isPaid = !isPenalidad && (t.saldo_pendiente <= 0 || t.estado_pago === "pagado" || t.estado_pago === "pagado_total");` evaluaba `0 <= 0` como `true`, asignando la oblea "✓ Pagado".
+- Solución Implementada:
+  * Migración de Base de Datos (`backend/database/migrations/2026_09_14_000001_recalcular_saldo_pendiente_turnos.php`):
+    - Recalculó automáticamente los registros históricos: para turnos activos con `monto_pagado < precio` y `estado_pago != 'pagado'`, actualizó `saldo_pendiente = precio - monto_pagado` y `estado_pago = 'pendiente'`.
+    - Reparó los 57 turnos recurrentes del sistema (incluidos Turno 44 y Turno 70 de `nico-tenis` a $8.000 c/u).
+  * Creación y Renovación de Series Fijas (`ClubDashboardController.php` & `TurnoFijoController.php`):
+    - Se aseguró la persistencia explícita de `monto_pagado => 0.00`, `saldo_pendiente => $precio`, `estado_pago => 'pendiente'` al crear turnos fijos y al renovar series por 6 meses.
+  * Blindaje en Servicios Backend (`ClubReporteService.php` & `DisponibilidadService.php`):
+    - Lógica robusta: si el turno no está completado/pagado, calcula `saldoCalculado = max(0, precio - monto_pagado)`. Si `saldo_pendiente` en BD era 0 a pesar de haber deuda impaga, se utiliza el saldo calculado.
+    - Asigna el `estado_pago` exacto: 'pendiente' si `monto_pagado == 0 && saldo > 0`, 'senado' si `monto_pagado > 0 && saldo > 0`, 'pagado_total' si `saldo <= 0 && monto_pagado > 0`.
+  * Frontend Web Next.js 14 (`ResumenDiarioTurnos.tsx`):
+    - Se redefinió `saldoReal` y `isPaid`: un turno con `monto_pagado == 0` y `precio > 0` NUNCA es considerado `isPaid`.
+    - Si el turno no está pagado:
+      * Muestra "Sin pagos" en color ámbar (`text-amber-400/90 font-medium`).
+      * Muestra `Resta: $${saldoReal.toLocaleString()}`.
+      * Despliega el botón "💵 Cobrar", el cual precarga el modal con el saldo pendiente exacto para cobrar en mostrador, transferencia o billetera virtual.
+- Verificación y Calidad:
+  * Backend PHPUnit: 184/184 tests pasados al 100% (999 aserciones, con nuevo test `test_turnos_fijos_sin_pagos_figuran_como_pendientes_en_resumen_diario` en `ClubResumenDiarioTest`).
+  * Frontend Web Vitest: 62/62 tests pasados al 100% (incluyendo `GrillaHoraria.test.tsx` y `authAndOnboarding.test.tsx`).
+  * Verificación en Vivo para `nico-tenis` el 2026-09-14:
+    - Turno 158: $8.000 pagado online, saldo pendiente $0, `estado_pago: 'pagado_total'`.
+    - Turno 44 (Fijo): $8.000 precio, $0 pagado, saldo pendiente $8.000, `estado_pago: 'pendiente'`.
+    - Turno 70 (Fijo): $8.000 precio, $0 pagado, saldo pendiente $8.000, `estado_pago: 'pendiente'`.
+    - Día 2026-09-14: Facturado $24.000, Cobrado $8.000, Saldo Pendiente $16.000, `estado_cobro: 'pendiente'`.
+===============================================================================
+
 
 

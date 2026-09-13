@@ -120,10 +120,15 @@ class TurnoFijoController extends Controller
                         ->first();
 
                     if ($existingTurno) {
+                        $montoPagadoActual = (float) ($existingTurno->monto_pagado ?? 0);
+                        $saldoPendienteCalculado = max(0.0, round($precio - $montoPagadoActual, 2));
                         $existingTurno->update([
                             'cliente_id' => $clienteId,
                             'hora_fin' => $horaFinNormalizada,
                             'precio' => $precio,
+                            'monto_pagado' => $montoPagadoActual,
+                            'saldo_pendiente' => $saldoPendienteCalculado,
+                            'estado_pago' => $saldoPendienteCalculado <= 0 && $montoPagadoActual > 0 ? 'pagado_total' : ($montoPagadoActual > 0 ? 'senado' : 'pendiente'),
                             'estado' => 'reservado',
                             'es_fijo' => true,
                         ]);
@@ -137,6 +142,9 @@ class TurnoFijoController extends Controller
                             'hora_inicio' => $horaInicioNormalizada,
                             'hora_fin' => $horaFinNormalizada,
                             'precio' => $precio,
+                            'monto_pagado' => 0.00,
+                            'saldo_pendiente' => $precio,
+                            'estado_pago' => 'pendiente',
                             'estado' => 'reservado',
                             'es_fijo' => true,
                         ]);

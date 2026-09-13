@@ -808,7 +808,16 @@ export default function ResumenDiarioTurnos({
                           <div className="space-y-2">
                             {dia.turnos.map((t) => {
                               const isPenalidad = t.estado === "cancelado" && (t.estado_pago === "retenido_penalidad" || !!t.es_penalidad);
-                              const isPaid = !isPenalidad && (t.saldo_pendiente <= 0 || t.estado_pago === "pagado" || t.estado_pago === "pagado_total");
+                              const saldoReal = isPenalidad
+                                ? 0
+                                : (typeof t.saldo_pendiente === "number" && t.saldo_pendiente > 0
+                                    ? t.saldo_pendiente
+                                    : Math.max(0, Number(t.precio || 0) - Number(t.monto_pagado || 0)));
+                              const isPaid = !isPenalidad && (
+                                Number(t.precio || 0) === 0 ||
+                                (saldoReal <= 0 && Number(t.monto_pagado || 0) > 0) ||
+                                ((t.estado_pago === "pagado" || t.estado_pago === "pagado_total" || t.estado === "pagado" || t.estado === "completado") && Number(t.monto_pagado || 0) >= Number(t.precio || 0))
+                              );
 
                               return (
                                 <div
@@ -868,7 +877,7 @@ export default function ResumenDiarioTurnos({
                                             {t.monto_pagado > 0 ? (
                                               <span className="text-emerald-400">Pagó ${t.monto_pagado.toLocaleString()}</span>
                                             ) : (
-                                              <span>Sin pagos</span>
+                                              <span className="text-amber-400/90 font-medium">Sin pagos</span>
                                             )}
                                           </div>
                                         </>
@@ -899,15 +908,15 @@ export default function ResumenDiarioTurnos({
                                       <div className="flex items-center gap-2">
                                         <div className="text-right">
                                           <span className="text-[10px] font-bold text-amber-400 uppercase block">
-                                            Resta: ${t.saldo_pendiente.toLocaleString()}
+                                            Resta: ${saldoReal.toLocaleString()}
                                           </span>
                                         </div>
                                         <button
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            setTurnoToPay(t);
-                                            setPagoMonto(t.saldo_pendiente.toString());
+                                            setTurnoToPay({ ...t, saldo_pendiente: saldoReal });
+                                            setPagoMonto(saldoReal.toString());
                                             setPagoMetodo("mostrador");
                                             const targetUserId = t.cliente_id;
                                             const targetEmail = (t as any).cliente_email;

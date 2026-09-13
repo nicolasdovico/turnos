@@ -161,9 +161,16 @@ class ClubReporteService
                     $globalSenasRetenidas += $montoPagado;
                 } else {
                     $precioEfectivo = $precioOriginal;
-                    $saldoPend = $t->saldo_pendiente !== null
-                        ? (float) $t->saldo_pendiente
-                        : max(0.0, $precioOriginal - $montoPagado);
+                    if (in_array($t->estado_pago, ['pagado', 'pagado_total']) || in_array($t->estado, ['pagado', 'completado'])) {
+                        $saldoPend = 0.0;
+                    } else {
+                        $saldoCalculado = max(0.0, round($precioOriginal - $montoPagado, 2));
+                        if ($t->saldo_pendiente !== null && (float) $t->saldo_pendiente > 0) {
+                            $saldoPend = (float) $t->saldo_pendiente;
+                        } else {
+                            $saldoPend = $saldoCalculado;
+                        }
+                    }
                 }
 
                 $montoTotalDia += $precioEfectivo;
@@ -199,6 +206,19 @@ class ClubReporteService
                     $totalesPorCancha[$t->cancha_id]['saldo_pendiente'] += $saldoPend;
                 }
 
+                $estadoPago = $t->estado_pago;
+                if ($isPenalidad) {
+                    $estadoPago = 'retenido_penalidad';
+                } elseif (empty($estadoPago) || ($estadoPago === 'pagado_total' && $saldoPend > 0 && $montoPagado <= 0)) {
+                    if ($saldoPend <= 0.0 && $montoPagado > 0) {
+                        $estadoPago = 'pagado_total';
+                    } elseif ($montoPagado > 0 && $saldoPend > 0.0) {
+                        $estadoPago = 'senado';
+                    } else {
+                        $estadoPago = 'pendiente';
+                    }
+                }
+
                 $listaTurnosFormateada[] = [
                     'id' => $t->id,
                     'cancha_id' => $t->cancha_id,
@@ -215,7 +235,7 @@ class ClubReporteService
                     'precio' => $precioOriginal,
                     'monto_pagado' => $montoPagado,
                     'saldo_pendiente' => $saldoPend,
-                    'estado_pago' => $t->estado_pago ?? ($saldoPend <= 0 ? 'pagado_total' : 'pendiente'),
+                    'estado_pago' => $estadoPago,
                     'metodo_pago' => $t->metodo_pago ?? 'mostrador',
                     'es_fijo' => $esFijo,
                     'estado' => $t->estado ?? 'reservado',

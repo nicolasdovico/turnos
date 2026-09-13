@@ -1073,6 +1073,8 @@ class ClubDashboardController extends Controller
                     ->first();
 
                 if ($turno) {
+                    $montoPagadoActual = (float) ($turno->monto_pagado ?? 0);
+                    $saldoPendienteCalculado = max(0.0, round($precio - $montoPagadoActual, 2));
                     $turno->update([
                         'complejo_id' => $complejo->id,
                         'cliente_id' => $clienteId,
@@ -1080,6 +1082,9 @@ class ClubDashboardController extends Controller
                         'cliente_telefono' => $clienteTelefono,
                         'hora_fin' => $horaFin,
                         'precio' => $precio,
+                        'monto_pagado' => $montoPagadoActual,
+                        'saldo_pendiente' => $saldoPendienteCalculado,
+                        'estado_pago' => $saldoPendienteCalculado <= 0 && $montoPagadoActual > 0 ? 'pagado_total' : ($montoPagadoActual > 0 ? 'senado' : 'pendiente'),
                         'metodo_pago' => $metodoPago,
                         'estado' => 'reservado',
                         'es_fijo' => true,
@@ -1096,6 +1101,9 @@ class ClubDashboardController extends Controller
                         'hora_inicio' => $horaInicio,
                         'hora_fin' => $horaFin,
                         'precio' => $precio,
+                        'monto_pagado' => 0.00,
+                        'saldo_pendiente' => $precio,
+                        'estado_pago' => 'pendiente',
                         'metodo_pago' => $metodoPago,
                         'estado' => 'reservado',
                         'es_fijo' => true,
@@ -1235,6 +1243,9 @@ class ClubDashboardController extends Controller
                     'hora_inicio' => $horaInicio,
                     'hora_fin' => $horaFin,
                     'precio' => $precio,
+                    'monto_pagado' => 0.00,
+                    'saldo_pendiente' => $precio,
+                    'estado_pago' => 'pendiente',
                     'metodo_pago' => $metodoPago,
                     'estado' => 'reservado',
                     'es_fijo' => true,

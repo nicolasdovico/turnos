@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Módulo Turnos Fijos & Horarios 100% Implementado)
-- **Última Actualización:** 2026-09-13 (Incorporación contable de señas retenidas por penalidad en Resumen Diario & Rendición de Caja: query adaptada en ClubReporteService y CajaService, KPI total_senas_retenidas, desglose por canal de pago, visualización detallada en ResumenDiarioTurnos con badge de penalidad y precio tachado sin saldo a cobrar pendiente; 183 tests backend, 62 frontend web, 20 mobile en verde).
+- **Última Actualización:** 2026-09-14 (Corrección de consistencia financiera de turnos fijos pendientes en Resumen Diario & Rendición: migración 2026_09_14_000001 para recalcular saldo_pendiente en base de datos, corrección en ClubDashboardController y TurnoFijoController al persistir series con saldo_pendiente = precio, blindaje en ClubReporteService y DisponibilidadService, y corrección en ResumenDiarioTurnos para no catalogar turnos impagos como "Pagado" y permitir su cobro en mostrador; 184 tests backend, 62 frontend web, 20 mobile en verde).
 
 ---
 
