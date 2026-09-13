@@ -1,4 +1,4 @@
-import { loginApi, registerApi, logoutApi, getProfileApi } from '../src/services/api';
+import { loginApi, registerApi, logoutApi, getProfileApi, fetchMisTurnosApi, cancelarTurnoClienteApi } from '../src/services/api';
 import * as secureStore from '../src/services/secureStore';
 
 // Mock de fetch global
@@ -102,4 +102,71 @@ describe('Cliente API de Autenticación Mobile', () => {
     );
     expect(profile.name).toBe('Jugador Autenticado');
   });
+
+  it('fetchMisTurnosApi obtiene los turnos del usuario autenticado con cabecera Bearer', async () => {
+    (secureStore.getToken as jest.Mock).mockResolvedValueOnce('secret_bearer_token');
+
+    const mockTurnos = [
+      {
+        id: 10,
+        fecha: '2026-09-15',
+        hora_inicio: '18:00',
+        hora_fin: '19:00',
+        monto_pagado: 5000,
+        saldo_pendiente: 5000,
+        estado: 'reservado',
+        puede_cancelar: true,
+      },
+    ];
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: mockTurnos, total: 1 }),
+    });
+
+    const turnos = await fetchMisTurnosApi();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/turnos/mis-turnos'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.any(Headers),
+      })
+    );
+    expect(turnos).toHaveLength(1);
+    expect(turnos[0].id).toBe(10);
+    expect(turnos[0].puede_cancelar).toBe(true);
+  });
+
+  it('cancelarTurnoClienteApi envía POST a /turnos/:id/cancelar-cliente con X-Tenant-ID y Bearer token', async () => {
+    (secureStore.getToken as jest.Mock).mockResolvedValueOnce('secret_bearer_token');
+
+    const mockResponse = {
+      success: true,
+      message: 'Turno cancelado exitosamente. Se han acreditado $5.000 a tu billetera virtual.',
+      reembolso_acreditado: true,
+      monto_reembolsado: 5000,
+      horas_restantes: 8,
+      limite_horas_complejo: 4,
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const res = await cancelarTurnoClienteApi(10, 2);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/turnos/10/cancelar-cliente'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.any(Headers),
+      })
+    );
+    expect(res.success).toBe(true);
+    expect(res.reembolso_acreditado).toBe(true);
+    expect(res.monto_reembolsado).toBe(5000);
+  });
 });
+

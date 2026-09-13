@@ -68,6 +68,7 @@ class DisponibilidadController extends Controller
             'precio_120_min' => $cancha->getPrecioParaDuracion(120),
             'tipo_cobro_reserva' => $cancha->complejo?->tipo_cobro_reserva ?? 'sena',
             'porcentaje_sena' => (float) ($cancha->complejo?->porcentaje_sena ?? 50.00),
+            'horas_limite_cancelacion' => (int) ($cancha->complejo?->horas_limite_cancelacion ?? 4),
             'slots_disponibles' => $slots,
             'turnos_ocupados' => $turnosOcupados,
             'turnos_retenidos' => $turnosRetenidos,

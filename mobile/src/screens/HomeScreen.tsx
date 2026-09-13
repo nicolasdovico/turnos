@@ -7,11 +7,13 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { Complejo } from '../types';
+import { Complejo, TurnoCliente } from '../types';
 import { getCurrentCoordinates, fetchNearbyComplejos } from '../services/locationService';
 import { registerForPushNotificationsAsync } from '../services/notificationService';
+import { fetchMisTurnosApi, cancelarTurnoClienteApi } from '../services/api';
 
 export function HomeScreen() {
   const { user, logout, isLoading } = useAuth();
@@ -19,11 +21,59 @@ export function HomeScreen() {
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [pushStatus, setPushStatus] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [misTurnos, setMisTurnos] = useState<TurnoCliente[]>([]);
+  const [isLoadingTurnos, setIsLoadingTurnos] = useState<boolean>(false);
 
-  // Inicializar geolocalización al cargar el Home
+  // Inicializar geolocalización y turnos al cargar el Home
   useEffect(() => {
     handleFindNearby();
+    handleLoadTurnos();
   }, []);
+
+  const handleLoadTurnos = async () => {
+    setIsLoadingTurnos(true);
+    try {
+      const turnos = await fetchMisTurnosApi();
+      setMisTurnos(turnos);
+    } catch {
+      // ignore network errors on home load
+    } finally {
+      setIsLoadingTurnos(false);
+    }
+  };
+
+  const handleCancelarTurno = (turno: TurnoCliente) => {
+    const limite = turno.limite_horas_cancelacion ?? 4;
+    const horas = turno.horas_restantes ?? 0;
+    const aplicaReembolso = horas >= limite && turno.monto_pagado > 0;
+
+    const mensajeExplicativo = aplicaReembolso
+      ? `Faltan aproximadamente ${horas} horas para tu partido (mínimo del club: ${limite} hs).\n\nSe reembolsarán $${turno.monto_pagado.toLocaleString()} de forma automática a tu Billetera Virtual en este club.`
+      : turno.monto_pagado > 0
+      ? `Faltan menos de ${limite} horas para tu partido.\n\nPor cancelación fuera de término, la seña abonada de $${turno.monto_pagado.toLocaleString()} no será reembolsable y quedará retenida en concepto de penalidad.`
+      : `¿Estás seguro de que deseas cancelar tu reserva para el ${turno.fecha} a las ${turno.hora_inicio} hs?`;
+
+    Alert.alert(
+      '¿Cancelar Turno?',
+      mensajeExplicativo,
+      [
+        { text: 'Volver', style: 'cancel' },
+        {
+          text: 'Confirmar Cancelación',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await cancelarTurnoClienteApi(turno.id, turno.complejo_id);
+              Alert.alert('Turno Cancelado', res.message || 'Tu reserva ha sido cancelada exitosamente.');
+              await handleLoadTurnos();
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'No se pudo cancelar el turno.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleFindNearby = async () => {
     setIsLocating(true);
@@ -109,7 +159,9 @@ export function HomeScreen() {
           <View className="flex-1 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
             <Text className="text-2xl mb-1">📅</Text>
             <Text className="text-xs font-semibold text-slate-400">Mis Turnos</Text>
-            <Text className="text-xl font-bold text-white mt-1">2 Activos</Text>
+            <Text className="text-xl font-bold text-white mt-1">
+              {misTurnos.filter((t) => t.estado === 'reservado').length} Activos
+            </Text>
           </View>
           <View className="flex-1 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
             <Text className="text-2xl mb-1">🏆</Text>
@@ -117,6 +169,117 @@ export function HomeScreen() {
             <Text className="text-xl font-bold text-white mt-1">1 Inscripto</Text>
           </View>
         </View>
+
+        {/* Sección Mis Turnos Reservados */}
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+            Tus Turnos Reservados 🎾
+          </Text>
+          <TouchableOpacity
+            onPress={handleLoadTurnos}
+            disabled={isLoadingTurnos}
+            className="flex-row items-center"
+          >
+            {isLoadingTurnos && <ActivityIndicator size="small" color="#10b981" className="mr-1" />}
+            <Text className="text-xs font-semibold text-emerald-400">Actualizar</Text>
+          </TouchableOpacity>
+        </View>
+
+        {misTurnos.length > 0 ? (
+          misTurnos.map((turno) => {
+            const isPagado = (turno.estado_pago === 'pagado' || turno.estado_pago === 'pagado_total') && turno.saldo_pendiente <= 0;
+            const isSenado = !isPagado && turno.monto_pagado > 0;
+            const isCancelado = turno.estado === 'cancelado';
+
+            return (
+              <View
+                key={turno.id}
+                className={`p-4 rounded-2xl mb-3 border ${
+                  isCancelado
+                    ? 'bg-slate-900/40 border-slate-800 opacity-60'
+                    : 'bg-slate-900 border-slate-800'
+                }`}
+              >
+                <View className="flex-row justify-between items-start mb-2">
+                  <View className="flex-1 mr-2">
+                    <Text className="text-base font-bold text-white">
+                      {turno.complejo?.nombre || 'Complejo Deportivo'}
+                    </Text>
+                    <Text className="text-xs text-slate-400">
+                      {turno.cancha?.nombre || 'Cancha'} • {turno.cancha?.deporte?.toUpperCase() || 'PÁDEL'}
+                    </Text>
+                  </View>
+                  <View className={`px-2.5 py-1 rounded-full border ${
+                    isCancelado
+                      ? 'bg-rose-500/10 border-rose-500/20'
+                      : isPagado
+                      ? 'bg-emerald-500/20 border-emerald-500/30'
+                      : isSenado
+                      ? 'bg-blue-500/20 border-blue-500/30'
+                      : 'bg-amber-500/20 border-amber-500/30'
+                  }`}>
+                    <Text className={`text-xs font-bold ${
+                      isCancelado
+                        ? 'text-rose-400'
+                        : isPagado
+                        ? 'text-emerald-300'
+                        : isSenado
+                        ? 'text-blue-300'
+                        : 'text-amber-300'
+                    }`}>
+                      {isCancelado
+                        ? 'Cancelado'
+                        : isPagado
+                        ? '100% Abonado'
+                        : isSenado
+                        ? 'Seña Abonada'
+                        : 'Pago Pendiente'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Fecha y Horario */}
+                <View className="flex-row items-center justify-between py-2 border-t border-slate-800/80 my-1">
+                  <Text className="text-xs text-slate-300 font-medium">
+                    📅 {turno.fecha}
+                  </Text>
+                  <Text className="text-xs font-mono font-bold text-emerald-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                    ⏰ {turno.hora_inicio} - {turno.hora_fin} hs
+                  </Text>
+                </View>
+
+                {/* Desglose Financiero */}
+                <View className="flex-row justify-between items-center text-xs pt-1">
+                  <Text className="text-xs text-slate-400">
+                    Abonado: <Text className="font-bold text-white">${turno.monto_pagado.toLocaleString()}</Text>
+                    {turno.saldo_pendiente > 0 && (
+                      <Text className="text-amber-400"> (Resta: ${turno.saldo_pendiente.toLocaleString()})</Text>
+                    )}
+                  </Text>
+                  <Text className="text-xs font-bold text-slate-300">
+                    Total: ${turno.precio.toLocaleString()}
+                  </Text>
+                </View>
+
+                {/* Botón de Cancelación */}
+                {!isCancelado && turno.puede_cancelar && (
+                  <TouchableOpacity
+                    className="mt-3 bg-rose-500/15 border border-rose-500/30 py-2.5 rounded-xl items-center active:bg-rose-500/25"
+                    onPress={() => handleCancelarTurno(turno)}
+                  >
+                    <Text className="text-rose-300 font-bold text-xs">✕ Cancelar Turno</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })
+        ) : (
+          <View className="bg-slate-900/50 border border-slate-800/80 p-4 rounded-2xl items-center mb-6">
+            <Text className="text-slate-400 text-xs text-center">
+              No tienes turnos reservados actualmente.
+            </Text>
+          </View>
+        )}
 
         {/* Sección de Geolocalización: Clubes Cercanos */}
         <View className="flex-row justify-between items-center mb-4">

@@ -41,8 +41,8 @@ Route::post('/turnos/liberar-bloqueo', [TurnoBloqueoController::class, 'liberarB
 Route::post('/turnos/confirmar', \App\Http\Controllers\Api\TurnoConfirmarController::class)
     ->middleware('tenant.has_module:reservas');
 
-Route::post('/turnos/{id}/cancelar-cliente', [\App\Http\Controllers\Api\TurnoCancelacionController::class, 'cancelarCliente'])
-    ->middleware('tenant.has_module:reservas');
+Route::get('/turnos/mis-turnos', [\App\Http\Controllers\Api\TurnoCancelacionController::class, 'misTurnos']);
+Route::post('/turnos/{id}/cancelar-cliente', [\App\Http\Controllers\Api\TurnoCancelacionController::class, 'cancelarCliente']);
 
 Route::get('/wallet/saldo', [\App\Http\Controllers\Api\WalletController::class, 'getSaldo']);
 Route::get('/wallet/movimientos', [\App\Http\Controllers\Api\WalletController::class, 'getMovimientos']);

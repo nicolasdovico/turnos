@@ -17,9 +17,79 @@ class TurnoCancelacionController extends Controller
         protected WalletService $walletService
     ) {}
 
+    public function misTurnos(Request $request): JsonResponse
+    {
+        $user = auth()->user() ?: ($request->bearerToken() ? \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable : null);
+
+        if (!$user) {
+            return response()->json([
+                'error' => 'UNAUTHENTICATED',
+                'message' => 'Debes iniciar sesión para consultar tus turnos.',
+            ], 401);
+        }
+
+        $turnos = Turno::withoutGlobalScopes()
+            ->where('cliente_id', $user->id)
+            ->with(['cancha.complejo'])
+            ->orderBy('fecha', 'desc')
+            ->orderBy('hora_inicio', 'desc')
+            ->get();
+
+        $data = $turnos->map(function ($t) {
+            $complejo = $t->cancha?->complejo;
+            $timezone = $complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
+
+            $fechaStr = $t->fecha instanceof Carbon ? $t->fecha->format('Y-m-d') : (string) $t->fecha;
+            $slotStartDateTime = Carbon::parse($fechaStr . ' ' . $t->hora_inicio, $timezone);
+            $now = Carbon::now($timezone);
+
+            $horasRestantes = $now->diffInHours($slotStartDateTime, false);
+            $limiteHoras = (int) ($complejo?->horas_limite_cancelacion ?? 4);
+
+            $dentroDeTiempo = $horasRestantes >= $limiteHoras;
+            $puedeCancelar = $t->estado === 'reservado';
+
+            return [
+                'id' => $t->id,
+                'complejo_id' => $t->complejo_id,
+                'cancha_id' => $t->cancha_id,
+                'fecha' => $fechaStr,
+                'hora_inicio' => substr($t->hora_inicio, 0, 5),
+                'hora_fin' => substr($t->hora_fin, 0, 5),
+                'precio' => (float) $t->precio,
+                'monto_pagado' => (float) ($t->monto_pagado ?? 0),
+                'saldo_pendiente' => (float) ($t->saldo_pendiente ?? 0),
+                'estado' => $t->estado,
+                'estado_pago' => $t->estado_pago,
+                'metodo_pago' => $t->metodo_pago,
+                'es_fijo' => (bool) $t->es_fijo,
+                'cancha' => $t->cancha ? [
+                    'id' => $t->cancha->id,
+                    'nombre' => $t->cancha->nombre,
+                    'deporte' => $t->cancha->deporte,
+                ] : null,
+                'complejo' => $complejo ? [
+                    'id' => $complejo->id,
+                    'nombre' => $complejo->nombre,
+                    'subdominio' => $complejo->subdominio,
+                    'horas_limite_cancelacion' => $limiteHoras,
+                ] : null,
+                'horas_restantes' => $horasRestantes,
+                'puede_cancelar' => $puedeCancelar,
+                'aplica_reembolso' => $dentroDeTiempo && (float) $t->monto_pagado > 0,
+                'limite_horas_cancelacion' => $limiteHoras,
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+            'total' => $data->count(),
+        ]);
+    }
+
     public function cancelarCliente(Request $request, int $id): JsonResponse
     {
-        $turno = Turno::with(['cancha.complejo'])->find($id);
+        $turno = Turno::withoutGlobalScopes()->with(['cancha.complejo'])->find($id);
 
         if (!$turno) {
             return response()->json([
@@ -49,7 +119,16 @@ class TurnoCancelacionController extends Controller
         }
 
         $complejo = $turno->cancha?->complejo;
-        $timezone = $complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
+
+        if (!$complejo || !$complejo->hasModule('reservas')) {
+            return response()->json([
+                'error' => 'MODULE_NOT_ENABLED',
+                'module' => 'reservas',
+                'message' => 'El módulo de reservas no está activo en este complejo.',
+            ], 403);
+        }
+
+        $timezone = $complejo->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
 
         $fechaStr = $turno->fecha instanceof Carbon ? $turno->fecha->format('Y-m-d') : (string) $turno->fecha;
         $slotStartDateTime = Carbon::parse($fechaStr . ' ' . $turno->hora_inicio, $timezone);

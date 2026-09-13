@@ -1,4 +1,4 @@
-import { AuthResponse, User } from '../types';
+import { AuthResponse, TurnoCliente, User } from '../types';
 import { getToken } from './secureStore';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080/api';
@@ -106,3 +106,54 @@ export async function getProfileApi(): Promise<User> {
 
   return data.user as User;
 }
+
+/**
+ * Obtener los turnos del cliente autenticado.
+ */
+export async function fetchMisTurnosApi(): Promise<TurnoCliente[]> {
+  const response = await fetchWithAuth('/turnos/mis-turnos', {
+    method: 'GET',
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Error al obtener tus turnos');
+  }
+
+  return (data.data || []) as TurnoCliente[];
+}
+
+/**
+ * Cancelar un turno del cliente autenticado aplicando reglas de política y reembolso.
+ */
+export async function cancelarTurnoClienteApi(
+  turnoId: number,
+  complejoId?: number
+): Promise<{
+  success: boolean;
+  message: string;
+  reembolso_acreditado: boolean;
+  monto_reembolsado: number;
+  horas_restantes: number;
+  limite_horas_complejo: number;
+}> {
+  const headers: Record<string, string> = {};
+  if (complejoId) {
+    headers['X-Tenant-ID'] = String(complejoId);
+  }
+
+  const response = await fetchWithAuth(`/turnos/${turnoId}/cancelar-cliente`, {
+    method: 'POST',
+    headers,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || data.error || 'Error al cancelar la reserva');
+  }
+
+  return data;
+}
+

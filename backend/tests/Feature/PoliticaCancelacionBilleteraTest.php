@@ -174,4 +174,91 @@ class PoliticaCancelacionBilleteraTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    public function test_cliente_puede_listar_sus_turnos_con_estado_y_posibilidad_de_cancelar(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $turno = Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'cliente_id' => $this->cliente->id,
+            'cliente_nombre' => $this->cliente->name,
+            'cliente_telefono' => $this->cliente->telefono,
+            'fecha' => '2026-08-31',
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:00',
+            'precio' => 12000.00,
+            'monto_pagado' => 6000.00,
+            'saldo_pendiente' => 6000.00,
+            'metodo_pago' => 'online',
+            'estado_pago' => 'senado',
+            'estado' => 'reservado',
+        ]);
+
+        $response = $this->actingAs($this->cliente)
+            ->getJson('/api/turnos/mis-turnos');
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'data' => [
+                '*' => [
+                    'id',
+                    'fecha',
+                    'hora_inicio',
+                    'hora_fin',
+                    'precio',
+                    'monto_pagado',
+                    'saldo_pendiente',
+                    'estado',
+                    'estado_pago',
+                    'cancha',
+                    'complejo',
+                    'horas_restantes',
+                    'puede_cancelar',
+                    'aplica_reembolso',
+                    'limite_horas_cancelacion',
+                ],
+            ],
+            'total',
+        ]);
+
+        $this->assertEquals(1, $response->json('total'));
+        $this->assertEquals(6000.00, $response->json('data.0.monto_pagado'));
+        $this->assertTrue($response->json('data.0.puede_cancelar'));
+        $this->assertTrue($response->json('data.0.aplica_reembolso'));
+        $this->assertEquals(8, $response->json('data.0.horas_restantes'));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_usuario_no_puede_cancelar_turno_ajeno(): void
+    {
+        $otroCliente = User::factory()->create([
+            'name' => 'Otro Usuario',
+            'email' => 'otro@usuario.com',
+        ]);
+
+        $turno = Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'cliente_id' => $this->cliente->id,
+            'cliente_nombre' => $this->cliente->name,
+            'fecha' => '2026-08-31',
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:00',
+            'precio' => 12000.00,
+            'monto_pagado' => 6000.00,
+            'saldo_pendiente' => 6000.00,
+            'estado' => 'reservado',
+        ]);
+
+        $response = $this->actingAs($otroCliente)
+            ->postJson("/api/turnos/{$turno->id}/cancelar-cliente");
+
+        $response->assertStatus(403);
+        $response->assertJson([
+            'error' => 'UNAUTHORIZED',
+        ]);
+    }
 }

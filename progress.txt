@@ -1397,6 +1397,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación de Calidad:
   * Backend PHPUnit: 169 tests pasados al 100% (882 aserciones).
   * Frontend Vitest: 55 tests pasados al 100% (4 archivos de test).
+-------------------------------------------------------------------------------
+[2026-09-13] - CANCELACIÓN DE TURNOS POR CLIENTES REGISTRADOS (WEB & MOBILE) CON POLÍTICA DE REEMBOLSO Y PENALIDAD
+-------------------------------------------------------------------------------
+- Diagnóstico y Requerimiento:
+  * Permitir a un cliente registrado cancelar sus reservas desde cualquier dispositivo conectado (Web Next.js y App Móvil React Native).
+  * Aplicar de forma estricta las políticas de cancelación del complejo:
+    - Si faltan >= horas_limite_cancelacion (por defecto 4 horas) para el inicio del turno: Reembolso del 100% de la seña/pago previo acreditado automáticamente a su Billetera Virtual en el club (`user_creditos`).
+    - Si faltan < horas_limite_cancelacion: El turno se libera pero la seña queda retenida como penalidad (`estado_pago = 'retenido_penalidad'`).
+    - En ambos casos, el turno pasa a estado 'cancelado' y se dispara `NotificarListaEsperaJob` para alertar de inmediato a jugadores en lista de espera.
+- Implementación Backend (Laravel 11):
+  * `TurnoCancelacionController.php`:
+    - Endpoint `GET /api/turnos/mis-turnos`: Devuelve todos los turnos reservados/confirmados del usuario autenticado con cálculo dinámico de `horas_restantes`, `puede_cancelar`, `aplica_reembolso` y `limite_horas_cancelacion`.
+    - Endpoint `POST /api/turnos/{id}/cancelar-cliente`: Utiliza `Turno::withoutGlobalScopes()` para resolver la reserva, valida ownership del usuario, verifica que el complejo tenga el módulo `reservas` activo, ejecuta el reembolso atómico a billetera o retención por penalidad y despacha `NotificarListaEsperaJob`.
+  * `routes/api.php`:
+    - Registro de rutas autenticadas `GET /api/turnos/mis-turnos` y `POST /api/turnos/{id}/cancelar-cliente`.
+  * `DisponibilidadController.php`:
+    - Retorna `horas_limite_cancelacion` en el JSON de disponibilidad para uso en clientes web.
+  * Tests Backend (`PoliticaCancelacionBilleteraTest.php`):
+    - `test_cancelar_turno_con_mas_de_4_horas_acredita_reembolso_en_billetera_y_notifica_espera`
+    - `test_cancelar_turno_con_menos_de_4_horas_retiene_sena_sin_reembolso_a_billetera`
+    - `test_cliente_puede_listar_sus_turnos_con_estado_y_posibilidad_de_cancelacion`
+    - `test_usuario_no_puede_cancelar_turno_ajeno`
+- Implementación Frontend Web (Next.js 14):
+  * `GrillaHoraria.tsx`:
+    - Tarjeta "Tus Reservas Confirmadas": Añadido botón interactivo `[ ✕ Cancelar Turno ]` por cada reserva del cliente.
+    - Modal de Confirmación de Cancelación: Informa detalle del turno, tiempo restante, política de cancelación del club y desglose exacto de reembolso (100% a billetera virtual si está en término, o retención por penalidad si es tardía).
+    - Gestión de estado: Llamada asíncrona a `POST /api/turnos/{id}/cancelar-cliente`, actualización reactiva del saldo en billetera (`walletBalance`), remoción de la reserva en el estado local y recarga de disponibilidad.
+    - Tipado y consistencia estricta: `walletBalance` normalizado como `number` y eliminación de argumentos redundantes en `fetchDisponibilidad`.
+  * Tests Web (`GrillaHoraria.test.tsx`):
+    - Test de integración verificando la apertura del modal de cancelación, visualización de políticas de reembolso y llamada correcta a la API con actualización de UI.
+- Implementación Frontend Mobile (React Native Expo):
+  * `types/index.ts`: Nueva interfaz `TurnoCliente`.
+  * `services/api.ts`: Métodos `fetchMisTurnosApi` y `cancelarTurnoClienteApi`.
+  * `HomeScreen.tsx`:
+    - Sección "Tus Turnos Reservados 🎾" con badge de conteo activo.
+    - Tarjeta por cada turno con estado, fecha, hora, monto abonado y badge de política de cancelación (Reembolso 100% vs Penalidad).
+    - Confirmación nativa mediante `Alert.alert` detallando las condiciones según las horas restantes.
+    - Acción de cancelación con feedback instantáneo y actualización de la lista.
+  * Tests Mobile (`__tests__/api.test.ts`):
+    - Cobertura de llamadas a API para `fetchMisTurnosApi` y `cancelarTurnoClienteApi`.
+- Verificación de Calidad:
+  * Backend PHPUnit: 181 tests pasados al 100% (959 aserciones).
+  * Frontend Web Vitest: 59 tests pasados al 100% (4 archivos de test).
+  * Frontend Web Build: `next build` producción exitoso (11/11 páginas estáticas generadas, 0 errores).
+  * Frontend Mobile Jest: 20 tests pasados al 100% (4 archivos de test).
 ===============================================================================
 
 

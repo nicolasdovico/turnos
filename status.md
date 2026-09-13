@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Módulo Turnos Fijos & Horarios 100% Implementado)
-- **Última Actualización:** 2026-09-05 (Cancelación en mostrador con reembolso a Billetera Virtual y alta express de usuario validado con OTP de 6 dígitos vía Mailpit; opción de reembolso en efectivo; asignación de email opcional en mostrador y actualización reactiva de saldo de billetera; 174 tests backend y 56 frontend en verde)
+- **Última Actualización:** 2026-09-13 (Cancelación de turnos por clientes registrados en Frontend Web y Mobile con políticas de reembolso automático a Billetera Virtual o penalidad tardía; endpoints de mis turnos y cancelación con notificación inmediata a lista de espera vía FCM; 181 tests backend, 59 frontend web, 20 mobile en verde, 0 errores en build de producción Next.js)
 
 ---
 

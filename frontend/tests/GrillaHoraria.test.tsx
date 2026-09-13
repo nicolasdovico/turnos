@@ -2233,4 +2233,122 @@ describe("Componente Reactivo GrillaHoraria", () => {
       );
     });
   });
+
+  it("permite al cliente registrado cancelar su turno desde su vista con confirmación de políticas de reembolso", async () => {
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 10, name: "Juan Perez", email: "juan@example.com" })
+    );
+    localStorage.setItem("saas_token", "dummy-client-token");
+
+    const occupiedTurno = {
+      id: 10,
+      cancha_id: 1,
+      fecha: "2026-09-01",
+      hora_inicio: "18:00",
+      hora_fin: "19:00",
+      precio: 10000,
+      monto_pagado: 5000,
+      saldo_pendiente: 5000,
+      estado_pago: "senado",
+      estado: "reservado",
+      cliente_id: 10,
+      cliente_nombre: "Juan Perez",
+      cliente_email: "juan@example.com",
+      is_mine: true,
+    };
+
+    let cancelCalled = false;
+
+    vi.spyOn(global, "fetch").mockImplementation((url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              user: { id: 10, name: "Juan Perez", email: "juan@example.com" },
+            }),
+        });
+      }
+      if (urlStr.includes("/turnos/10/cancelar-cliente")) {
+        cancelCalled = true;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "Turno cancelado exitosamente. Se han acreditado $5.000 en tu billetera virtual.",
+              reembolso_acreditado: true,
+              monto_reembolsado: 5000,
+            }),
+        });
+      }
+      if (urlStr.includes("/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              slots: [],
+              turnos_ocupados: cancelCalled ? [] : [occupiedTurno],
+              tipo_cobro_reserva: "sena",
+              porcentaje_sena: 50,
+              horas_limite_cancelacion: 4,
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+      />
+    );
+
+    // 1. Debe aparecer la tarjeta de reserva confirmada del cliente con su botón de cancelar
+    await waitFor(() => {
+      expect(screen.getByTestId("client-confirmed-turnos-section")).toBeDefined();
+      expect(screen.getByTestId("client-cancel-btn-10")).toBeDefined();
+    });
+
+    // 2. Click en Cancelar Turno
+    fireEvent.click(screen.getByTestId("client-cancel-btn-10"));
+
+    // 3. Debe abrirse el modal con la advertencia y desglose de reembolso
+    await waitFor(() => {
+      expect(screen.getByTestId("client-cancel-modal")).toBeDefined();
+      expect(screen.getByText("¿Cancelar tu Reserva?")).toBeDefined();
+      expect(screen.getByTestId("confirm-client-cancel-btn")).toBeDefined();
+    });
+
+    // 4. Confirmar la cancelación
+    fireEvent.click(screen.getByTestId("confirm-client-cancel-btn"));
+
+    // 5. Debe haberse llamado a POST /turnos/10/cancelar-cliente y cerrado el modal
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/turnos/10/cancelar-cliente"),
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            Authorization: "Bearer dummy-client-token",
+          }),
+        })
+      );
+      expect(screen.queryByTestId("client-cancel-modal")).toBeNull();
+    });
+  });
 });
+

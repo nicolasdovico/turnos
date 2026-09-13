@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock, DollarSign, User, Calendar } from "lucide-react";
+import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock, DollarSign, User, Calendar, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export interface Slot {
@@ -163,6 +163,10 @@ export default function GrillaHoraria({
   const [cancelOtpCountdown, setCancelOtpCountdown] = useState<number>(0);
   const [isSendingCancelOtp, setIsSendingCancelOtp] = useState<boolean>(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [clientCancelModalTurno, setClientCancelModalTurno] = useState<TurnoOcupado | null>(null);
+  const [isCancelingClientTurno, setIsCancelingClientTurno] = useState<boolean>(false);
+  const [clientCancelError, setClientCancelError] = useState<string | null>(null);
+  const [clubHorasLimiteCancelacion, setClubHorasLimiteCancelacion] = useState<number>(4);
   const [turnoToPay, setTurnoToPay] = useState<TurnoOcupado | null>(null);
   const [pagoMetodo, setPagoMetodo] = useState<"mostrador" | "transferencia" | "billetera" | "online">("mostrador");
   const [pagoMonto, setPagoMonto] = useState<string>("");
@@ -305,7 +309,7 @@ export default function GrillaHoraria({
     const token = getAuthToken(propToken);
     if (!token) {
       setCurrentUser(null);
-      setWalletBalance(null);
+      setWalletBalance(0);
       return;
     }
     if (typeof fetch === "function") {
@@ -330,7 +334,7 @@ export default function GrillaHoraria({
                 fetchWalletBalance();
               } else {
                 setCurrentUser(null);
-                setWalletBalance(null);
+                setWalletBalance(0);
               }
             })
             .catch(() => {});
@@ -356,7 +360,7 @@ export default function GrillaHoraria({
       setCurrentUser(null);
       setClienteNombre("");
       setClienteTelefono("");
-      setWalletBalance(null);
+      setWalletBalance(0);
       setConfirmedTurnos([]);
     }
     prevUserRef.current = globalAuthUser;
@@ -370,7 +374,7 @@ export default function GrillaHoraria({
         setCurrentUser(null);
         setClienteNombre("");
         setClienteTelefono("");
-        setWalletBalance(null);
+        setWalletBalance(0);
         setConfirmedTurnos([]);
         setActiveLock(null);
         setMyLockedSlots({});
@@ -379,7 +383,7 @@ export default function GrillaHoraria({
             sessionStorage.removeItem(`confirmed_turnos_${canchaId}`);
           } catch {}
         }
-        fetchDisponibilidad(fecha, duracion, false, true);
+        fetchDisponibilidad(fecha, duracion, false);
       } else {
         setCurrentUser(detail.user);
         if (!isAdmin) {
@@ -389,7 +393,7 @@ export default function GrillaHoraria({
           }
         }
         fetchWalletBalance();
-        fetchDisponibilidad(fecha, duracion, false, true);
+        fetchDisponibilidad(fecha, duracion, false);
       }
     };
 
@@ -691,6 +695,11 @@ export default function GrillaHoraria({
       } else if (data.data?.tipo_cobro_reserva) {
         setClubTipoCobro(data.data.tipo_cobro_reserva);
       }
+      if (data.horas_limite_cancelacion !== undefined && !isNaN(Number(data.horas_limite_cancelacion))) {
+        setClubHorasLimiteCancelacion(Number(data.horas_limite_cancelacion));
+      } else if (data.data?.horas_limite_cancelacion !== undefined && !isNaN(Number(data.data.horas_limite_cancelacion))) {
+        setClubHorasLimiteCancelacion(Number(data.data.horas_limite_cancelacion));
+      }
 
       const incomingTurnos: TurnoOcupado[] = Array.isArray(data.turnos_ocupados)
         ? data.turnos_ocupados
@@ -780,6 +789,68 @@ export default function GrillaHoraria({
       }
     } finally {
       if (!silent) setLoading(false);
+    }
+  };
+
+  const openClientCancelModal = (turno: TurnoOcupado) => {
+    setClientCancelModalTurno(turno);
+    setClientCancelError(null);
+  };
+
+  const handleConfirmClientCancel = async () => {
+    if (!clientCancelModalTurno) return;
+    const targetTurno = clientCancelModalTurno;
+    setIsCancelingClientTurno(true);
+    setClientCancelError(null);
+    try {
+      const token = getAuthToken(propToken);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/turnos/${targetTurno.id}/cancelar-cliente`, {
+        method: "POST",
+        headers,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Error al cancelar la reserva.");
+      }
+
+      // Si hubo reembolso a billetera virtual, actualizar saldo local
+      if (data.reembolso_acreditado && data.monto_reembolsado) {
+        setWalletBalance((prev) => (prev ?? 0) + Number(data.monto_reembolsado));
+      }
+
+      // Remover el turno cancelado de las listas locales
+      setConfirmedTurnos((prev) => prev.filter((t) => t.id !== targetTurno.id));
+      setTurnosOcupados((prev) => prev.filter((t) => t.id !== targetTurno.id));
+
+      if (typeof window !== "undefined") {
+        try {
+          const stored = sessionStorage.getItem(`confirmed_turnos_${canchaId}`);
+          if (stored) {
+            const parsed: TurnoOcupado[] = JSON.parse(stored);
+            const filtered = parsed.filter((t) => t.id !== targetTurno.id);
+            sessionStorage.setItem(`confirmed_turnos_${canchaId}`, JSON.stringify(filtered));
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      addToast("success", data.message || "Tu turno fue cancelado correctamente.");
+      setClientCancelModalTurno(null);
+      fetchDisponibilidad(fecha);
+    } catch (err: any) {
+      setClientCancelError(err.message || "Error al cancelar el turno.");
+      addToast("error", err.message || "Error al cancelar el turno.");
+    } finally {
+      setIsCancelingClientTurno(false);
     }
   };
 
@@ -2419,7 +2490,19 @@ export default function GrillaHoraria({
 
                   <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
                     <span>Total: <strong className="text-white">${(turno.precio || 0).toLocaleString()}</strong></span>
-                    <span className="text-emerald-400 font-medium">✓ Cancha confirmada</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-emerald-400 font-medium">✓ Cancha confirmada</span>
+                      {turno.id && (
+                        <button
+                          type="button"
+                          data-testid={`client-cancel-btn-${turno.id}`}
+                          onClick={() => openClientCancelModal(turno)}
+                          className="px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/25 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+                        >
+                          <span>✕</span> Cancelar Turno
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -2631,6 +2714,126 @@ export default function GrillaHoraria({
           )}
         </div>
       )}
+
+      {/* Modal Confirmación de Cancelación de Turno por el Cliente */}
+      {clientCancelModalTurno && (() => {
+        const now = new Date();
+        const [y, m, d] = (clientCancelModalTurno.fecha || fecha).split("-").map(Number);
+        const [hh, mm] = (clientCancelModalTurno.hora_inicio || "00:00").split(":").map(Number);
+        const slotStart = new Date(y, m - 1, d, hh, mm);
+        const diffMs = slotStart.getTime() - now.getTime();
+        const diffHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+        const dentroDeTiempo = diffHours >= clubHorasLimiteCancelacion;
+        const montoPagado = Number(clientCancelModalTurno.monto_pagado || 0);
+
+        return (
+          <div
+            data-testid="client-cancel-modal"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150"
+          >
+            <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-left">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl border bg-rose-500/10 text-rose-400 border-rose-500/20">
+                  ⚠️
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">¿Cancelar tu Reserva?</h3>
+                  <p className="text-xs text-slate-400">
+                    {canchaNombre} • {clientCancelModalTurno.fecha}
+                  </p>
+                </div>
+              </div>
+
+              {/* Detalle del Turno */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs space-y-2">
+                <div className="flex justify-between items-center text-slate-300">
+                  <span className="text-slate-400">Horario:</span>
+                  <span className="font-mono font-bold text-white">
+                    {clientCancelModalTurno.hora_inicio} a {clientCancelModalTurno.hora_fin} hs
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-300">
+                  <span className="text-slate-400">Titular:</span>
+                  <span className="font-semibold text-slate-200">
+                    {clientCancelModalTurno.cliente_nombre || currentUser?.name || "Jugador"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-300">
+                  <span className="text-slate-400">Abonado Online:</span>
+                  <span className={`font-mono font-bold ${montoPagado > 0 ? "text-emerald-400" : "text-slate-400"}`}>
+                    ${montoPagado.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Explicación de Políticas y Billetera Virtual */}
+              {montoPagado > 0 ? (
+                dentroDeTiempo ? (
+                  <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 text-xs space-y-1.5 text-emerald-200">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                      <span>✓</span>
+                      <span>Reembolso 100% en Billetera Virtual</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-300/90 leading-relaxed">
+                      Faltan aproximadamente <strong>{diffHours} horas</strong> para el inicio de tu turno (política del club: mínimo {clubHorasLimiteCancelacion} hs). Se acreditarán <strong>${montoPagado.toLocaleString()}</strong> de forma inmediata en tu Billetera Virtual de este club.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-xs space-y-1.5 text-amber-200">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                      <span>⚠️</span>
+                      <span>Cancelación fuera de término</span>
+                    </div>
+                    <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                      Faltan menos de {clubHorasLimiteCancelacion} horas para el turno. Por política de cancelaciones tardías del club, la seña abonada de <strong>${montoPagado.toLocaleString()}</strong> no es reembolsable y quedará retenida en concepto de penalidad.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/50 text-xs text-slate-300">
+                  <p className="text-[11px] leading-relaxed">
+                    No habías abonado una seña previa para este turno. El turno se cancelará y el horario quedará liberado para otros jugadores.
+                  </p>
+                </div>
+              )}
+
+              {clientCancelError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400">
+                  {clientCancelError}
+                </div>
+              )}
+
+              {/* Botones de Acción */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  disabled={isCancelingClientTurno}
+                  onClick={() => setClientCancelModalTurno(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-semibold transition cursor-pointer"
+                >
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  data-testid="confirm-client-cancel-btn"
+                  disabled={isCancelingClientTurno}
+                  onClick={handleConfirmClientCancel}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-rose-900/30 cursor-pointer disabled:opacity-50"
+                >
+                  {isCancelingClientTurno ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Cancelando...</span>
+                    </>
+                  ) : (
+                    <span>Confirmar Cancelación</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal Confirmación de Cancelación / Liberación de Turno (Admin) */}
       {turnoToCancel && (
