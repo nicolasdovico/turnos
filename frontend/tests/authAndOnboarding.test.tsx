@@ -1023,6 +1023,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
         total_facturado: 45000,
         total_cobrado: 35000,
         total_saldo_pendiente: 10000,
+        total_senas_retenidas: 4000,
         total_turnos: 4,
         total_turnos_fijos: 1,
         ocupacion_promedio: 75.5,
@@ -1038,6 +1039,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
           monto_total: 25000,
           monto_cobrado: 25000,
           saldo_pendiente: 0,
+          senas_retenidas: 0,
           estado_cobro: "al_dia",
           ocupacion_porcentaje: 80.0,
           minutos_ocupados: 180,
@@ -1078,14 +1080,15 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
           monto_total: 20000,
           monto_cobrado: 10000,
           saldo_pendiente: 10000,
+          senas_retenidas: 4000,
           estado_cobro: "pendiente",
           ocupacion_porcentaje: 70.0,
           minutos_ocupados: 120,
           minutos_disponibles: 240,
           desglose_metodos: {
             mostrador: 0,
-            transferencia: 10000,
-            online: 0,
+            transferencia: 6000,
+            online: 4000,
             billetera: 0,
             otro: 0,
           },
@@ -1107,6 +1110,24 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
               es_fijo: false,
               estado: "reservado",
             },
+            {
+              id: 103,
+              cancha_id: 1,
+              cancha_nombre: "Cancha Central",
+              cliente_nombre: "Marcelo Gallardo",
+              cliente_telefono: "+5491199881122",
+              hora_inicio: "16:00",
+              hora_fin: "17:00",
+              duracion_minutos: 60,
+              precio: 8000,
+              monto_pagado: 4000,
+              saldo_pendiente: 0,
+              estado_pago: "retenido_penalidad",
+              metodo_pago: "online",
+              es_fijo: false,
+              estado: "cancelado",
+              es_penalidad: true,
+            },
           ],
         },
       ],
@@ -1123,8 +1144,8 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
       ],
       metodos_pago: {
         mostrador: 25000,
-        transferencia: 10000,
-        online: 0,
+        transferencia: 6000,
+        online: 4000,
         billetera: 0,
         otro: 0,
       },
@@ -1187,12 +1208,14 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getAllByText("$45,000").length).toBeGreaterThanOrEqual(1); // Total Facturado
     expect(screen.getAllByText("$35,000").length).toBeGreaterThanOrEqual(1); // Cobrado
     expect(screen.getAllByText("$10,000").length).toBeGreaterThanOrEqual(1); // Saldo Pendiente
+    expect(screen.getByText(/Inc\. \$4,000 por señas retenidas/i)).toBeDefined();
 
     // Verify Day Rows
     expect(screen.getByText(/Martes/i)).toBeDefined();
     expect(screen.getByText(/Miércoles/i)).toBeDefined();
     expect(screen.getAllByText(/Al Día/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Pendiente/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Inc\. \$4,000 retenido/i)).toBeDefined();
 
     // Click to expand day details
     const dayRow = screen.getByText(/Miércoles/i);
@@ -1201,5 +1224,11 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     // Verify detailed turnos inside expanded accordion
     expect(await screen.findByText(/Martín Palermo/i)).toBeDefined();
     expect(screen.getByRole("button", { name: /Cobrar/i })).toBeDefined();
+
+    // Verify cancelled turno with penalty
+    expect(screen.getByText(/Marcelo Gallardo/i)).toBeDefined();
+    expect(screen.getByText(/Cancelado/i)).toBeDefined();
+    expect(screen.getByText(/Seña Retenida \(Penalidad\)/i)).toBeDefined();
+    expect(screen.getByText(/Seña retenida: \$4,000/i)).toBeDefined();
   });
 });

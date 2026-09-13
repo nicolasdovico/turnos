@@ -57,10 +57,17 @@ class ClubReporteService
         // Horarios de atención configurados (para cálculo de ocupación)
         $horarios = HorarioAtencion::where('complejo_id', $complejo->id)->get();
 
-        // Consulta de turnos
+        // Consulta de turnos (incluyendo turnos cancelados con seña retenida por penalidad)
         $turnosQuery = Turno::where('complejo_id', $complejo->id)
             ->whereBetween('fecha', [$strDesde, $strHasta])
-            ->whereNotIn('estado', ['cancelado', 'rechazado', 'anulado'])
+            ->where(function ($q) {
+                $q->whereNotIn('estado', ['cancelado', 'rechazado', 'anulado'])
+                  ->orWhere(function ($sub) {
+                      $sub->where('estado', 'cancelado')
+                          ->where('estado_pago', 'retenido_penalidad')
+                          ->where('monto_pagado', '>', 0);
+                  });
+            })
             ->with(['cancha']);
 
         if ($canchaId) {
@@ -91,6 +98,7 @@ class ClubReporteService
         $globalFacturado = 0.0;
         $globalCobrado = 0.0;
         $globalSaldoPendiente = 0.0;
+        $globalSenasRetenidas = 0.0;
         $globalTurnosCount = 0;
         $globalTurnosFijosCount = 0;
         $globalMinutosOcupados = 0;
@@ -125,6 +133,7 @@ class ClubReporteService
             $montoTotalDia = 0.0;
             $montoCobradoDia = 0.0;
             $saldoPendienteDia = 0.0;
+            $senasRetenidasDia = 0.0;
             $fijosDia = 0;
             $minutosOcupadosDia = 0;
 
@@ -139,13 +148,25 @@ class ClubReporteService
             $listaTurnosFormateada = [];
 
             foreach ($turnosDelDia as $t) {
-                $precio = (float) ($t->precio ?? 0);
+                $isPenalidad = ($t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad');
+                $precioOriginal = (float) ($t->precio ?? 0);
                 $montoPagado = (float) ($t->monto_pagado ?? 0);
-                $saldoPend = $t->saldo_pendiente !== null
-                    ? (float) $t->saldo_pendiente
-                    : max(0.0, $precio - $montoPagado);
 
-                $montoTotalDia += $precio;
+                if ($isPenalidad) {
+                    // Turnos cancelados con penalidad: el ingreso real del club es la seña retenida
+                    // No hay deuda ni saldo pendiente a cobrar porque la reserva fue cancelada
+                    $precioEfectivo = $montoPagado;
+                    $saldoPend = 0.0;
+                    $senasRetenidasDia += $montoPagado;
+                    $globalSenasRetenidas += $montoPagado;
+                } else {
+                    $precioEfectivo = $precioOriginal;
+                    $saldoPend = $t->saldo_pendiente !== null
+                        ? (float) $t->saldo_pendiente
+                        : max(0.0, $precioOriginal - $montoPagado);
+                }
+
+                $montoTotalDia += $precioEfectivo;
                 $montoCobradoDia += $montoPagado;
                 $saldoPendienteDia += $saldoPend;
 
@@ -162,16 +183,18 @@ class ClubReporteService
                 $desgloseMetodosDia[$metodo] += $montoPagado;
                 $metodosTotales[$metodo] += $montoPagado;
 
-                // Minutos de duración
+                // Minutos de duración: solo computar ocupación si el turno no fue cancelado
                 $inicioTurno = Carbon::parse($t->hora_inicio);
                 $finTurno = Carbon::parse($t->hora_fin);
                 $duracionMin = max(30, $inicioTurno->diffInMinutes($finTurno));
-                $minutosOcupadosDia += $duracionMin;
+                if (!$isPenalidad) {
+                    $minutosOcupadosDia += $duracionMin;
+                }
 
                 // Totales por cancha
                 if (isset($totalesPorCancha[$t->cancha_id])) {
                     $totalesPorCancha[$t->cancha_id]['turnos']++;
-                    $totalesPorCancha[$t->cancha_id]['total_facturado'] += $precio;
+                    $totalesPorCancha[$t->cancha_id]['total_facturado'] += $precioEfectivo;
                     $totalesPorCancha[$t->cancha_id]['total_cobrado'] += $montoPagado;
                     $totalesPorCancha[$t->cancha_id]['saldo_pendiente'] += $saldoPend;
                 }
@@ -189,13 +212,14 @@ class ClubReporteService
                     'hora_inicio' => substr((string) $t->hora_inicio, 0, 5),
                     'hora_fin' => substr((string) $t->hora_fin, 0, 5),
                     'duracion_minutos' => $duracionMin,
-                    'precio' => $precio,
+                    'precio' => $precioOriginal,
                     'monto_pagado' => $montoPagado,
                     'saldo_pendiente' => $saldoPend,
                     'estado_pago' => $t->estado_pago ?? ($saldoPend <= 0 ? 'pagado_total' : 'pendiente'),
                     'metodo_pago' => $t->metodo_pago ?? 'mostrador',
                     'es_fijo' => $esFijo,
                     'estado' => $t->estado ?? 'reservado',
+                    'es_penalidad' => $isPenalidad,
                 ];
             }
 
@@ -238,6 +262,7 @@ class ClubReporteService
                 'monto_total' => $montoTotalDia,
                 'monto_cobrado' => $montoCobradoDia,
                 'saldo_pendiente' => $saldoPendienteDia,
+                'senas_retenidas' => round($senasRetenidasDia, 2),
                 'estado_cobro' => $estadoCobro,
                 'ocupacion_porcentaje' => $ocupacionPorcentaje,
                 'minutos_ocupados' => $minutosOcupadosDia,
@@ -259,9 +284,10 @@ class ClubReporteService
                 'cancha_id' => $canchaId,
             ],
             'kpis' => [
-                'total_facturado' => $globalFacturado,
-                'total_cobrado' => $globalCobrado,
-                'total_saldo_pendiente' => $globalSaldoPendiente,
+                'total_facturado' => round($globalFacturado, 2),
+                'total_cobrado' => round($globalCobrado, 2),
+                'total_saldo_pendiente' => round($globalSaldoPendiente, 2),
+                'total_senas_retenidas' => round($globalSenasRetenidas, 2),
                 'total_turnos' => $globalTurnosCount,
                 'total_turnos_fijos' => $globalTurnosFijosCount,
                 'ocupacion_promedio' => $ocupacionPromedio,

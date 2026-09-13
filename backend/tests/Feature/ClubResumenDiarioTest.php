@@ -262,4 +262,70 @@ class ClubResumenDiarioTest extends TestCase
         $this->assertCount(1, $dias[0]['turnos']);
         $this->assertEquals($cancha1->id, $dias[0]['turnos'][0]['cancha_id']);
     }
+
+    public function test_turnos_cancelados_con_penalidad_se_incluyen_en_resumen_diario_y_rendicion_de_caja(): void
+    {
+        $owner = User::factory()->create(['email' => 'dueño@tenispark.com']);
+
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Nico Tenis Park',
+            'subdominio' => 'nico-tenis-test',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'tenis',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Court Central',
+            'deporte' => 'tenis',
+            'superficie' => 'polvo',
+            'precio_base' => 8000,
+            'activa' => true,
+        ]);
+
+        // Turno cancelado fuera de término con seña retenida como penalidad
+        $turnoCancelado = Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'fecha' => '2026-09-13',
+            'hora_inicio' => '18:00:00',
+            'hora_fin' => '19:00:00',
+            'precio' => 8000,
+            'monto_pagado' => 4000,
+            'saldo_pendiente' => 4000,
+            'estado' => 'cancelado',
+            'estado_pago' => 'retenido_penalidad',
+            'metodo_pago' => 'online',
+            'cliente_nombre' => 'Marcelo Gallardo',
+        ]);
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/clubs/nico-tenis-test/resumen-diario?fecha_desde=2026-09-13&fecha_hasta=2026-09-13');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.kpis.total_facturado', 4000)
+            ->assertJsonPath('data.kpis.total_cobrado', 4000)
+            ->assertJsonPath('data.kpis.total_saldo_pendiente', 0)
+            ->assertJsonPath('data.kpis.total_senas_retenidas', 4000)
+            ->assertJsonPath('data.kpis.total_turnos', 1)
+            ->assertJsonPath('data.metodos_pago.online', 4000);
+
+        $dias = $response->json('data.dias');
+        $this->assertCount(1, $dias);
+        $this->assertEquals(4000, $dias[0]['senas_retenidas']);
+        $this->assertEquals(4000, $dias[0]['monto_cobrado']);
+        $this->assertEquals(0, $dias[0]['saldo_pendiente']);
+        $this->assertCount(1, $dias[0]['turnos']);
+
+        $turnoReporte = $dias[0]['turnos'][0];
+        $this->assertEquals($turnoCancelado->id, $turnoReporte['id']);
+        $this->assertEquals('cancelado', $turnoReporte['estado']);
+        $this->assertEquals('retenido_penalidad', $turnoReporte['estado_pago']);
+        $this->assertTrue($turnoReporte['es_penalidad']);
+        $this->assertEquals(4000, $turnoReporte['monto_pagado']);
+        $this->assertEquals(0, $turnoReporte['saldo_pendiente']);
+    }
 }

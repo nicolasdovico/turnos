@@ -1484,5 +1484,39 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Frontend Web: 62/62 tests pasados (+2 nuevos tests de aislamiento de reservas mostrador y liberación reactiva en `GrillaHoraria.test.tsx`).
 ===============================================================================
 
+-------------------------------------------------------------------------------
+[2026-09-13] - INCORPORACIÓN DE SEÑAS RETENIDAS POR PENALIDAD EN RENDICIÓN DE CAJA Y RESUMEN DIARIO
+-------------------------------------------------------------------------------
+- Diagnóstico del Problema:
+  * Cuando un cliente cancelaba un turno con menos de 4 horas de anticipación, el sistema retenía la seña abonada como penalidad (`estado = 'cancelado'`, `estado_pago = 'retenido_penalidad'`).
+  * En el complejo `nico-tenis` (complejo 115), la seña de $4.000 retenida del Turno 156 (fecha 2026-09-13) no aparecía en el reporte de caja:
+    - En `ClubReporteService.php`, la consulta de turnos filtraba con `whereNotIn('estado', ['cancelado', 'rechazado', 'anulado'])`, excluyendo totalmente todos los turnos cancelados.
+    - Como resultado, la rendición de caja figuraba en $0, el desglose de canal de pago online figuraba en $0 y el turno cancelado no figuraba en la lista diaria.
+- Solución Implementada:
+  * Backend Laravel 11 (`ClubReporteService.php`):
+    - Se adaptó la query para incluir turnos activos y aquellos cancelados con seña retenida:
+      `estado = 'cancelado' AND estado_pago = 'retenido_penalidad' AND monto_pagado > 0`.
+    - Se diferenció el cálculo financiero: para cancelaciones con penalidad, el monto efectivamente facturado y cobrado es el monto de la seña retenida (`$precioEfectivo = $montoPagado`), el saldo pendiente es $0.0 (no hay saldo a cobrar por una reserva cancelada) y no se computan minutos de ocupación de cancha (la cancha quedó libre/disponible).
+    - Se agregó el acumulador `senas_retenidas` tanto a nivel día (`DiaResumen`) como en los KPIs globales (`kpis.total_senas_retenidas`).
+    - Se incorporó la marca `es_penalidad: true` en el array formateado de turnos.
+  * Backend Laravel 11 (`CajaService.php`):
+    - Se actualizaron las consultas de ingresos por turnos en sesiones de caja (`cerrarCaja` y `obtenerResumenDiario`) para incluir turnos con `estado_pago = 'retenido_penalidad'`, sumando el monto pagado de la seña retenida.
+  * Backend Laravel 11 (`TurnoCancelacionController.php`):
+    - Al cancelar un turno, se actualiza `saldo_pendiente = 0` para asegurar integridad contable.
+  * Frontend Web Next.js 14 (`ResumenDiarioTurnos.tsx`):
+    - Se actualizaron las interfaces TypeScript (`TurnoDetalle`, `DiaResumen`, `ResumenDiarioData`).
+    - En la tarjeta KPI "Cobrado en Caja (Real)", se muestra el aviso informativo: `⚠️ Inc. $X.XXX por señas retenidas` cuando `total_senas_retenidas > 0`.
+    - En el desglose del día, se visibiliza el total cobrado y el monto retenido.
+    - En el listado de turnos del día:
+      * Se renderiza el badge "Cancelado" y el badge de estado "⚠️ Seña Retenida (Penalidad)".
+      * Se muestra el precio original tachado y la seña retenida en caja (`Seña retenida: $X.XXX`).
+      * Se oculta el botón "💵 Cobrar".
+- Verificación y Calidad:
+  * Backend PHPUnit: 183/183 tests pasados al 100% (986 aserciones, incluyendo nuevo test `test_turnos_cancelados_con_penalidad_se_incluyen_en_resumen_diario_y_rendicion_de_caja`).
+  * Frontend Web Vitest: 62/62 tests pasados al 100% (verificando KPIs, desglose y badges de señas retenidas en `authAndOnboarding.test.tsx`).
+  * Verificación HTTP en vivo vía curl en `nico-tenis`:
+    - GET `/api/clubs/nico-tenis/resumen-diario?fecha_desde=2026-09-13&fecha_hasta=2026-09-13` retorna HTTP 200 con `total_facturado: 4000`, `total_cobrado: 4000`, `total_senas_retenidas: 4000`, `metodos_pago.online: 4000` y el Turno 156 catalogado con `es_penalidad: true`.
+===============================================================================
+
 
 

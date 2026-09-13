@@ -62,11 +62,22 @@ class CajaService
                 ->where('tipo_pago', '!=', 'efectivo')
                 ->sum('total');
 
-            // Calculate court reservations confirmed during session
+            // Calculate court reservations confirmed or cancelled with penalty during session
             $totalIngresosTurnos = (float) Turno::where('created_at', '>=', $sesion->fecha_apertura)
                 ->where('created_at', '<=', $ahora)
-                ->where('estado', 'reservado')
-                ->sum('precio');
+                ->where(function ($q) {
+                    $q->whereIn('estado', ['reservado', 'confirmado', 'pagado'])
+                      ->orWhere(function ($sub) {
+                          $sub->where('estado', 'cancelado')
+                              ->where('estado_pago', 'retenido_penalidad');
+                      });
+                })
+                ->get()
+                ->sum(function ($t) {
+                    return $t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad'
+                        ? (float) $t->monto_pagado
+                        : (float) $t->precio;
+                });
 
             $totalEsperadoEfectivo = round((float) $sesion->monto_apertura + $totalVentasEfectivo, 2);
             $diferencia = round($montoCierreDeclarado - $totalEsperadoEfectivo, 2);
@@ -112,8 +123,19 @@ class CajaService
             ->sum('total');
 
         $totalTurnos = (float) Turno::whereBetween('created_at', [$fechaInicio, $fechaFin])
-            ->where('estado', 'reservado')
-            ->sum('precio');
+            ->where(function ($q) {
+                $q->whereIn('estado', ['reservado', 'confirmado', 'pagado'])
+                  ->orWhere(function ($sub) {
+                      $sub->where('estado', 'cancelado')
+                          ->where('estado_pago', 'retenido_penalidad');
+                  });
+            })
+            ->get()
+            ->sum(function ($t) {
+                return $t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad'
+                    ? (float) $t->monto_pagado
+                    : (float) $t->precio;
+            });
 
         $totalAperturas = (float) $sesiones->sum('monto_apertura');
         $totalDeclarado = (float) $sesiones->where('estado', 'cerrada')->sum('monto_cierre_declarado');

@@ -40,6 +40,7 @@ export interface TurnoDetalle {
   metodo_pago: string;
   es_fijo: boolean;
   estado: string;
+  es_penalidad?: boolean;
 }
 
 export interface DiaResumen {
@@ -51,6 +52,7 @@ export interface DiaResumen {
   monto_total: number;
   monto_cobrado: number;
   saldo_pendiente: number;
+  senas_retenidas?: number;
   estado_cobro: "al_dia" | "pendiente" | "sin_turnos";
   ocupacion_porcentaje: number;
   minutos_ocupados: number;
@@ -80,6 +82,7 @@ export interface ResumenDiarioData {
     total_facturado: number;
     total_cobrado: number;
     total_saldo_pendiente: number;
+    total_senas_retenidas?: number;
     total_turnos: number;
     total_turnos_fijos: number;
     ocupacion_promedio: number;
@@ -508,6 +511,11 @@ export default function ResumenDiarioTurnos({
                 {data.kpis.porcentaje_cobrado}%
               </span>
             </div>
+            {(data.kpis.total_senas_retenidas ?? 0) > 0 && (
+              <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center gap-1.5 text-[11px] text-amber-400/90 font-medium">
+                <span>⚠️ Inc. ${(data.kpis.total_senas_retenidas || 0).toLocaleString()} por señas retenidas</span>
+              </div>
+            )}
           </div>
 
           {/* Saldo Pendiente */}
@@ -750,6 +758,11 @@ export default function ResumenDiarioTurnos({
                         <div className="text-sm font-black text-emerald-400">
                           ${dia.monto_cobrado.toLocaleString()}
                         </div>
+                        {(dia.senas_retenidas ?? 0) > 0 && (
+                          <div className="text-[10px] text-amber-400 font-semibold">
+                            (Inc. ${dia.senas_retenidas?.toLocaleString()} retenido)
+                          </div>
+                        )}
                       </div>
 
                       <div className="text-left md:text-right font-mono min-w-[90px]">
@@ -794,12 +807,17 @@ export default function ResumenDiarioTurnos({
                         ) : (
                           <div className="space-y-2">
                             {dia.turnos.map((t) => {
-                              const isPaid = t.saldo_pendiente <= 0 || t.estado_pago === "pagado" || t.estado_pago === "pagado_total";
+                              const isPenalidad = t.estado === "cancelado" && (t.estado_pago === "retenido_penalidad" || !!t.es_penalidad);
+                              const isPaid = !isPenalidad && (t.saldo_pendiente <= 0 || t.estado_pago === "pagado" || t.estado_pago === "pagado_total");
 
                               return (
                                 <div
                                   key={t.id}
-                                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition"
+                                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border transition ${
+                                    isPenalidad
+                                      ? "bg-slate-900/60 border-rose-900/40 hover:border-rose-700/60"
+                                      : "bg-slate-900/90 border-slate-800 hover:border-slate-700"
+                                  }`}
                                 >
                                   {/* Left: Time & Player */}
                                   <div className="flex items-start gap-3">
@@ -811,6 +829,11 @@ export default function ResumenDiarioTurnos({
                                         <span className="text-xs font-bold text-white flex items-center gap-1">
                                           <User className="w-3 h-3 text-slate-400" /> {t.cliente_nombre}
                                         </span>
+                                        {isPenalidad && (
+                                          <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-black border border-rose-500/30 uppercase">
+                                            Cancelado
+                                          </span>
+                                        )}
                                         {t.es_fijo && (
                                           <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold border border-indigo-500/30">
                                             🔁 Fijo
@@ -831,14 +854,25 @@ export default function ResumenDiarioTurnos({
                                   {/* Right: Payment Details & Checkout Button */}
                                   <div className="flex items-center gap-4 justify-between sm:justify-end font-mono">
                                     <div className="text-right">
-                                      <div className="text-xs font-bold text-white">${t.precio.toLocaleString()}</div>
-                                      <div className="text-[10px] text-slate-400">
-                                        {t.monto_pagado > 0 ? (
-                                          <span className="text-emerald-400">Pagó ${t.monto_pagado.toLocaleString()}</span>
-                                        ) : (
-                                          <span>Sin pagos</span>
-                                        )}
-                                      </div>
+                                      {isPenalidad ? (
+                                        <>
+                                          <div className="text-xs font-bold text-slate-500 line-through">${t.precio.toLocaleString()}</div>
+                                          <div className="text-[10px] text-amber-400 font-bold">
+                                            Seña retenida: ${t.monto_pagado.toLocaleString()}
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="text-xs font-bold text-white">${t.precio.toLocaleString()}</div>
+                                          <div className="text-[10px] text-slate-400">
+                                            {t.monto_pagado > 0 ? (
+                                              <span className="text-emerald-400">Pagó ${t.monto_pagado.toLocaleString()}</span>
+                                            ) : (
+                                              <span>Sin pagos</span>
+                                            )}
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
 
                                     {/* Method Badge */}
@@ -853,7 +887,11 @@ export default function ResumenDiarioTurnos({
                                     </span>
 
                                     {/* Paid / Pending Status & Action */}
-                                    {isPaid ? (
+                                    {isPenalidad ? (
+                                      <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-extrabold flex items-center gap-1">
+                                        ⚠️ Seña Retenida (Penalidad)
+                                      </span>
+                                    ) : isPaid ? (
                                       <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold flex items-center gap-1">
                                         ✓ Pagado
                                       </span>

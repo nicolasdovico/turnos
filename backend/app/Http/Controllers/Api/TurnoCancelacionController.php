@@ -168,6 +168,7 @@ class TurnoCancelacionController extends Controller
             $turno->update([
                 'estado' => 'cancelado',
                 'estado_pago' => $reembolsoAcreditado ? 'reembolsado' : ($turno->monto_pagado > 0 ? 'retenido_penalidad' : 'cancelado'),
+                'saldo_pendiente' => 0,
             ]);
         });
 

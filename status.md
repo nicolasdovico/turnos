@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Módulo Turnos Fijos & Horarios 100% Implementado)
-- **Última Actualización:** 2026-09-13 (Corrección y verificación integral de cancelación de turnos por clientes: liberación inmediata de slots en disponibilidad, reporte y Redis, aislamiento estricto de reservas mostrador sin titularidad por nombre, sincronización reactiva multi-pestaña y multi-componente vía evento saas-turno-cancelled; 181 tests backend, 62 frontend web, 20 mobile en verde).
+- **Última Actualización:** 2026-09-13 (Incorporación contable de señas retenidas por penalidad en Resumen Diario & Rendición de Caja: query adaptada en ClubReporteService y CajaService, KPI total_senas_retenidas, desglose por canal de pago, visualización detallada en ResumenDiarioTurnos con badge de penalidad y precio tachado sin saldo a cobrar pendiente; 183 tests backend, 62 frontend web, 20 mobile en verde).
 
 ---
 
