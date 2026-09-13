@@ -261,4 +261,68 @@ class PoliticaCancelacionBilleteraTest extends TestCase
             'error' => 'UNAUTHORIZED',
         ]);
     }
+
+    public function test_cancelar_turno_libera_slot_inmediatamente_en_disponibilidad_y_reporte(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 10:00:00', 'America/Argentina/Buenos_Aires'));
+
+        // Configurar horario de atención para el lunes (día 1)
+        HorarioAtencion::create([
+            'complejo_id' => $this->complejo->id,
+            'dia_semana' => 1,
+            'hora_apertura' => '08:00:00',
+            'hora_cierre' => '23:00:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        $turno = Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'cliente_id' => $this->cliente->id,
+            'cliente_nombre' => $this->cliente->name,
+            'cliente_email' => $this->cliente->email,
+            'fecha' => '2026-08-31',
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:00',
+            'precio' => 12000.00,
+            'monto_pagado' => 6000.00,
+            'saldo_pendiente' => 6000.00,
+            'metodo_pago' => 'online',
+            'estado_pago' => 'senado',
+            'estado' => 'reservado',
+        ]);
+
+        $disponibilidadService = app(\App\Services\DisponibilidadService::class);
+        $reporteService = app(\App\Services\ClubReporteService::class);
+
+        // Antes de cancelar: 18:00 está ocupado y reportado en el resumen diario
+        $dispAntes = $disponibilidadService->obtenerDisponibilidadCompleta($this->cancha->id, '2026-08-31');
+        $slot18Antes = collect($dispAntes['slots'])->firstWhere('hora_inicio', '18:00');
+        $this->assertNull($slot18Antes);
+        $this->assertTrue(collect($dispAntes['turnos_ocupados'])->contains('id', $turno->id));
+
+        $resumenAntes = $reporteService->obtenerResumenDiario($this->complejo, '2026-08-31', '2026-08-31');
+        $this->assertEquals(1, $resumenAntes['kpis']['total_turnos']);
+
+        // El cliente cancela su turno
+        $response = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->postJson("/api/turnos/{$turno->id}/cancelar-cliente");
+
+        $response->assertStatus(200);
+
+        // Después de cancelar: 18:00 debe figurar como disponible en los slots y fuera de turnos_ocupados
+        $dispDespues = $disponibilidadService->obtenerDisponibilidadCompleta($this->cancha->id, '2026-08-31');
+        $slot18Despues = collect($dispDespues['slots'])->firstWhere('hora_inicio', '18:00');
+        $this->assertNotNull($slot18Despues);
+        $this->assertTrue($slot18Despues['disponible']);
+        $this->assertFalse(collect($dispDespues['turnos_ocupados'])->contains('id', $turno->id));
+
+        // En el resumen diario del club para el administrador ya no debe figurar como turno ocupado
+        $resumenDespues = $reporteService->obtenerResumenDiario($this->complejo, '2026-08-31', '2026-08-31');
+        $this->assertEquals(0, $resumenDespues['kpis']['total_turnos']);
+
+        Carbon::setTestNow();
+    }
 }
+

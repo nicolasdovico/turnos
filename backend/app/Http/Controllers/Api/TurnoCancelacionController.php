@@ -14,8 +14,11 @@ use Illuminate\Support\Facades\DB;
 class TurnoCancelacionController extends Controller
 {
     public function __construct(
-        protected WalletService $walletService
-    ) {}
+        protected WalletService $walletService,
+        protected ?\App\Services\ReservaLockService $reservaLockService = null
+    ) {
+        $this->reservaLockService = $reservaLockService ?? app(\App\Services\ReservaLockService::class);
+    }
 
     public function misTurnos(Request $request): JsonResponse
     {
@@ -168,11 +171,19 @@ class TurnoCancelacionController extends Controller
             ]);
         });
 
+        $horaInicioNorm = Carbon::parse($turno->hora_inicio)->format('H:i');
+        $horaFinNorm = $turno->hora_fin ? Carbon::parse($turno->hora_fin)->format('H:i') : null;
+
+        // Asegurar que cualquier bloqueo temporal residual en Redis quede liberado de inmediato
+        try {
+            $this->reservaLockService->liberarBloqueo($turno->cancha_id, $fechaStr, $horaInicioNorm);
+            $this->reservaLockService->liberarBloqueo($turno->cancha_id, $fechaStr, $turno->hora_inicio);
+        } catch (\Throwable $e) {
+            // Ignorar fallas secundarias de redis
+        }
+
         // Trigger asynchronous waitlist notification for interested players
         try {
-            $horaInicioNorm = Carbon::parse($turno->hora_inicio)->format('H:i');
-            $horaFinNorm = $turno->hora_fin ? Carbon::parse($turno->hora_fin)->format('H:i') : null;
-
             NotificarListaEsperaJob::dispatch(
                 $turno->cancha_id,
                 $fechaStr,

@@ -2352,6 +2352,191 @@ describe("Componente Reactivo GrillaHoraria", () => {
     });
   });
 
+  it("no atribuye reservas de mostrador con el mismo nombre al cliente autenticado si no coinciden cliente_id o email", async () => {
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 94, name: "Marcelo Gallardo", email: "marcelogallardo@gmail.com" })
+    );
+    localStorage.setItem("saas_token", "dummy-gallardo-token");
+
+    const walkInTurno = {
+      id: 153,
+      cancha_id: 1,
+      fecha: "2026-09-14",
+      hora_inicio: "08:00",
+      hora_fin: "09:00",
+      precio: 20000,
+      monto_pagado: 20000,
+      saldo_pendiente: 0,
+      estado_pago: "pagado_total",
+      estado: "reservado",
+      cliente_id: null,
+      cliente_nombre: "Marcelo Gallardo",
+    };
+
+    vi.spyOn(global, "fetch").mockImplementation((url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              user: { id: 94, name: "Marcelo Gallardo", email: "marcelogallardo@gmail.com" },
+            }),
+        });
+      }
+      if (urlStr.includes("/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              slots: [],
+              turnos_ocupados: [walkInTurno],
+              tipo_cobro_reserva: "sena",
+              porcentaje_sena: 50,
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="nico-padel"
+        fechaInicial="2026-09-14"
+      />
+    );
+
+    // No debe mostrar la sección de "Tus Reservas Confirmadas" ni botones de cancelar para reservas ajenas/mostrador
+    await waitFor(() => {
+      expect(screen.queryByTestId("client-confirmed-turnos-section")).toBeNull();
+      expect(screen.queryByTestId("client-cancel-btn-153")).toBeNull();
+    });
+  });
+
+  it("al cancelar turno por cliente, actualiza disponibilidad, emite evento saas-turno-cancelled y libera el slot", async () => {
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 94, name: "Marcelo Gallardo", email: "marcelogallardo@gmail.com" })
+    );
+    localStorage.setItem("saas_token", "dummy-gallardo-token");
+
+    let isCancelled = false;
+    const cancelledEventSpy = vi.fn();
+    window.addEventListener("saas-turno-cancelled", cancelledEventSpy);
+
+    const clientTurno = {
+      id: 155,
+      cancha_id: 1,
+      fecha: "2026-09-14",
+      hora_inicio: "10:00",
+      hora_fin: "11:00",
+      precio: 20000,
+      monto_pagado: 10000,
+      saldo_pendiente: 10000,
+      estado_pago: "senado",
+      estado: "reservado",
+      cliente_id: 94,
+      cliente_nombre: "Marcelo Gallardo",
+      cliente_email: "marcelogallardo@gmail.com",
+      is_mine: true,
+    };
+
+    vi.spyOn(global, "fetch").mockImplementation((url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              user: { id: 94, name: "Marcelo Gallardo", email: "marcelogallardo@gmail.com" },
+            }),
+        });
+      }
+      if (urlStr.includes("/turnos/155/cancelar-cliente")) {
+        isCancelled = true;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "Turno cancelado exitosamente. Se han acreditado $10.000 en tu billetera virtual.",
+              reembolso_acreditado: true,
+              monto_reembolsado: 10000,
+            }),
+        });
+      }
+      if (urlStr.includes("/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              slots_disponibles: isCancelled
+                ? [
+                    {
+                      cancha_id: 1,
+                      fecha: "2026-09-14",
+                      hora_inicio: "10:00",
+                      hora_fin: "11:00",
+                      duracion_minutos: 60,
+                      precio: 20000,
+                      estado: "disponible",
+                      disponible: true,
+                    },
+                  ]
+                : [],
+              turnos_ocupados: isCancelled ? [] : [clientTurno],
+              tipo_cobro_reserva: "sena",
+              porcentaje_sena: 50,
+              horas_limite_cancelacion: 4,
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="nico-padel"
+        fechaInicial="2026-09-14"
+      />
+    );
+
+    // 1. Debe aparecer el turno reservado
+    await waitFor(() => {
+      expect(screen.getByTestId("client-cancel-btn-155")).toBeDefined();
+    });
+
+    // 2. Click en Cancelar Turno y Confirmar
+    fireEvent.click(screen.getByTestId("client-cancel-btn-155"));
+    await waitFor(() => {
+      expect(screen.getByTestId("confirm-client-cancel-btn")).toBeDefined();
+    });
+    fireEvent.click(screen.getByTestId("confirm-client-cancel-btn"));
+
+    // 3. Tras cancelar, se debe despachar el evento global
+    await waitFor(() => {
+      expect(cancelledEventSpy).toHaveBeenCalled();
+      expect(screen.queryByTestId("client-confirmed-turnos-section")).toBeNull();
+      // Y debe figurar el horario 10:00 como disponible en la grilla
+      expect(screen.getByText("10:00")).toBeDefined();
+      expect(screen.getByText("Libre")).toBeDefined();
+    });
+
+    window.removeEventListener("saas-turno-cancelled", cancelledEventSpy);
+  });
+
   it("formatea correctamente las fechas de YYYY-MM-DD a DD-MM-YYYY (dd-mm-aaaa)", () => {
     expect(formatFechaDDMMAAAA("2026-09-14")).toBe("14-09-2026");
     expect(formatFechaDDMMAAAA("2026-01-05")).toBe("05-01-2026");

@@ -1461,4 +1461,28 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Mobile Jest: 20 tests pasados al 100% (4 archivos de test).
 ===============================================================================
 
+-------------------------------------------------------------------------------
+[2026-09-13] - CORRECCIÓN INTEGRAL: LIBERACIÓN DE SLOTS Y AISLAMIENTO DE RESERVAS TRAS CANCELACIÓN POR CLIENTE
+-------------------------------------------------------------------------------
+- Diagnóstico del Problema:
+  * En las pruebas en `nico-padel` para la fecha `14-09`:
+    1. El turno 155 (10:00 - 11:00) fue cancelado por el cliente con acreditación de seña a billetera virtual ($10.000). En la base de datos pasó a `cancelado` y fue reembolsado.
+    2. Sin embargo, en el frontend (`clientConfirmedTurnos`), la condición `isMine` comparaba erróneamente por nombre de cliente (`cliente_nombre === currentUser.name`), provocando que reservas manuales de mostrador creadas con el nombre del cliente pero sin cuenta asociada (`cliente_id: null`, como los turnos 153 y 154 de las 08:00 y 09:00) se atribuyeran erróneamente al usuario logueado en "Tus Reservas Confirmadas" con botones de cancelar que fallaban con 403 Forbidden.
+    3. Al cancelar, el frontend hacía refetch con la fecha del estado local en lugar de la fecha del turno cancelado (`targetTurno.fecha`), y el filtrado local no contemplaba normalización de tipos (`String(id)`) ni coincidencia por fecha y hora.
+    4. Los componentes (`ResumenDiarioTurnos` en el panel admin y `GrillaHoraria` en otras pestañas) no se enteraban de la cancelación hasta el siguiente ciclo de polling pasivo (30s) o recarga manual.
+- Solución Implementada:
+  * Backend Laravel 11 (`TurnoCancelacionController.php`):
+    - Al cancelar un turno por cliente (`cancelarCliente`), además de cambiar el estado y reembolsar a billetera, se liberan explícitamente los bloqueos temporales residuales en Redis mediante `ReservaLockService::liberarBloqueo`.
+    - Tests agregados en `PoliticaCancelacionBilleteraTest.php` comprobando que la cancelación deja el slot inmediatamente disponible en `DisponibilidadService`, excluido de `turnos_ocupados` y removido del reporte diario de administración.
+  * Frontend Web Next.js 14 (`GrillaHoraria.tsx`):
+    - Corrección en `clientConfirmedTurnos`: Se eliminó la comparación laxa por `cliente_nombre`. Ahora sólo se reconocen turnos propios si `is_mine === true`, `cliente_id === currentUser.id`, o `cliente_email === currentUser.email`, protegiendo la cuenta de reservas ajenas de mostrador.
+    - En `handleConfirmClientCancel`: Se limpia el estado local (`confirmedTurnos`, `turnosOcupados` y `sessionStorage`) tanto por `id` como por `fecha` y `hora_inicio`, y se recarga la disponibilidad para la fecha exacta del turno cancelado.
+    - Sincronización en tiempo real: Se dispara el evento global `saas-turno-cancelled` y se guarda en `localStorage` (`saas_last_cancelled_turno`).
+    - Listener reactivo en `GrillaHoraria` y `ResumenDiarioTurnos` para revalidar inmediatamente la grilla y el panel de administración al detectar cancelaciones de cualquier cliente en cualquier pestaña.
+  * Tests y Verificación de Calidad:
+    - Backend: 181/181 tests pasados (46 assertions en `PoliticaCancelacionBilleteraTest`).
+    - Frontend Web: 62/62 tests pasados (+2 nuevos tests de aislamiento de reservas mostrador y liberación reactiva en `GrillaHoraria.test.tsx`).
+===============================================================================
+
+
 

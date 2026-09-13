@@ -235,9 +235,17 @@ export default function ResumenDiarioTurnos({
     };
     window.addEventListener("focus", onFocus);
 
+    const onRemoteCancel = () => {
+      fetchResumen(true);
+    };
+    window.addEventListener("saas-turno-cancelled", onRemoteCancel);
+    window.addEventListener("storage", onRemoteCancel);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("saas-turno-cancelled", onRemoteCancel);
+      window.removeEventListener("storage", onRemoteCancel);
     };
   }, [subdomain, fechaDesde, fechaHasta, selectedCanchaId]);
 

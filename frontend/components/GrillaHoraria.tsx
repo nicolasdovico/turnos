@@ -836,17 +836,38 @@ export default function GrillaHoraria({
       }
 
       // Remover el turno cancelado de las listas locales
-      setConfirmedTurnos((prev) => prev.filter((t) => t.id !== targetTurno.id));
-      setTurnosOcupados((prev) => prev.filter((t) => t.id !== targetTurno.id));
+      const targetFecha = targetTurno.fecha || fecha;
+      const targetHora = (targetTurno.hora_inicio || "").substring(0, 5);
+
+      const isTargetTurno = (t: TurnoOcupado) =>
+        (Boolean(targetTurno.id) && Boolean(t.id) && String(t.id) === String(targetTurno.id)) ||
+        (t.fecha === targetFecha && (t.hora_inicio || "").substring(0, 5) === targetHora);
+
+      setConfirmedTurnos((prev) => prev.filter((t) => !isTargetTurno(t)));
+      setTurnosOcupados((prev) => prev.filter((t) => !isTargetTurno(t)));
 
       if (typeof window !== "undefined") {
         try {
           const stored = sessionStorage.getItem(`confirmed_turnos_${canchaId}`);
           if (stored) {
             const parsed: TurnoOcupado[] = JSON.parse(stored);
-            const filtered = parsed.filter((t) => t.id !== targetTurno.id);
+            const filtered = parsed.filter((t) => !isTargetTurno(t));
             sessionStorage.setItem(`confirmed_turnos_${canchaId}`, JSON.stringify(filtered));
           }
+        } catch {
+          // ignore
+        }
+
+        try {
+          const cancelEventPayload = {
+            turnoId: targetTurno.id,
+            canchaId,
+            fecha: targetFecha,
+            horaInicio: targetHora,
+            timestamp: Date.now(),
+          };
+          window.dispatchEvent(new CustomEvent("saas-turno-cancelled", { detail: cancelEventPayload }));
+          localStorage.setItem("saas_last_cancelled_turno", JSON.stringify(cancelEventPayload));
         } catch {
           // ignore
         }
@@ -854,7 +875,10 @@ export default function GrillaHoraria({
 
       addToast("success", data.message || "Tu turno fue cancelado correctamente.");
       setClientCancelModalTurno(null);
-      fetchDisponibilidad(fecha);
+      if (targetFecha !== fecha) {
+        setFecha(targetFecha);
+      }
+      await fetchDisponibilidad(targetFecha, duracion);
     } catch (err: any) {
       setClientCancelError(err.message || "Error al cancelar el turno.");
       addToast("error", err.message || "Error al cancelar el turno.");
@@ -1255,6 +1279,40 @@ export default function GrillaHoraria({
     };
   }, [fecha, canchaId, duracion]);
 
+  // Revalidate availability immediately when a turno is cancelled anywhere in this or other tabs
+  useEffect(() => {
+    const handleRemoteCancel = (e: any) => {
+      let cancelledCanchaId: number | null = null;
+      let cancelledFecha: string | null = null;
+
+      if (e?.type === "saas-turno-cancelled" && e.detail) {
+        cancelledCanchaId = e.detail.canchaId;
+        cancelledFecha = e.detail.fecha;
+      } else if (e?.type === "storage" && e.key === "saas_last_cancelled_turno" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          cancelledCanchaId = parsed.canchaId;
+          cancelledFecha = parsed.fecha;
+        } catch {}
+      }
+
+      if (!cancelledCanchaId || cancelledCanchaId === canchaId) {
+        if (!cancelledFecha || cancelledFecha === fecha) {
+          fetchDisponibilidad(fecha, duracion, true);
+        }
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("saas-turno-cancelled", handleRemoteCancel);
+      window.addEventListener("storage", handleRemoteCancel);
+      return () => {
+        window.removeEventListener("saas-turno-cancelled", handleRemoteCancel);
+        window.removeEventListener("storage", handleRemoteCancel);
+      };
+    }
+  }, [canchaId, fecha, duracion]);
+
   // Smart Visibility Toast Manager: Pauses countdown when tab is hidden, resumes when visible
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -1488,8 +1546,7 @@ export default function GrillaHoraria({
           const isMine =
             (t as any).is_mine ||
             (t.cliente_id && t.cliente_id === currentUser.id) ||
-            (t.cliente_email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase()) ||
-            (t.cliente_nombre && currentUser.name && t.cliente_nombre.toLowerCase() === currentUser.name.toLowerCase());
+            (t.cliente_email && currentUser.email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase());
           if (isMine) {
             seen.add(hora);
             list.push({ ...t, hora_inicio: hora });
