@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Módulo Turnos Fijos & Horarios 100% Implementado)
-- **Última Actualización:** 2026-09-14 (Corrección de desadjudicación de turnos cancelados por el administrador para el cliente `bela@gmail.com`: saneamiento de `saldo_pendiente` a 0 en `ClubDashboardController::destroyTurno`, soporte de filtrado activo y resguardo de `puede_cancelar`/`aplica_reembolso` en `TurnoCancelacionController`, depuración reactiva de turnos cancelados en `sessionStorage` y `confirmedTurnos` con despacho de eventos `saas-turno-cancelled` en `GrillaHoraria.tsx`, y exclusión de turnos cancelados en `HomeScreen.tsx` móvil; 185 tests backend, 62 frontend web y 20 mobile en verde al 100%).
+- **Última Actualización:** 2026-09-14 (Corrección de desadjudicación y depuración reactiva de turnos cancelados en navegador de cliente: saneamiento de `saldo_pendiente` en backend, sincronización automática con `mis-turnos?estado=activos` en `syncClientActiveTurnos`, depuración inmediata en `sessionStorage` y `clientConfirmedTurnos` según `disponible: true` en `GrillaHoraria.tsx`; 185 tests backend, 63 frontend web y 20 mobile en verde al 100%).
 
 ---
 

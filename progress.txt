@@ -1592,3 +1592,32 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Con token de `bela@gmail.com`, GET `/api/turnos/mis-turnos?estado=activos` retorna 0 turnos para el 14/09 a las 11:00 hs.
     - GET `/api/canchas/61/disponibilidad?fecha=2026-09-14` retorna el horario 11:00 como `disponible: true` y no figura en `turnos_ocupados`.
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-14] - DEPURACIÓN REACTIVA DE SESSIONSTORAGE Y SINCRONIZACIÓN DE RESERVAS LIBERADAS
+-------------------------------------------------------------------------------
+- Diagnóstico y Causa Raíz:
+  * El usuario reportó que, tras la anulación del turno por parte del administrativo desde el panel de control, en el navegador del cliente (`bela@gmail.com`) continuaba apareciendo la reserva como adjudicada.
+  * Análisis de Almacenamiento Local:
+    - Al reservar en el navegador del cliente, el objeto se persiste en `sessionStorage` (`confirmed_turnos_61`) con `estado: 'reservado'`.
+    - Cuando el empleado administrativo cancela o anula el turno desde el panel de control (`/panel`) o desde otra máquina/sesión, la base de datos se actualiza a `estado = 'cancelado'`, pero el `sessionStorage` del cliente retenía el objeto local estático con `estado: 'reservado'`.
+    - Las validaciones locales `t.estado === 'cancelado'` no surtían efecto porque el objeto en `sessionStorage` nunca mutaba por sí solo.
+- Solución Implementada:
+  * Frontend Web Next.js (`GrillaHoraria.tsx`):
+    1. Depuración por Disponibilidad de Slots (`freeStartTimes` y `occupiedTurnoMap`):
+       - En `fetchDisponibilidad`, se calculan los horarios que ahora figuran como disponibles (`disponible: true`) o que han sido reocupados por otro ID de turno.
+       - En `saveConfirmedTurnos`, cualquier turno cuyo horario figure como libre o haya sido reasignado en el backend se purga inmediatamente de `confirmedTurnos` y de `sessionStorage`.
+    2. Filtrado en `clientConfirmedTurnos`:
+       - Se aplica la misma comprobación contra `freeStartTimes` para que un turno cuyo horario esté disponible en el backend jamás se renderice en la sección "🎉 Tus Reservas Confirmadas".
+    3. Sincronización con Endpoint de Turnos Activos (`syncClientActiveTurnos`):
+       - Para clientes autenticados, se consulta `GET /api/turnos/mis-turnos?estado=activos`.
+       - Se purga de `confirmedTurnos` y `sessionStorage` cualquier reserva del usuario cuyo ID ya no figure en el listado de turnos activos del servidor.
+       - Se ejecuta automáticamente al detectar la sesión (`useEffect` de `globalAuthUser` y `token`), en eventos `saas-auth-changed`, en el intervalo de polling (30s) y al recuperar el foco de la ventana (`onWindowFocus`).
+    4. Período de Gracia (`created_at_local`):
+       - Se añade timestamp local a las confirmaciones recientes para proteger reservas recién hechas durante los primeros 10 segundos ante respuestas estáticas de mocks.
+  * Pruebas Automatizadas:
+    - Nuevo test en `GrillaHoraria.test.tsx`: "depura y no muestra en Tus Reservas Confirmadas un turno previamente almacenado en sessionStorage si el horario ahora figura como disponible en el backend tras anulación de admin".
+- Verificación de Calidad:
+  * Backend PHPUnit: 185/185 tests pasados al 100% (1006 aserciones).
+  * Frontend Web Vitest: 63/63 tests pasados al 100%.
+  * Frontend Mobile Jest: 20/20 tests pasados al 100%.
+===============================================================================

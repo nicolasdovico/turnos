@@ -96,6 +96,7 @@ export interface TurnoOcupado {
   cliente_email?: string | null;
   cliente_telefono?: string | null;
   cliente_saldo_billetera?: number;
+  created_at_local?: number;
 }
 
 export interface CurrentUser {
@@ -313,6 +314,47 @@ export default function GrillaHoraria({
     }
   };
 
+  const syncClientActiveTurnos = async (userParam?: CurrentUser | null) => {
+    const userToSync = userParam || currentUser || (globalAuthUser as CurrentUser | null);
+    if (isAdmin || !userToSync) return;
+    try {
+      const token = getAuthToken(propToken);
+      if (!token) return;
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+      const subParam = subdomain ? `?subdomain=${subdomain}&estado=activos` : `?estado=activos`;
+      const res = await fetch(`${apiUrl}/turnos/mis-turnos${subParam}`, { headers });
+      if (res && res.ok) {
+        const json = await res.json();
+        const activeList = Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : [];
+        const activeIds = new Set(activeList.map((t: any) => Number(t.id)));
+
+        saveConfirmedTurnos((prev) => {
+          const now = Date.now();
+          const next = prev.filter((t) => {
+            const isMine =
+              (t.cliente_id !== undefined && t.cliente_id !== null && Number(t.cliente_id) === Number(userToSync.id)) ||
+              (t.cliente_email && userToSync.email && t.cliente_email.toLowerCase() === userToSync.email.toLowerCase()) ||
+              (!t.cliente_id && !t.cliente_email);
+            if (isMine && t.id) {
+              const isRecentlyConfirmed = t.created_at_local && (now - t.created_at_local) < 10000;
+              if (!isRecentlyConfirmed && !activeIds.has(Number(t.id))) {
+                return false;
+              }
+            }
+            return true;
+          });
+          return next.length !== prev.length ? next : prev;
+        });
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   // Check authenticated user session
   useEffect(() => {
     const token = getAuthToken(propToken);
@@ -341,6 +383,7 @@ export default function GrillaHoraria({
                   setClienteTelefono(data.user.telefono || "");
                 }
                 fetchWalletBalance();
+                syncClientActiveTurnos(data.user);
               } else {
                 setCurrentUser(null);
                 setWalletBalance(0);
@@ -365,6 +408,7 @@ export default function GrillaHoraria({
           setClienteTelefono((globalAuthUser as any).telefono);
         }
       }
+      syncClientActiveTurnos(globalAuthUser as CurrentUser);
     } else if (prevUserRef.current) {
       setCurrentUser(null);
       setClienteNombre("");
@@ -402,6 +446,7 @@ export default function GrillaHoraria({
           }
         }
         fetchWalletBalance();
+        syncClientActiveTurnos(detail.user);
         fetchDisponibilidad(fecha, duracion, false);
       }
     };
@@ -790,9 +835,33 @@ export default function GrillaHoraria({
         }));
         setSlots(formattedSlots);
 
+        const freeStartTimes = new Set(
+          formattedSlots
+            .filter((s) => s.disponible)
+            .map((s) => (s.hora_inicio || "").substring(0, 5))
+        );
+        const occupiedTurnoMap = new Map<string, number>();
+        incomingTurnos.forEach((t) => {
+          const h = (t.hora_inicio || "").substring(0, 5);
+          if (t.id) occupiedTurnoMap.set(h, Number(t.id));
+        });
+
         saveConfirmedTurnos((prev) => {
+          const now = Date.now();
           const next = prev.filter((t) => {
             if (t.fecha !== targetFecha) return true;
+            const hora = (t.hora_inicio || "").substring(0, 5);
+            const isRecentlyConfirmed = t.created_at_local && (now - t.created_at_local) < 10000;
+            if (isRecentlyConfirmed) return true;
+
+            // Si el horario ahora figura como DISPONIBLE/LIBRE en el backend, fue liberado o cancelado
+            if (freeStartTimes.has(hora)) return false;
+
+            // Si el horario ahora está ocupado por OTRO turno diferente en el backend
+            if (t.id && occupiedTurnoMap.has(hora) && occupiedTurnoMap.get(hora) !== Number(t.id)) {
+              return false;
+            }
+
             if (t.estado === "cancelado" || (t as any).estado_pago === "reembolsado") return false;
             return true;
           });
@@ -1308,11 +1377,13 @@ export default function GrillaHoraria({
     const POLL_INTERVAL = 30000; // 30 seconds
     const intervalId = setInterval(() => {
       fetchDisponibilidad(fecha, duracion, true);
+      syncClientActiveTurnos();
     }, POLL_INTERVAL);
 
     const onWindowFocus = () => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         fetchDisponibilidad(fecha, duracion, true);
+        syncClientActiveTurnos();
       }
     };
 
@@ -1586,16 +1657,33 @@ export default function GrillaHoraria({
     const list: TurnoOcupado[] = [];
     const seen = new Set<string>();
 
+    const freeStartTimes = new Set(
+      slots.filter((s) => s.disponible).map((s) => (s.hora_inicio || "").substring(0, 5))
+    );
+    const occupiedTurnoMap = new Map<string, number>();
+    turnosOcupados.forEach((t) => {
+      const h = (t.hora_inicio || "").substring(0, 5);
+      if (t.id) occupiedTurnoMap.set(h, Number(t.id));
+    });
+
+    const now = Date.now();
+
     // 1. Locally confirmed turnos in this session
     confirmedTurnos.forEach((t) => {
       const hora = (t.hora_inicio || "").substring(0, 5);
       if (t.fecha === fecha && !seen.has(hora)) {
+        const isRecentlyConfirmed = t.created_at_local && (now - t.created_at_local) < 10000;
+        if (!isRecentlyConfirmed) {
+          if (freeStartTimes.has(hora)) return;
+          if (t.id && occupiedTurnoMap.has(hora) && occupiedTurnoMap.get(hora) !== Number(t.id)) return;
+        }
+
         if (t.estado === "cancelado" || (t as any).estado_pago === "reembolsado") return;
 
         if (currentUser) {
           const matches =
             !t.cliente_id ||
-            t.cliente_id === currentUser.id ||
+            Number(t.cliente_id) === Number(currentUser.id) ||
             (t.cliente_email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase());
           if (matches) {
             seen.add(hora);
@@ -1616,10 +1704,10 @@ export default function GrillaHoraria({
       turnosOcupados.forEach((t) => {
         const hora = (t.hora_inicio || "").substring(0, 5);
         if (t.fecha === fecha && !seen.has(hora)) {
-          if (t.estado === "cancelado") return;
+          if (t.estado === "cancelado" || (t as any).estado_pago === "reembolsado") return;
           const isMine =
             (t as any).is_mine ||
-            (t.cliente_id && t.cliente_id === currentUser.id) ||
+            (t.cliente_id && Number(t.cliente_id) === Number(currentUser.id)) ||
             (t.cliente_email && currentUser.email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase());
           if (isMine) {
             seen.add(hora);
@@ -2025,6 +2113,7 @@ export default function GrillaHoraria({
           cliente_email: data.turno.cliente_email || (currentUser ? currentUser.email : undefined),
           cliente_nombre: targetNombre,
           cliente_telefono: targetTelefono,
+          created_at_local: Date.now(),
         };
         saveConfirmedTurnos((prev) => [confirmedItem, ...prev.filter((t) => t.hora_inicio !== confirmedItem.hora_inicio)]);
       }

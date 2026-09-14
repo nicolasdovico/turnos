@@ -2543,5 +2543,96 @@ describe("Componente Reactivo GrillaHoraria", () => {
     expect(formatFechaDDMMAAAA("2026-12-31")).toBe("31-12-2026");
     expect(formatFechaDDMMAAAA("")).toBe("");
   });
+
+  it("depura y no muestra en Tus Reservas Confirmadas un turno previamente almacenado en sessionStorage si el horario ahora figura como disponible en el backend tras anulación de admin", async () => {
+    localStorage.setItem("saas_token", "fake-bela-token");
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 70, name: "Fernando Belasteguin", email: "bela@gmail.com" })
+    );
+
+    // El cliente tenía guardado en su sessionStorage el turno 159 a las 11:00 hs
+    const staleTurno = [
+      {
+        id: 159,
+        hora_inicio: "11:00",
+        hora_fin: "12:00",
+        fecha: "2026-09-14",
+        precio: 20000,
+        monto_pagado: 20000,
+        saldo_pendiente: 0,
+        estado_pago: "pagado",
+        estado: "reservado",
+        cliente_id: 70,
+        cliente_nombre: "Fernando Belasteguin",
+        cliente_email: "bela@gmail.com",
+      },
+    ];
+    sessionStorage.setItem("confirmed_turnos_61", JSON.stringify(staleTurno));
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              user: { id: 70, name: "Fernando Belasteguin", email: "bela@gmail.com" },
+            }),
+        });
+      }
+      if (url.includes("/turnos/mis-turnos")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: [] }), // El turno 159 ya no está activo
+        });
+      }
+      if (url.includes("/disponibilidad")) {
+        // En el backend, el turno fue anulado por el admin y el slot 11:00 ahora está disponible
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              slots_disponibles: [
+                { hora_inicio: "11:00", hora_fin: "12:00", disponible: true, precio: 20000 },
+              ],
+              turnos_ocupados: [],
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={61}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="nico-padel"
+        fechaInicial="2026-09-14"
+        isAdmin={false}
+      />
+    );
+
+    // Debe mostrar el slot de las 11:00 disponible/libre
+    await waitFor(() => {
+      expect(screen.getByText("11:00")).toBeDefined();
+      expect(screen.getByText("Libre")).toBeDefined();
+    });
+
+    // NO debe mostrar la sección de reservas confirmadas para este turno anulado
+    expect(screen.queryByTestId("client-confirmed-turnos-section")).toBeNull();
+    expect(screen.queryByText(/Tus Reservas Confirmadas/i)).toBeNull();
+
+    // El sessionStorage debe haber sido depurado
+    const stored = JSON.parse(sessionStorage.getItem("confirmed_turnos_61") || "[]");
+    expect(stored.length).toBe(0);
+  });
 });
 
