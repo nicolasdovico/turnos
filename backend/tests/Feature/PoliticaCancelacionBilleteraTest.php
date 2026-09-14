@@ -324,5 +324,53 @@ class PoliticaCancelacionBilleteraTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    public function test_turnos_cancelados_por_admin_con_devolucion_efectivo_no_figuran_como_activos_para_el_cliente(): void
+    {
+        $owner = User::factory()->create();
+        $this->complejo->update(['user_id' => $owner->id]);
+
+        $turno = Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'cliente_id' => $this->cliente->id,
+            'cliente_nombre' => $this->cliente->name,
+            'cliente_email' => $this->cliente->email,
+            'fecha' => '2026-09-14',
+            'hora_inicio' => '11:00',
+            'hora_fin' => '12:00',
+            'precio' => 20000.00,
+            'monto_pagado' => 20000.00,
+            'saldo_pendiente' => 0.00,
+            'metodo_pago' => 'online',
+            'estado_pago' => 'pagado_total',
+            'estado' => 'reservado',
+        ]);
+
+        // El administrador anula el turno con reembolso en efectivo
+        $responseAdmin = $this->actingAs($owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos/{$turno->id}/cancelar", [
+                'accion_reembolso' => 'efectivo',
+            ]);
+
+        $responseAdmin->assertStatus(200);
+
+        $turno->refresh();
+        $this->assertEquals('cancelado', $turno->estado);
+        $this->assertEquals('reembolsado', $turno->estado_pago);
+        $this->assertEquals(0.00, (float) $turno->saldo_pendiente);
+
+        // Al consultar turnos activos del cliente, el turno cancelado no debe figurar como activo
+        $resActivos = $this->actingAs($this->cliente, 'sanctum')
+            ->getJson('/api/turnos/mis-turnos?estado=activos');
+
+        $resActivos->assertStatus(200);
+        $this->assertCount(0, $resActivos->json('data'));
+
+        // Disponibilidad de la cancha debe tener el slot disponible y no en turnos_ocupados
+        $dispService = app(\App\Services\DisponibilidadService::class);
+        $disp = $dispService->obtenerDisponibilidadCompleta($this->cancha->id, '2026-09-14', 60, false, $this->cliente->id);
+        $this->assertFalse(collect($disp['turnos_ocupados'])->contains('id', $turno->id));
+    }
 }
 

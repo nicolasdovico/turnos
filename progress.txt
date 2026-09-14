@@ -1555,6 +1555,40 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Turno 70 (Fijo): $8.000 precio, $0 pagado, saldo pendiente $8.000, `estado_pago: 'pendiente'`.
     - Día 2026-09-14: Facturado $24.000, Cobrado $8.000, Saldo Pendiente $16.000, `estado_cobro: 'pendiente'`.
 ===============================================================================
-
-
-
+-------------------------------------------------------------------------------
+[2026-09-14] - CORRECCIÓN DE DESADJUDICACIÓN DE TURNOS ANULADOS POR EL ADMINISTRADOR
+-------------------------------------------------------------------------------
+- Diagnóstico y Causa Raíz:
+  * El usuario `bela@gmail.com` (ID 70) reservó el Turno 159 en `nico-padel` para el día 14/09 a las 11:00 hs (Cancha 1), con pago 100% abonado ($20.000).
+  * El administrador del club procedió a liberar/anular el turno desde el panel con devolución en efectivo.
+  * El slot se liberó correctamente en la grilla y el turno quedó cancelado en base de datos (`estado = 'cancelado'`, `estado_pago = 'reembolsado'`).
+  * Sin embargo, al iniciar sesión el cliente `bela@gmail.com`:
+    1. En el frontend web (`GrillaHoraria.tsx`), la sección "🎉 Tus Reservas Confirmadas" continuaba mostrando el turno asignado como confirmado y 100% abonado. Esto sucedía porque:
+       - Al reservar, el turno se había guardado en `sessionStorage` (`confirmed_turnos_61`).
+       - La función `handleLiberarTurno` del administrador no limpiaba el turno de `confirmedTurnos` ni de `sessionStorage`, ni emitía evento de cancelación a otras pestañas/ventanas.
+       - En `clientConfirmedTurnos`, se iteraba `confirmedTurnos` sin descartar los turnos que estuvieran con `estado === 'cancelado'` o `estado_pago === 'reembolsado'`.
+    2. En el backend (`TurnoCancelacionController.php` - endpoint `misTurnos`), los turnos cancelados se retornaban con `aplica_reembolso = true` y no existía filtro de estado para turnos activos.
+    3. En el frontend móvil (`HomeScreen.tsx`), el listado de turnos de la tarjeta "Tus Turnos Reservados 🎾" y el contador de "Activos" mapeaban todos los turnos del usuario sin excluir turnos con `estado === 'cancelado'` o `'anulado'`.
+    4. En `ClubDashboardController::destroyTurno`, al liberar con devolución en efectivo no se reseteaba explícitamente `saldo_pendiente = 0.00`.
+- Solución Implementada:
+  * Backend Laravel 11 (`ClubDashboardController.php`):
+    - Al anular o cancelar el turno en `destroyTurno`, se asigna `$turno->saldo_pendiente = 0.00;` para evitar inconsistencias de saldos remanentes.
+  * Backend Laravel 11 (`TurnoCancelacionController.php`):
+    - Soporte para parámetros de filtro `?estado=activos` y `?solo_activos=1` en `misTurnos`.
+    - Blindaje de propiedades: si el turno está cancelado/rechazado/anulado, `puede_cancelar = false` y `aplica_reembolso = false`.
+  * Frontend Web Next.js 14 (`GrillaHoraria.tsx`):
+    - En `handleLiberarTurno`: se elimina inmediatamente el turno de `confirmedTurnos` y de `sessionStorage.getItem('confirmed_turnos_' + canchaId)`.
+    - Se despacha el evento CustomEvent `saas-turno-cancelled` con el `turnoId`, `canchaId`, `fecha` y `horaInicio`, y se actualiza `localStorage.setItem('saas_last_cancelled_turno', ...)`.
+    - En `handleRemoteCancel`: escucha tanto el evento local `saas-turno-cancelled` como el evento de ventana `storage` para sincronizar en tiempo real todas las pestañas y dispositivos del usuario, depurando la caché de reservas confirmadas.
+    - En `saveConfirmedTurnos` (`fetchDisponibilidad`): se filtran y descartan automáticamente registros con `estado === 'cancelado'` o `estado_pago === 'reembolsado'`.
+    - En `clientConfirmedTurnos`: se excluyen turnos con `estado === 'cancelado'` o `estado_pago === 'reembolsado'`, impidiendo que un turno anulado vuelva a mostrarse como adjudicado.
+  * Frontend Mobile React Native (`HomeScreen.tsx`):
+    - Se filtran los turnos activos en el contador ("Mis Turnos X Activos") y en la lista de tarjetas "Tus Turnos Reservados 🎾" descartando turnos con `t.estado === 'cancelado' || t.estado === 'anulado'`.
+- Verificación de Calidad:
+  * Backend PHPUnit: 185/185 tests pasados al 100% (1006 aserciones, incluyendo nuevo test `test_turnos_cancelados_por_admin_con_devolucion_efectivo_no_figuran_como_activos_para_el_cliente` en `PoliticaCancelacionBilleteraTest.php`).
+  * Frontend Web Vitest: 62/62 tests pasados al 100% (incluyendo todos los tests de `GrillaHoraria.test.tsx` y `authAndOnboarding.test.tsx`).
+  * Frontend Mobile Jest: 20/20 tests pasados al 100% en las 4 suites de `mobile/__tests__`.
+  * Verificación en Vivo:
+    - Con token de `bela@gmail.com`, GET `/api/turnos/mis-turnos?estado=activos` retorna 0 turnos para el 14/09 a las 11:00 hs.
+    - GET `/api/canchas/61/disponibilidad?fecha=2026-09-14` retorna el horario 11:00 como `disponible: true` y no figura en `turnos_ocupados`.
+===============================================================================

@@ -789,6 +789,15 @@ export default function GrillaHoraria({
           es_fijo: Boolean(s.es_fijo),
         }));
         setSlots(formattedSlots);
+
+        saveConfirmedTurnos((prev) => {
+          const next = prev.filter((t) => {
+            if (t.fecha !== targetFecha) return true;
+            if (t.estado === "cancelado" || (t as any).estado_pago === "reembolsado") return false;
+            return true;
+          });
+          return next.length !== prev.length ? next : prev;
+        });
       } else {
         setSlots([]);
       }
@@ -998,6 +1007,44 @@ export default function GrillaHoraria({
 
       addToast("success", data.message || `Turno de las ${targetTurno.hora_inicio} hs liberado correctamente.`);
       setTurnoToCancel(null);
+
+      const targetFecha = targetTurno.fecha || fecha;
+      const targetHora = (targetTurno.hora_inicio || "").substring(0, 5);
+
+      const isTargetTurno = (t: TurnoOcupado) =>
+        (Boolean(targetTurno.id) && Boolean(t.id) && String(t.id) === String(targetTurno.id)) ||
+        (t.fecha === targetFecha && (t.hora_inicio || "").substring(0, 5) === targetHora);
+
+      setConfirmedTurnos((prev) => prev.filter((t) => !isTargetTurno(t)));
+      setTurnosOcupados((prev) => prev.filter((t) => !isTargetTurno(t)));
+
+      if (typeof window !== "undefined") {
+        try {
+          const stored = sessionStorage.getItem(`confirmed_turnos_${canchaId}`);
+          if (stored) {
+            const parsed: TurnoOcupado[] = JSON.parse(stored);
+            const filtered = parsed.filter((t) => !isTargetTurno(t));
+            sessionStorage.setItem(`confirmed_turnos_${canchaId}`, JSON.stringify(filtered));
+          }
+        } catch {
+          // ignore
+        }
+
+        try {
+          const cancelEventPayload = {
+            turnoId: targetTurno.id,
+            canchaId,
+            fecha: targetFecha,
+            horaInicio: targetHora,
+            timestamp: Date.now(),
+          };
+          window.dispatchEvent(new CustomEvent("saas-turno-cancelled", { detail: cancelEventPayload }));
+          localStorage.setItem("saas_last_cancelled_turno", JSON.stringify(cancelEventPayload));
+        } catch {
+          // ignore
+        }
+      }
+
       fetchDisponibilidad(fecha);
     } catch (err: any) {
       setCancelError(err.message || "Error al liberar el turno.");
@@ -1284,20 +1331,44 @@ export default function GrillaHoraria({
     const handleRemoteCancel = (e: any) => {
       let cancelledCanchaId: number | null = null;
       let cancelledFecha: string | null = null;
+      let cancelledTurnoId: number | null = null;
+      let cancelledHoraInicio: string | null = null;
 
       if (e?.type === "saas-turno-cancelled" && e.detail) {
         cancelledCanchaId = e.detail.canchaId;
         cancelledFecha = e.detail.fecha;
+        cancelledTurnoId = e.detail.turnoId;
+        cancelledHoraInicio = e.detail.horaInicio;
       } else if (e?.type === "storage" && e.key === "saas_last_cancelled_turno" && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           cancelledCanchaId = parsed.canchaId;
           cancelledFecha = parsed.fecha;
+          cancelledTurnoId = parsed.turnoId;
+          cancelledHoraInicio = parsed.horaInicio;
         } catch {}
       }
 
       if (!cancelledCanchaId || cancelledCanchaId === canchaId) {
         if (!cancelledFecha || cancelledFecha === fecha) {
+          if (cancelledTurnoId || cancelledHoraInicio) {
+            const isCancelled = (t: TurnoOcupado) =>
+              (cancelledTurnoId && String(t.id) === String(cancelledTurnoId)) ||
+              (cancelledHoraInicio && t.fecha === (cancelledFecha || fecha) && (t.hora_inicio || "").substring(0, 5) === cancelledHoraInicio.substring(0, 5));
+
+            setConfirmedTurnos((prev) => prev.filter((t) => !isCancelled(t)));
+            setTurnosOcupados((prev) => prev.filter((t) => !isCancelled(t)));
+
+            if (typeof window !== "undefined") {
+              try {
+                const stored = sessionStorage.getItem(`confirmed_turnos_${canchaId}`);
+                if (stored) {
+                  const parsed: TurnoOcupado[] = JSON.parse(stored);
+                  sessionStorage.setItem(`confirmed_turnos_${canchaId}`, JSON.stringify(parsed.filter((t) => !isCancelled(t))));
+                }
+              } catch {}
+            }
+          }
           fetchDisponibilidad(fecha, duracion, true);
         }
       }
@@ -1519,6 +1590,8 @@ export default function GrillaHoraria({
     confirmedTurnos.forEach((t) => {
       const hora = (t.hora_inicio || "").substring(0, 5);
       if (t.fecha === fecha && !seen.has(hora)) {
+        if (t.estado === "cancelado" || (t as any).estado_pago === "reembolsado") return;
+
         if (currentUser) {
           const matches =
             !t.cliente_id ||
@@ -1543,6 +1616,7 @@ export default function GrillaHoraria({
       turnosOcupados.forEach((t) => {
         const hora = (t.hora_inicio || "").substring(0, 5);
         if (t.fecha === fecha && !seen.has(hora)) {
+          if (t.estado === "cancelado") return;
           const isMine =
             (t as any).is_mine ||
             (t.cliente_id && t.cliente_id === currentUser.id) ||
@@ -1556,7 +1630,7 @@ export default function GrillaHoraria({
     }
 
     return list.sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
-  }, [isAdmin, confirmedTurnos, turnosOcupados, currentUser, fecha]);
+  }, [isAdmin, confirmedTurnos, turnosOcupados, slots, currentUser, fecha]);
 
   const isSlotInPast = (slotHoraInicio: string, slotFecha: string) => {
     const today = getTodayString();

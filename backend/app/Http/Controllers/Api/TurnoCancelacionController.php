@@ -31,12 +31,24 @@ class TurnoCancelacionController extends Controller
             ], 401);
         }
 
-        $turnos = Turno::withoutGlobalScopes()
+        $query = Turno::withoutGlobalScopes()
             ->where('cliente_id', $user->id)
             ->with(['cancha.complejo'])
             ->orderBy('fecha', 'desc')
-            ->orderBy('hora_inicio', 'desc')
-            ->get();
+            ->orderBy('hora_inicio', 'desc');
+
+        if ($request->has('estado')) {
+            $estado = $request->input('estado');
+            if ($estado === 'activos') {
+                $query->whereNotIn('estado', ['cancelado', 'rechazado', 'anulado']);
+            } else {
+                $query->where('estado', $estado);
+            }
+        } elseif ($request->boolean('solo_activos', false)) {
+            $query->whereNotIn('estado', ['cancelado', 'rechazado', 'anulado']);
+        }
+
+        $turnos = $query->get();
 
         $data = $turnos->map(function ($t) {
             $complejo = $t->cancha?->complejo;
@@ -49,8 +61,10 @@ class TurnoCancelacionController extends Controller
             $horasRestantes = $now->diffInHours($slotStartDateTime, false);
             $limiteHoras = (int) ($complejo?->horas_limite_cancelacion ?? 4);
 
+            $esCancelado = in_array($t->estado, ['cancelado', 'rechazado', 'anulado']);
             $dentroDeTiempo = $horasRestantes >= $limiteHoras;
-            $puedeCancelar = $t->estado === 'reservado';
+            $puedeCancelar = !$esCancelado && $t->estado === 'reservado';
+            $aplicaReembolso = !$esCancelado && $dentroDeTiempo && (float) $t->monto_pagado > 0;
 
             return [
                 'id' => $t->id,
@@ -79,7 +93,7 @@ class TurnoCancelacionController extends Controller
                 ] : null,
                 'horas_restantes' => $horasRestantes,
                 'puede_cancelar' => $puedeCancelar,
-                'aplica_reembolso' => $dentroDeTiempo && (float) $t->monto_pagado > 0,
+                'aplica_reembolso' => $aplicaReembolso,
                 'limite_horas_cancelacion' => $limiteHoras,
             ];
         });

@@ -169,7 +169,7 @@ export function HomeScreen() {
             <Text className="text-2xl mb-1">📅</Text>
             <Text className="text-xs font-semibold text-slate-400">Mis Turnos</Text>
             <Text className="text-xl font-bold text-white mt-1">
-              {misTurnos.filter((t) => t.estado === 'reservado').length} Activos
+              {misTurnos.filter((t) => t.estado !== 'cancelado' && t.estado !== 'anulado').length} Activos
             </Text>
           </View>
           <View className="flex-1 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
@@ -194,8 +194,8 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {misTurnos.length > 0 ? (
-          misTurnos.map((turno) => {
+        {misTurnos.filter((t) => t.estado !== 'cancelado' && t.estado !== 'anulado').length > 0 ? (
+          misTurnos.filter((t) => t.estado !== 'cancelado' && t.estado !== 'anulado').map((turno) => {
             const isPagado = (turno.estado_pago === 'pagado' || turno.estado_pago === 'pagado_total') && turno.saldo_pendiente <= 0;
             const isSenado = !isPagado && turno.monto_pagado > 0;
             const isCancelado = turno.estado === 'cancelado';

@@ -664,6 +664,7 @@ class ClubDashboardController extends Controller
         }
 
         $turno->estado = 'cancelado';
+        $turno->saldo_pendiente = 0.00;
         $turno->save();
 
         $mensaje = $montoPagado > 0 && $accionReembolso === 'billetera' && $clienteDestino
