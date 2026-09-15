@@ -335,6 +335,10 @@ export default function ClubAdminPanel() {
   const [tfDiaSemana, setTfDiaSemana] = useState<number>(1); // Lunes
   const [tfHoraInicio, setTfHoraInicio] = useState<string>("19:00");
   const [tfHoraFin, setTfHoraFin] = useState<string>("");
+  const [tfDuracionMinutos, setTfDuracionMinutos] = useState<number>(60);
+  const [verificandoDisponibilidad, setVerificandoDisponibilidad] = useState<boolean>(false);
+  const [conflictoDisponibilidad, setConflictoDisponibilidad] = useState<{ mensaje: string; fecha?: string } | null>(null);
+  const [disponibilidadOk, setDisponibilidadOk] = useState<boolean>(false);
   const [tfTipoCliente, setTfTipoCliente] = useState<"manual" | "registrado">("manual");
   const [tfClienteNombre, setTfClienteNombre] = useState<string>("");
   const [tfClienteTelefono, setTfClienteTelefono] = useState<string>("");
@@ -724,6 +728,24 @@ export default function ClubAdminPanel() {
       setTfHoraInicio("19:00");
     }
 
+    const initialCancha = canchas.length > 0 ? canchas[0] : null;
+    if (initialCancha) {
+      setTfCanchaId(initialCancha.id);
+      const dur = initialCancha.duracion_minutos || 60;
+      setTfDuracionMinutos(dur);
+      if (dur === 90 && initialCancha.precio_90_min) {
+        setTfPrecio(String(initialCancha.precio_90_min));
+      } else if (dur === 120 && initialCancha.precio_120_min) {
+        setTfPrecio(String(initialCancha.precio_120_min));
+      } else {
+        setTfPrecio(String(initialCancha.precio_base || 8000));
+      }
+    } else {
+      setTfCanchaId("");
+      setTfDuracionMinutos(60);
+      setTfPrecio("8000");
+    }
+
     setTfHoraFin("");
     setTfTipoCliente("manual");
     setTfClienteNombre("");
@@ -732,15 +754,94 @@ export default function ClubAdminPanel() {
     setSearchUserQuery("");
     setSelectedUserObj(null);
     setShowUserDropdown(false);
-    setTfPrecio(canchas.length > 0 ? String(canchas[0].precio_base || 8000) : "8000");
     setTfSemanas(26); // 6 meses estándar
     setTfMetodoPago("mostrador");
     setTurnosFijosSuccessMsg(null);
     setTurnosFijosErrorMsg(null);
     setTurnosFijosModalError(null);
+    setConflictoDisponibilidad(null);
+    setDisponibilidadOk(false);
     setShowNewTurnoFijoModal(true);
     fetchRegisteredUsers("");
   };
+
+  const getHoraFinCalculada = (horaIni: string, duracionMin: number): string => {
+    if (!horaIni) return "";
+    const [h, m] = horaIni.split(":").map(Number);
+    const totalMin = (h || 0) * 60 + (m || 0) + duracionMin;
+    const finH = String(Math.floor(totalMin / 60)).padStart(2, "0");
+    const finM = String(totalMin % 60).padStart(2, "0");
+    return `${finH}:${finM}`;
+  };
+
+  // Chequeo reactivo de disponibilidad previa contra reservas casuales/fijas en horizonte de semanas
+  useEffect(() => {
+    if (!showNewTurnoFijoModal || !tfCanchaId || !tfHoraInicio || tfDiaSemana === undefined) {
+      setConflictoDisponibilidad(null);
+      setDisponibilidadOk(false);
+      return;
+    }
+
+    const horarioDia = horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana));
+    if (horarios.length > 0 && !horarioDia) {
+      setConflictoDisponibilidad(null);
+      setDisponibilidadOk(false);
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        setVerificandoDisponibilidad(true);
+        const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+        const selCancha = canchas.find((c) => c.id === tfCanchaId);
+        const duracionEfectiva = selCancha?.permite_duracion_flexible ? tfDuracionMinutos : (selCancha?.duracion_minutos || 60);
+        const calculatedHoraFin = getHoraFinCalculada(tfHoraInicio, duracionEfectiva);
+
+        const res = await fetch(`${API_BASE}/clubs/${subdomain}/turnos-fijos/verificar-disponibilidad`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+          },
+          body: JSON.stringify({
+            cancha_id: tfCanchaId,
+            dia_semana: tfDiaSemana,
+            hora_inicio: tfHoraInicio,
+            hora_fin: calculatedHoraFin,
+            duracion_minutos: duracionEfectiva,
+            semanas: tfSemanas || 26,
+          }),
+        });
+
+        const data = await res.json();
+        if (!isMounted) return;
+
+        if (res.ok && data.success) {
+          if (data.disponible) {
+            setConflictoDisponibilidad(null);
+            setDisponibilidadOk(true);
+          } else {
+            setDisponibilidadOk(false);
+            setConflictoDisponibilidad({
+              mensaje: data.message || "Conflicto de horario detectado.",
+              fecha: data.fecha_conflicto || "",
+            });
+          }
+        }
+      } catch (e) {
+        // En caso de error de red puntual en chequeo asíncrono, no bloquear al usuario
+      } finally {
+        if (isMounted) setVerificandoDisponibilidad(false);
+      }
+    }, 350);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [showNewTurnoFijoModal, tfCanchaId, tfDiaSemana, tfHoraInicio, tfDuracionMinutos, tfSemanas, subdomain]);
 
   const handleCreateTurnoFijo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -759,23 +860,15 @@ export default function ClubAdminPanel() {
         throw new Error("Selecciona un usuario registrado de la lista.");
       }
 
+      const selCancha = canchas.find((c) => c.id === tfCanchaId);
+      const horarioDia = horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana));
+      const duracionEfectiva = selCancha?.permite_duracion_flexible ? tfDuracionMinutos : (selCancha?.duracion_minutos || horarioDia?.duracion_turno_minutos || 60);
+      const hFin = getHoraFinCalculada(tfHoraInicio, duracionEfectiva);
+
       // Validar contra días y horarios de atención del club
       if (horarios.length > 0) {
-        const horarioDia = horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana));
         if (!horarioDia) {
           throw new Error(`El club se encuentra cerrado los días ${DIAS[tfDiaSemana]}. No es posible agendar turnos.`);
-        }
-
-        const selCancha = canchas.find((c) => c.id === tfCanchaId);
-        const duracion = selCancha?.duracion_minutos || horarioDia?.duracion_turno_minutos || 60;
-
-        let hFin = tfHoraFin;
-        if (!hFin && tfHoraInicio) {
-          const [h, m] = tfHoraInicio.split(":").map(Number);
-          const totalMin = (h || 0) * 60 + (m || 0) + duracion;
-          const finH = String(Math.floor(totalMin / 60)).padStart(2, "0");
-          const finM = String(totalMin % 60).padStart(2, "0");
-          hFin = `${finH}:${finM}`;
         }
 
         const horaAp = (horarioDia.hora_apertura || "08:00").substring(0, 5);
@@ -784,6 +877,10 @@ export default function ClubAdminPanel() {
         if (tfHoraInicio < horaAp || hFin > horaCi || tfHoraInicio >= hFin) {
           throw new Error(`El horario seleccionado (${tfHoraInicio} a ${hFin} hs) está fuera del horario de atención del club para los días ${DIAS[tfDiaSemana]} (${horaAp} a ${horaCi} hs).`);
         }
+      }
+
+      if (conflictoDisponibilidad) {
+        throw new Error(conflictoDisponibilidad.mensaje);
       }
 
       const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
@@ -798,7 +895,8 @@ export default function ClubAdminPanel() {
           cancha_id: tfCanchaId,
           dia_semana: tfDiaSemana,
           hora_inicio: tfHoraInicio,
-          hora_fin: tfHoraFin || undefined,
+          hora_fin: hFin || undefined,
+          duracion_minutos: duracionEfectiva,
           semanas: tfSemanas || 26,
           precio: tfPrecio ? parseFloat(tfPrecio) : undefined,
           cliente_id: tfTipoCliente === "registrado" && tfClienteId ? Number(tfClienteId) : null,
@@ -816,6 +914,8 @@ export default function ClubAdminPanel() {
       setTurnosFijosSuccessMsg(`¡Turno fijo de ${tfSemanas} semanas (6 meses) fijado exitosamente (${data.cantidad} turnos agendados)!`);
       setShowNewTurnoFijoModal(false);
       setTurnosFijosModalError(null);
+      setConflictoDisponibilidad(null);
+      setDisponibilidadOk(false);
       fetchTurnosFijos();
     } catch (err: any) {
       setTurnosFijosModalError(err.message || "Error al crear turno fijo.");
@@ -2971,8 +3071,16 @@ export default function ClubAdminPanel() {
                       const cid = Number(e.target.value);
                       setTfCanchaId(cid);
                       const sel = canchas.find((c) => c.id === cid);
-                      if (sel && !tfPrecio) {
-                        setTfPrecio(String(sel.precio_base || 8000));
+                      if (sel) {
+                        const dur = sel.duracion_minutos || 60;
+                        setTfDuracionMinutos(dur);
+                        if (dur === 90 && sel.precio_90_min) {
+                          setTfPrecio(String(sel.precio_90_min));
+                        } else if (dur === 120 && sel.precio_120_min) {
+                          setTfPrecio(String(sel.precio_120_min));
+                        } else {
+                          setTfPrecio(String(sel.precio_base || 8000));
+                        }
                       }
                     }}
                     required
@@ -2981,11 +3089,51 @@ export default function ClubAdminPanel() {
                     <option value="">Selecciona una Cancha</option>
                     {canchas.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.nombre} • {c.deporte?.toUpperCase()} (${c.precio_base?.toLocaleString()})
+                        {c.nombre} • {c.deporte?.toUpperCase()} (${c.precio_base?.toLocaleString()}) {c.permite_duracion_flexible ? "(Duración Variable)" : ""}
                       </option>
                     ))}
                   </select>
                 </div>
+
+                {/* Field: Duración Variable (si la cancha elegida lo permite) */}
+                {(() => {
+                  const selCancha = canchas.find((c) => c.id === tfCanchaId);
+                  if (!selCancha?.permite_duracion_flexible) return null;
+
+                  const duraciones = (selCancha.duraciones_permitidas && selCancha.duraciones_permitidas.length > 0)
+                    ? selCancha.duraciones_permitidas
+                    : [60, 90, 120];
+
+                  return (
+                    <div>
+                      <label htmlFor="tf-duracion" className="block text-slate-300 font-bold mb-1">
+                        Duración del Turno (Cancha con Turnos Variables):
+                      </label>
+                      <select
+                        id="tf-duracion"
+                        value={tfDuracionMinutos}
+                        onChange={(e) => {
+                          const nuevaDur = Number(e.target.value);
+                          setTfDuracionMinutos(nuevaDur);
+                          if (nuevaDur === 90 && selCancha.precio_90_min) {
+                            setTfPrecio(String(selCancha.precio_90_min));
+                          } else if (nuevaDur === 120 && selCancha.precio_120_min) {
+                            setTfPrecio(String(selCancha.precio_120_min));
+                          } else {
+                            setTfPrecio(String(selCancha.precio_base || 8000));
+                          }
+                        }}
+                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-white font-medium focus:border-emerald-500 focus:outline-none"
+                      >
+                        {duraciones.map((dur) => (
+                          <option key={dur} value={dur}>
+                            {dur} Minutos {dur === 90 && selCancha.precio_90_min ? `($${Number(selCancha.precio_90_min).toLocaleString()})` : dur === 120 && selCancha.precio_120_min ? `($${Number(selCancha.precio_120_min).toLocaleString()})` : `($${Number(selCancha.precio_base).toLocaleString()})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })()}
 
                 {/* Field 2 & 3: Día de la semana y Horario */}
                 <div className="grid grid-cols-2 gap-3">
@@ -3026,11 +3174,12 @@ export default function ClubAdminPanel() {
                   </div>
                 </div>
 
-                {/* Schedule Info / Closed Alert Banner */}
+                {/* Schedule Info / Closed Alert Banner / Availability Pre-Check */}
                 {(() => {
                   const horarioDia = horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana));
                   const selCancha = canchas.find((c) => c.id === tfCanchaId);
-                  const duracion = selCancha?.duracion_minutos || horarioDia?.duracion_turno_minutos || 60;
+                  const duracionEfectiva = selCancha?.permite_duracion_flexible ? tfDuracionMinutos : (selCancha?.duracion_minutos || horarioDia?.duracion_turno_minutos || 60);
+                  const hFin = getHoraFinCalculada(tfHoraInicio, duracionEfectiva);
 
                   if (horarios.length > 0 && !horarioDia) {
                     return (
@@ -3045,9 +3194,40 @@ export default function ClubAdminPanel() {
                     const horaAp = horarioDia.hora_apertura.substring(0, 5);
                     const horaCi = horarioDia.hora_cierre.substring(0, 5);
                     return (
-                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs flex items-center justify-between">
-                        <span>🕒 Horario de atención {DIAS[tfDiaSemana]}: <strong className="text-white font-mono">{horaAp} a {horaCi} hs</strong></span>
-                        <span className="text-emerald-400 font-mono font-bold">Turnos de {duracion} min</span>
+                      <div className="space-y-2">
+                        <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs flex items-center justify-between">
+                          <span>🕒 Horario de atención {DIAS[tfDiaSemana]}: <strong className="text-white font-mono">{horaAp} a {horaCi} hs</strong></span>
+                          <span className="text-emerald-400 font-mono font-bold">
+                            Turnos de {duracionEfectiva} min {hFin ? `(${tfHoraInicio} a ${hFin} hs)` : ""}
+                          </span>
+                        </div>
+
+                        {verificandoDisponibilidad && (
+                          <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-400 text-xs flex items-center gap-2">
+                            <div className="h-3 w-3 animate-spin rounded-full border border-emerald-400 border-t-transparent" />
+                            <span>Comprobando disponibilidad de las {tfSemanas} semanas en el calendario...</span>
+                          </div>
+                        )}
+
+                        {conflictoDisponibilidad && !verificandoDisponibilidad && (
+                          <div role="alert" className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex items-start gap-2">
+                            <span className="text-sm">⚠️</span>
+                            <div>
+                              <strong className="block text-amber-300 font-bold">Conflicto de disponibilidad detectado</strong>
+                              <p className="mt-0.5">{conflictoDisponibilidad.mensaje}</p>
+                              <span className="block mt-1 text-[11px] text-amber-400/80">
+                                No es posible fijar este horario porque ya se encuentra reservado más adelante. Elige otro horario o reubica la reserva previa.
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {disponibilidadOk && !conflictoDisponibilidad && !verificandoDisponibilidad && (
+                          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                            <span>✓</span>
+                            <span>Horario 100% disponible para las {tfSemanas} semanas consecutivas (sin reservas casuales ni turnos fijos previos).</span>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -3295,7 +3475,12 @@ export default function ClubAdminPanel() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isSavingTurnoFijo || (horarios.length > 0 && !horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana)))}
+                    disabled={
+                      isSavingTurnoFijo ||
+                      verificandoDisponibilidad ||
+                      Boolean(conflictoDisponibilidad) ||
+                      (horarios.length > 0 && !horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana)))
+                    }
                     className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
                     {isSavingTurnoFijo ? (

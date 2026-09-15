@@ -1736,5 +1736,43 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - `validates fixed turn creation against business hours and closed days in modal`: valida indicador de cerrado, banner de advertencia, deshabilitación de botón y mensaje de error ante horarios fuera de atención.
     - Suite completa Frontend: 65/65 tests pasados al 100% (4 suites).
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-15] - TURNOS FIJOS: DURACIÓN VARIABLE DE CANCHAS Y CONTROL PREVIO DE CONFLICTOS CON RESERVAS CASUALES
+-------------------------------------------------------------------------------
+- Problema y Requerimientos del Usuario:
+  * En el panel de club (`/panel`), solapa "Turnos Fijos", el modal mostraba una duración fija (e.g. 60 min) aún cuando existen canchas configuradas con turnos de duración variable (`permite_duracion_flexible`). Se requería permitir al administrador elegir la duración (60, 90 o 120 minutos) mediante un `<select>` que se despliegue únicamente si la cancha seleccionada acepta turnos variables, recalculando hora de finalización, tarifas y badge de horario.
+  * Antes de la confirmación del turno fijo, se requería verificar que no exista ningún turno asignado más adelante en ese horario durante el horizonte de semanas (por ejemplo, si un cliente casual reservó previamente ese horario, evitando colisiones o sobreescrituras silenciosas).
+- Soluciones Implementadas:
+  * Backend (Laravel 11):
+    - `ClubDashboardController::storeTurnoFijo` y `TurnoFijoController`:
+      * Incorporación del parámetro `duracion_minutos` (`in:60,90,120`) en la validación del request.
+      * Cálculo preciso de `$duracion` respetando la duración elegida o la configuración de cancha/horario, derivando `$horaFin` automáticamente.
+      * Detección estricta de conflictos con `whereNotIn('estado', ['cancelado', 'disponible'])` y `where('hora_inicio', '<', $horaFin)->where('hora_fin', '>', $horaInicio)`.
+      * Mensaje descriptivo con fecha en formato `dd-mm-aaaa`, rango horario, nombre del cliente y especificación de si el conflicto es con una `reserva casual` o `turno fijo`.
+    - Endpoint de Verificación Previa (`POST /api/clubs/{subdomain}/turnos-fijos/verificar-disponibilidad`):
+      * Realiza el chequeo previo sin persistir datos en la base de datos, retornando `disponible: true/false` con detalles del conflicto detectado para feedback visual en tiempo real.
+    - `ClubDashboardController::renovarTurnoFijo`:
+      * Mismo control reforzado de conflictos con `whereNotIn('estado', ['cancelado', 'disponible'])`.
+  * Frontend Web (Next.js 14):
+    - `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+      * Estado `tfDuracionMinutos` reactivo.
+      * Si la cancha seleccionada posee `permite_duracion_flexible`, se renderiza el select con las opciones configuradas (`duraciones_permitidas` o `[60, 90, 120]`), actualizando dinámicamente la tarifa sugerida (`precio_base`, `precio_90_min`, `precio_120_min`).
+      * Helper `getHoraFinCalculada` para derivar la hora de finalización en base a la hora de inicio y la duración seleccionada.
+      * `useEffect` con debounce que consulta automáticamente al endpoint de verificación de disponibilidad.
+      * Despliegue de banners interactivos:
+        - `⏳ Comprobando disponibilidad de las {tfSemanas} semanas en el calendario...`
+        - `⚠️ Conflicto de disponibilidad detectado: {mensaje con fecha dd-mm-aaaa, horario y cliente casual}`
+        - `✓ Horario 100% disponible para las {tfSemanas} semanas consecutivas.`
+      * Botón "Asignar Turno Fijo" deshabilitado automáticamente mientras exista un conflicto detectado.
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (`tests/Feature/TurnoFijoManagementTest.php`):
+    - `test_cannot_create_fixed_turno_if_casual_reservation_exists_on_future_date`: prueba que una reserva casual en la semana 2 detenga la creación con HTTP 409 y mensaje explícito.
+    - `test_can_create_fixed_turno_with_variable_duration`: valida creación de serie fija de 120 min con persistencia correcta de `hora_fin`.
+    - `test_verificar_disponibilidad_detects_future_casual_conflict`: valida el endpoint de verificación previa en casos libres y con conflicto.
+    - Suite completa Backend: 194/194 tests pasados al 100% (1055 assertions).
+  * Frontend (`tests/authAndOnboarding.test.tsx`):
+    - `supports variable duration courts and checks future casual reservation conflicts in modal`: valida visibilidad condicional del select de duración, actualización de precios y badge, y bloqueo del botón submit con banner de advertencia ante conflicto con cliente casual.
+    - Suite completa Frontend: 66/66 tests pasados al 100% (4 suites).
+===============================================================================
 
 

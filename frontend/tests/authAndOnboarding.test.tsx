@@ -1239,6 +1239,142 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(await screen.findByText(/está fuera del horario de atención del club/i)).toBeDefined();
   });
 
+  it("supports variable duration courts and checks future casual reservation conflicts in modal", async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string, opts?: any) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/is-admin")) {
+        return { ok: true, json: async () => ({ is_admin: true }) } as any;
+      }
+      if (urlStr.includes("/dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Padel Club Central",
+                subdominio: "padel-central",
+                deporte_principal: "padel",
+                tipo_negocio: { nombre: "Club Deportivo" },
+                owner: { name: "Dueño Central" },
+              },
+              plan: {
+                nombre: "Oro",
+                modulos: [{ slug: "reservas" }, { slug: "turnos_fijos" }],
+              },
+              canchas: [
+                {
+                  id: 1,
+                  nombre: "Cancha 1 Fija",
+                  deporte: "padel",
+                  precio_base: 8000,
+                  duracion_minutos: 60,
+                  permite_duracion_flexible: false,
+                  estado: "activo",
+                },
+                {
+                  id: 2,
+                  nombre: "Cancha 2 Flexible",
+                  deporte: "padel",
+                  precio_base: 8000,
+                  precio_90_min: 11000,
+                  precio_120_min: 14000,
+                  duracion_minutos: 60,
+                  permite_duracion_flexible: true,
+                  duraciones_permitidas: [60, 90, 120],
+                  estado: "activo",
+                },
+              ],
+              horarios_atencion: [
+                { id: 1, dia_semana: 1, hora_apertura: "08:00:00", hora_cierre: "23:00:00", duracion_turno_minutos: 60 },
+              ],
+              stats: { total_canchas: 2, total_turnos: 0, modulos_count: 2 },
+            },
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/verificar-disponibilidad")) {
+        const body = JSON.parse(opts?.body || "{}");
+        if (body.cancha_id === 2 && body.duracion_minutos === 90) {
+          return {
+            ok: true,
+            json: async () => ({
+              success: true,
+              disponible: false,
+              error: "RECURRING_SLOT_CONFLICT",
+              message: "Conflicto en la fecha 29-09-2026 (19:00 a 20:30 hs): ya existe un turno asignado a Carlos Casual (reserva casual).",
+              fecha_conflicto: "2026-09-29",
+            }),
+          } as any;
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            disponible: true,
+            message: "Horario disponible para las 26 semanas.",
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/turnos-fijos")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [],
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    const turnosFijosTabBtn = await screen.findByRole("button", { name: /Turnos Fijos/i });
+    fireEvent.click(turnosFijosTabBtn);
+
+    // Open Assign New Turno Fijo modal
+    const btnNuevoFijo = await screen.findByRole("button", { name: /Asignar Primer Turno Fijo/i });
+    fireEvent.click(btnNuevoFijo);
+
+    // Cancha 1 (non flexible) is default: duration select should NOT be in the document
+    expect(screen.queryByLabelText(/Duración del Turno \(Cancha con Turnos Variables\):/i)).toBeNull();
+
+    // Select Cancha 2 (flexible)
+    const selectCancha = screen.getByLabelText(/Cancha:/i);
+    fireEvent.change(selectCancha, { target: { value: "2" } });
+
+    // Duration selector should now appear
+    const selectDuracion = await screen.findByLabelText(/Duración del Turno \(Cancha con Turnos Variables\):/i) as HTMLSelectElement;
+    expect(selectDuracion).toBeDefined();
+    expect(screen.getByText(/60 Minutos/i)).toBeDefined();
+    expect(screen.getByText(/90 Minutos/i)).toBeDefined();
+    expect(screen.getByText(/120 Minutos/i)).toBeDefined();
+
+    // Change duration to 90 min
+    fireEvent.change(selectDuracion, { target: { value: "90" } });
+
+    // Price input should automatically update to 11000
+    const inputPrecio = screen.getByPlaceholderText("8000") as HTMLInputElement;
+    expect(inputPrecio.value).toBe("11000");
+
+    // The schedule info banner should show 90 min and calculated end time (19:00 a 20:30 hs)
+    expect(await screen.findByText(/Turnos? de 90 min/i)).toBeDefined();
+    expect(screen.getByText(/19:00 a 20:30 hs/i)).toBeDefined();
+
+    // Availability conflict alert should appear
+    expect(await screen.findByText(/Conflicto en la fecha 29-09-2026/i)).toBeDefined();
+    expect(screen.getByText(/Carlos Casual \(reserva casual\)/i)).toBeDefined();
+
+    // Submit button must be disabled due to detected conflict
+    const submitBtn = screen.getByRole("button", { name: /Asignar Turno Fijo/i }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+  });
+
   it("renders Resumen Diario & Caja tab with financial KPIs, day by day cards and court filtering in club admin panel", async () => {
     const mockResumenData = {
       periodo: {

@@ -619,5 +619,148 @@ class TurnoFijoManagementTest extends TestCase
             ]);
         $this->assertStringContainsString('fuera del horario de atención', $responseAfter->json('message'));
     }
+
+    public function test_cannot_create_fixed_turno_if_casual_reservation_exists_on_future_date(): void
+    {
+        // 2026-09-01 is Tuesday (week 1). Week 2 is 2026-09-08.
+        // Suppose a casual client booked Tuesday 2026-09-08 at 19:00 - 20:30.
+        Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'cliente_id' => null,
+            'cliente_nombre' => 'Carlos Casual',
+            'cliente_telefono' => '1155667788',
+            'fecha' => '2026-09-08',
+            'hora_inicio' => '19:00',
+            'hora_fin' => '20:30',
+            'precio' => 8000,
+            'monto_pagado' => 4000,
+            'saldo_pendiente' => 4000,
+            'estado' => 'reservado',
+            'es_fijo' => false,
+            'metodo_pago' => 'mostrador',
+        ]);
+
+        // Club admin attempts to book fixed turno starting 2026-09-01 for 4 weeks at 19:00
+        $response = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 2, // Martes
+                'hora_inicio' => '19:00',
+                'semanas' => 4,
+                'precio' => 8000,
+                'cliente_id' => $this->client->id,
+            ]);
+
+        $response->assertStatus(409)
+            ->assertJson([
+                'success' => false,
+                'error' => 'RECURRING_SLOT_CONFLICT',
+            ]);
+
+        $message = $response->json('message');
+        $this->assertStringContainsString('08-09-2026', $message);
+        $this->assertStringContainsString('Carlos Casual', $message);
+        $this->assertStringContainsString('reserva casual', $message);
+    }
+
+    public function test_can_create_fixed_turno_with_variable_duration(): void
+    {
+        // Enable variable duration on court
+        $this->cancha->update([
+            'permite_duracion_flexible' => true,
+            'duraciones_permitidas' => [60, 90, 120],
+            'duracion_minutos' => 60,
+            'precio_base' => 8000,
+            'precio_90_min' => 11000,
+            'precio_120_min' => 14000,
+        ]);
+
+        // Request 120 min fixed turno (e.g. 18:00 to 20:00)
+        $response = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 2, // Martes
+                'hora_inicio' => '18:00',
+                'duracion_minutos' => 120,
+                'semanas' => 4,
+                'precio' => 14000,
+                'cliente_id' => $this->client->id,
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'success' => true,
+                'cantidad' => 4,
+            ]);
+
+        // Verify that turnos created have hora_fin = 20:00
+        $turnos = Turno::where('cancha_id', $this->cancha->id)
+            ->where('hora_inicio', '18:00:00')
+            ->get();
+
+        $this->assertCount(4, $turnos);
+        foreach ($turnos as $t) {
+            $this->assertEquals('20:00:00', $t->hora_fin);
+            $this->assertEquals(14000, (float) $t->precio);
+            $this->assertTrue($t->es_fijo);
+        }
+    }
+
+    public function test_verificar_disponibilidad_detects_future_casual_conflict(): void
+    {
+        // 1. Availability check returns true when slot is free
+        $responseFree = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos/verificar-disponibilidad", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 2,
+                'hora_inicio' => '19:00',
+                'duracion_minutos' => 90,
+                'semanas' => 4,
+            ]);
+
+        $responseFree->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'disponible' => true,
+            ]);
+
+        // 2. Add casual reservation on week 3 (2026-09-15)
+        Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'cliente_nombre' => 'Esteban Casual',
+            'fecha' => '2026-09-15',
+            'hora_inicio' => '19:00',
+            'hora_fin' => '20:30',
+            'precio' => 8000,
+            'monto_pagado' => 8000,
+            'saldo_pendiente' => 0,
+            'estado' => 'reservado',
+            'es_fijo' => false,
+            'metodo_pago' => 'online',
+        ]);
+
+        // 3. Availability check now returns false with conflict details
+        $responseConflict = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos/verificar-disponibilidad", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 2,
+                'hora_inicio' => '19:00',
+                'duracion_minutos' => 90,
+                'semanas' => 4,
+            ]);
+
+        $responseConflict->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'disponible' => false,
+                'error' => 'RECURRING_SLOT_CONFLICT',
+            ]);
+
+        $this->assertStringContainsString('15-09-2026', $responseConflict->json('message'));
+        $this->assertStringContainsString('Esteban Casual', $responseConflict->json('message'));
+    }
 }
+
 

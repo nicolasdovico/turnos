@@ -996,6 +996,7 @@ class ClubDashboardController extends Controller
             'hora_inicio' => 'required|string|max:5',
             'hora_fin' => 'nullable|string|max:5',
             'fecha_inicio' => 'nullable|date_format:Y-m-d',
+            'duracion_minutos' => 'nullable|integer|in:60,90,120',
             'semanas' => 'nullable|integer|min:1|max:52',
             'precio' => 'nullable|numeric|min:0',
             'cliente_id' => 'nullable|integer|exists:users,id',
@@ -1039,7 +1040,15 @@ class ClubDashboardController extends Controller
             }
         }
 
-        $duracion = $cancha->duracion_minutos ?: ($horario->duracion_turno_minutos ?: 60);
+        if (!empty($validated['duracion_minutos'])) {
+            $duracion = (int) $validated['duracion_minutos'];
+        } elseif ($cancha->permite_duracion_flexible && !empty($validated['hora_fin'])) {
+            $iniMin = Carbon::parse($horaInicio)->hour * 60 + Carbon::parse($horaInicio)->minute;
+            $finMin = Carbon::parse($validated['hora_fin'])->hour * 60 + Carbon::parse($validated['hora_fin'])->minute;
+            $duracion = $finMin > $iniMin ? ($finMin - $iniMin) : ($cancha->duracion_minutos ?: 60);
+        } else {
+            $duracion = $cancha->duracion_minutos ?: ($horario->duracion_turno_minutos ?: 60);
+        }
 
         if (!empty($validated['hora_fin'])) {
             $horaFin = Carbon::parse($validated['hora_fin'])->format('H:i');
@@ -1090,23 +1099,37 @@ class ClubDashboardController extends Controller
             $precio,
             $metodoPago
         ) {
-            // Comprobación de conflictos
+            // Comprobación de conflictos contra turnos ya asignados (casuales o fijos)
             foreach ($fechas as $f) {
                 $conflicto = Turno::withoutGlobalScopes()
                     ->where('cancha_id', $cancha->id)
                     ->where('fecha', $f)
-                    ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+                    ->whereNotIn('estado', ['cancelado', 'disponible'])
                     ->where('hora_inicio', '<', $horaFin)
                     ->where('hora_fin', '>', $horaInicio)
                     ->lockForUpdate()
                     ->first();
 
                 if ($conflicto) {
+                    $fechaFmt = Carbon::parse($f)->format('d-m-Y');
+                    $horaIniFmt = Carbon::parse($conflicto->hora_inicio)->format('H:i');
+                    $horaFinFmt = Carbon::parse($conflicto->hora_fin)->format('H:i');
+                    $nombreOcupante = $conflicto->cliente_nombre ?: ($conflicto->cliente?->name ?: 'un cliente');
+                    $tipoTurno = $conflicto->es_fijo ? 'turno fijo' : 'reserva casual';
+
                     return response()->json([
                         'success' => false,
                         'error' => 'RECURRING_SLOT_CONFLICT',
-                        'message' => "Conflicto en la fecha {$f} {$horaInicio}: el horario ya se encuentra ocupado.",
+                        'message' => "Conflicto en la fecha {$fechaFmt} ({$horaIniFmt} a {$horaFinFmt} hs): ya existe un turno asignado a {$nombreOcupante} ({$tipoTurno}).",
                         'fecha_conflicto' => $f,
+                        'conflicto' => [
+                            'fecha' => $f,
+                            'fecha_formateada' => $fechaFmt,
+                            'hora_inicio' => $horaIniFmt,
+                            'hora_fin' => $horaFinFmt,
+                            'cliente_nombre' => $nombreOcupante,
+                            'tipo' => $tipoTurno,
+                        ],
                     ], 409);
                 }
             }
@@ -1166,6 +1189,138 @@ class ClubDashboardController extends Controller
                 'cantidad' => count($turnosCreados),
             ], 201);
         });
+    }
+
+    /**
+     * Verificar disponibilidad para una serie de turnos fijos antes de confirmar.
+     */
+    public function verificarDisponibilidadTurnoFijo(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::where('subdominio', $cleanSubdomain)->first();
+        if (!$complejo) {
+            return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        $validated = $request->validate([
+            'cancha_id' => 'required|integer|exists:canchas,id',
+            'dia_semana' => 'required|integer|between:0,6',
+            'hora_inicio' => 'required|string|max:5',
+            'hora_fin' => 'nullable|string|max:5',
+            'duracion_minutos' => 'nullable|integer|in:60,90,120',
+            'semanas' => 'nullable|integer|min:1|max:52',
+        ]);
+
+        $cancha = Cancha::where('complejo_id', $complejo->id)->find($validated['cancha_id']);
+        if (!$cancha) {
+            return response()->json(['success' => false, 'message' => 'Cancha no encontrada en este complejo.'], 404);
+        }
+
+        $targetDiaSemana = (int) $validated['dia_semana'];
+        $nombresDias = [0 => 'Domingo', 1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado'];
+        $nombreDia = $nombresDias[$targetDiaSemana] ?? "Día {$targetDiaSemana}";
+
+        $horario = HorarioAtencion::where('complejo_id', $complejo->id)
+            ->where('dia_semana', $targetDiaSemana)
+            ->first();
+
+        if (!$horario) {
+            return response()->json([
+                'success' => true,
+                'disponible' => false,
+                'error' => 'COMPLEJO_CERRADO',
+                'message' => "El club se encuentra cerrado los días {$nombreDia}.",
+            ]);
+        }
+
+        $horaInicio = Carbon::parse($validated['hora_inicio'])->format('H:i');
+        $semanas = $validated['semanas'] ?? 26;
+
+        $startDate = Carbon::today();
+        if ($startDate->dayOfWeek !== $targetDiaSemana) {
+            $startDate->next($targetDiaSemana);
+        }
+
+        if (!empty($validated['duracion_minutos'])) {
+            $duracion = (int) $validated['duracion_minutos'];
+        } elseif ($cancha->permite_duracion_flexible && !empty($validated['hora_fin'])) {
+            $iniMin = Carbon::parse($horaInicio)->hour * 60 + Carbon::parse($horaInicio)->minute;
+            $finMin = Carbon::parse($validated['hora_fin'])->hour * 60 + Carbon::parse($validated['hora_fin'])->minute;
+            $duracion = $finMin > $iniMin ? ($finMin - $iniMin) : ($cancha->duracion_minutos ?: 60);
+        } else {
+            $duracion = $cancha->duracion_minutos ?: ($horario->duracion_turno_minutos ?: 60);
+        }
+
+        if (!empty($validated['hora_fin'])) {
+            $horaFin = Carbon::parse($validated['hora_fin'])->format('H:i');
+        } else {
+            $horaFin = Carbon::parse($startDate->format('Y-m-d') . ' ' . $horaInicio)
+                ->addMinutes($duracion)
+                ->format('H:i');
+        }
+
+        $horaAperturaFmt = Carbon::parse($horario->hora_apertura)->format('H:i');
+        $horaCierreFmt = Carbon::parse($horario->hora_cierre)->format('H:i');
+
+        if ($horaInicio < $horaAperturaFmt || $horaFin > $horaCierreFmt || $horaInicio >= $horaFin) {
+            return response()->json([
+                'success' => true,
+                'disponible' => false,
+                'error' => 'FUERA_DE_HORARIO',
+                'message' => "El horario seleccionado ({$horaInicio} a {$horaFin} hs) está fuera del horario de atención ({$horaAperturaFmt} a {$horaCierreFmt} hs).",
+            ]);
+        }
+
+        $fechas = [];
+        $currentDate = $startDate->copy();
+        for ($i = 0; $i < $semanas; $i++) {
+            $fechas[] = $currentDate->format('Y-m-d');
+            $currentDate->addWeek();
+        }
+
+        foreach ($fechas as $f) {
+            $conflicto = Turno::withoutGlobalScopes()
+                ->where('cancha_id', $cancha->id)
+                ->where('fecha', $f)
+                ->whereNotIn('estado', ['cancelado', 'disponible'])
+                ->where('hora_inicio', '<', $horaFin)
+                ->where('hora_fin', '>', $horaInicio)
+                ->first();
+
+            if ($conflicto) {
+                $fechaFmt = Carbon::parse($f)->format('d-m-Y');
+                $horaIniFmt = Carbon::parse($conflicto->hora_inicio)->format('H:i');
+                $horaFinFmt = Carbon::parse($conflicto->hora_fin)->format('H:i');
+                $nombreOcupante = $conflicto->cliente_nombre ?: ($conflicto->cliente?->name ?: 'un cliente');
+                $tipoTurno = $conflicto->es_fijo ? 'turno fijo' : 'reserva casual';
+
+                return response()->json([
+                    'success' => true,
+                    'disponible' => false,
+                    'error' => 'RECURRING_SLOT_CONFLICT',
+                    'message' => "Conflicto en la fecha {$fechaFmt} ({$horaIniFmt} a {$horaFinFmt} hs): ya existe un turno asignado a {$nombreOcupante} ({$tipoTurno}).",
+                    'fecha_conflicto' => $f,
+                    'conflicto' => [
+                        'fecha' => $f,
+                        'fecha_formateada' => $fechaFmt,
+                        'hora_inicio' => $horaIniFmt,
+                        'hora_fin' => $horaFinFmt,
+                        'cliente_nombre' => $nombreOcupante,
+                        'tipo' => $tipoTurno,
+                    ],
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'disponible' => true,
+            'semanas' => $semanas,
+            'duracion_minutos' => $duracion,
+            'hora_inicio' => $horaInicio,
+            'hora_fin' => $horaFin,
+            'message' => "Horario disponible para las {$semanas} semanas consecutivas.",
+        ]);
     }
 
     /**
@@ -1262,18 +1417,32 @@ class ClubDashboardController extends Controller
                 $conflicto = Turno::withoutGlobalScopes()
                     ->where('cancha_id', $canchaId)
                     ->where('fecha', $f)
-                    ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+                    ->whereNotIn('estado', ['cancelado', 'disponible'])
                     ->where('hora_inicio', '<', $horaFin)
                     ->where('hora_fin', '>', $horaInicio)
                     ->lockForUpdate()
                     ->first();
 
                 if ($conflicto) {
+                    $fechaFmt = Carbon::parse($f)->format('d-m-Y');
+                    $horaIniFmt = Carbon::parse($conflicto->hora_inicio)->format('H:i');
+                    $horaFinFmt = Carbon::parse($conflicto->hora_fin)->format('H:i');
+                    $nombreOcupante = $conflicto->cliente_nombre ?: ($conflicto->cliente?->name ?: 'un cliente');
+                    $tipoTurno = $conflicto->es_fijo ? 'turno fijo' : 'reserva casual';
+
                     return response()->json([
                         'success' => false,
                         'error' => 'RECURRING_SLOT_CONFLICT',
-                        'message' => "Conflicto en la fecha {$f} {$horaInicio}: el horario ya se encuentra ocupado.",
+                        'message' => "Conflicto al renovar en la fecha {$fechaFmt} ({$horaIniFmt} a {$horaFinFmt} hs): ya existe un turno asignado a {$nombreOcupante} ({$tipoTurno}).",
                         'fecha_conflicto' => $f,
+                        'conflicto' => [
+                            'fecha' => $f,
+                            'fecha_formateada' => $fechaFmt,
+                            'hora_inicio' => $horaIniFmt,
+                            'hora_fin' => $horaFinFmt,
+                            'cliente_nombre' => $nombreOcupante,
+                            'tipo' => $tipoTurno,
+                        ],
                     ], 409);
                 }
             }

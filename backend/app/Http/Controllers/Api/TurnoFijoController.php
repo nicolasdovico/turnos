@@ -30,6 +30,7 @@ class TurnoFijoController extends Controller
             'fecha_inicio' => ['nullable', 'date_format:Y-m-d'],
             'hora_inicio' => ['required', 'string'],
             'hora_fin' => ['nullable', 'string'],
+            'duracion_minutos' => ['nullable', 'integer', 'in:60,90,120'],
             'semanas' => ['nullable', 'integer', 'min:1', 'max:52'],
             'precio' => ['nullable', 'numeric', 'min:0'],
         ]);
@@ -73,7 +74,15 @@ class TurnoFijoController extends Controller
             ], 422);
         }
 
-        $duracion = $cancha->duracion_minutos ?: ($horario->duracion_turno_minutos ?: 60);
+        if (!empty($validated['duracion_minutos'])) {
+            $duracion = (int) $validated['duracion_minutos'];
+        } elseif ($cancha->permite_duracion_flexible && !empty($validated['hora_fin'])) {
+            $iniMin = Carbon::parse($horaInicioNormalizada)->hour * 60 + Carbon::parse($horaInicioNormalizada)->minute;
+            $finMin = Carbon::parse($validated['hora_fin'])->hour * 60 + Carbon::parse($validated['hora_fin'])->minute;
+            $duracion = $finMin > $iniMin ? ($finMin - $iniMin) : ($cancha->duracion_minutos ?: 60);
+        } else {
+            $duracion = $cancha->duracion_minutos ?: ($horario->duracion_turno_minutos ?: 60);
+        }
 
         // Calculate hora_fin if omitted
         if (!empty($validated['hora_fin'])) {
@@ -116,9 +125,10 @@ class TurnoFijoController extends Controller
             ) {
                 // Pass 1: Verify no conflicts exist across all requested weeks
                 foreach ($fechas as $fecha) {
-                    $conflicto = Turno::where('cancha_id', $cancha->id)
+                    $conflicto = Turno::withoutGlobalScopes()
+                        ->where('cancha_id', $cancha->id)
                         ->where('fecha', $fecha)
-                        ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+                        ->whereNotIn('estado', ['cancelado', 'disponible'])
                         ->where('hora_inicio', '<', $horaFinNormalizada)
                         ->where('hora_fin', '>', $horaInicioNormalizada)
                         ->lockForUpdate()

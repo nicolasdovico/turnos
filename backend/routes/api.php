@@ -124,6 +124,7 @@ Route::prefix('clubs')->group(function () {
     Route::post('/{subdomain}/turnos/{id}/registrar-pago', [\App\Http\Controllers\Api\ClubDashboardController::class, 'registrarPagoTurno']);
     Route::get('/{subdomain}/turnos-fijos', [\App\Http\Controllers\Api\ClubDashboardController::class, 'getTurnosFijos']);
     Route::post('/{subdomain}/turnos-fijos', [\App\Http\Controllers\Api\ClubDashboardController::class, 'storeTurnoFijo']);
+    Route::post('/{subdomain}/turnos-fijos/verificar-disponibilidad', [\App\Http\Controllers\Api\ClubDashboardController::class, 'verificarDisponibilidadTurnoFijo']);
     Route::post('/{subdomain}/turnos-fijos/renovar', [\App\Http\Controllers\Api\ClubDashboardController::class, 'renovarTurnoFijo']);
     Route::delete('/{subdomain}/turnos-fijos/serie', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroySerieTurnoFijo']);
     Route::put('/{subdomain}/configuracion', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateConfiguracion']);
