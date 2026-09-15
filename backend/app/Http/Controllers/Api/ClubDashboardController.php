@@ -1013,6 +1013,20 @@ class ClubDashboardController extends Controller
         $horaInicio = Carbon::parse($validated['hora_inicio'])->format('H:i');
         $targetDiaSemana = (int) $validated['dia_semana'];
 
+        $horario = HorarioAtencion::where('complejo_id', $complejo->id)
+            ->where('dia_semana', $targetDiaSemana)
+            ->first();
+
+        $nombresDias = [0 => 'Domingo', 1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado'];
+        $nombreDia = $nombresDias[$targetDiaSemana] ?? "Día {$targetDiaSemana}";
+
+        if (!$horario) {
+            return response()->json([
+                'success' => false,
+                'message' => "El club se encuentra cerrado los días {$nombreDia}. No es posible asignar turnos fijos.",
+            ], 422);
+        }
+
         if (!empty($validated['fecha_inicio'])) {
             $startDate = Carbon::parse($validated['fecha_inicio']);
             if ($startDate->dayOfWeek !== $targetDiaSemana) {
@@ -1025,16 +1039,24 @@ class ClubDashboardController extends Controller
             }
         }
 
+        $duracion = $cancha->duracion_minutos ?: ($horario->duracion_turno_minutos ?: 60);
+
         if (!empty($validated['hora_fin'])) {
             $horaFin = Carbon::parse($validated['hora_fin'])->format('H:i');
         } else {
-            $horario = HorarioAtencion::where('complejo_id', $complejo->id)
-                ->where('dia_semana', $targetDiaSemana)
-                ->first();
-            $duracion = $cancha->duracion_minutos ?: ($horario?->duracion_turno_minutos ?: 60);
             $horaFin = Carbon::parse($startDate->format('Y-m-d') . ' ' . $horaInicio)
                 ->addMinutes($duracion)
                 ->format('H:i');
+        }
+
+        $horaAperturaFmt = Carbon::parse($horario->hora_apertura)->format('H:i');
+        $horaCierreFmt = Carbon::parse($horario->hora_cierre)->format('H:i');
+
+        if ($horaInicio < $horaAperturaFmt || $horaFin > $horaCierreFmt || $horaInicio >= $horaFin) {
+            return response()->json([
+                'success' => false,
+                'message' => "El horario seleccionado ({$horaInicio} a {$horaFin} hs) está fuera del horario de atención del club para los días {$nombreDia} ({$horaAperturaFmt} a {$horaCierreFmt} hs).",
+            ], 422);
         }
 
         $precio = $validated['precio'] ?? (float) $cancha->precio_base;

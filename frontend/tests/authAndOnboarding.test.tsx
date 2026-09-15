@@ -1013,7 +1013,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
   });
 
   it("orders turnos fijos chronologically by day of week and displays dates in DD-MM-YYYY format", async () => {
-    (global.fetch as any).mockImplementation(async (url: string) => {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
       const urlStr = url.toString();
       if (urlStr.includes("/is-admin")) {
         return { ok: true, json: async () => ({ is_admin: true }) } as any;
@@ -1125,6 +1125,118 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     const verFechasButtons = screen.getAllByRole("button", { name: /Ver Fechas/i });
     fireEvent.click(verFechasButtons[0]);
     expect(screen.getByText("01-09-2026")).toBeDefined();
+  });
+
+  it("validates fixed turn creation against business hours and closed days in modal", async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/is-admin")) {
+        return { ok: true, json: async () => ({ is_admin: true }) } as any;
+      }
+      if (urlStr.includes("/dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Padel Club Central",
+                subdominio: "padel-central",
+                deporte_principal: "padel",
+                tipo_negocio: { nombre: "Club Deportivo" },
+                owner: { name: "Dueño Central" },
+              },
+              plan: {
+                nombre: "Oro",
+                modulos: [{ slug: "reservas" }, { slug: "turnos_fijos" }],
+              },
+              canchas: [
+                {
+                  id: 1,
+                  nombre: "Cancha 1 Panorámica",
+                  deporte: "padel",
+                  precio_base: 8000,
+                  duracion_minutos: 90,
+                  estado: "activo",
+                },
+              ],
+              horarios_atencion: [
+                { id: 1, dia_semana: 1, hora_apertura: "08:00:00", hora_cierre: "23:00:00", duracion_turno_minutos: 90 },
+                { id: 2, dia_semana: 2, hora_apertura: "08:00:00", hora_cierre: "23:00:00", duracion_turno_minutos: 90 },
+                // Domingo (0) is CLOSED (omitted from horarios_atencion)
+              ],
+              stats: { total_canchas: 1, total_turnos: 0, modulos_count: 2 },
+            },
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/turnos-fijos")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [],
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    const turnosFijosTabBtn = await screen.findByRole("button", { name: /Turnos Fijos/i });
+    fireEvent.click(turnosFijosTabBtn);
+
+    // Open Assign New Turno Fijo modal
+    const btnNuevoFijo = await screen.findByRole("button", { name: /Asignar Primer Turno Fijo/i });
+    fireEvent.click(btnNuevoFijo);
+
+    expect(screen.getByRole("heading", { name: /Asignar Nuevo Turno Fijo/i })).toBeDefined();
+
+    // Verify Domingo is marked as (Cerrado) in day select
+    expect(screen.getByText(/Domingo \(Cerrado\)/i)).toBeDefined();
+
+    // Verify open day business hours banner is shown (Lunes 08:00 a 23:00 hs • Turnos de 90 min)
+    expect(screen.getByText(/Horario de atención Lunes:/i)).toBeDefined();
+    expect(screen.getByText(/Turnos de 90 min/i)).toBeDefined();
+
+    // Try selecting Domingo (dia 0)
+    const selectDia = screen.getByLabelText(/Día de la Semana:/i) as HTMLSelectElement;
+    fireEvent.change(selectDia, { target: { value: "0" } });
+
+    // Warning banner should show that club is closed on Domingo
+    expect(screen.getByText(/El club se encuentra cerrado los días Domingo/i)).toBeDefined();
+
+    // The submit button must be disabled when closed day is selected
+    const submitBtn = screen.getByRole("button", { name: /Asignar Turno Fijo/i }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+
+    // Switch back to Lunes (dia 1)
+    fireEvent.change(selectDia, { target: { value: "1" } });
+    expect(submitBtn.disabled).toBe(false);
+
+    // Select Cancha 1
+    const selectCancha = screen.getByLabelText(/Cancha:/i);
+    fireEvent.change(selectCancha, { target: { value: "1" } });
+
+    // Enter out-of-hours time: 06:00
+    const inputHora = screen.getByLabelText(/Hora de Inicio:/i);
+    fireEvent.change(inputHora, { target: { value: "06:00" } });
+
+    // Fill client name
+    const inputNombre = screen.getByPlaceholderText(/Ej: Marcelo Gómez/i);
+    fireEvent.change(inputNombre, { target: { value: "Cliente Prueba" } });
+
+    // Submit form with out-of-hours time
+    const form = screen.getByRole("form", { name: /form-nuevo-turno-fijo/i });
+    fireEvent.submit(form);
+
+    // Validation error should appear inside the modal
+    expect(await screen.findByText(/está fuera del horario de atención del club/i)).toBeDefined();
   });
 
   it("renders Resumen Diario & Caja tab with financial KPIs, day by day cards and court filtering in club admin panel", async () => {

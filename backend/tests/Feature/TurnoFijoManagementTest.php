@@ -557,5 +557,67 @@ class TurnoFijoManagementTest extends TestCase
         $this->assertEquals(4, $data[1]['dia_semana']);
         $this->assertEquals(0, $data[2]['dia_semana']);
     }
+
+    public function test_cannot_create_fixed_turno_on_closed_day(): void
+    {
+        // By default setUp only creates HorarioAtencion for Tuesday (2).
+        // Domingo (0) is closed (no HorarioAtencion record).
+        $response = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 0, // Domingo
+                'hora_inicio' => '10:00',
+                'hora_fin' => '11:30',
+                'semanas' => 4,
+                'precio' => 7500,
+                'cliente_id' => $this->client->id,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+            ]);
+
+        $this->assertStringContainsString('cerrado los días Domingo', $response->json('message'));
+    }
+
+    public function test_cannot_create_fixed_turno_outside_business_hours(): void
+    {
+        // Tuesday (2) is open 08:00 to 23:00.
+        // 1. Try before opening time (06:00)
+        $responseBefore = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 2, // Martes
+                'hora_inicio' => '06:00',
+                'hora_fin' => '07:30',
+                'semanas' => 4,
+                'precio' => 7500,
+                'cliente_id' => $this->client->id,
+            ]);
+
+        $responseBefore->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+            ]);
+        $this->assertStringContainsString('fuera del horario de atención', $responseBefore->json('message'));
+
+        // 2. Try after closing time (start at 22:30 with 90 min duration, finishes at 00:00 > 23:00)
+        $responseAfter = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 2, // Martes
+                'hora_inicio' => '22:30',
+                'semanas' => 4,
+                'precio' => 7500,
+                'cliente_id' => $this->client->id,
+            ]);
+
+        $responseAfter->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+            ]);
+        $this->assertStringContainsString('fuera del horario de atención', $responseAfter->json('message'));
+    }
 }
 

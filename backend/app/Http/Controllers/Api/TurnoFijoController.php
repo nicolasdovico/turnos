@@ -59,17 +59,39 @@ class TurnoFijoController extends Controller
             }
         }
 
+        $horario = HorarioAtencion::where('complejo_id', $cancha->complejo_id)
+            ->where('dia_semana', $targetDiaSemana)
+            ->first();
+
+        $nombresDias = [0 => 'Domingo', 1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado'];
+        $nombreDia = $nombresDias[$targetDiaSemana] ?? "Día {$targetDiaSemana}";
+
+        if (!$horario) {
+            return response()->json([
+                'error' => 'COMPLEJO_CERRADO',
+                'message' => "El club se encuentra cerrado los días {$nombreDia}. No es posible asignar turnos fijos.",
+            ], 422);
+        }
+
+        $duracion = $cancha->duracion_minutos ?: ($horario->duracion_turno_minutos ?: 60);
+
         // Calculate hora_fin if omitted
         if (!empty($validated['hora_fin'])) {
             $horaFinNormalizada = Carbon::parse($validated['hora_fin'])->format('H:i');
         } else {
-            $horario = HorarioAtencion::where('complejo_id', $cancha->complejo_id)
-                ->where('dia_semana', $targetDiaSemana)
-                ->first();
-            $duracion = $cancha->duracion_minutos ?: ($horario?->duracion_turno_minutos ?: 60);
             $horaFinNormalizada = Carbon::parse($startDate->format('Y-m-d') . ' ' . $horaInicioNormalizada)
                 ->addMinutes($duracion)
                 ->format('H:i');
+        }
+
+        $horaAperturaFmt = Carbon::parse($horario->hora_apertura)->format('H:i');
+        $horaCierreFmt = Carbon::parse($horario->hora_cierre)->format('H:i');
+
+        if ($horaInicioNormalizada < $horaAperturaFmt || $horaFinNormalizada > $horaCierreFmt || $horaInicioNormalizada >= $horaFinNormalizada) {
+            return response()->json([
+                'error' => 'FUERA_DE_HORARIO',
+                'message' => "El horario seleccionado ({$horaInicioNormalizada} a {$horaFinNormalizada} hs) está fuera del horario de atención del club para los días {$nombreDia} ({$horaAperturaFmt} a {$horaCierreFmt} hs).",
+            ], 422);
         }
 
         $precio = $validated['precio'] ?? (float) $cancha->precio_base;

@@ -1708,5 +1708,33 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Se agregó el test `orders turnos fijos chronologically by day of week and displays dates in DD-MM-YYYY format` validando que la UI ordene las tarjetas según los días de la semana y formatee las fechas a `DD-MM-YYYY` (`01-09-2026 al 02-03-2027` y `01-09-2026`).
     - Se verificó la suite completa de frontend: 64/64 tests pasados en las 4 suites de prueba.
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-15] - VALIDACIÓN DE TURNOS FIJOS CONTRA DÍAS Y HORARIOS DE ATENCIÓN DEL CLUB (BACKEND & FRONTEND)
+-------------------------------------------------------------------------------
+- Problema Reportado:
+  * Al momento de asignar un nuevo turno fijo en el panel de administración del club (`/tenants/[subdomain]/panel`), no se validaba la configuración de días y horarios de atención del club (`horarios_atencion`). Se permitía crear turnos fijos en días que el complejo permanece cerrado (por ejemplo, los domingos en `nico-padel`) o fuera del horario comercial (por ejemplo a las 06:00 hs cuando el club abre a las 08:00 hs o luego de la hora de cierre).
+- Soluciones Implementadas:
+  * Backend (Laravel 11):
+    - `ClubDashboardController::storeTurnoFijo`:
+      * Validación de día cerrado: consulta `HorarioAtencion` para el `dia_semana` seleccionado. Si no existe registro de horario, rechaza la solicitud con HTTP 422 y mensaje explicativo: *"El club se encuentra cerrado los días {nombreDia}. No es posible asignar turnos fijos."*.
+      * Validación de horario de atención: verifica que `$horaInicio >= $horaApertura` y `$horaFin <= $horaCierre` y `$horaInicio < $horaFin`. Si excede el rango operativo, rechaza con HTTP 422: *"El horario seleccionado ({horaInicio} a {horaFin} hs) está fuera del horario de atención del club para los días {nombreDia} ({horaApertura} a {horaCierre} hs)."*.
+    - `TurnoFijoController::__invoke`:
+      * Aplicación de las mismas validaciones de consistencia para el endpoint de turnos fijos.
+  * Frontend Web (Next.js 14):
+    - `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+      * En el select de días del modal de alta de turno fijo, los días sin horario de atención configurado se rotulan con `(Cerrado)` y se deshabilitan (`disabled`).
+      * Al seleccionar un día operativo, se despliega un badge informativo indicando la franja horaria de atención (`🕒 Horario de atención {día}: {apertura} a {cierre} hs • Turnos de {duración} min`).
+      * Si se seleccionara un día sin atención, se muestra un banner de advertencia `🚫 El club se encuentra cerrado los días {día}` y se desactiva el botón de confirmación ("Asignar Turno Fijo").
+      * En `handleCreateTurnoFijo`: validación en el cliente contra los `horarios` cargados en el panel, arrojando errores específicos y evitando peticiones innecesarias.
+      * Nuevo estado `turnosFijosModalError` para aislar los mensajes de error dentro del modal de alta sin duplicar alertas en la pestaña principal detrás del backdrop.
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (`tests/Feature/TurnoFijoManagementTest.php`):
+    - `test_cannot_create_fixed_turno_on_closed_day`: verifica código HTTP 422 al intentar crear turno fijo en día cerrado.
+    - `test_cannot_create_fixed_turno_outside_business_hours`: verifica código HTTP 422 antes de la apertura o después del cierre.
+    - Suite completa Backend: 191/191 tests pasados al 100% (1029 aserciones).
+  * Frontend (`tests/authAndOnboarding.test.tsx`):
+    - `validates fixed turn creation against business hours and closed days in modal`: valida indicador de cerrado, banner de advertencia, deshabilitación de botón y mensaje de error ante horarios fuera de atención.
+    - Suite completa Frontend: 65/65 tests pasados al 100% (4 suites).
+===============================================================================
 
 

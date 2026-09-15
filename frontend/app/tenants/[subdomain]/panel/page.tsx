@@ -327,6 +327,7 @@ export default function ClubAdminPanel() {
   const [isRenewingSerieKey, setIsRenewingSerieKey] = useState<string | null>(null);
   const [turnosFijosSuccessMsg, setTurnosFijosSuccessMsg] = useState<string | null>(null);
   const [turnosFijosErrorMsg, setTurnosFijosErrorMsg] = useState<string | null>(null);
+  const [turnosFijosModalError, setTurnosFijosModalError] = useState<string | null>(null);
   const [expandedSerieKey, setExpandedSerieKey] = useState<string | null>(null);
 
   // Formulario de Alta Turno Fijo
@@ -704,8 +705,25 @@ export default function ClubAdminPanel() {
 
   const handleOpenNewTurnoFijoModal = () => {
     setTfCanchaId(canchas.length > 0 ? canchas[0].id : "");
-    setTfDiaSemana(1); // Lunes
-    setTfHoraInicio("19:00");
+
+    // Pick first open day in horarios, or default to 1 (Lunes)
+    const openDay = DIAS_CONFIG.find((d) => horarios.length === 0 || horarios.some((h) => Number(h.dia_semana) === Number(d.dia_semana)));
+    const initialDia = openDay ? openDay.dia_semana : 1;
+    setTfDiaSemana(initialDia);
+
+    const initialHorario = horarios.find((h) => Number(h.dia_semana) === Number(initialDia));
+    if (initialHorario) {
+      const horaAp = (initialHorario.hora_apertura || "08:00").substring(0, 5);
+      const horaCi = (initialHorario.hora_cierre || "23:00").substring(0, 5);
+      if ("19:00" >= horaAp && "19:00" < horaCi) {
+        setTfHoraInicio("19:00");
+      } else {
+        setTfHoraInicio(horaAp);
+      }
+    } else {
+      setTfHoraInicio("19:00");
+    }
+
     setTfHoraFin("");
     setTfTipoCliente("manual");
     setTfClienteNombre("");
@@ -719,6 +737,7 @@ export default function ClubAdminPanel() {
     setTfMetodoPago("mostrador");
     setTurnosFijosSuccessMsg(null);
     setTurnosFijosErrorMsg(null);
+    setTurnosFijosModalError(null);
     setShowNewTurnoFijoModal(true);
     fetchRegisteredUsers("");
   };
@@ -727,7 +746,7 @@ export default function ClubAdminPanel() {
     e.preventDefault();
     setIsSavingTurnoFijo(true);
     setTurnosFijosSuccessMsg(null);
-    setTurnosFijosErrorMsg(null);
+    setTurnosFijosModalError(null);
 
     try {
       if (!tfCanchaId) {
@@ -738,6 +757,33 @@ export default function ClubAdminPanel() {
       }
       if (tfTipoCliente === "registrado" && !tfClienteId) {
         throw new Error("Selecciona un usuario registrado de la lista.");
+      }
+
+      // Validar contra días y horarios de atención del club
+      if (horarios.length > 0) {
+        const horarioDia = horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana));
+        if (!horarioDia) {
+          throw new Error(`El club se encuentra cerrado los días ${DIAS[tfDiaSemana]}. No es posible agendar turnos.`);
+        }
+
+        const selCancha = canchas.find((c) => c.id === tfCanchaId);
+        const duracion = selCancha?.duracion_minutos || horarioDia?.duracion_turno_minutos || 60;
+
+        let hFin = tfHoraFin;
+        if (!hFin && tfHoraInicio) {
+          const [h, m] = tfHoraInicio.split(":").map(Number);
+          const totalMin = (h || 0) * 60 + (m || 0) + duracion;
+          const finH = String(Math.floor(totalMin / 60)).padStart(2, "0");
+          const finM = String(totalMin % 60).padStart(2, "0");
+          hFin = `${finH}:${finM}`;
+        }
+
+        const horaAp = (horarioDia.hora_apertura || "08:00").substring(0, 5);
+        const horaCi = (horarioDia.hora_cierre || "23:00").substring(0, 5);
+
+        if (tfHoraInicio < horaAp || hFin > horaCi || tfHoraInicio >= hFin) {
+          throw new Error(`El horario seleccionado (${tfHoraInicio} a ${hFin} hs) está fuera del horario de atención del club para los días ${DIAS[tfDiaSemana]} (${horaAp} a ${horaCi} hs).`);
+        }
       }
 
       const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
@@ -769,9 +815,10 @@ export default function ClubAdminPanel() {
 
       setTurnosFijosSuccessMsg(`¡Turno fijo de ${tfSemanas} semanas (6 meses) fijado exitosamente (${data.cantidad} turnos agendados)!`);
       setShowNewTurnoFijoModal(false);
+      setTurnosFijosModalError(null);
       fetchTurnosFijos();
     } catch (err: any) {
-      setTurnosFijosErrorMsg(err.message || "Error al crear turno fijo.");
+      setTurnosFijosModalError(err.message || "Error al crear turno fijo.");
     } finally {
       setIsSavingTurnoFijo(false);
     }
@@ -2894,20 +2941,31 @@ export default function ClubAdminPanel() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowNewTurnoFijoModal(false)}
+                  onClick={() => {
+                    setShowNewTurnoFijoModal(false);
+                    setTurnosFijosModalError(null);
+                  }}
                   className="text-slate-400 hover:text-white transition rounded-lg p-1 text-sm font-bold"
                 >
                   ✕
                 </button>
               </div>
 
-              <form onSubmit={handleCreateTurnoFijo} className="space-y-4 text-xs">
+              <form aria-label="form-nuevo-turno-fijo" onSubmit={handleCreateTurnoFijo} className="space-y-4 text-xs">
+                {turnosFijosModalError && (
+                  <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span>{turnosFijosModalError}</span>
+                  </div>
+                )}
+
                 {/* Field 1: Cancha */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">
+                  <label htmlFor="tf-cancha" className="block text-slate-300 font-bold mb-1">
                     Cancha:
                   </label>
                   <select
+                    id="tf-cancha"
                     value={tfCanchaId}
                     onChange={(e) => {
                       const cid = Number(e.target.value);
@@ -2932,27 +2990,33 @@ export default function ClubAdminPanel() {
                 {/* Field 2 & 3: Día de la semana y Horario */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-300 font-bold mb-1">
+                    <label htmlFor="tf-dia-semana" className="block text-slate-300 font-bold mb-1">
                       Día de la Semana:
                     </label>
                     <select
+                      id="tf-dia-semana"
                       value={tfDiaSemana}
                       onChange={(e) => setTfDiaSemana(Number(e.target.value))}
                       className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-white font-medium focus:border-emerald-500 focus:outline-none"
                     >
-                      {DIAS_CONFIG.map((d) => (
-                        <option key={d.dia_semana} value={d.dia_semana}>
-                          {d.nombre}
-                        </option>
-                      ))}
+                      {DIAS_CONFIG.map((d) => {
+                        const horarioDia = horarios.find((h) => Number(h.dia_semana) === Number(d.dia_semana));
+                        const estaCerrado = horarios.length > 0 && !horarioDia;
+                        return (
+                          <option key={d.dia_semana} value={d.dia_semana} disabled={estaCerrado}>
+                            {d.nombre} {estaCerrado ? "(Cerrado)" : horarioDia ? `(${horarioDia.hora_apertura.substring(0, 5)} a ${horarioDia.hora_cierre.substring(0, 5)} hs)` : ""}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-bold mb-1">
+                    <label htmlFor="tf-hora-inicio" className="block text-slate-300 font-bold mb-1">
                       Hora de Inicio:
                     </label>
                     <input
+                      id="tf-hora-inicio"
                       type="time"
                       value={tfHoraInicio}
                       onChange={(e) => setTfHoraInicio(e.target.value)}
@@ -2961,6 +3025,35 @@ export default function ClubAdminPanel() {
                     />
                   </div>
                 </div>
+
+                {/* Schedule Info / Closed Alert Banner */}
+                {(() => {
+                  const horarioDia = horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana));
+                  const selCancha = canchas.find((c) => c.id === tfCanchaId);
+                  const duracion = selCancha?.duracion_minutos || horarioDia?.duracion_turno_minutos || 60;
+
+                  if (horarios.length > 0 && !horarioDia) {
+                    return (
+                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-2">
+                        <span>🚫</span>
+                        <span>El club se encuentra cerrado los días {DIAS[tfDiaSemana]}. Selecciona otro día.</span>
+                      </div>
+                    );
+                  }
+
+                  if (horarioDia) {
+                    const horaAp = horarioDia.hora_apertura.substring(0, 5);
+                    const horaCi = horarioDia.hora_cierre.substring(0, 5);
+                    return (
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 text-xs flex items-center justify-between">
+                        <span>🕒 Horario de atención {DIAS[tfDiaSemana]}: <strong className="text-white font-mono">{horaAp} a {horaCi} hs</strong></span>
+                        <span className="text-emerald-400 font-mono font-bold">Turnos de {duracion} min</span>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
 
                 {/* Field 4: Tipo de Titular */}
                 <div className="space-y-2 pt-1">
@@ -3192,14 +3285,17 @@ export default function ClubAdminPanel() {
                 <div className="flex gap-3 pt-3">
                   <button
                     type="button"
-                    onClick={() => setShowNewTurnoFijoModal(false)}
+                    onClick={() => {
+                      setShowNewTurnoFijoModal(false);
+                      setTurnosFijosModalError(null);
+                    }}
                     className="flex-1 rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-slate-300 transition"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={isSavingTurnoFijo}
+                    disabled={isSavingTurnoFijo || (horarios.length > 0 && !horarios.find((h) => Number(h.dia_semana) === Number(tfDiaSemana)))}
                     className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
                     {isSavingTurnoFijo ? (

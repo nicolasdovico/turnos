@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Lista de Espera Inteligente Multicanal con Evolution API WhatsApp & Email Mailpit 100% Operativa)
-- **Última Actualización:** 2026-09-15 (Solapa "Turnos Fijos" en panel de club: formateo regional de fechas a dd-mm-aaaa y ordenamiento cronológico por día de la semana de Lunes a Domingo; 189 tests backend y 64 frontend web al 100% en verde).
+- **Última Actualización:** 2026-09-15 (Validación de asignación de turnos fijos contra días cerrados y horarios de atención del club en backend y frontend con feedback visual en modal; 191 tests backend y 65 frontend web al 100% en verde).
 
 ---
 
