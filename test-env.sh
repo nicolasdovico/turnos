@@ -24,8 +24,8 @@ echo "3. Esperando que los contenedores completen el arranque..."
 sleep 5
 
 # 4. Verificar estado de contenedores
-echo "4. Verificando estado de los 5 contenedores:"
-SERVICES=("saas_backend" "saas_frontend" "saas_webserver" "saas_database" "saas_cache")
+echo "4. Verificando estado de los contenedores:"
+SERVICES=("saas_backend" "saas_frontend" "saas_webserver" "saas_database" "saas_cache" "saas_mailpit" "saas_evolution_api" "saas_queue_worker")
 for s in "${SERVICES[@]}"; do
     STATUS=$(docker inspect -f '{{.State.Running}}' "$s" 2>/dev/null || echo "false")
     if [ "$STATUS" = "true" ]; then

@@ -1621,3 +1621,70 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend Web Vitest: 63/63 tests pasados al 100%.
   * Frontend Mobile Jest: 20/20 tests pasados al 100%.
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-14] - LISTA DE ESPERA INTELIGENTE Y NOTIFICACIÓN MULTICANAL (EMAIL + WHATSAPP EVOLUTION API)
+-------------------------------------------------------------------------------
+- Diagnóstico y Requerimientos:
+  * El usuario solicitó resolver la contradicción en el caso de uso CU-13: los turnos ocupados no se mostraban a los usuarios regulares, por lo que no existía el botón "Avisarme", y se requería un canal de notificación universal sin requerir app móvil nativa.
+  * Solución acordada:
+    1. Notificación multicanal: Email interactivo vía Mailpit (puerto 8025) + WhatsApp automatizado mediante Evolution API (microservicio open source self-hosted en Docker).
+    2. Contenedor de Evolution API integrado en `docker-compose.yml` (`saas_evolution_api` en puerto 8085).
+    3. Diseño de Grilla Unificada: Se preserva la estética, dimensiones y estructura responsiva existente (`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3`), mostrando turnos ocupados con badge `Ocupado` y botón `[ 🔔 Avisarme ]` / `[ ✓ Notificación Activa ]`, protegiendo al 100% los datos privados del titular.
+- Componentes Implementados:
+  * Infraestructura Docker (`docker-compose.yml`):
+    - Se agregó el servicio `evolution_api` usando la imagen `evoapicloud/evolution-api:latest`, conectado a PostgreSQL (`saas_database`) con esquema dedicado `evolution_api` y Redis (`saas_cache`).
+    - Expuesto en puerto `8085:8080`.
+    - Variables añadidas al backend: `EVOLUTION_API_URL=http://evolution_api:8080`, `EVOLUTION_API_KEY=evolution_secret_token_saas`, `EVOLUTION_API_INSTANCE=turnos`.
+  * Backend Laravel 11:
+    - `App\Mail\TurnoLiberadoMail`: Mailable con diseño HTML responsive que detalla complejo, cancha, fecha, horario y botón CTA directo con enlace para reservar el turno liberado.
+    - `App\Services\WhatsAppEvolutionService`: Servicio para formateo inteligente de números telefónicos (soporta prefijos internacionales y celulares de Argentina con código de país 549) y despacho HTTP a la API de Evolution (`POST /message/sendText/{instance}`).
+    - `App\Jobs\NotificarListaEsperaJob`: Orquestador en background que consulta suscripciones pendientes, envía correo electrónico vía `Mail::to()`, despacha mensaje de WhatsApp vía `WhatsAppEvolutionService`, envía push FCM si existe token, y marca `notificado = true`.
+    - `App\Http\Controllers\Api\ClubDashboardController`: Se conectó el despacho de `NotificarListaEsperaJob` tanto al anular/cancelar turnos de clientes (`destroyTurno`) como al liberar fechas puntuales de series fijas (`liberarFechaPuntual`).
+  * Frontend Web Next.js (`GrillaHoraria.tsx`):
+    - Consulta reactiva de suscripciones activas (`fetchMisSuscripciones`) contra `GET /api/lista-espera/mis-suscripciones`.
+    - Desuscripción interactiva mediante `DELETE /api/lista-espera` para alternar entre "Avisarme" y "Notificación Activa".
+    - Integración visual de turnos ocupados en la cuadrícula general de slots, con badge `Ocupado` en tono rosa/slate, protección estricta de privacidad (sin nombres ni teléfonos) y botón toggleable de lista de espera.
+- Verificación de Calidad:
+  * Backend PHPUnit: 188/188 tests pasados al 100% (1012 aserciones), incluyendo nuevos tests unitarios y de integración en `ListaEsperaTest.php`.
+  * Frontend Web Vitest: 63/63 tests pasados al 100% en las 4 suites.
+  * Contenedor Evolution API verificado y respondiendo `200 OK` en `http://localhost:8085`.
+  * Documentación: `GUIA_DE_PRUEBAS_MANUALES.md` actualizada con el flujo paso a paso de CU-13.
+====================================================
+-------------------------------------------------------------------------------
+[2026-09-15] - CORRECCIÓN Y VERIFICACIÓN EN VIVO: ENTREGA DE NOTIFICACIONES MULTICANAL (EMAIL & WHATSAPP) Y WORKER DE COLAS DOCKER
+-------------------------------------------------------------------------------
+- Diagnóstico y Causa Raíz del Problema:
+  * Al cancelar un turno desde el panel por el empleado administrativo, el correo electrónico y el mensaje de WhatsApp a los usuarios en lista de espera no se enviaban ni llegaban a destino.
+  * Causa Raíz 1 (Falta de Queue Worker): En el backend Laravel `QUEUE_CONNECTION=redis` estaba configurado y `NotificarListaEsperaJob` implementa `ShouldQueue`. Al cancelarse un turno, `NotificarListaEsperaJob::dispatch()` encolaba el job correctamente en Redis (`queues:default`), pero en `docker-compose.yml` NO existía ningún servicio o worker ejecutando `php artisan queue:work`. En consecuencia, los jobs quedaban retenidos indefinidamente en Redis.
+  * Causa Raíz 2 (Referencia de Clase Inexistente): En `NotificarListaEsperaJob.php`, se importaba y resolvía `App\Services\NotificationService` (inexistente) en lugar de `App\Services\FCMNotificationService`, arrojando errores al invocar notificaciones móviles push.
+  * Causa Raíz 3 (Aislamiento Multi-tenant en Consultas Asíncronas): `Cancha` y `ListaEspera` implementan `BelongsToTenant` con `TenantScope`. En jobs asíncronos o contextos sin inquilino explícito, las consultas requerían `withoutGlobalScopes()` para garantizar la captura de suscriptores sin interferencias de scopes globales.
+  * Causa Raíz 4 (Formato de Teléfonos Argentinos en WhatsApp): Refuerzo en `WhatsAppEvolutionService::formatearNumeroTelefono` para contemplar números con 12 dígitos `5411...` autoinyectando el prefijo móvil `9` (`54911...`).
+- Soluciones Implementadas:
+  * Infraestructura Docker (`docker-compose.yml`):
+    - Se agregó el servicio `queue_worker` (`container_name: saas_queue_worker`) con comando `php artisan queue:work --tries=3 --timeout=90`, conectado a `saas_network`, `saas_database`, `saas_cache` y `saas_mailpit`.
+    - Se definió explícitamente `QUEUE_CONNECTION=redis` y `FRONTEND_URL=http://localhost:8080` tanto en `backend` como en `queue_worker`.
+    - Se actualizó `test-env.sh` incorporando a `saas_queue_worker`, `saas_mailpit` y `saas_evolution_api` en las verificaciones de salud multi-contenedor.
+  * Backend Laravel 11 (`NotificarListaEsperaJob.php`):
+    - Corrección de imports a `App\Services\FCMNotificationService`.
+    - Invocación con `Cancha::withoutGlobalScopes()` y `ListaEspera::withoutGlobalScopes()`, permitiendo coincidencia de `hora_inicio` tanto en formato `H:i` como `H:i:s`.
+    - Logging estructurado ante envíos exitosos de emails y WhatsApp.
+  * Backend Service (`WhatsAppEvolutionService.php`):
+    - Soporte para números argentinos de 12 dígitos (`54` + 10 dígitos) convirtiéndolos a `549` + 10 dígitos.
+    - Logging explícito ante teléfonos vacíos o no formateables.
+  * Tests Automatizados (`ListaEsperaTest.php`):
+    - Actualización de mocks para `FCMNotificationService`.
+- Verificación y Validación en Vivo:
+  * Prueba real de cancelación administrativa para el Turno 162 (12:00 hs, Cancha 61, Nico Pádel):
+    - El empleado administrativo canceló el turno vía API (`POST /api/clubs/nico-padel/turnos/162/cancelar`).
+    - `saas_queue_worker` tomó inmediatamente el job en Redis (`RUNNING -> DONE en 681ms`).
+    - Correo recibido con éxito en Mailpit (`http://localhost:8025`): destinatario `bela@gmail.com`, asunto "🎾 ¡Turno Disponible a las 12:00 hs en Nico Pádel & Sport Club!".
+    - Mensaje de WhatsApp despachado con éxito vía Evolution API a `5491149790220` (`connectionStatus: open`).
+    - Registro en `lista_espera` actualizado a `notificado = true`.
+  * Verificación de Suites:
+    - Backend PHPUnit: 188/188 tests pasados al 100% (1012 assertions).
+    - Frontend Vitest: 63/63 tests pasados al 100% (4 suites).
+    - `./test-env.sh`: 8/8 contenedores RUNNING y funcionales.
+  * Ajuste de Copy:
+    - Se modificó el cierre del mensaje de WhatsApp en `WhatsAppEvolutionService.php` y el pie del correo en `TurnoLiberadoMail.php` cambiando "slot" por "turno": *"Quien complete la reserva primero se queda con el turno."*.
+===============================================================================
+

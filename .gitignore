@@ -46,3 +46,10 @@ mobile/node_modules/
 mobile/dist/
 mobile/web-build/
 
+# Evolution API / WhatsApp Sessions & Backups
+evolution_instances/
+evolution_instances_backup/
+instances/
+evolution_store/
+*.session.json
+

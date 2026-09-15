@@ -21,6 +21,7 @@ services:
       - DB_PASSWORD=saas_pass
       - REDIS_HOST=cache
       - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
       - MAIL_MAILER=smtp
       - MAIL_HOST=mailpit
       - MAIL_PORT=1025
@@ -29,12 +30,60 @@ services:
       - MAIL_ENCRYPTION=null
       - MAIL_FROM_ADDRESS=soporte@turnos-saas.com
       - MAIL_FROM_NAME="Turnos SaaS"
+      - FRONTEND_URL=http://localhost:8080
+      - EVOLUTION_API_URL=http://evolution_api:8080
+      - EVOLUTION_API_KEY=evolution_secret_token_saas
+      - EVOLUTION_API_INSTANCE=turnos
     depends_on:
       database:
         condition: service_healthy
       cache:
         condition: service_healthy
       mailpit:
+        condition: service_started
+
+  queue_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: saas_queue_worker
+    restart: unless-stopped
+    command: php artisan queue:work --tries=3 --timeout=90
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/docker/php-fpm-tuning.conf:/usr/local/etc/php-fpm.d/zz-tuning.conf:ro
+    networks:
+      - saas_network
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=false
+      - DB_CONNECTION=pgsql
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_DATABASE=saas_db
+      - DB_USERNAME=saas_user
+      - DB_PASSWORD=saas_pass
+      - REDIS_HOST=cache
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+      - MAIL_USERNAME=null
+      - MAIL_PASSWORD=null
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS=soporte@turnos-saas.com
+      - MAIL_FROM_NAME="Turnos SaaS"
+      - FRONTEND_URL=http://localhost:8080
+      - EVOLUTION_API_URL=http://evolution_api:8080
+      - EVOLUTION_API_KEY=evolution_secret_token_saas
+      - EVOLUTION_API_INSTANCE=turnos
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      backend:
         condition: service_started
 
   frontend:
@@ -120,6 +169,37 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+    networks:
+      - saas_network
+
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: saas_evolution_api
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    environment:
+      - SERVER_URL=http://localhost:8085
+      - AUTHENTICATION_API_KEY=evolution_secret_token_saas
+      - CONFIG_SESSION_PHONE_CLIENT=Ubuntu
+      - CONFIG_SESSION_PHONE_NAME=Chrome
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://saas_user:saas_pass@database:5432/saas_db?schema=evolution_api
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution_api
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_DATA_CHATS=false
+      - DATABASE_SAVE_DATA_CONTACTS=false
+      - DATABASE_SAVE_DATA_HISTORIC=false
+      - DATABASE_SAVE_DATA_LABELS=false
+      - CACHE_REDIS_ENABLED=false
+      - CACHE_LOCAL_ENABLED=true
+      - DEL_INSTANCE=false
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
     networks:
       - saas_network
 

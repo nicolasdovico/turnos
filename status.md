@@ -6,8 +6,8 @@
 
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Módulo Turnos Fijos & Horarios 100% Implementado)
-- **Última Actualización:** 2026-09-14 (Corrección de desadjudicación y depuración reactiva de turnos cancelados en navegador de cliente: saneamiento de `saldo_pendiente` en backend, sincronización automática con `mis-turnos?estado=activos` en `syncClientActiveTurnos`, depuración inmediata en `sessionStorage` y `clientConfirmedTurnos` según `disponible: true` en `GrillaHoraria.tsx`; 185 tests backend, 63 frontend web y 20 mobile en verde al 100%).
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Lista de Espera Inteligente Multicanal con Evolution API WhatsApp & Email Mailpit 100% Operativa)
+- **Última Actualización:** 2026-09-14 (Integración de microservicio Evolution API WhatsApp en Docker, notificación multicanal de liberación de turnos por Email HTML y WhatsApp, unificación estética de grilla horaria con slots ocupados protegidos y botón interactivo Avisarme / Notificación Activa; 188 tests backend y 63 frontend web al 100% en verde).
 
 ---
 
