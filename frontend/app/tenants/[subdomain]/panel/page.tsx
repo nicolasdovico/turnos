@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import ResumenDiarioTurnos from "@/components/ResumenDiarioTurnos";
+import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 interface ComplejoData {
   id: number;
@@ -834,7 +835,7 @@ export default function ClubAdminPanel() {
         throw new Error(data.message || "Error al liberar la fecha.");
       }
 
-      setTurnosFijosSuccessMsg(`Fecha puntual del ${fechaPuntualToRelease.fecha} liberada correctamente. El turno vuelve a estar disponible.`);
+      setTurnosFijosSuccessMsg(`Fecha puntual del ${formatFechaDDMMAAAA(fechaPuntualToRelease.fecha)} liberada correctamente. El turno vuelve a estar disponible.`);
       setFechaPuntualToRelease(null);
       fetchTurnosFijos();
     } catch (err: any) {
@@ -2652,11 +2653,19 @@ export default function ClubAdminPanel() {
 
             {/* List of Turnos Fijos */}
             {(() => {
-              const filteredSeries = turnosFijos.filter((s) => {
-                if (filtroDiaFijo !== "todos" && s.dia_semana !== filtroDiaFijo) return false;
-                if (filtroCanchaFijo !== "todos" && s.cancha_id !== filtroCanchaFijo) return false;
-                return true;
-              });
+              const filteredSeries = [...turnosFijos]
+                .filter((s) => {
+                  if (filtroDiaFijo !== "todos" && s.dia_semana !== filtroDiaFijo) return false;
+                  if (filtroCanchaFijo !== "todos" && s.cancha_id !== filtroCanchaFijo) return false;
+                  return true;
+                })
+                .sort((a, b) => {
+                  const diaA = a.dia_semana === 0 ? 7 : a.dia_semana;
+                  const diaB = b.dia_semana === 0 ? 7 : b.dia_semana;
+                  if (diaA !== diaB) return diaA - diaB;
+                  if (a.hora_inicio !== b.hora_inicio) return a.hora_inicio.localeCompare(b.hora_inicio);
+                  return (a.cancha_id || 0) - (b.cancha_id || 0);
+                });
 
               if (loadingTurnosFijos) {
                 return (
@@ -2779,7 +2788,7 @@ export default function ClubAdminPanel() {
                             <div className="flex items-center justify-between text-[11px] text-slate-400">
                               <span>Horizonte 6 Meses:</span>
                               <span className="text-slate-300 font-mono">
-                                {serie.fecha_inicio} al {serie.fecha_fin}
+                                {formatFechaDDMMAAAA(serie.fecha_inicio)} al {formatFechaDDMMAAAA(serie.fecha_fin)}
                               </span>
                             </div>
                           </div>
@@ -2803,7 +2812,7 @@ export default function ClubAdminPanel() {
                                     className="p-2 rounded-xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs"
                                   >
                                     <div className="flex items-center gap-2 font-mono">
-                                      <span className="text-slate-300">{f.fecha}</span>
+                                      <span className="text-slate-300">{formatFechaDDMMAAAA(f.fecha)}</span>
                                       <span className="text-slate-500">|</span>
                                       <span className="text-slate-400">{f.hora_inicio} hs</span>
                                     </div>
@@ -3220,7 +3229,7 @@ export default function ClubAdminPanel() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">¿Liberar Fecha Puntual?</h3>
-                  <p className="text-xs text-slate-400">{fechaPuntualToRelease.fecha} • {fechaPuntualToRelease.hora_inicio} hs</p>
+                  <p className="text-xs text-slate-400">{formatFechaDDMMAAAA(fechaPuntualToRelease.fecha)} • {fechaPuntualToRelease.hora_inicio} hs</p>
                 </div>
               </div>
 

@@ -1687,4 +1687,26 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Ajuste de Copy:
     - Se modificó el cierre del mensaje de WhatsApp en `WhatsAppEvolutionService.php` y el pie del correo en `TurnoLiberadoMail.php` cambiando "slot" por "turno": *"Quien complete la reserva primero se queda con el turno."*.
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-15] - CORRECCIÓN EN PANEL DE CLUB: FORMATO DE FECHA DD-MM-AAAA Y ORDENAMIENTO DE TURNOS FIJOS
+-------------------------------------------------------------------------------
+- Requerimientos:
+  * En la solapa "Turnos Fijos" del panel de administración del club, las fechas se mostraban en formato `aaaa-mm-dd`. Se corrigió para que se muestren en formato regional `dd-mm-aaaa` (DD-MM-YYYY).
+  * Al listar los turnos fijos habiendo seleccionado el filtro "Todos", los turnos no se mostraban en orden cronológico por día de la semana (por ejemplo, salía Jueves antes que Martes). Se corrigió para seguir estrictamente el orden natural de la semana (Lunes [1] -> Martes [2] -> Miércoles [3] -> Jueves [4] -> Viernes [5] -> Sábado [6] -> Domingo [7/0]) y hora de inicio.
+- Soluciones Implementadas:
+  * Backend (`ClubDashboardController.php`):
+    - En el método `getTurnosFijos`, se añadió ordenamiento con `usort` para ordenar las series por día de la semana (`$diaA = $a['dia_semana'] === 0 ? 7 : (int)$a['dia_semana']`), luego por hora de inicio (`hora_inicio`) y cancha (`cancha_id`).
+  * Frontend Web (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+    - Se importó la función utilitaria `formatFechaDDMMAAAA` desde `@/components/GrillaHoraria`.
+    - Se aplicó `formatFechaDDMMAAAA` al rango de horizonte de 6 meses (`{formatFechaDDMMAAAA(serie.fecha_inicio)} al {formatFechaDDMMAAAA(serie.fecha_fin)}`), al listado de próximas fechas generadas (`{formatFechaDDMMAAAA(f.fecha)}`), al encabezado del modal de confirmación de liberación de fecha puntual (`¿Liberar Fecha Puntual?`) y al mensaje toast de éxito.
+    - Se actualizó el filtrado en cliente `filteredSeries` para ordenar también cronológicamente por día de la semana (Lunes=1 ... Domingo=7) y hora de inicio.
+- Tests y Verificación de Calidad:
+  * Backend (`TurnoFijoManagementTest.php`):
+    - Se agregó el test unitario `test_fixed_turnos_list_is_ordered_by_day_of_week_monday_to_sunday` que crea series fijas en Jueves, Domingo y Martes y valida que la API retorne exactamente en orden: Martes (2), Jueves (4), Domingo (0).
+    - Ejecución de suite: 189/189 tests pasados (1020 aserciones).
+  * Frontend (`authAndOnboarding.test.tsx`):
+    - Se agregó el test `orders turnos fijos chronologically by day of week and displays dates in DD-MM-YYYY format` validando que la UI ordene las tarjetas según los días de la semana y formatee las fechas a `DD-MM-YYYY` (`01-09-2026 al 02-03-2027` y `01-09-2026`).
+    - Se verificó la suite completa de frontend: 64/64 tests pasados en las 4 suites de prueba.
+===============================================================================
+
 

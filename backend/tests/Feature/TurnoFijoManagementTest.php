@@ -485,4 +485,77 @@ class TurnoFijoManagementTest extends TestCase
         $this->assertEquals(8000, $turnoAfter['monto_pagado']);
         $this->assertEquals(0, $turnoAfter['saldo_pendiente']);
     }
+
+    public function test_fixed_turnos_list_is_ordered_by_day_of_week_monday_to_sunday(): void
+    {
+        HorarioAtencion::create([
+            'complejo_id' => $this->complejo->id,
+            'dia_semana' => 4, // Jueves
+            'hora_apertura' => '08:00',
+            'hora_cierre' => '23:00',
+            'duracion_turno_minutos' => 90,
+        ]);
+        HorarioAtencion::create([
+            'complejo_id' => $this->complejo->id,
+            'dia_semana' => 0, // Domingo
+            'hora_apertura' => '08:00',
+            'hora_cierre' => '23:00',
+            'duracion_turno_minutos' => 90,
+        ]);
+
+        // 1. Thursday series starting on 2026-09-03
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 4, // Jueves
+                'hora_inicio' => '19:00',
+                'hora_fin' => '20:30',
+                'fecha_inicio' => '2026-09-03',
+                'semanas' => 4,
+                'precio' => 7500,
+                'cliente_id' => $this->client->id,
+            ])
+            ->assertStatus(201);
+
+        // 2. Sunday series starting on 2026-09-06
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 0, // Domingo
+                'hora_inicio' => '10:00',
+                'hora_fin' => '11:30',
+                'fecha_inicio' => '2026-09-06',
+                'semanas' => 4,
+                'precio' => 7500,
+                'cliente_id' => $this->client->id,
+            ])
+            ->assertStatus(201);
+
+        // 3. Tuesday series starting on 2026-09-08 (created last, later date, but Tuesday comes earlier in week)
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 2, // Martes
+                'hora_inicio' => '18:00',
+                'hora_fin' => '19:30',
+                'fecha_inicio' => '2026-09-08',
+                'semanas' => 4,
+                'precio' => 7500,
+                'cliente_id' => $this->client->id,
+            ])
+            ->assertStatus(201);
+
+        $response = $this->actingAs($this->owner, 'sanctum')
+            ->getJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos");
+
+        $response->assertStatus(200);
+        $data = $response->json('data');
+
+        $this->assertCount(3, $data);
+        // Order should be: Martes (2), Jueves (4), Domingo (0)
+        $this->assertEquals(2, $data[0]['dia_semana']);
+        $this->assertEquals(4, $data[1]['dia_semana']);
+        $this->assertEquals(0, $data[2]['dia_semana']);
+    }
 }
+

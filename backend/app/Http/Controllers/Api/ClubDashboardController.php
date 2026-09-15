@@ -952,6 +952,18 @@ class ClubDashboardController extends Controller
             return $s;
         }, $seriesMap));
 
+        usort($series, function ($a, $b) {
+            $diaA = $a['dia_semana'] === 0 ? 7 : (int) $a['dia_semana'];
+            $diaB = $b['dia_semana'] === 0 ? 7 : (int) $b['dia_semana'];
+            if ($diaA !== $diaB) {
+                return $diaA <=> $diaB;
+            }
+            if ($a['hora_inicio'] !== $b['hora_inicio']) {
+                return strcmp($a['hora_inicio'], $b['hora_inicio']);
+            }
+            return ($a['cancha_id'] ?? 0) <=> ($b['cancha_id'] ?? 0);
+        });
+
         return response()->json([
             'success' => true,
             'data' => $series,

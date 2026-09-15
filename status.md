@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Lista de Espera Inteligente Multicanal con Evolution API WhatsApp & Email Mailpit 100% Operativa)
-- **Última Actualización:** 2026-09-14 (Integración de microservicio Evolution API WhatsApp en Docker, notificación multicanal de liberación de turnos por Email HTML y WhatsApp, unificación estética de grilla horaria con slots ocupados protegidos y botón interactivo Avisarme / Notificación Activa; 188 tests backend y 63 frontend web al 100% en verde).
+- **Última Actualización:** 2026-09-15 (Solapa "Turnos Fijos" en panel de club: formateo regional de fechas a dd-mm-aaaa y ordenamiento cronológico por día de la semana de Lunes a Domingo; 189 tests backend y 64 frontend web al 100% en verde).
 
 ---
 

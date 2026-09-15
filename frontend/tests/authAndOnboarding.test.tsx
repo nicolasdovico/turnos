@@ -955,6 +955,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(await screen.findByText(/Gestión de Turnos Fijos & Abonados/i)).toBeDefined();
     expect(screen.getByText(/Esteban Abonado/i)).toBeDefined();
     expect(screen.getByText(/Por Vencer \(2 sem\)/i)).toBeDefined();
+    expect(screen.getByText(/01-09-2026 al 28-02-2027/i)).toBeDefined();
 
     // Click "⚡ Renovar 6 Meses Más"
     const btnRenovar = screen.getByRole("button", { name: /Renovar 6 Meses Más/i });
@@ -1009,6 +1010,121 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
       expect(postTurnoFijoPayload.cliente_id).toBe(88);
       expect(postTurnoFijoPayload.cliente_nombre).toBe("Franco Colapinto");
     });
+  });
+
+  it("orders turnos fijos chronologically by day of week and displays dates in DD-MM-YYYY format", async () => {
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/is-admin")) {
+        return { ok: true, json: async () => ({ is_admin: true }) } as any;
+      }
+      if (urlStr.includes("/dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Padel Club Central",
+                subdominio: "padel-central",
+                deporte_principal: "padel",
+                tipo_negocio: { nombre: "Club Deportivo" },
+                owner: { name: "Dueño Central" },
+              },
+              plan: {
+                nombre: "Oro",
+                modulos: [{ slug: "reservas" }, { slug: "turnos_fijos" }],
+              },
+              canchas: [
+                {
+                  id: 1,
+                  nombre: "Cancha 1 Panorámica",
+                  deporte: "padel",
+                  precio_base: 8000,
+                  estado: "activo",
+                },
+              ],
+              stats: { total_canchas: 1, total_turnos: 26, modulos_count: 2 },
+            },
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/turnos-fijos")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [
+              {
+                id: 201,
+                cancha_id: 1,
+                cancha_nombre: "Cancha 1",
+                deporte: "padel",
+                dia_semana: 4, // Jueves (returned first by mock)
+                hora_inicio: "19:00",
+                hora_fin: "20:30",
+                precio: 8000,
+                cliente_nombre: "Jugador Jueves",
+                proximas_fechas_count: 5,
+                fecha_inicio: "2026-09-03",
+                fecha_fin: "2027-03-04",
+                requiere_renovacion: false,
+                proximas_fechas: [
+                  { id: 201, fecha: "2026-09-03", hora_inicio: "19:00", hora_fin: "20:30", estado_pago: "pendiente" },
+                ],
+              },
+              {
+                id: 101,
+                cancha_id: 1,
+                cancha_nombre: "Cancha 1",
+                deporte: "padel",
+                dia_semana: 2, // Martes (returned second by mock)
+                hora_inicio: "18:00",
+                hora_fin: "19:30",
+                precio: 8000,
+                cliente_nombre: "Jugador Martes",
+                proximas_fechas_count: 5,
+                fecha_inicio: "2026-09-01",
+                fecha_fin: "2027-03-02",
+                requiere_renovacion: false,
+                proximas_fechas: [
+                  { id: 101, fecha: "2026-09-01", hora_inicio: "18:00", hora_fin: "19:30", estado_pago: "pagado" },
+                ],
+              },
+            ],
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    const turnosFijosTabBtn = await screen.findByRole("button", { name: /Turnos Fijos/i });
+    fireEvent.click(turnosFijosTabBtn);
+
+    expect(await screen.findByText(/Gestión de Turnos Fijos & Abonados/i)).toBeDefined();
+
+    // Verify dates formatted in DD-MM-YYYY
+    expect(screen.getByText(/01-09-2026 al 02-03-2027/i)).toBeDefined();
+    expect(screen.getByText(/03-09-2026 al 04-03-2027/i)).toBeDefined();
+
+    // Verify ordering: cards should have Martes before Jueves
+    const cards = screen.getAllByTestId("turno-fijo-card");
+    expect(cards.length).toBe(2);
+    expect(cards[0].textContent).toContain("Martes");
+    expect(cards[0].textContent).toContain("Jugador Martes");
+    expect(cards[1].textContent).toContain("Jueves");
+    expect(cards[1].textContent).toContain("Jugador Jueves");
+
+    // Click "Ver Fechas" on the first card to verify upcoming date format
+    const verFechasButtons = screen.getAllByRole("button", { name: /Ver Fechas/i });
+    fireEvent.click(verFechasButtons[0]);
+    expect(screen.getByText("01-09-2026")).toBeDefined();
   });
 
   it("renders Resumen Diario & Caja tab with financial KPIs, day by day cards and court filtering in club admin panel", async () => {
