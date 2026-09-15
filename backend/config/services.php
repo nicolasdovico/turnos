@@ -50,4 +50,10 @@ return [
         'url' => env('FCM_URL', 'https://fcm.googleapis.com/fcm/send'),
     ],
 
+    'evolution_api' => [
+        'url' => env('EVOLUTION_API_URL', 'http://evolution_api:8080'),
+        'api_key' => env('EVOLUTION_API_KEY', 'evolution_secret_token_saas'),
+        'instance' => env('EVOLUTION_API_INSTANCE', 'turnos'),
+    ],
+
 ];

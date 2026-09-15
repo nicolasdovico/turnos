@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\ClubReporteService;
 use App\Services\ReservaLockService;
 use App\Services\WalletService;
+use App\Jobs\NotificarListaEsperaJob;
 use App\Models\EmailVerification;
 use App\Http\Controllers\Api\OtpVerificationController;
 use Carbon\Carbon;
@@ -667,6 +668,17 @@ class ClubDashboardController extends Controller
         $turno->saldo_pendiente = 0.00;
         $turno->save();
 
+        $fechaStr = is_string($turno->fecha) ? $turno->fecha : $turno->fecha->format('Y-m-d');
+        $horaInicioStr = Carbon::parse($turno->hora_inicio)->format('H:i');
+        $horaFinStr = $turno->hora_fin ? Carbon::parse($turno->hora_fin)->format('H:i') : null;
+
+        NotificarListaEsperaJob::dispatch(
+            $turno->cancha_id,
+            $fechaStr,
+            $horaInicioStr,
+            $horaFinStr
+        );
+
         $mensaje = $montoPagado > 0 && $accionReembolso === 'billetera' && $clienteDestino
             ? "Turno liberado. Se acreditaron $" . number_format($montoPagado, 0, ',', '.') . " en la Billetera Virtual de {$clienteDestino->name} ({$clienteDestino->email})."
             : ($montoPagado > 0 && $accionReembolso === 'efectivo'
@@ -1295,17 +1307,17 @@ class ClubDashboardController extends Controller
         $fecha = is_string($turno->fecha) ? $turno->fecha : $turno->fecha->format('Y-m-d');
         $horaInicio = Carbon::parse($turno->hora_inicio)->format('H:i');
 
+        $horaFin = $turno->hora_fin ? Carbon::parse($turno->hora_fin)->format('H:i') : null;
         $turno->delete();
 
         $this->reservaLockService->liberarBloqueo($canchaId, $fecha, $horaInicio);
 
-        try {
-            \App\Models\ListaEspera::where('cancha_id', $canchaId)
-                ->where('fecha', $fecha)
-                ->where('hora_inicio', $horaInicio)
-                ->where('notificado', false)
-                ->update(['notificado' => true]);
-        } catch (\Throwable $e) {}
+        NotificarListaEsperaJob::dispatch(
+            $canchaId,
+            $fecha,
+            $horaInicio,
+            $horaFin
+        );
 
         return response()->json([
             'success' => true,

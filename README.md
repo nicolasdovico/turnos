@@ -207,3 +207,8 @@ docker compose exec frontend npm run test:coverage
 ## 📄 Licencia y Memoria del Proyecto
 
 Para conocer el estado exacto de avance, consulta [`status.md`](status.md) y [`progress.txt`](progress.txt). Las directivas de desarrollo están documentadas en [`RULES.md`](RULES.md).
+
+
+ejemplos de sitios
+https://www.dondejuegoapp.com/
+https://www.turnosport.com/

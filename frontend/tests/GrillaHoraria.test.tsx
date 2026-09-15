@@ -30,7 +30,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
     vi.restoreAllMocks();
   });
 
-  it("renderiza los turnos disponibles y oculta los no disponibles para los clientes", () => {
+  it("renderiza los turnos disponibles y muestra slots ocupados protegidos con opción de lista de espera", () => {
     render(
       <GrillaHoraria
         canchaId={1}
@@ -45,8 +45,9 @@ describe("Componente Reactivo GrillaHoraria", () => {
     expect(screen.getByLabelText("Turno 09:00 a 10:00 Disponible")).toBeDefined();
     expect(screen.getByLabelText("Turno 10:00 a 11:00 Disponible")).toBeDefined();
 
-    // The occupied slot (11:00) should be omitted for clients
-    expect(screen.queryByLabelText("Turno 11:00 a 12:00 Ocupado")).toBeNull();
+    // The occupied slot (11:00) is rendered as occupied with waitlist option, not selectable
+    expect(screen.getByLabelText("Turno 11:00 a 12:00 Ocupado")).toBeDefined();
+    expect(screen.getByTestId("waitlist-card-11:00")).toBeDefined();
   });
 
   it("renderiza mensaje distintivo de complejo cerrado cuando no hay atencion el dia seleccionado", async () => {
@@ -340,7 +341,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
       });
     });
 
-    // 1. Cliente común: NO ve el turno 20:00-21:30 ni la sección de turnos ocupados
+    // 1. Cliente común: Ve el turno 20:00-21:30 como ocupado con Lista de Espera, pero SIN datos personales ni sección admin
     const { unmount } = render(
       <GrillaHoraria
         canchaId={1}
@@ -355,8 +356,9 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(screen.getByLabelText("Turno 18:30 a 20:00 Disponible")).toBeDefined();
     });
 
-    // El slot ocupado de las 20:00 no debe estar en los botones de selección
-    expect(screen.queryByLabelText(/Turno 20:00 a 21:30/i)).toBeNull();
+    // El slot ocupado de las 20:00 está presente para lista de espera, pero NO revela datos del cliente
+    expect(screen.getByTestId("waitlist-card-20:00")).toBeDefined();
+    expect(screen.queryByText("Martín Palermo")).toBeNull();
     // La sección administrativa no debe existir
     expect(screen.queryByTestId("admin-occupied-turnos-section")).toBeNull();
 
@@ -1193,7 +1195,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
           body: expect.stringContaining('"hora_inicio":"19:00"'),
         })
       );
-      expect(screen.getByText("✓ Notificación Activa")).toBeDefined();
+      expect(screen.getByText(/Notificación Activa/i)).toBeDefined();
     });
   });
 

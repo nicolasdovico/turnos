@@ -314,6 +314,39 @@ export default function GrillaHoraria({
     }
   };
 
+  const fetchMisSuscripciones = async () => {
+    try {
+      const token = getAuthToken(propToken);
+      if (!token) return;
+      const headers: Record<string, string> = {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+      const res = await fetch(`${apiUrl}/lista-espera/mis-suscripciones`, { headers });
+      if (res && res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.suscripciones)) {
+          setSubscribedWaitlists((prev) => {
+            const next = new Set(prev);
+            data.suscripciones.forEach((s: any) => {
+              if (!s.notificado) {
+                const sFecha = typeof s.fecha === "string" ? s.fecha.substring(0, 10) : "";
+                const sHora = (s.hora_inicio || "").substring(0, 5);
+                if (sFecha && sHora) {
+                  next.add(`${sFecha}-${sHora}`);
+                }
+              }
+            });
+            return next;
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const syncClientActiveTurnos = async (userParam?: CurrentUser | null) => {
     const userToSync = userParam || currentUser || (globalAuthUser as CurrentUser | null);
     if (isAdmin || !userToSync) return;
@@ -383,6 +416,7 @@ export default function GrillaHoraria({
                   setClienteTelefono(data.user.telefono || "");
                 }
                 fetchWalletBalance();
+                fetchMisSuscripciones();
                 syncClientActiveTurnos(data.user);
               } else {
                 setCurrentUser(null);
@@ -446,6 +480,7 @@ export default function GrillaHoraria({
           }
         }
         fetchWalletBalance();
+        fetchMisSuscripciones();
         syncClientActiveTurnos(detail.user);
         fetchDisponibilidad(fecha, duracion, false);
       }
@@ -2192,6 +2227,49 @@ export default function GrillaHoraria({
     }
   };
 
+  const handleUnsubscribeWaitlist = async (slot: Slot) => {
+    try {
+      const activeToken = getAuthToken(propToken);
+      if (!activeToken && !currentUser) {
+        return;
+      }
+
+      setSubscribingSlot(slot.hora_inicio);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/lista-espera`, {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({
+          cancha_id: canchaId,
+          fecha,
+          hora_inicio: slot.hora_inicio,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al desuscribirse de la lista de espera.");
+      }
+
+      setSubscribedWaitlists((prev) => {
+        const next = new Set(prev);
+        next.delete(`${fecha}-${slot.hora_inicio}`);
+        return next;
+      });
+      addToast("info", `Desactivaste el aviso para el turno de las ${slot.hora_inicio} hs.`);
+    } catch (err: any) {
+      addToast("error", err.message || "Error al desuscribirse de la lista de espera.");
+    } finally {
+      setSubscribingSlot(null);
+    }
+  };
+
   const formatCountdown = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
@@ -2491,13 +2569,64 @@ export default function GrillaHoraria({
       <div className="mt-8">
         {(() => {
           const availableSlots = slots.filter((s) => s.disponible && !isSlotInPast(s.hora_inicio, fecha));
+
+          // In client view, combine available slots and occupied slots into the unified grid
+          const occupiedMap = new Map<string, Slot>();
+          turnosOcupados.forEach((t) => {
+            const hInicio = (t.hora_inicio || "").substring(0, 5);
+            const hFin = (t.hora_fin || "").substring(0, 5);
+            if (hInicio && !isSlotInPast(hInicio, fecha) && !availableSlots.some((a) => (a.hora_inicio || "").substring(0, 5) === hInicio)) {
+              occupiedMap.set(hInicio, {
+                hora_inicio: hInicio,
+                hora_fin: hFin,
+                disponible: false,
+                precio: t.precio ? Number(t.precio) : undefined,
+                duracion_minutos: t.duracion_minutos,
+              });
+            }
+          });
+
+          slots
+            .filter((s) => !s.disponible && !isSlotInPast(s.hora_inicio, fecha))
+            .forEach((s) => {
+              const hInicio = (s.hora_inicio || "").substring(0, 5);
+              if (hInicio && !availableSlots.some((a) => (a.hora_inicio || "").substring(0, 5) === hInicio)) {
+                occupiedMap.set(hInicio, {
+                  hora_inicio: hInicio,
+                  hora_fin: (s.hora_fin || "").substring(0, 5),
+                  disponible: false,
+                  precio: s.precio ? Number(s.precio) : undefined,
+                  duracion_minutos: s.duracion_minutos,
+                });
+              }
+            });
+
+          const displaySlots: Slot[] = isAdmin
+            ? availableSlots
+            : [
+                ...availableSlots,
+                ...Array.from(occupiedMap.values()),
+              ].sort((a, b) => (a.hora_inicio || "").localeCompare(b.hora_inicio || ""));
+
+          const hasOccupied = !isAdmin && displaySlots.some((s) => !s.disponible);
+
           return (
             <>
-              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                {isAdmin
-                  ? `Horarios Disponibles para Reservar (${availableSlots.length})`
-                  : `Horarios Disponibles (${availableSlots.length} turnos)`}
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                  {isAdmin
+                    ? `Horarios Disponibles para Reservar (${availableSlots.length})`
+                    : `Turnos del Día (${displaySlots.length} horarios • ${availableSlots.length} disponibles)`}
+                </h3>
+                {hasOccupied && (
+                  <span
+                    data-testid="public-waitlist-section"
+                    className="text-[11px] text-amber-300/90 font-medium flex items-center gap-1.5 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20"
+                  >
+                    <span>🔔</span> ¿Buscabas otro horario? Súmate a la <strong>Lista de Espera</strong>
+                  </span>
+                )}
+              </div>
 
               {loading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -2511,115 +2640,118 @@ export default function GrillaHoraria({
                   <p className="text-amber-300 font-bold">Complejo cerrado este día</p>
                   <p className="text-slate-400 text-sm mt-1">El club no cuenta con horarios de atención habilitados para la fecha seleccionada.</p>
                 </div>
-              ) : availableSlots.length === 0 ? (
+              ) : displaySlots.length === 0 ? (
                 <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-800">
                   <Clock className="w-10 h-10 text-slate-600 mx-auto mb-2" />
                   <p className="text-slate-400 font-medium">No hay turnos disponibles para la fecha seleccionada.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {availableSlots.map((slot) => {
-                    const isLockedByMe = activeLock?.horaInicio === slot.hora_inicio;
-                    const isLocking = lockingSlot === slot.hora_inicio;
+                  {displaySlots.map((slot) => {
+                    if (slot.disponible) {
+                      const isLockedByMe = activeLock?.horaInicio === slot.hora_inicio;
+                      const isLocking = lockingSlot === slot.hora_inicio;
 
-                    let buttonClasses =
-                      "relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 ";
+                      let buttonClasses =
+                        "relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 ";
 
-                    if (isLockedByMe) {
-                      buttonClasses += "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500 shadow-lg";
-                    } else {
-                      buttonClasses +=
-                        "bg-slate-800/60 border-slate-700/80 text-white hover:border-emerald-500/70 hover:bg-slate-800 cursor-pointer hover:shadow-md";
+                      if (isLockedByMe) {
+                        buttonClasses += "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500 shadow-lg";
+                      } else {
+                        buttonClasses +=
+                          "bg-slate-800/60 border-slate-700/80 text-white hover:border-emerald-500/70 hover:bg-slate-800 cursor-pointer hover:shadow-md";
+                      }
+
+                      return (
+                        <button
+                          key={slot.hora_inicio}
+                          disabled={isLocking}
+                          onClick={() => handleSelectSlot(slot)}
+                          className={buttonClasses}
+                          aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Disponible`}
+                        >
+                          <div className="flex justify-between items-start w-full">
+                            <span className="font-mono text-lg font-extrabold tracking-tight">
+                              {slot.hora_inicio}
+                            </span>
+                            {isLockedByMe ? (
+                              <span className="flex h-2 w-2 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                Libre
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-3 flex justify-between items-end w-full">
+                            <span className="text-xs text-slate-400 font-medium">hasta {slot.hora_fin}</span>
+                            <span className="text-xs font-black text-emerald-400">
+                              ${slot.precio?.toLocaleString() || precioBase || 0}
+                            </span>
+                          </div>
+                        </button>
+                      );
                     }
 
+                    // Occupied Slot Tile (Same grid, identical dimensions, elegant dark styling)
+                    const isSubscribed = subscribedWaitlists.has(`${fecha}-${slot.hora_inicio}`);
+                    const isSubscribing = subscribingSlot === slot.hora_inicio;
+
                     return (
-                      <button
+                      <div
                         key={slot.hora_inicio}
-                        disabled={isLocking}
-                        onClick={() => handleSelectSlot(slot)}
-                        className={buttonClasses}
-                        aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Disponible`}
+                        data-testid={`waitlist-card-${slot.hora_inicio}`}
+                        className="relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 bg-slate-900/80 border-slate-800/90 text-slate-400"
+                        aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Ocupado`}
                       >
                         <div className="flex justify-between items-start w-full">
-                          <span className="font-mono text-lg font-extrabold tracking-tight">
+                          <span className="font-mono text-lg font-extrabold tracking-tight text-slate-400">
                             {slot.hora_inicio}
                           </span>
-                          {isLockedByMe ? (
-                            <span className="flex h-2 w-2 relative">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                          ) : (
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                              Libre
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-3 flex justify-between items-end w-full">
-                          <span className="text-xs text-slate-400 font-medium">hasta {slot.hora_fin}</span>
-                          <span className="text-xs font-black text-emerald-400">
-                            ${slot.precio?.toLocaleString() || precioBase || 0}
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-rose-400/90 border border-rose-500/20">
+                            Ocupado
                           </span>
                         </div>
-                      </button>
+
+                        <div className="mt-3 flex justify-between items-center w-full gap-1.5">
+                          <span className="text-xs text-slate-500 font-medium">hasta {slot.hora_fin}</span>
+                          <button
+                            type="button"
+                            disabled={isSubscribing}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isSubscribed) {
+                                handleUnsubscribeWaitlist(slot);
+                              } else {
+                                handleSubscribeWaitlist(slot);
+                              }
+                            }}
+                            className={`py-1 px-2.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                              isSubscribed
+                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 cursor-pointer"
+                                : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer shadow-sm"
+                            }`}
+                            title={isSubscribed ? "Clic para desactivar aviso" : "Avisarme si se libera"}
+                          >
+                            {isSubscribed ? (
+                              <>
+                                <span>✓</span> Notificación Activa
+                              </>
+                            ) : isSubscribing ? (
+                              "Guardando..."
+                            ) : (
+                              <>
+                                <span>🔔</span> Avisarme
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
-                </div>
-              )}
-
-              {/* Public Waitlist for Occupied Slots */}
-              {!isAdmin && slots.some((s) => !s.disponible && !isSlotInPast(s.hora_inicio, fecha)) && (
-                <div data-testid="public-waitlist-section" className="mt-8 pt-6 border-t border-slate-800/80">
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div>
-                      <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <span>🔔</span> ¿Buscabas otro horario? Súmate a la Lista de Espera
-                      </h4>
-                      <p className="text-[11px] text-slate-400">
-                        Si alguien cancela su reserva, te notificaremos por push al instante para que lo aproveches
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                    {slots
-                      .filter((s) => !s.disponible && !isSlotInPast(s.hora_inicio, fecha))
-                      .map((s) => {
-                        const isSubscribed = subscribedWaitlists.has(`${fecha}-${s.hora_inicio}`);
-                        const isSubscribing = subscribingSlot === s.hora_inicio;
-
-                        return (
-                          <div
-                            key={s.hora_inicio}
-                            data-testid={`waitlist-card-${s.hora_inicio}`}
-                            className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between gap-2"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono text-sm font-bold text-slate-300">
-                                ⏰ {s.hora_inicio}
-                              </span>
-                              <span className="text-[10px] uppercase font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
-                                Ocupado
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              disabled={isSubscribed || isSubscribing}
-                              onClick={() => handleSubscribeWaitlist(s)}
-                              className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 ${
-                                isSubscribed
-                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-default"
-                                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer"
-                              }`}
-                            >
-                              {isSubscribed ? "✓ Notificación Activa" : isSubscribing ? "Guardando..." : "🔔 Avisarme"}
-                            </button>
-                          </div>
-                        );
-                      })}
-                  </div>
                 </div>
               )}
             </>

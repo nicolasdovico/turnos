@@ -247,15 +247,21 @@ Esta guía contiene la especificación formal y práctica de **todos los Casos d
 
 ---
 
-### CU-13: Suscripción a Lista de Espera Inteligente y Notificación Push Automática
-* **Actor:** Cliente interesado en un turno ya reservado.
-* **Precondición:** Turno ocupado en la grilla.
+### CU-13: Suscripción a Lista de Espera Inteligente y Notificación Multicanal (Email y WhatsApp)
+* **Actor:** Cliente o Jugador interesado en un horario ya reservado/ocupado por otro usuario.
+* **Precondición:** Turno ocupado en la grilla horaria.
 * **Flujo Paso a Paso:**
-  1. Inicia sesión como jugador (ej. `messi@jugador.test`).
-  2. En un turno ocupado por otro usuario, haz clic en el botón **`[ 🔔 Avisarme ]`**.
-  3. El botón cambia su estado a **`[ ✓ Notificación Activa ]`**.
-  4. En otra ventana, como administrador o titular, cancela o libera ese turno.
-* **Resultado Esperado:** El job `NotificarListaEsperaJob` se despacha en segundo plano, marca `notificado = true` en la base de datos, envía la notificación push (FCM) al dispositivo del usuario suscrito y vuelve a colocar el slot como disponible en la grilla pública.
+  1. Inicia sesión como jugador (ej. `messi@jugador.test` / `password123`).
+  2. En la grilla horaria pública del club (`http://nico-padel.localhost:8080/`), ubica un turno con badge **`Ocupado`** en la grilla integrada de tarjetas.
+  3. Comprueba que por privacidad no se exponen los datos personales del titular actual del turno.
+  4. En la misma tarjeta del turno ocupado, haz clic en el botón **`[ 🔔 Avisarme ]`**.
+  5. El botón cambia de forma optimista e interactiva a **`[ ✓ Notificación Activa ]`** (se puede hacer clic nuevamente para alternar y desactivar el aviso).
+  6. En otra pestaña o como administrador del club, anula o libera ese turno ocupado.
+* **Resultado Esperado:**
+  - El job `NotificarListaEsperaJob` se procesa en segundo plano y marca `notificado = true` en la base de datos.
+  - Se despacha un correo electrónico con diseño HTML (`TurnoLiberadoMail`) visible en Mailpit ([`http://localhost:8025`](http://localhost:8025)).
+  - Se envía una notificación por WhatsApp vía Evolution API ([`http://localhost:8085`](http://localhost:8085)) con el mensaje de liberación y el enlace directo para reservar el slot.
+  - El slot vuelve a figurar como **`Libre`** (verde) en la grilla pública.
 
 ---
 

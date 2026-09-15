@@ -8,7 +8,7 @@ use App\Models\Complejo;
 use App\Models\ListaEspera;
 use App\Models\Plan;
 use App\Models\User;
-use App\Services\NotificationService;
+use App\Services\FCMNotificationService;
 use Database\Seeders\ModuloSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -132,8 +132,8 @@ class ListaEsperaTest extends TestCase
             'notificado' => false,
         ]);
 
-        // Mock NotificationService
-        $mockNotification = Mockery::mock(NotificationService::class);
+        // Mock FCMNotificationService
+        $mockNotification = Mockery::mock(FCMNotificationService::class);
         $mockNotification->shouldReceive('sendPushNotification')
             ->once()
             ->with(
@@ -142,9 +142,9 @@ class ListaEsperaTest extends TestCase
                 Mockery::pattern('/20:00/i'),
                 Mockery::type('array')
             )
-            ->andReturn(true);
+            ->andReturn([]);
 
-        $this->app->instance(NotificationService::class, $mockNotification);
+        $this->app->instance(FCMNotificationService::class, $mockNotification);
 
         // Ejecutar el Job
         $job = new NotificarListaEsperaJob($this->cancha->id, '2026-09-01', '20:00', '21:00');
@@ -153,5 +153,103 @@ class ListaEsperaTest extends TestCase
         // Verificar que la suscripción quedó notificada
         $suscripcion->refresh();
         $this->assertTrue($suscripcion->notificado);
+    }
+
+    public function test_notificar_lista_espera_envia_email_y_whatsapp_via_evolution(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $suscripcion = ListaEspera::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'fecha' => '2026-09-02',
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:00',
+            'user_id' => $this->cliente->id,
+            'notificado' => false,
+        ]);
+
+        $mockWhatsApp = Mockery::mock(\App\Services\WhatsAppEvolutionService::class);
+        $mockWhatsApp->shouldReceive('enviarMensajeTurnoLiberado')
+            ->once()
+            ->with(
+                Mockery::on(fn ($u) => $u->id === $this->cliente->id),
+                Mockery::on(fn ($c) => $c->id === $this->cancha->id),
+                '2026-09-02',
+                '18:00',
+                '19:00'
+            )
+            ->andReturn(true);
+
+        $this->app->instance(\App\Services\WhatsAppEvolutionService::class, $mockWhatsApp);
+
+        $job = new NotificarListaEsperaJob($this->cancha->id, '2026-09-02', '18:00', '19:00');
+        $job->handle();
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\TurnoLiberadoMail::class, function ($mail) {
+            return $mail->hasTo($this->cliente->email);
+        });
+
+        $suscripcion->refresh();
+        $this->assertTrue($suscripcion->notificado);
+    }
+
+    public function test_admin_cancelar_turno_despacha_notificar_lista_espera_job(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $owner = User::factory()->create();
+        $this->complejo->user_id = $owner->id;
+        $this->complejo->save();
+
+        $turno = \App\Models\Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'fecha' => '2026-09-03',
+            'hora_inicio' => '19:00',
+            'hora_fin' => '20:00',
+            'precio' => 10000,
+            'estado' => 'reservado',
+            'estado_pago' => 'pendiente',
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->deleteJson("/api/clubs/{$this->complejo->subdominio}/turnos/{$turno->id}");
+
+        $response->assertStatus(200);
+
+        \Illuminate\Support\Facades\Queue::assertPushed(NotificarListaEsperaJob::class, function ($job) use ($turno) {
+            return $job->canchaId === $turno->cancha_id && $job->fecha === '2026-09-03' && $job->horaInicio === '19:00';
+        });
+    }
+
+    public function test_admin_liberar_fecha_puntual_despacha_notificar_lista_espera_job(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $owner = User::factory()->create();
+        $this->complejo->user_id = $owner->id;
+        $this->complejo->save();
+
+        $turno = \App\Models\Turno::create([
+            'complejo_id' => $this->complejo->id,
+            'cancha_id' => $this->cancha->id,
+            'fecha' => '2026-09-04',
+            'hora_inicio' => '21:00',
+            'hora_fin' => '22:00',
+            'precio' => 12000,
+            'estado' => 'reservado',
+            'estado_pago' => 'pendiente',
+            'es_fijo' => true,
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->deleteJson("/api/clubs/{$this->complejo->subdominio}/turnos/{$turno->id}/liberar-fecha");
+
+        $response->assertStatus(200);
+
+        \Illuminate\Support\Facades\Queue::assertPushed(NotificarListaEsperaJob::class, function ($job) use ($turno) {
+            return $job->canchaId === $turno->cancha_id && $job->fecha === '2026-09-04' && $job->horaInicio === '21:00';
+        });
     }
 }
