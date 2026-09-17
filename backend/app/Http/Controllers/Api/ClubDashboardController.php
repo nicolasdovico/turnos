@@ -1934,5 +1934,212 @@ class ClubDashboardController extends Controller
             'data' => $resumen,
         ]);
     }
+
+    /**
+     * Listar billeteras de clientes del complejo con KPIs y filtros.
+     */
+    public function getBilleteras(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autenticado.',
+            ], 401);
+        }
+
+        $isAdmin = ($complejo->user_id && $complejo->user_id === $user->id) || ($user->role ?? '') === 'admin' || $user->email === 'admin@admin.com';
+        if (!$isAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos de administrador para este club.',
+            ], 403);
+        }
+
+        $search = $request->query('search');
+        $soloConSaldo = filter_var($request->query('solo_con_saldo', false), FILTER_VALIDATE_BOOLEAN);
+        $perPage = min(100, max(5, (int) $request->query('per_page', 20)));
+        $orderBy = $request->query('order_by', 'saldo_desc');
+
+        $metricas = $this->walletService->obtenerMetricasComplejo($complejo->id);
+        $billeteras = $this->walletService->listarBilleterasComplejo(
+            $complejo->id,
+            $search,
+            $soloConSaldo,
+            $perPage,
+            $orderBy
+        );
+
+        return response()->json([
+            'success' => true,
+            'metricas' => $metricas,
+            'billeteras' => $billeteras,
+        ]);
+    }
+
+    /**
+     * Obtener movimientos de billetera de un cliente en este club.
+     */
+    public function getMovimientosClienteBilletera(Request $request, string $subdomain, int $userId): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autenticado.',
+            ], 401);
+        }
+
+        $isAdmin = ($complejo->user_id && $complejo->user_id === $user->id) || ($user->role ?? '') === 'admin' || $user->email === 'admin@admin.com';
+        if (!$isAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos de administrador para este club.',
+            ], 403);
+        }
+
+        $cliente = User::find($userId);
+        if (!$cliente) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cliente no encontrado.',
+            ], 404);
+        }
+
+        $saldoActual = $this->walletService->obtenerSaldo($userId, $complejo->id);
+        $movimientos = $this->walletService->obtenerMovimientosClienteComplejo($userId, $complejo->id);
+
+        return response()->json([
+            'success' => true,
+            'cliente' => [
+                'id' => $cliente->id,
+                'name' => $cliente->name,
+                'email' => $cliente->email,
+                'telefono' => $cliente->telefono,
+                'saldo' => $saldoActual,
+                'saldo_formateado' => '$' . number_format($saldoActual, 2, ',', '.'),
+            ],
+            'movimientos' => $movimientos,
+        ]);
+    }
+
+    /**
+     * Ajustar saldo de billetera de cliente (acreditar o debitar manualmente con motivo).
+     */
+    public function ajustarSaldoBilletera(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autenticado.',
+            ], 401);
+        }
+
+        $isAdmin = ($complejo->user_id && $complejo->user_id === $user->id) || ($user->role ?? '') === 'admin' || $user->email === 'admin@admin.com';
+        if (!$isAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos de administrador para este club.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'monto' => 'required|numeric|gt:0',
+            'tipo_operacion' => 'required|in:acreditar,debitar',
+            'motivo' => 'required|string|min:3|max:255',
+        ]);
+
+        $targetUserId = (int) $validated['user_id'];
+        $monto = (float) $validated['monto'];
+        $tipoOperacion = $validated['tipo_operacion'];
+        $motivo = trim($validated['motivo']);
+
+        $cliente = User::find($targetUserId);
+
+        if ($tipoOperacion === 'acreditar') {
+            $movimiento = $this->walletService->acreditar(
+                $targetUserId,
+                $complejo->id,
+                $monto,
+                'carga_manual',
+                null,
+                $motivo . " (por {$user->name})"
+            );
+            $nuevoSaldo = $this->walletService->obtenerSaldo($targetUserId, $complejo->id);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Se acreditaron exitosamente $" . number_format($monto, 2, ',', '.') . " a {$cliente->name}.",
+                'nuevo_saldo' => $nuevoSaldo,
+                'nuevo_saldo_formateado' => '$' . number_format($nuevoSaldo, 2, ',', '.'),
+                'movimiento' => $movimiento,
+            ]);
+        } else {
+            $saldoActual = $this->walletService->obtenerSaldo($targetUserId, $complejo->id);
+            if ($saldoActual < $monto) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Saldo insuficiente para debitar. El cliente dispone de $" . number_format($saldoActual, 2, ',', '.') . ".",
+                ], 422);
+            }
+
+            $debited = $this->walletService->debitar(
+                $targetUserId,
+                $complejo->id,
+                $monto,
+                'ajuste_manual',
+                null,
+                $motivo . " (por {$user->name})"
+            );
+
+            if (!$debited) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo procesar el débito de saldo.',
+                ], 422);
+            }
+
+            $nuevoSaldo = $this->walletService->obtenerSaldo($targetUserId, $complejo->id);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Se debitaron exitosamente $" . number_format($monto, 2, ',', '.') . " a {$cliente->name}.",
+                'nuevo_saldo' => $nuevoSaldo,
+                'nuevo_saldo_formateado' => '$' . number_format($nuevoSaldo, 2, ',', '.'),
+            ]);
+        }
+    }
 }
 
