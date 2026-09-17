@@ -1239,6 +1239,108 @@ export default function ClubAdminPanel() {
     }
   };
 
+  const handleDownloadQr = async () => {
+    if (!cleanWaNumber) return;
+    try {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https%3A%2F%2Fwa.me%2F${cleanWaNumber}`;
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `qr-whatsapp-${subdomain || "club"}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=https%3A%2F%2Fwa.me%2F${cleanWaNumber}`, "_blank");
+    }
+  };
+
+  const handlePrintPoster = () => {
+    if (!cleanWaNumber) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const clubName = clubNombre.trim() || complejo?.nombre || "Club Deportivo";
+    const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=https%3A%2F%2Fwa.me%2F${cleanWaNumber}`;
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Cartel WhatsApp - ${clubName}</title>
+          <style>
+            @page { size: auto; margin: 15mm; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              margin: 0;
+              padding: 20px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              background: #f8fafc;
+              color: #0f172a;
+            }
+            .poster {
+              background: #ffffff;
+              border: 4px solid #10b981;
+              border-radius: 28px;
+              padding: 40px 32px;
+              max-width: 500px;
+              width: 100%;
+              text-align: center;
+              box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            }
+            .icon { font-size: 48px; margin-bottom: 12px; }
+            h1 { font-size: 28px; font-weight: 900; margin: 0 0 8px 0; color: #064e3b; }
+            h2 { font-size: 18px; font-weight: 700; color: #047857; margin: 0 0 20px 0; text-transform: uppercase; letter-spacing: 1px; }
+            .qr-frame {
+              background: #f0fdf4;
+              border: 2px dashed #34d399;
+              border-radius: 20px;
+              padding: 20px;
+              display: inline-block;
+              margin: 0 auto 20px auto;
+            }
+            .qr-frame img { display: block; width: 240px; height: 240px; }
+            p { font-size: 15px; line-height: 1.5; color: #334155; margin: 0 0 16px 0; }
+            .wa-badge {
+              display: inline-block;
+              background: #10b981;
+              color: #ffffff;
+              font-weight: 800;
+              font-size: 15px;
+              padding: 8px 20px;
+              border-radius: 9999px;
+              margin-top: 10px;
+            }
+            .subtext { font-size: 12px; color: #64748b; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="poster">
+            <div class="icon">💬 🎾</div>
+            <h1>${clubName}</h1>
+            <h2>¡Chateá y Reservá por WhatsApp!</h2>
+            <div class="qr-frame">
+              <img src="${qrSrc}" alt="Código QR WhatsApp" />
+            </div>
+            <p>Apuntá con la <strong>cámara de tu celular</strong> a este código QR para abrir el chat directo y consultar turnos, precios o disponibilidad.</p>
+            <div class="wa-badge">wa.me/${cleanWaNumber}</div>
+            <div class="subtext">Turnos &amp; Gestión Deportiva Oficial</div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const updateClubNombre = (val: string) => {
     setClubNombre(val);
     setIsClubDataDirty(true);
@@ -4384,8 +4486,11 @@ export default function ClubAdminPanel() {
 
             {/* Modal Código QR de WhatsApp */}
             {showQrModal && isPhoneValid && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-                <div className="relative w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl text-center space-y-6">
+              <div
+                data-testid="admin-qr-modal"
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in"
+              >
+                <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl text-center space-y-6 max-h-[92vh] overflow-y-auto">
                   <button
                     type="button"
                     onClick={() => setShowQrModal(false)}
@@ -4398,8 +4503,8 @@ export default function ClubAdminPanel() {
                     <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto text-2xl shadow-inner">
                       💬
                     </div>
-                    <h3 className="text-lg font-black text-white">Código QR de WhatsApp</h3>
-                    <p className="text-xs text-slate-400">
+                    <h3 className="text-xl font-black text-white">Código QR de WhatsApp</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
                       Escanea este código con la cámara de tu celular para abrir directamente el chat con <strong className="text-emerald-400">{complejo?.nombre || "el Club"}</strong>
                     </p>
                   </div>
@@ -4407,37 +4512,75 @@ export default function ClubAdminPanel() {
                   {/* Imagen QR generada dinámicamente */}
                   <div className="p-4 bg-white rounded-2xl inline-block shadow-2xl border border-slate-200">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https%3A%2F%2Fwa.me%2F${cleanWaNumber}`}
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=https%3A%2F%2Fwa.me%2F${cleanWaNumber}`}
                       alt={`Código QR WhatsApp ${cleanWaNumber}`}
-                      width={220}
-                      height={220}
+                      width={240}
+                      height={240}
                       className="w-48 h-48 mx-auto"
                     />
                   </div>
 
-                  <div className="space-y-3">
-                    <div className="font-mono text-xs text-slate-300 bg-slate-950 border border-slate-800 py-2 px-3 rounded-xl flex items-center justify-center gap-2">
-                      <span className="text-emerald-400">wa.me/</span>
-                      <span className="font-bold text-white">{cleanWaNumber}</span>
-                    </div>
+                  {/* Enlace y número formateado */}
+                  <div className="font-mono text-xs text-slate-300 bg-slate-950 border border-slate-800 py-2 px-3 rounded-xl flex items-center justify-center gap-2">
+                    <span className="text-emerald-400">wa.me/</span>
+                    <span className="font-bold text-white">{cleanWaNumber}</span>
+                  </div>
 
-                    <div className="flex flex-col gap-2">
-                      <a
-                        href={`https://wa.me/${cleanWaNumber}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black tracking-wide flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/40 cursor-pointer"
-                      >
-                        <span>💬</span> Abrir en WhatsApp Web ↗
-                      </a>
+                  {/* Instrucciones de uso para mostrador */}
+                  <div className="text-left bg-slate-950/80 rounded-2xl p-4 border border-slate-800 space-y-2 text-xs">
+                    <div className="font-bold text-emerald-400 flex items-center gap-1.5 text-xs">
+                      <span>📋</span> Instrucciones de Uso:
+                    </div>
+                    <ol className="space-y-1.5 list-decimal list-inside text-slate-400 leading-relaxed">
+                      <li>
+                        <strong className="text-slate-200">Descargá el archivo</strong> o hacé clic en <strong className="text-slate-200">Imprimir Cartel</strong> para generar la lámina.
+                      </li>
+                      <li>
+                        Colocalo en el <strong className="text-slate-200">mostrador de recepción</strong>, buffet o entrada a las canchas.
+                      </li>
+                      <li>
+                        Los jugadores solo deben apuntar la <strong className="text-slate-200">cámara de su celular</strong> para iniciar la conversación al instante.
+                      </li>
+                    </ol>
+                  </div>
+
+                  {/* Acciones del Modal */}
+                  <div className="space-y-2.5 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setShowQrModal(false)}
-                        className="w-full py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer"
+                        onClick={handleDownloadQr}
+                        className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition border border-slate-700 cursor-pointer"
+                        title="Descargar imagen PNG en alta definición"
                       >
-                        Cerrar
+                        <span>⬇</span> Descargar QR (PNG)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePrintPoster}
+                        className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-md shadow-emerald-950/40 cursor-pointer"
+                        title="Imprimir cartel listo para colocar en recepción"
+                      >
+                        <span>🖨️</span> Imprimir Cartel
                       </button>
                     </div>
+
+                    <a
+                      href={`https://wa.me/${cleanWaNumber}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2.5 rounded-xl border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+                    >
+                      <span>💬</span> Probar en WhatsApp Web ↗
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowQrModal(false)}
+                      className="w-full py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold transition cursor-pointer"
+                    >
+                      Cerrar
+                    </button>
                   </div>
                 </div>
               </div>

@@ -1834,3 +1834,26 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Total Frontend: 67/67 tests exitosos (4 suites).
   * Build de producción Next.js (npm run build): 100% exitoso.
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-17] - BOTÓN FLOTANTE DE WHATSAPP, QR EN ENCABEZADO Y ACCIONES DE DESCARGA E IMPRESIÓN DE CARTEL
+-------------------------------------------------------------------------------
+- Diagnóstico y Requerimiento:
+  * En la web pública de clientes, el badge de teléfono en el hero sobrecargaba la estética visual.
+  * Se requería implementar un logo/botón flotante clickeable de WhatsApp para acceso permanente en móvil y escritorio, y un botón en el encabezado para desplegar el QR en pantalla para escaneo rápido con celular.
+  * En el panel de administración, se requerían instrucciones explícitas y botones para descargar la imagen QR en PNG de alta resolución e imprimir un cartel formateado para recepción/mostrador.
+- Soluciones Implementadas:
+  * Frontend Web Público (frontend/app/tenants/[subdomain]/page.tsx):
+    - Limpieza del hero principal retirando el badge tosco de contacto.
+    - Incorporación del botón "📱 QR WhatsApp" en las insignias superiores del establecimiento.
+    - Modal público con QR dinámico en alta resolución e instrucciones para jugadores: "Apuntá con la cámara de tu celular a este código para abrir directamente el chat con el club".
+    - Botón flotante permanente de WhatsApp (fixed bottom-6 right-6 z-50) con verde oficial (#25D366), badge de notificación animado (ping), tooltip informativo y redirección directa a wa.me.
+  * Frontend Panel de Administración (frontend/app/tenants/[subdomain]/panel/page.tsx):
+    - Modal de Código QR enriquecido con caja de "📋 Instrucciones de Uso" paso a paso para el club.
+    - Botón "⬇ Descargar QR (PNG)" con fetch de blob y descarga automática del archivo qr-whatsapp-[subdomain].png.
+    - Botón "🖨️ Imprimir Cartel" con generación de documento imprimible (ventana A4 optimizada para enmarcar con logo, QR de 450x450, borde verde y tipografía elegante) disparando window.print().
+- Tests Automatizados & Verificación de Calidad:
+  * Frontend Web (tests/authAndOnboarding.test.tsx):
+    - Se amplió la suite de pruebas validando la presencia del botón flotante con href wa.me, apertura y cierre del modal QR desde el encabezado público, y verificación de las instrucciones, botón de descarga e impresión en el modal del panel de control.
+    - 67/67 tests frontend aprobados al 100% (4 suites).
+    - 195/195 tests backend aprobados al 100%.
+===============================================================================

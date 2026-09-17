@@ -1,10 +1,19 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import GrillaHoraria from "@/components/GrillaHoraria";
 import { useAuth } from "@/context/AuthContext";
+
+const formatWhatsAppNumber = (phone: string | null | undefined): string => {
+  if (!phone) return "";
+  let digits = phone.replace(/\D/g, "");
+  if (digits.length === 10 && (digits.startsWith("11") || digits.startsWith("2") || digits.startsWith("3"))) {
+    digits = "549" + digits;
+  }
+  return digits;
+};
 
 interface ComplejoData {
   id: number;
@@ -58,6 +67,9 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
   const [canchas, setCanchas] = useState<CanchaItem[]>([]);
   const [selectedCanchaId, setSelectedCanchaId] = useState<number | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showPublicQrModal, setShowPublicQrModal] = useState<boolean>(false);
+
+  const cleanWaNumber = useMemo(() => formatWhatsAppNumber(complejo?.telefono), [complejo?.telefono]);
 
   useEffect(() => {
     const fetchClubData = async () => {
@@ -201,35 +213,32 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
               <span className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1 text-xs font-semibold capitalize">
                 🏆 {complejo.deporte_principal}
               </span>
+              {complejo.telefono && (
+                <button
+                  type="button"
+                  onClick={() => setShowPublicQrModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-500/40 px-3.5 py-1 text-xs font-bold transition shadow-sm cursor-pointer"
+                  title="Ver código QR para chatear por WhatsApp"
+                  data-testid="header-qr-button"
+                >
+                  <span>📱</span>
+                  <span>QR WhatsApp</span>
+                </button>
+              )}
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white capitalize">
               {complejo.nombre}
             </h1>
 
-            {(complejo.direccion || complejo.ciudad || complejo.telefono) && (
-              <div className="flex items-center justify-center gap-4 text-xs sm:text-sm text-slate-400 flex-wrap">
-                {(complejo.direccion || complejo.ciudad) && (
-                  <span className="flex items-center gap-1">
-                    <span>📍</span>
-                    <span>
-                      {[complejo.direccion, complejo.ciudad].filter(Boolean).join(", ")}
-                    </span>
+            {(complejo.direccion || complejo.ciudad) && (
+              <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-slate-400 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <span>📍</span>
+                  <span>
+                    {[complejo.direccion, complejo.ciudad].filter(Boolean).join(", ")}
                   </span>
-                )}
-                {complejo.telefono && (
-                  <a
-                    href={`https://wa.me/${complejo.telefono.replace(/\D/g, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 transition text-xs font-semibold shadow-sm cursor-pointer"
-                    title="Abrir chat de WhatsApp con el club"
-                  >
-                    <span>💬</span>
-                    <span>WhatsApp: {complejo.telefono}</span>
-                    <span className="text-[10px]">↗</span>
-                  </a>
-                )}
+                </span>
               </div>
             )}
 
@@ -396,6 +405,100 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
           </a>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Contact Button */}
+      {complejo.telefono && (
+        <aside
+          aria-label="Contacto por WhatsApp"
+          className="fixed bottom-6 right-6 z-50 flex items-center group"
+          data-testid="floating-whatsapp-widget"
+        >
+          <div className="hidden sm:flex items-center bg-slate-900/95 text-white text-xs font-semibold px-3 py-2 rounded-2xl shadow-xl border border-slate-700/80 mr-3 backdrop-blur-sm opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <span>¿Dudas o consultas? <strong className="text-emerald-400">¡Chateá con nosotros!</strong></span>
+          </div>
+          <a
+            href={`https://wa.me/${cleanWaNumber}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative flex items-center justify-center w-14 h-14 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-2xl shadow-emerald-950/60 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
+            title="Abrir chat de WhatsApp"
+            aria-label="Contactar por WhatsApp"
+            data-testid="floating-whatsapp-button"
+          >
+            <svg className="w-8 h-8 fill-current" viewBox="0 0 24 24">
+              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.9-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+            </svg>
+            <span className="absolute -top-1 -right-1 flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+            </span>
+          </a>
+        </aside>
+      )}
+
+      {/* Modal Código QR Público para Celulares */}
+      {showPublicQrModal && complejo.telefono && (
+        <div
+          data-testid="public-qr-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in"
+        >
+          <div className="relative w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl text-center space-y-6">
+            <button
+              type="button"
+              onClick={() => setShowPublicQrModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white text-base p-2 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto text-2xl shadow-inner">
+                💬
+              </div>
+              <h3 className="text-xl font-black text-white">Chateá por WhatsApp</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Apuntá con la <strong className="text-emerald-400">cámara de tu celular</strong> a este código para abrir directamente el chat con <strong>{complejo.nombre}</strong>.
+              </p>
+            </div>
+
+            {/* Código QR */}
+            <div className="p-4 bg-white rounded-2xl inline-block shadow-2xl border border-slate-200">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=https%3A%2F%2Fwa.me%2F${cleanWaNumber}`}
+                alt={`Código QR WhatsApp ${complejo.nombre}`}
+                width={240}
+                height={240}
+                className="w-48 h-48 mx-auto"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="font-mono text-xs text-slate-300 bg-slate-950 border border-slate-800 py-2 px-3 rounded-xl flex items-center justify-center gap-2">
+                <span className="text-emerald-400">wa.me/</span>
+                <span className="font-bold text-white">{cleanWaNumber}</span>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <a
+                  href={`https://wa.me/${cleanWaNumber}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black tracking-wide flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/40 cursor-pointer"
+                >
+                  <span>💬</span> Abrir en WhatsApp Web ↗
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowPublicQrModal(false)}
+                  className="w-full py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

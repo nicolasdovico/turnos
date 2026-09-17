@@ -535,6 +535,26 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getAllByText("Cancha 2 (Rápida)").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/tenis •/i).length).toBeGreaterThanOrEqual(1);
 
+    // Verify floating WhatsApp button
+    const floatingBtn = screen.getByTestId("floating-whatsapp-button");
+    expect(floatingBtn).toBeDefined();
+    expect(floatingBtn.getAttribute("href")).toBe("https://wa.me/5491149790220");
+
+    // Verify header QR button and modal interaction
+    const headerQrBtn = screen.getByTestId("header-qr-button");
+    expect(headerQrBtn).toBeDefined();
+    fireEvent.click(headerQrBtn);
+
+    const publicQrModal = await screen.findByTestId("public-qr-modal");
+    expect(publicQrModal).toBeDefined();
+    expect(screen.getByText(/Chateá por WhatsApp/i)).toBeDefined();
+    expect(screen.getByAltText(/Código QR WhatsApp Nico Tenis/i)).toBeDefined();
+
+    // Close public QR modal
+    const closePublicModalBtn = screen.getByRole("button", { name: "✕" });
+    fireEvent.click(closePublicModalBtn);
+    expect(screen.queryByTestId("public-qr-modal")).toBeNull();
+
     // Switch court
     const court2Btn = screen.getByText("Cancha 2 (Rápida)");
     fireEvent.click(court2Btn);
@@ -1705,13 +1725,17 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     fireEvent.change(telInput, { target: { value: "+54 9 11 4979-0220" } });
     expect(await screen.findByText(/Abrir chat \(wa\.me\/5491149790220\)/i)).toBeDefined();
 
-    // Test opening and closing QR modal
+    // Test opening and closing QR modal with instructions, download and print buttons
     const qrBtn = screen.getByRole("button", { name: /Ver Código QR/i });
     fireEvent.click(qrBtn);
     expect(await screen.findByText(/Código QR de WhatsApp/i)).toBeDefined();
     expect(screen.getByAltText(/Código QR WhatsApp 5491149790220/i)).toBeDefined();
-    const closeQrBtn = screen.getByRole("button", { name: /Cerrar/i });
+    expect(screen.getByText(/Instrucciones de Uso:/i)).toBeDefined();
+    expect(screen.getByRole("button", { name: /Descargar QR \(PNG\)/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Imprimir Cartel/i })).toBeDefined();
+    const closeQrBtn = screen.getByRole("button", { name: "✕" });
     fireEvent.click(closeQrBtn);
+    expect(screen.queryByTestId("admin-qr-modal")).toBeNull();
 
     // Modify remaining values
     fireEvent.change(nombreInput, { target: { value: "Nico Sport & Pádel Center" } });
