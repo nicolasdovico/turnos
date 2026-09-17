@@ -930,4 +930,60 @@ class ClubDashboardTest extends TestCase
             ->getJson('/api/clubs/club-verif-3/clientes/verificar-email?email=test@test.com');
         $resOther->assertStatus(403);
     }
+
+    public function test_actualizar_hora_inicio_luz_en_configuracion_club(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_luz@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Luz Test',
+            'subdominio' => 'club-luz-test',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+            'hora_inicio_luz' => '19:00',
+        ]);
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/club-luz-test/configuracion', [
+                'hora_inicio_luz' => '20:00',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('complejo.hora_inicio_luz', '20:00');
+
+        $this->assertDatabaseHas('complejos', [
+            'id' => $complejo->id,
+            'hora_inicio_luz' => '20:00',
+        ]);
+
+        // Verificar que dashboard también lo retorne
+        $resDash = $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/clubs/club-luz-test/dashboard');
+
+        $resDash->assertStatus(200)
+            ->assertJsonPath('data.complejo.hora_inicio_luz', '20:00');
+    }
+
+    public function test_actualizar_hora_inicio_luz_valida_formato_hora(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_luz_inv@club.com']);
+        Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Luz Inv',
+            'subdominio' => 'club-luz-inv',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/club-luz-inv/configuracion', [
+                'hora_inicio_luz' => '25:99',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['hora_inicio_luz']);
+    }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\BelongsToTenant;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -124,5 +125,109 @@ class Cancha extends Model
         }
 
         return $precioBase;
+    }
+
+    /**
+     * Calcula el precio del turno con luz artificial según la duración en minutos.
+     */
+    public function getPrecioConLuzParaDuracion(int $duracionMinutos): float
+    {
+        if (empty($this->precio_con_luz) || (float) $this->precio_con_luz <= 0) {
+            return $this->getPrecioParaDuracion($duracionMinutos);
+        }
+
+        $baseDuracion = (int) ($this->duracion_minutos ?: 60);
+        $precioLuz = (float) $this->precio_con_luz;
+
+        // Si la duración solicitada coincide con la duración base:
+        if ($duracionMinutos === $baseDuracion) {
+            return $precioLuz;
+        }
+
+        // Prorrateo si la base es de 90 minutos:
+        if ($baseDuracion === 90) {
+            if ($duracionMinutos === 60) {
+                return round(($precioLuz / 90) * 60, 2);
+            }
+            if ($duracionMinutos === 120) {
+                return round(($precioLuz / 90) * 120, 2);
+            }
+        }
+
+        // Prorrateo estándar para canchas base de 60 minutos:
+        if ($duracionMinutos === 90) {
+            return round($precioLuz * 1.5, 2);
+        }
+        if ($duracionMinutos === 120) {
+            return round($precioLuz * 2.0, 2);
+        }
+        if ($duracionMinutos === 30) {
+            return round($precioLuz * 0.5, 2);
+        }
+
+        return $precioLuz;
+    }
+
+    /**
+     * Determina si el horario del turno requiere iluminación artificial según la hora de corte.
+     * Regla estándar: Se aplica tarifa con luz si el turno finaliza después de la hora de corte (hora_fin > hora_inicio_luz)
+     * o si inicia a partir de la hora de corte (hora_inicio >= hora_inicio_luz).
+     */
+    public function requiereLuz(string $horaInicio, ?string $horaFin = null, ?string $horaInicioLuz = '19:00', int $duracionMinutos = 60): bool
+    {
+        if (!$this->iluminacion || empty($this->precio_con_luz) || (float) $this->precio_con_luz <= 0) {
+            return false;
+        }
+
+        $corte = $horaInicioLuz ?: '19:00';
+        $hInicio = substr(trim($horaInicio), 0, 5);
+
+        if (!$horaFin) {
+            try {
+                $horaFin = Carbon::createFromFormat('H:i', $hInicio)->addMinutes($duracionMinutos)->format('H:i');
+            } catch (\Throwable $e) {
+                $horaFin = null;
+            }
+        }
+
+        if ($horaFin) {
+            $hFin = substr(trim($horaFin), 0, 5);
+            return ($hFin > $corte) || ($hInicio >= $corte);
+        }
+
+        return $hInicio >= $corte;
+    }
+
+    /**
+     * Cotiza el turno detallando si aplica luz artificial, precio base, recargo de luz y precio final.
+     */
+    public function calcularCotizacionTurno(int $duracionMinutos, string $horaInicio, ?string $horaFin = null, ?string $horaInicioLuz = '19:00'): array
+    {
+        $precioBase = $this->getPrecioParaDuracion($duracionMinutos);
+        $aplicaLuz = $this->requiereLuz($horaInicio, $horaFin, $horaInicioLuz, $duracionMinutos);
+
+        if ($aplicaLuz) {
+            $precioFinal = $this->getPrecioConLuzParaDuracion($duracionMinutos);
+            $recargoLuz = max(0.0, round($precioFinal - $precioBase, 2));
+        } else {
+            $precioFinal = $precioBase;
+            $recargoLuz = 0.0;
+        }
+
+        return [
+            'precio' => $precioFinal,
+            'aplica_luz' => $aplicaLuz,
+            'precio_base' => $precioBase,
+            'precio_con_luz' => (float) ($this->precio_con_luz ?? 0),
+            'recargo_luz' => $recargoLuz,
+        ];
+    }
+
+    /**
+     * Obtiene el precio final del turno para la duración y horario dados.
+     */
+    public function getPrecioParaTurno(int $duracionMinutos, string $horaInicio, ?string $horaFin = null, ?string $horaInicioLuz = '19:00'): float
+    {
+        return $this->calcularCotizacionTurno($duracionMinutos, $horaInicio, $horaFin, $horaInicioLuz)['precio'];
     }
 }

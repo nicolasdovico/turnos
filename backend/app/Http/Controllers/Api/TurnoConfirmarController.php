@@ -193,7 +193,15 @@ class TurnoConfirmarController extends Controller
         $horaInicioCarbon = Carbon::parse($fechaNormalizada . ' ' . $horaInicioNormalizada);
         $horaFinCarbon = Carbon::parse($fechaNormalizada . ' ' . $horaFinNormalizada);
         $duracionCalculada = (int) $horaInicioCarbon->diffInMinutes($horaFinCarbon);
-        $precioCalculado = $cancha->getPrecioParaDuracion($duracionCalculada > 0 ? $duracionCalculada : (int) ($cancha->duracion_minutos ?: 60));
+        $duracionEfectiva = $duracionCalculada > 0 ? $duracionCalculada : (int) ($cancha->duracion_minutos ?: 60);
+        $horaInicioLuz = $complejo?->hora_inicio_luz ?? '19:00';
+        $cotizacion = $cancha->calcularCotizacionTurno(
+            $duracionEfectiva,
+            $horaInicioNormalizada,
+            $horaFinNormalizada,
+            $horaInicioLuz
+        );
+        $precioCalculado = $cotizacion['precio'];
 
         $precio = isset($validated['precio']) && is_numeric($validated['precio'])
             ? (float) $validated['precio']

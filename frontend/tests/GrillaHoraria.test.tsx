@@ -2636,5 +2636,141 @@ describe("Componente Reactivo GrillaHoraria", () => {
     const stored = JSON.parse(sessionStorage.getItem("confirmed_turnos_61") || "[]");
     expect(stored.length).toBe(0);
   });
+
+  it("muestra badge '💡 Con Luz' en turnos con tarifa nocturna y desglose detallado en modal de confirmacion", async () => {
+    localStorage.setItem("saas_token", "fake-token-luz");
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({ id: 88, name: "Lucas Campagnolo", email: "campa@padel.com" })
+    );
+
+    const testSlots = [
+      {
+        hora_inicio: "18:00",
+        hora_fin: "19:30",
+        duracion_minutos: 90,
+        precio: 10000,
+        tarifa_con_luz: false,
+        precio_base: 10000,
+        recargo_luz: 0,
+        disponible: true,
+      },
+      {
+        hora_inicio: "19:30",
+        hora_fin: "21:00",
+        duracion_minutos: 90,
+        precio: 14000,
+        tarifa_con_luz: true,
+        precio_base: 10000,
+        recargo_luz: 4000,
+        disponible: true,
+      },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              user: {
+                id: 88,
+                name: "Lucas Campagnolo",
+                email: "campa@padel.com",
+              },
+            }),
+        });
+      }
+
+      if (urlStr.includes("/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              hora_inicio_luz: "20:00",
+              porcentaje_sena: 50,
+              slots_disponibles: testSlots,
+              turnos_ocupados: [],
+              turnos_retenidos: [],
+              optimizacion_anti_baches: { activa: false, total_horarios_protegidos: 0, horarios_protegidos: [] },
+            }),
+        });
+      }
+
+      if (urlStr.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              token_reserva: "token-luz-1930",
+              ttl_segundos: 600,
+              expira_en_segundos: 600,
+            }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={75}
+        canchaNombre="Cancha Panoramica 1"
+        deporte="padel"
+        subdomain="nico-padel"
+        fechaInicial="2026-09-14"
+        initialSlots={testSlots}
+        isAdmin={false}
+        porcentajeSena={50}
+      />
+    );
+
+    // 1. Debe renderizar ambos slots
+    await waitFor(() => {
+      expect(screen.getByText("18:00")).toBeDefined();
+      expect(screen.getByText("19:30")).toBeDefined();
+    });
+
+    // 2. El slot de las 19:30 debe tener el badge "💡 Con Luz"
+    expect(screen.getByText(/💡 Con Luz/i)).toBeDefined();
+    expect(screen.getByText(/\$?\s*14[,.]000/)).toBeDefined();
+    expect(screen.getByText(/\$?\s*10[,.]000/)).toBeDefined();
+
+    // 3. Clickear en 19:30 para bloquear el turno
+    const btnSlot1930 = screen.getByRole("button", { name: /Turno 19:30 a 21:00 Disponible/i });
+    fireEvent.click(btnSlot1930);
+
+    // 4. Clickear en "Confirmar Reserva" del banner de turno retenido
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // 5. En el modal de confirmación, debe figurar el modal abierto y la tarifa nocturna con desglose
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva de Turno")).toBeDefined();
+    });
+
+    const nocturnalBanner = screen.getByTestId("nocturnal-tariff-banner");
+    expect(nocturnalBanner).toBeDefined();
+    expect(nocturnalBanner.textContent).toContain("Tarifa Nocturna (Luz artificial incluida)");
+    expect(nocturnalBanner.textContent).toContain("14,000");
+
+    expect(screen.getByText(/Tarifa total del turno \(con luz\):/i)).toBeDefined();
+
+    const senaBreakdown = screen.getByTestId("sena-breakdown");
+    expect(senaBreakdown).toBeDefined();
+    expect(senaBreakdown.textContent).toContain("Seña a Cobrar (50%)");
+    expect(senaBreakdown.textContent).toContain("7,000");
+  });
 });
 

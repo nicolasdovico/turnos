@@ -577,6 +577,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
   });
 
   it("renders and updates payment and cancellation policies in club admin panel", async () => {
+    let putConfigPayload: any = null;
     vi.spyOn(global, "fetch").mockImplementation(async (url: any, options: any) => {
       const urlStr = String(url);
       if (urlStr.includes("is-admin")) {
@@ -586,6 +587,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
         } as any;
       }
       if (urlStr.includes("configuracion") && options?.method === "PUT") {
+        putConfigPayload = JSON.parse(options.body);
         return {
           ok: true,
           json: async () => ({
@@ -598,6 +600,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
               porcentaje_sena: 30,
               horas_limite_cancelacion: 6,
               tipo_cobro_reserva: "sena",
+              hora_inicio_luz: putConfigPayload.hora_inicio_luz,
             },
           }),
         } as any;
@@ -617,6 +620,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
                 horas_limite_cancelacion: 4,
                 tipo_cobro_reserva: "sena",
                 permite_mostrador_publico: true,
+                hora_inicio_luz: "19:00",
               },
               plan: {
                 id: 1,
@@ -656,11 +660,21 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     const btn6hs = screen.getByRole("button", { name: /6 hs/i });
     fireEvent.click(btn6hs);
 
+    // Seasonal lighting card exists
+    expect(screen.getByText(/Horario de Iluminación Artificial \(Temporadas\)/i)).toBeDefined();
+    const veranoBtn = screen.getByRole("button", { name: /Temporada de Verano/i });
+    expect(veranoBtn).toBeDefined();
+    fireEvent.click(veranoBtn);
+
     // Click submit
     const saveBtn = screen.getByRole("button", { name: /Guardar Políticas de Reserva/i });
     fireEvent.click(saveBtn);
 
     expect(await screen.findByText(/Políticas de cobro de seña y cancelación guardadas exitosamente!/i)).toBeDefined();
+    expect(putConfigPayload).not.toBeNull();
+    expect(putConfigPayload.hora_inicio_luz).toBe("20:00");
+    expect(putConfigPayload.porcentaje_sena).toBe(30);
+    expect(putConfigPayload.horas_limite_cancelacion).toBe(6);
   });
 
   it("renders and updates weekly business hours in club admin panel", async () => {

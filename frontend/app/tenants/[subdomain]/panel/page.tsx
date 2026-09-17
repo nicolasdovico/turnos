@@ -22,6 +22,7 @@ interface ComplejoData {
   porcentaje_sena?: number;
   horas_limite_cancelacion?: number;
   permite_mostrador_publico?: boolean;
+  hora_inicio_luz?: string;
   owner: { id: number; name: string; email: string } | null;
 }
 
@@ -438,6 +439,7 @@ export default function ClubAdminPanel() {
   const [porcentajeSena, setPorcentajeSena] = useState<number>(50);
   const [horasLimiteCancelacion, setHorasLimiteCancelacion] = useState<number>(4);
   const [permiteMostradorPublico, setPermiteMostradorPublico] = useState<boolean>(true);
+  const [horaInicioLuz, setHoraInicioLuz] = useState<string>("19:00");
   const [isSavingPoliticas, setIsSavingPoliticas] = useState(false);
   const [isPoliticasDirty, setIsPoliticasDirty] = useState(false);
   const isPoliticasDirtyRef = React.useRef<boolean>(false);
@@ -629,6 +631,9 @@ export default function ClubAdminPanel() {
           }
           if (data.data.complejo.permite_mostrador_publico !== undefined) {
             setPermiteMostradorPublico(Boolean(data.data.complejo.permite_mostrador_publico));
+          }
+          if (data.data.complejo.hora_inicio_luz) {
+            setHoraInicioLuz(data.data.complejo.hora_inicio_luz.substring(0, 5));
           }
         }
       }
@@ -1135,6 +1140,7 @@ export default function ClubAdminPanel() {
           porcentaje_sena: porcentajeSena,
           horas_limite_cancelacion: horasLimiteCancelacion,
           permite_mostrador_publico: permiteMostradorPublico,
+          hora_inicio_luz: horaInicioLuz,
         }),
       });
 
@@ -1180,6 +1186,12 @@ export default function ClubAdminPanel() {
     isPoliticasDirtyRef.current = true;
   };
 
+  const updateHoraInicioLuz = (val: string) => {
+    setHoraInicioLuz(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
   const descartarCambiosPoliticas = () => {
     if (complejo) {
       if (complejo.tipo_cobro_reserva) {
@@ -1193,6 +1205,9 @@ export default function ClubAdminPanel() {
       }
       if (complejo.permite_mostrador_publico !== undefined) {
         setPermiteMostradorPublico(Boolean(complejo.permite_mostrador_publico));
+      }
+      if (complejo.hora_inicio_luz) {
+        setHoraInicioLuz(complejo.hora_inicio_luz.substring(0, 5));
       }
     }
     setIsPoliticasDirty(false);
@@ -4259,10 +4274,124 @@ export default function ClubAdminPanel() {
                 </div>
               </div>
 
-              {/* Card 4: Mostrador Presencial */}
+              {/* Card 4: Horario de Iluminación Artificial & Temporadas */}
+              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20 text-xl">
+                      💡
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">4. Horario de Iluminación Artificial (Temporadas)</h3>
+                      <p className="text-xs text-slate-400">
+                        Ajusta la hora a partir de la cual el turno pasa a tarifa con luz artificial
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xl font-black text-amber-400 font-mono bg-amber-950/80 px-4 py-1.5 rounded-2xl border border-amber-500/30 self-start sm:self-auto">
+                    {horaInicioLuz} hs
+                  </span>
+                </div>
+
+                {/* Presets & Custom Picker */}
+                <div className="space-y-4 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => updateHoraInicioLuz("20:00")}
+                      className={`p-4 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                        horaInicioLuz === "20:00"
+                          ? "bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/50 shadow-lg"
+                          : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-sm">☀️ Temporada de Verano</span>
+                        <span className="text-xs font-mono font-bold text-amber-400">20:00 hs</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-2">
+                        Días largos. Se enciende más tarde para aprovechar la luz natural.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateHoraInicioLuz("18:00")}
+                      className={`p-4 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                        horaInicioLuz === "18:00"
+                          ? "bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/50 shadow-lg"
+                          : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-sm">❄️ Temporada de Invierno</span>
+                        <span className="text-xs font-mono font-bold text-amber-400">18:00 hs</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-2">
+                        Días cortos. Oscurece temprano y se requiere iluminación desde la tarde.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => updateHoraInicioLuz("19:00")}
+                      className={`p-4 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                        horaInicioLuz === "19:00"
+                          ? "bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/50 shadow-lg"
+                          : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white text-sm">🍂 Media Estación</span>
+                        <span className="text-xs font-mono font-bold text-amber-400">19:00 hs</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-2">
+                        Otoño / Primavera. Horario intermedio de transición estacional.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Manual Time Picker */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-slate-950 border border-slate-800/80 gap-3">
+                    <div className="text-xs text-slate-300">
+                      <span className="font-bold text-white">⚙️ Horario Personalizado: </span>
+                      <span className="text-slate-400">Si tu club enciende los reflectores a una hora exacta distinta:</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        aria-label="Horario personalizado de corte de luz"
+                        value={horaInicioLuz}
+                        onChange={(e) => updateHoraInicioLuz(e.target.value)}
+                        className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Info / Rule details */}
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 space-y-1.5">
+                    <div className="font-bold flex items-center gap-1.5 text-amber-300">
+                      <span>✨</span> Regla de Tarifas Automática:
+                    </div>
+                    <ul className="space-y-1 text-[11px] list-disc list-inside text-amber-200/80">
+                      <li>
+                        Todo turno que <strong>finalice después de las {horaInicioLuz} hs</strong> (o inicie a partir de dicha hora) se cotizará automáticamente con el <strong>Precio con Luz</strong> de la cancha.
+                      </li>
+                      <li>
+                        El porcentaje de seña configurado se calculará automáticamente sobre la tarifa con luz y el saldo pendiente en el club se actualizará solo.
+                      </li>
+                      <li>
+                        Canchas que no tengan configurado &apos;Precio con Luz&apos; (o techadas con precio único) mantendrán siempre su precio base.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 5: Mostrador Presencial */}
               <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex items-center justify-between">
                 <div className="space-y-1 pr-4">
-                  <div className="font-bold text-sm text-white">Permitir Pago en Mostrador para Clientes Públicos</div>
+                  <div className="font-bold text-sm text-white">5. Permitir Pago en Mostrador para Clientes Públicos</div>
                   <p className="text-xs text-slate-400">
                     Si está activo, los jugadores pueden optar por reservar online y abonar presencialmente sin tarjeta previa.
                   </p>

@@ -107,8 +107,7 @@ class DisponibilidadService
             $duracionMinutos = $cancha->duracion_minutos ?: ($horario->duracion_turno_minutos ?: 60);
         }
 
-        // Calculate price for this duration
-        $precio = $cancha->getPrecioParaDuracion($duracionMinutos);
+        $horaInicioLuz = $cancha->complejo?->hora_inicio_luz ?? '19:00';
 
         $horaApertura = Carbon::parse($fecha . ' ' . $horario->hora_apertura, $timezone);
         $horaCierre = Carbon::parse($fecha . ' ' . $horario->hora_cierre, $timezone);
@@ -145,6 +144,9 @@ class DisponibilidadService
             }
             $horaFinFormatted = $slotEnd->format('H:i');
 
+            $cotizacionSlot = $cancha->calcularCotizacionTurno($duracionMinutos, $horaInicioFormatted, $horaFinFormatted, $horaInicioLuz);
+            $precioSlot = $cotizacionSlot['precio'];
+
             // 1. Check if overlaps with any occupied turno in DB
             $startTs = $currentSlotStart->timestamp;
             $endTs = $slotEnd->timestamp;
@@ -170,14 +172,24 @@ class DisponibilidadService
             if ($estaBloqueadoEnRedis && !$estaOcupadoEnDb && $overlappingLock) {
                 $alreadyInRetenidos = collect($turnosRetenidos)->contains(fn ($r) => $r['hora_inicio'] === $overlappingLock['hora_inicio']);
                 if (!$alreadyInRetenidos) {
+                    $durLock = $overlappingLock['duracion_minutos'] ?? $duracionMinutos;
+                    $cotLock = $cancha->calcularCotizacionTurno(
+                        $durLock,
+                        $overlappingLock['hora_inicio'],
+                        $overlappingLock['hora_fin'],
+                        $horaInicioLuz
+                    );
                     $turnosRetenidos[] = [
                         'cancha_id' => $canchaId,
                         'cancha_nombre' => $cancha->nombre,
                         'fecha' => $fechaCarbon->format('Y-m-d'),
                         'hora_inicio' => $overlappingLock['hora_inicio'],
                         'hora_fin' => $overlappingLock['hora_fin'],
-                        'duracion_minutos' => $overlappingLock['duracion_minutos'] ?? $duracionMinutos,
-                        'precio' => $precio,
+                        'duracion_minutos' => $durLock,
+                        'precio' => $cotLock['precio'],
+                        'tarifa_con_luz' => $cotLock['aplica_luz'],
+                        'precio_base' => $cotLock['precio_base'],
+                        'recargo_luz' => $cotLock['recargo_luz'],
                         'ttl_segundos' => $overlappingLock['ttl'] ?? 600,
                         'expira_en_segundos' => $overlappingLock['ttl'] ?? 600,
                         'token_reserva' => $overlappingLock['token'] ?? null,
@@ -253,7 +265,10 @@ class DisponibilidadService
                         'hora_inicio' => $horaInicioFormatted,
                         'hora_fin' => $horaFinFormatted,
                         'duracion_minutos' => $duracionMinutos,
-                        'precio' => $precio,
+                        'precio' => $precioSlot,
+                        'tarifa_con_luz' => $cotizacionSlot['aplica_luz'],
+                        'precio_base' => $cotizacionSlot['precio_base'],
+                        'recargo_luz' => $cotizacionSlot['recargo_luz'],
                         'estado' => 'disponible',
                         'disponible' => true,
                     ];
@@ -282,14 +297,24 @@ class DisponibilidadService
 
             $alreadyInRetenidos = collect($turnosRetenidos)->contains(fn ($r) => $r['hora_inicio'] === $lock['hora_inicio']);
             if (!$alreadyInRetenidos) {
+                $durLock = $lock['duracion_minutos'] ?? $duracionMinutos;
+                $cotLock = $cancha->calcularCotizacionTurno(
+                    $durLock,
+                    $lock['hora_inicio'],
+                    $lock['hora_fin'],
+                    $horaInicioLuz
+                );
                 $turnosRetenidos[] = [
                     'cancha_id' => $canchaId,
                     'cancha_nombre' => $cancha->nombre,
                     'fecha' => $fechaCarbon->format('Y-m-d'),
                     'hora_inicio' => $lock['hora_inicio'],
                     'hora_fin' => $lock['hora_fin'],
-                    'duracion_minutos' => $lock['duracion_minutos'] ?? $duracionMinutos,
-                    'precio' => $precio,
+                    'duracion_minutos' => $durLock,
+                    'precio' => $cotLock['precio'],
+                    'tarifa_con_luz' => $cotLock['aplica_luz'],
+                    'precio_base' => $cotLock['precio_base'],
+                    'recargo_luz' => $cotLock['recargo_luz'],
                     'ttl_segundos' => $lock['ttl'] ?? 600,
                     'expira_en_segundos' => $lock['ttl'] ?? 600,
                     'token_reserva' => $lock['token'] ?? null,
@@ -326,17 +351,15 @@ class DisponibilidadService
 
             $data = [
                 'id' => $t->id,
-                'cancha_id' => $t->cancha_id,
-                'fecha' => is_string($t->fecha) ? $t->fecha : $t->fecha->format('Y-m-d'),
                 'hora_inicio' => Carbon::parse($t->hora_inicio)->format('H:i'),
-                'hora_fin' => Carbon::parse($t->hora_fin)->format('H:i'),
-                'duracion_minutos' => Carbon::parse($t->hora_inicio)->diffInMinutes(Carbon::parse($t->hora_fin)),
+                'hora_fin' => $t->hora_fin ? Carbon::parse($t->hora_fin)->format('H:i') : null,
+                'duracion_minutos' => $t->duracion_minutos ?: $cancha->duracion_minutos,
                 'precio' => $precio,
                 'monto_pagado' => $montoPagado,
                 'saldo_pendiente' => $saldoPendiente,
-                'estado_pago' => $estadoPago,
-                'metodo_pago' => $t->metodo_pago ?? 'mostrador',
                 'estado' => $t->estado,
+                'estado_pago' => $t->estado_pago ?: 'pendiente',
+                'metodo_pago' => $t->metodo_pago ?: 'mostrador',
                 'es_fijo' => (bool) $t->es_fijo,
             ];
 
@@ -361,6 +384,7 @@ class DisponibilidadService
             'slots' => $slotsDisponibles,
             'turnos_ocupados' => $turnosOcupadosData,
             'turnos_retenidos' => $turnosRetenidos,
+            'hora_inicio_luz' => $horaInicioLuz,
             'complejo_cerrado' => false,
             'optimizacion_anti_baches' => [
                 'activa' => $antiBachesActivo,

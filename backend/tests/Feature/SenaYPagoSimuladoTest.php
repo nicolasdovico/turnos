@@ -560,5 +560,144 @@ class SenaYPagoSimuladoTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    public function test_disponibilidad_y_confirmacion_con_tarifa_estacional_luz(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 08:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $this->complejo->update([
+            'hora_inicio_luz' => '20:00',
+            'porcentaje_sena' => 50.00,
+        ]);
+
+        $canchaLuz = Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha 3 - Panorámica Pro',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 10000.00,
+            'precio_con_luz' => 14000.00,
+            'iluminacion' => true,
+            'duracion_minutos' => 90,
+            'permite_duracion_flexible' => false,
+            'estado' => 'activo',
+        ]);
+
+        // Verificar disponibilidad
+        $responseDisp = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->getJson("/api/canchas/{$canchaLuz->id}/disponibilidad?fecha=2026-08-31");
+
+        $responseDisp->assertStatus(200);
+        $responseDisp->assertJsonPath('hora_inicio_luz', '20:00');
+        $responseDisp->assertJsonPath('precio_base', 10000);
+        $responseDisp->assertJsonPath('precio_con_luz', 14000);
+
+        $slots = collect($responseDisp->json('slots_disponibles'));
+        $this->assertNotEmpty($slots);
+
+        // Turno diurno: 18:00 a 19:30 (finaliza <= 20:00)
+        $slotDiurno = $slots->firstWhere('hora_inicio', '18:00');
+        if ($slotDiurno) {
+            $this->assertEquals(10000, $slotDiurno['precio']);
+            $this->assertFalse($slotDiurno['tarifa_con_luz']);
+            $this->assertEquals(0, $slotDiurno['recargo_luz']);
+        }
+
+        // Turno que cruza la hora de corte: 19:30 a 21:00 (finaliza a las 21:00 > 20:00)
+        $slotCruza = $slots->firstWhere('hora_inicio', '19:30');
+        if ($slotCruza) {
+            $this->assertEquals(14000, $slotCruza['precio']);
+            $this->assertTrue($slotCruza['tarifa_con_luz']);
+            $this->assertEquals(4000, $slotCruza['recargo_luz']);
+        }
+
+        // Confirmar reserva en turno nocturno (19:30 a 21:00) con seña 50%
+        $responseConfirmar = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $canchaLuz->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '19:30',
+                'hora_fin' => '21:00',
+                'metodo_pago' => 'simulador_dev',
+                'modalidad_pago' => 'sena',
+            ]);
+
+        $responseConfirmar->assertStatus(200);
+        $responseConfirmar->assertJson([
+            'success' => true,
+            'turno' => [
+                'precio' => '14000.00',
+                'monto_pagado' => '7000.00',
+                'saldo_pendiente' => '7000.00',
+                'estado_pago' => 'senado',
+                'estado' => 'reservado',
+            ],
+        ]);
+
+        // Confirmar reserva en turno diurno (10:00 a 11:30) con seña 50%
+        $responseConfirmarDiurno = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $canchaLuz->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '11:30',
+                'metodo_pago' => 'simulador_dev',
+                'modalidad_pago' => 'sena',
+            ]);
+
+        $responseConfirmarDiurno->assertStatus(200);
+        $responseConfirmarDiurno->assertJson([
+            'success' => true,
+            'turno' => [
+                'precio' => '10000.00',
+                'monto_pagado' => '5000.00',
+                'saldo_pendiente' => '5000.00',
+                'estado_pago' => 'senado',
+                'estado' => 'reservado',
+            ],
+        ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_cancha_sin_precio_con_luz_o_techada_conserva_precio_base(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-31 08:00:00', 'America/Argentina/Buenos_Aires'));
+
+        $this->complejo->update([
+            'hora_inicio_luz' => '20:00',
+        ]);
+
+        $canchaTechada = Cancha::create([
+            'complejo_id' => $this->complejo->id,
+            'nombre' => 'Cancha Techada Indoor',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 12000.00,
+            'precio_con_luz' => null,
+            'techada' => true,
+            'duracion_minutos' => 90,
+            'permite_duracion_flexible' => false,
+            'estado' => 'activo',
+        ]);
+
+        $responseDisp = $this->withHeader('X-Tenant-ID', (string) $this->complejo->id)
+            ->actingAs($this->cliente)
+            ->getJson("/api/canchas/{$canchaTechada->id}/disponibilidad?fecha=2026-08-31");
+
+        $responseDisp->assertStatus(200);
+        $slots = collect($responseDisp->json('slots_disponibles'));
+        $slotNoche = $slots->firstWhere('hora_inicio', '21:00');
+        if ($slotNoche) {
+            $this->assertEquals(12000, $slotNoche['precio']);
+            $this->assertFalse($slotNoche['tarifa_con_luz']);
+            $this->assertEquals(0, $slotNoche['recargo_luz']);
+        }
+
+        Carbon::setTestNow();
+    }
 }
 

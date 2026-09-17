@@ -9,6 +9,9 @@ export interface Slot {
   hora_fin: string;
   disponible: boolean;
   precio?: number;
+  tarifa_con_luz?: boolean;
+  precio_base?: number;
+  recargo_luz?: number;
   es_fijo?: boolean;
   duracion_minutos?: number;
 }
@@ -44,6 +47,9 @@ export interface ActiveLock {
   ttlSeconds: number;
   expiresAt: number;
   precio: number;
+  tarifaConLuz?: boolean;
+  precioBase?: number;
+  recargoLuz?: number;
 }
 
 export interface ToastMessage {
@@ -71,6 +77,9 @@ export interface RetainedLock {
   hora_fin: string;
   duracion_minutos?: number;
   precio?: number;
+  tarifa_con_luz?: boolean;
+  precio_base?: number;
+  recargo_luz?: number;
   ttl_segundos: number;
   expira_en_segundos?: number;
   token_reserva?: string;
@@ -865,6 +874,9 @@ export default function GrillaHoraria({
               ? Boolean(s.disponible)
               : s.estado === "disponible" || s.estado === undefined,
           precio: s.precio ? Number(s.precio) : undefined,
+          tarifa_con_luz: Boolean(s.tarifa_con_luz),
+          precio_base: s.precio_base ? Number(s.precio_base) : undefined,
+          recargo_luz: s.recargo_luz ? Number(s.recargo_luz) : undefined,
           duracion_minutos: s.duracion_minutos ? Number(s.duracion_minutos) : undefined,
           es_fijo: Boolean(s.es_fijo),
         }));
@@ -1641,6 +1653,7 @@ export default function GrillaHoraria({
         const ttl = Math.max(0, Math.floor((ml.expiresAt - now) / 1000));
         const existing = map.get(hora);
         map.set(hora, {
+          ...existing,
           cancha_id: ml.canchaId,
           cancha_nombre: canchaNombre,
           fecha: ml.fecha,
@@ -1648,8 +1661,10 @@ export default function GrillaHoraria({
           hora_fin: (ml.horaFin || "").substring(0, 5),
           duracion_minutos: ml.duracionMinutos || duracion,
           precio: ml.precio,
+          tarifa_con_luz: ml.tarifaConLuz ?? existing?.tarifa_con_luz,
+          precio_base: ml.precioBase ?? existing?.precio_base,
+          recargo_luz: ml.recargoLuz ?? existing?.recargo_luz,
           token_reserva: ml.tokenReserva,
-          ...existing,
           is_mine: true,
           ttl_segundos: ttl,
         });
@@ -1663,6 +1678,7 @@ export default function GrillaHoraria({
         const ttl = Math.max(0, Math.floor((activeLock.expiresAt - now) / 1000));
         const existing = map.get(hora);
         map.set(hora, {
+          ...existing,
           cancha_id: activeLock.canchaId,
           cancha_nombre: canchaNombre,
           fecha: activeLock.fecha,
@@ -1670,8 +1686,10 @@ export default function GrillaHoraria({
           hora_fin: (activeLock.horaFin || "").substring(0, 5),
           duracion_minutos: activeLock.duracionMinutos || duracion,
           precio: activeLock.precio,
+          tarifa_con_luz: activeLock.tarifaConLuz ?? existing?.tarifa_con_luz,
+          precio_base: activeLock.precioBase ?? existing?.precio_base,
+          recargo_luz: activeLock.recargoLuz ?? existing?.recargo_luz,
           token_reserva: activeLock.tokenReserva,
-          ...existing,
           is_mine: true,
           ttl_segundos: ttl,
         });
@@ -1845,6 +1863,9 @@ export default function GrillaHoraria({
         ttlSeconds: ttl,
         expiresAt,
         precio: slot.precio || 0,
+        tarifaConLuz: Boolean(slot.tarifa_con_luz),
+        precioBase: slot.precio_base,
+        recargoLuz: slot.recargo_luz,
       };
 
       setActiveLock(newLock);
@@ -2536,6 +2557,9 @@ export default function GrillaHoraria({
                             ttlSeconds: currentTtl,
                             expiresAt: Date.now() + currentTtl * 1000,
                             precio: lock.precio || 0,
+                            tarifaConLuz: Boolean(lock.tarifa_con_luz ?? activeLock?.tarifaConLuz),
+                            precioBase: lock.precio_base ?? activeLock?.precioBase,
+                            recargoLuz: lock.recargo_luz ?? activeLock?.recargoLuz,
                           };
                           setActiveLock(selectedLock);
                           if (onConfirmSuccess) {
@@ -2680,9 +2704,19 @@ export default function GrillaHoraria({
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                               </span>
                             ) : (
-                              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                Libre
-                              </span>
+                              <div className="flex items-center gap-1">
+                                {slot.tarifa_con_luz && (
+                                  <span
+                                    title="Tarifa con luz artificial incluida"
+                                    className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-0.5"
+                                  >
+                                    💡 Con Luz
+                                  </span>
+                                )}
+                                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                  Libre
+                                </span>
+                              </div>
                             )}
                           </div>
 
@@ -3816,8 +3850,23 @@ export default function GrillaHoraria({
                   )}
 
                   <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                    {activeLock.tarifaConLuz && (
+                      <div
+                        data-testid="nocturnal-tariff-banner"
+                        className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300"
+                      >
+                        <span className="flex items-center gap-1.5 font-bold">
+                          <span>💡</span> Tarifa Nocturna (Luz artificial incluida)
+                        </span>
+                        <span className="font-mono font-extrabold text-amber-200">
+                          ${tarifaTotal.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-400">Tarifa total del turno:</span>
+                      <span className="text-slate-400">
+                        {activeLock.tarifaConLuz ? "Tarifa total del turno (con luz):" : "Tarifa total del turno:"}
+                      </span>
                       <span className="font-bold text-slate-300">${tarifaTotal.toLocaleString()}</span>
                     </div>
                     <div data-testid="sena-breakdown" className="flex justify-between items-center text-xs bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">

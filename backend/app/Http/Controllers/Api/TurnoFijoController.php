@@ -103,7 +103,12 @@ class TurnoFijoController extends Controller
             ], 422);
         }
 
-        $precio = $validated['precio'] ?? (float) $cancha->precio_base;
+        $duracionMinutos = (int) Carbon::parse($horaInicioNormalizada)->diffInMinutes(Carbon::parse($horaFinNormalizada));
+        $horaInicioLuz = $cancha->complejo?->hora_inicio_luz ?? '19:00';
+        $precioCalculado = $cancha->getPrecioParaTurno($duracionMinutos > 0 ? $duracionMinutos : 60, $horaInicioNormalizada, $horaFinNormalizada, $horaInicioLuz);
+        $precio = isset($validated['precio']) && is_numeric($validated['precio'])
+            ? (float) $validated['precio']
+            : $precioCalculado;
         $clienteId = $validated['cliente_id'];
 
         // Build list of dates for the recurring series

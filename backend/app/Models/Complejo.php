@@ -35,6 +35,7 @@ class Complejo extends Model
         'monto_sena_fijo',
         'permite_mostrador_publico',
         'horas_limite_cancelacion',
+        'hora_inicio_luz',
     ];
 
     protected function casts(): array

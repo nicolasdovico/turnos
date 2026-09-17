@@ -120,6 +120,7 @@ class ClubDashboardController extends Controller
                     'monto_sena_fijo' => $complejo->monto_sena_fijo ? (float) $complejo->monto_sena_fijo : null,
                     'horas_limite_cancelacion' => (int) ($complejo->horas_limite_cancelacion ?? 4),
                     'permite_mostrador_publico' => (bool) ($complejo->permite_mostrador_publico ?? true),
+                    'hora_inicio_luz' => $complejo->hora_inicio_luz ? substr($complejo->hora_inicio_luz, 0, 5) : '19:00',
                     'created_at' => $complejo->created_at,
                     'owner' => $complejo->owner ? [
                         'id' => $complejo->owner->id,
@@ -759,6 +760,7 @@ class ClubDashboardController extends Controller
             'monto_sena_fijo' => 'nullable|numeric|min:0',
             'horas_limite_cancelacion' => 'nullable|integer|min:0|max:72',
             'permite_mostrador_publico' => 'nullable|boolean',
+            'hora_inicio_luz' => ['nullable', 'string', 'regex:/^([01][0-9]|2[0-3]):[0-5][0-9]$/'],
         ]);
 
         $updateData = [];
@@ -796,6 +798,7 @@ class ClubDashboardController extends Controller
                 'monto_sena_fijo' => $complejo->monto_sena_fijo ? (float) $complejo->monto_sena_fijo : null,
                 'horas_limite_cancelacion' => (int) ($complejo->horas_limite_cancelacion ?? 4),
                 'permite_mostrador_publico' => (bool) ($complejo->permite_mostrador_publico ?? true),
+                'hora_inicio_luz' => $complejo->hora_inicio_luz ? substr($complejo->hora_inicio_luz, 0, 5) : '19:00',
             ],
         ]);
     }
