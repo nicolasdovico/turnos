@@ -1774,5 +1774,38 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - `supports variable duration courts and checks future casual reservation conflicts in modal`: valida visibilidad condicional del select de duración, actualización de precios y badge, y bloqueo del botón submit con banner de advertencia ante conflicto con cliente casual.
     - Suite completa Frontend: 66/66 tests pasados al 100% (4 suites).
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-17] - EDICIÓN INTEGRAL DE DATOS INSTITUCIONALES DEL CLUB EN PANEL ADMINISTRATIVO
+-------------------------------------------------------------------------------
+- Diagnóstico y Requerimiento:
+  * En el panel de administración (`/panel`), solapa "📋 Datos del Club", la sección exhibía exclusivamente datos estáticos de solo lectura sin posibilidad de editar el nombre, teléfono de contacto, ciudad, dirección, deporte principal o tipo de establecimiento.
+  * Se requería implementar un formulario de edición reactivo y seguro que preserve los identificadores inmutables de multi-tenancy (subdominio canónico, UUID, titular y plan) e impida la pérdida de cambios accidentales por revalidaciones en segundo plano.
+- Soluciones Implementadas:
+  * Backend (Laravel 11):
+    - `ClubDashboardController::updateConfiguracion`:
+      * Validación de `'deporte_principal' => 'nullable|string|max:50'` y `'tipo_negocio_id' => 'nullable|integer|exists:tipos_negocio,id'`.
+      * Persistencia en el modelo `Complejo` y recarga de relación `tipoNegocio`.
+      * Enriquecimiento del payload de respuesta JSON retornando `complejo` con `uuid`, `deporte_principal` y objeto `tipo_negocio` (`id`, `nombre`, `slug`).
+    - `ClubDashboardController::show`:
+      * Incorporación de `'tipos_negocio'` en la respuesta de dashboard para poblar dinámicamente el selector del frontend sin requests adicionales.
+  * Frontend Web (Next.js 14):
+    - `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+      * Estados reactivos para los campos editables (`clubNombre`, `clubTelefono`, `clubCiudad`, `clubDireccion`, `clubDeportePrincipal`, `clubTipoNegocioId`).
+      * Control de cambios pendientes (*dirty tracking*) mediante `isClubDataDirty` y `isClubDataDirtyRef` para evitar que el polling en segundo plano (30s) o el foco de la ventana sobreescriban modificaciones no guardadas.
+      * Integración de `isClubDataDirtyRef` en el listener `beforeunload` para advertir si el usuario intenta cerrar o recargar la pestaña.
+      * Formulario de edición con inputs estilizados, select de deportes (`Pádel`, `Tenis`, `Fútbol 11`, `Fútbol 5`, `Fútbol 7`, `Básquetbol`, `Gimnasio`, `Multideporte`) y select de tipo de establecimiento (`Club`, `Complejo`, `Gimnasio`).
+      * Bloque de parámetros protegidos del sistema con insignia "Solo Lectura" y candados: Subdominio canónico, UUID, Administrador y Plan.
+      * Botón "Descartar cambios" para restablecer valores originales y botón "💾 Guardar Datos del Club" con feedback visual de guardado.
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (`tests/Feature/ClubDashboardTest.php`):
+    - Nuevo test unitario `test_club_owner_can_update_institutional_club_data` validando actualización completa de `nombre`, `telefono`, `ciudad`, `direccion`, `deporte_principal` y `tipo_negocio_id`, persistencia en PostgreSQL y respuesta HTTP 200 con relaciones.
+    - Suite completa Backend: 195/195 tests pasados al 100% (1065 aserciones).
+  * Frontend (`tests/authAndOnboarding.test.tsx`):
+    - Nuevo test de integración `renders and updates institutional club data in club admin panel` verificando navegación a la pestaña, carga de datos iniciales, edición de campos, activación de indicador de cambios pendientes, envío de payload PUT y mensaje toast de éxito.
+    - Suite completa Frontend: 67/67 tests pasados al 100% (4 suites).
+    - Next.js 14 Production Build: `npm run build` exitoso (11/11 páginas estáticas generadas, 0 errores).
+  * Frontend Mobile: 20/20 tests Jest pasados al 100% (4 suites).
+===============================================================================
+
 
 

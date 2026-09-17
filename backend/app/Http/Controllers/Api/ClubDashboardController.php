@@ -141,6 +141,9 @@ class ClubDashboardController extends Controller
                     'total_turnos' => $totalTurnos,
                     'modulos_count' => count($modulosActivos),
                 ],
+                'tipos_negocio' => \App\Models\TipoNegocio::where('esta_activo', true)
+                    ->orderBy('id', 'asc')
+                    ->get(['id', 'nombre', 'slug']),
             ],
         ]);
     }
@@ -732,6 +735,8 @@ class ClubDashboardController extends Controller
             'telefono' => 'nullable|string|max:50',
             'ciudad' => 'nullable|string|max:100',
             'direccion' => 'nullable|string|max:255',
+            'deporte_principal' => 'nullable|string|max:50',
+            'tipo_negocio_id' => 'nullable|integer|exists:tipos_negocio,id',
             'tipo_cobro_reserva' => 'nullable|string|in:sena,total,ninguno',
             'porcentaje_sena' => 'nullable|numeric|min:10|max:100',
             'monto_sena_fijo' => 'nullable|numeric|min:0',
@@ -750,21 +755,30 @@ class ClubDashboardController extends Controller
             $complejo->update($updateData);
         }
 
+        $complejo->load('tipoNegocio');
+
         return response()->json([
             'success' => true,
-            'message' => 'Políticas y configuración del club actualizadas exitosamente.',
+            'message' => 'Datos y configuración del club actualizados exitosamente.',
             'complejo' => [
                 'id' => $complejo->id,
+                'uuid' => $complejo->uuid,
                 'nombre' => $complejo->nombre,
                 'subdominio' => $complejo->subdominio,
+                'tipo_negocio' => $complejo->tipoNegocio ? [
+                    'id' => $complejo->tipoNegocio->id,
+                    'nombre' => $complejo->tipoNegocio->nombre,
+                    'slug' => $complejo->tipoNegocio->slug,
+                ] : null,
+                'deporte_principal' => $complejo->deporte_principal ?? 'padel',
+                'telefono' => $complejo->telefono,
+                'ciudad' => $complejo->ciudad,
+                'direccion' => $complejo->direccion,
                 'tipo_cobro_reserva' => $complejo->tipo_cobro_reserva ?? 'sena',
                 'porcentaje_sena' => (float) ($complejo->porcentaje_sena ?? 50.00),
                 'monto_sena_fijo' => $complejo->monto_sena_fijo ? (float) $complejo->monto_sena_fijo : null,
                 'horas_limite_cancelacion' => (int) ($complejo->horas_limite_cancelacion ?? 4),
                 'permite_mostrador_publico' => (bool) ($complejo->permite_mostrador_publico ?? true),
-                'telefono' => $complejo->telefono,
-                'ciudad' => $complejo->ciudad,
-                'direccion' => $complejo->direccion,
             ],
         ]);
     }

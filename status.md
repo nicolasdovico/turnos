@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Lista de Espera Inteligente Multicanal con Evolution API WhatsApp & Email Mailpit 100% Operativa)
-- **Última Actualización:** 2026-09-15 (Soporte de canchas con duración flexible en turnos fijos (60/90/120 min) con tarifas dinámicas y verificación previa en tiempo real contra colisiones con reservas casuales y turnos fijos futuros; 194 tests backend y 66 frontend web al 100% en verde).
+- **Última Actualización:** 2026-09-17 (Edición integral y segura de Datos del Club desde el panel de administración (/panel) con formulario reactivo, control de cambios pendientes (dirty tracking), soporte para deporte principal y tipo de establecimiento en backend; 195 tests backend, 67 tests frontend web y 20 tests mobile al 100% en verde).
 
 ---
 

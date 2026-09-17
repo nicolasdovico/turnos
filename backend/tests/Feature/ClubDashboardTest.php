@@ -28,6 +28,7 @@ class ClubDashboardTest extends TestCase
         $this->seed([
             ModuloSeeder::class,
             PlanSeeder::class,
+            \Database\Seeders\TipoNegocioSeeder::class,
         ]);
     }
 
@@ -175,6 +176,60 @@ class ClubDashboardTest extends TestCase
             'porcentaje_sena' => 30.00,
             'horas_limite_cancelacion' => 6,
             'permite_mostrador_publico' => false,
+        ]);
+    }
+
+    public function test_club_owner_can_update_institutional_club_data(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Nicolás Dueño',
+            'email' => 'nico@datosclub.com',
+        ]);
+
+        $tipoComplejo = \App\Models\TipoNegocio::where('slug', 'complejo')->first();
+
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Nico Pádel Antiguo',
+            'subdominio' => 'nico-datos-club',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'telefono' => '11223344',
+            'ciudad' => 'Luján',
+            'direccion' => 'Calle Vieja 123',
+            'estado' => 'activo',
+        ]);
+
+        $payload = [
+            'nombre' => 'Nico Sport & Pádel Center',
+            'telefono' => '+54 9 11 4979-0220',
+            'ciudad' => 'Mercedes',
+            'direccion' => 'Av. Siempre Viva 742',
+            'deporte_principal' => 'tenis',
+            'tipo_negocio_id' => $tipoComplejo->id,
+        ];
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-datos-club/configuracion', $payload);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('complejo.nombre', 'Nico Sport & Pádel Center')
+            ->assertJsonPath('complejo.telefono', '+54 9 11 4979-0220')
+            ->assertJsonPath('complejo.ciudad', 'Mercedes')
+            ->assertJsonPath('complejo.direccion', 'Av. Siempre Viva 742')
+            ->assertJsonPath('complejo.deporte_principal', 'tenis')
+            ->assertJsonPath('complejo.tipo_negocio.id', $tipoComplejo->id)
+            ->assertJsonPath('complejo.tipo_negocio.slug', 'complejo');
+
+        $this->assertDatabaseHas('complejos', [
+            'id' => $complejo->id,
+            'nombre' => 'Nico Sport & Pádel Center',
+            'telefono' => '+54 9 11 4979-0220',
+            'ciudad' => 'Mercedes',
+            'direccion' => 'Av. Siempre Viva 742',
+            'deporte_principal' => 'tenis',
+            'tipo_negocio_id' => $tipoComplejo->id,
         ]);
     }
 

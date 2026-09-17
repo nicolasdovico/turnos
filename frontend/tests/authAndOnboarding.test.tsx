@@ -1595,4 +1595,128 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Seña Retenida \(Penalidad\)/i)).toBeDefined();
     expect(screen.getByText(/Seña retenida: \$4,000/i)).toBeDefined();
   });
+
+  it("renders and updates institutional club data in club admin panel", async () => {
+    let putConfigPayload: any = null;
+
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any, options?: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("/configuracion") && options?.method === "PUT") {
+        putConfigPayload = JSON.parse(options.body);
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            message: "Datos y configuración del club actualizados exitosamente.",
+            complejo: {
+              id: 1,
+              uuid: "abc-123-uuid",
+              nombre: putConfigPayload.nombre,
+              subdominio: "nico-padel",
+              deporte_principal: putConfigPayload.deporte_principal,
+              telefono: putConfigPayload.telefono,
+              ciudad: putConfigPayload.ciudad,
+              direccion: putConfigPayload.direccion,
+              tipo_negocio: { id: 2, nombre: "Complejo", slug: "complejo" },
+            },
+          }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                uuid: "abc-123-uuid",
+                nombre: "Nico Pádel Antiguo",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+                telefono: "11223344",
+                ciudad: "Luján",
+                direccion: "Calle Falsa 123",
+                tipo_negocio: { id: 1, nombre: "Club", slug: "club" },
+                owner: { id: 10, name: "Nicolás Dueño", email: "nico@dueno.com" },
+                estado: "activo",
+              },
+              plan: {
+                id: 1,
+                nombre: "Oro",
+                slug: "oro",
+                modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }],
+              },
+              canchas: [],
+              horarios_atencion: [],
+              stats: { total_canchas: 0, total_turnos: 0, modulos_count: 1 },
+              tipos_negocio: [
+                { id: 1, nombre: "Club", slug: "club" },
+                { id: 2, nombre: "Complejo", slug: "complejo" },
+                { id: 3, nombre: "Gimnasio", slug: "gimnasio" },
+              ],
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Switch to Datos del Club tab
+    const configTabBtn = await screen.findByRole("button", { name: /Datos del Club/i });
+    fireEvent.click(configTabBtn);
+
+    expect(await screen.findByText(/Información Institucional del Club/i)).toBeDefined();
+
+    // Verify initial values
+    const nombreInput = screen.getByPlaceholderText("Ej: Nico Pádel Club") as HTMLInputElement;
+    expect(nombreInput.value).toBe("Nico Pádel Antiguo");
+
+    const telInput = screen.getByPlaceholderText("+54 9 11 1234-5678") as HTMLInputElement;
+    expect(telInput.value).toBe("11223344");
+
+    const ciudadInput = screen.getByPlaceholderText("Ej: Luján, Buenos Aires") as HTMLInputElement;
+    expect(ciudadInput.value).toBe("Luján");
+
+    const dirInput = screen.getByPlaceholderText("Ej: Av. Constitución 1234") as HTMLInputElement;
+    expect(dirInput.value).toBe("Calle Falsa 123");
+
+    // Modify values
+    fireEvent.change(nombreInput, { target: { value: "Nico Sport & Pádel Center" } });
+    fireEvent.change(telInput, { target: { value: "+54 9 11 4979-0220" } });
+    fireEvent.change(ciudadInput, { target: { value: "Mercedes" } });
+    fireEvent.change(dirInput, { target: { value: "Av. 29 Nro 456" } });
+
+    // Verify dirty tracking badge is displayed
+    expect(await screen.findByText(/Cambios sin guardar/i)).toBeDefined();
+
+    // Click Save
+    const saveBtn = screen.getByRole("button", { name: /Guardar Datos del Club/i });
+    fireEvent.click(saveBtn);
+
+    // Verify success feedback
+    expect(await screen.findByText(/¡Datos institucionales del club actualizados exitosamente!/i)).toBeDefined();
+
+    // Verify PUT payload sent to backend
+    expect(putConfigPayload).toEqual({
+      nombre: "Nico Sport & Pádel Center",
+      telefono: "+54 9 11 4979-0220",
+      ciudad: "Mercedes",
+      direccion: "Av. 29 Nro 456",
+      deporte_principal: "padel",
+      tipo_negocio_id: 1,
+    });
+  });
 });

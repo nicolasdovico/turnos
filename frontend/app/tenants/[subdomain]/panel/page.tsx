@@ -25,6 +25,12 @@ interface ComplejoData {
   owner: { id: number; name: string; email: string } | null;
 }
 
+interface TipoNegocioItem {
+  id: number;
+  nombre: string;
+  slug: string;
+}
+
 interface PlanData {
   id: number;
   nombre: string;
@@ -317,6 +323,21 @@ export default function ClubAdminPanel() {
   const [horariosErrorMsg, setHorariosErrorMsg] = useState<string | null>(null);
   const [stats, setStats] = useState({ total_canchas: 0, total_turnos: 0, modulos_count: 0 });
 
+  // Estados para Datos del Club
+  const [tiposNegocio, setTiposNegocio] = useState<TipoNegocioItem[]>([]);
+  const [clubNombre, setClubNombre] = useState<string>("");
+  const [clubTelefono, setClubTelefono] = useState<string>("");
+  const [clubCiudad, setClubCiudad] = useState<string>("");
+  const [clubDireccion, setClubDireccion] = useState<string>("");
+  const [clubDeportePrincipal, setClubDeportePrincipal] = useState<string>("padel");
+  const [clubTipoNegocioId, setClubTipoNegocioId] = useState<number | "">("");
+
+  const [isSavingClubData, setIsSavingClubData] = useState<boolean>(false);
+  const [isClubDataDirty, setIsClubDataDirty] = useState<boolean>(false);
+  const isClubDataDirtyRef = React.useRef<boolean>(false);
+  const [clubDataSuccessMsg, setClubDataSuccessMsg] = useState<string | null>(null);
+  const [clubDataErrorMsg, setClubDataErrorMsg] = useState<string | null>(null);
+
   // Estados para Turnos Fijos
   const [turnosFijos, setTurnosFijos] = useState<TurnoFijoSerie[]>([]);
   const [loadingTurnosFijos, setLoadingTurnosFijos] = useState(false);
@@ -533,6 +554,15 @@ export default function ClubAdminPanel() {
 
       if (data.data?.complejo) {
         setComplejo(data.data.complejo);
+        // Si el usuario tiene cambios sin guardar en datos del club, no los pisamos con el refresco en segundo plano
+        if (!isClubDataDirtyRef.current) {
+          setClubNombre(data.data.complejo.nombre || "");
+          setClubTelefono(data.data.complejo.telefono || "");
+          setClubCiudad(data.data.complejo.ciudad || "");
+          setClubDireccion(data.data.complejo.direccion || "");
+          setClubDeportePrincipal(data.data.complejo.deporte_principal || "padel");
+          setClubTipoNegocioId(data.data.complejo.tipo_negocio?.id || "");
+        }
         // Si el usuario tiene cambios sin guardar en políticas, no los pisamos con el refresco en segundo plano
         if (!isPoliticasDirtyRef.current) {
           if (data.data.complejo.tipo_cobro_reserva) {
@@ -548,6 +578,10 @@ export default function ClubAdminPanel() {
             setPermiteMostradorPublico(Boolean(data.data.complejo.permite_mostrador_publico));
           }
         }
+      }
+
+      if (data.data?.tipos_negocio) {
+        setTiposNegocio(data.data.tipos_negocio);
       }
 
       setPlan(data.data.plan);
@@ -645,7 +679,7 @@ export default function ClubAdminPanel() {
   // Protección ante salida o recarga accidental con cambios pendientes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isHorariosDirtyRef.current || isPoliticasDirtyRef.current) {
+      if (isHorariosDirtyRef.current || isPoliticasDirtyRef.current || isClubDataDirtyRef.current) {
         e.preventDefault();
         e.returnValue = "";
         return "";
@@ -1112,6 +1146,108 @@ export default function ClubAdminPanel() {
     isPoliticasDirtyRef.current = false;
     setPoliticasSuccessMsg(null);
     setPoliticasErrorMsg(null);
+  };
+
+  const handleSaveClubData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clubNombre.trim()) {
+      setClubDataErrorMsg("El nombre del club es obligatorio.");
+      return;
+    }
+    setIsSavingClubData(true);
+    setClubDataSuccessMsg(null);
+    setClubDataErrorMsg(null);
+
+    try {
+      const activeToken = token || localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const payload: any = {
+        nombre: clubNombre.trim(),
+        telefono: clubTelefono.trim() || null,
+        ciudad: clubCiudad.trim() || null,
+        direccion: clubDireccion.trim() || null,
+        deporte_principal: clubDeportePrincipal,
+      };
+      if (clubTipoNegocioId !== "") {
+        payload.tipo_negocio_id = Number(clubTipoNegocioId);
+      }
+
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/configuracion`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al actualizar los datos del club.");
+      }
+
+      setClubDataSuccessMsg("¡Datos institucionales del club actualizados exitosamente!");
+      if (data.complejo) {
+        setComplejo((prev) => (prev ? { ...prev, ...data.complejo } : data.complejo));
+      }
+      setIsClubDataDirty(false);
+      isClubDataDirtyRef.current = false;
+    } catch (err: any) {
+      setClubDataErrorMsg(err.message || "Error al guardar los datos del club.");
+    } finally {
+      setIsSavingClubData(false);
+    }
+  };
+
+  const updateClubNombre = (val: string) => {
+    setClubNombre(val);
+    setIsClubDataDirty(true);
+    isClubDataDirtyRef.current = true;
+  };
+
+  const updateClubTelefono = (val: string) => {
+    setClubTelefono(val);
+    setIsClubDataDirty(true);
+    isClubDataDirtyRef.current = true;
+  };
+
+  const updateClubCiudad = (val: string) => {
+    setClubCiudad(val);
+    setIsClubDataDirty(true);
+    isClubDataDirtyRef.current = true;
+  };
+
+  const updateClubDireccion = (val: string) => {
+    setClubDireccion(val);
+    setIsClubDataDirty(true);
+    isClubDataDirtyRef.current = true;
+  };
+
+  const updateClubDeportePrincipal = (val: string) => {
+    setClubDeportePrincipal(val);
+    setIsClubDataDirty(true);
+    isClubDataDirtyRef.current = true;
+  };
+
+  const updateClubTipoNegocioId = (val: number | "") => {
+    setClubTipoNegocioId(val);
+    setIsClubDataDirty(true);
+    isClubDataDirtyRef.current = true;
+  };
+
+  const descartarCambiosClubData = () => {
+    if (complejo) {
+      setClubNombre(complejo.nombre || "");
+      setClubTelefono(complejo.telefono || "");
+      setClubCiudad(complejo.ciudad || "");
+      setClubDireccion(complejo.direccion || "");
+      setClubDeportePrincipal(complejo.deporte_principal || "padel");
+      setClubTipoNegocioId(complejo.tipo_negocio?.id || "");
+    }
+    setIsClubDataDirty(false);
+    isClubDataDirtyRef.current = false;
+    setClubDataSuccessMsg(null);
+    setClubDataErrorMsg(null);
   };
 
   const updateDiaHorario = (dia_semana: number, fields: Partial<HorarioDiaForm>) => {
@@ -3878,51 +4014,285 @@ export default function ClubAdminPanel() {
         {/* TAB 5: DATOS DEL CLUB */}
         {/* ========================================================================= */}
         {activeTab === "config" && (
-          <div className="mt-8 space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">Información Institucional del Club</h2>
-              <p className="text-xs text-slate-400">Datos públicos y dirección del complejo</p>
+          <div className="mt-8 space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                  <span>📋</span> Información Institucional del Club
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Edita los datos públicos, medios de contacto y categorización de tu complejo deportivo
+                </p>
+              </div>
+
+              {isClubDataDirty && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-xl animate-pulse">
+                    ⚠️ Cambios sin guardar
+                  </span>
+                  <button
+                    type="button"
+                    onClick={descartarCambiosClubData}
+                    className="text-xs text-slate-400 hover:text-white underline transition cursor-pointer"
+                  >
+                    Descartar cambios
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="rounded-3xl bg-slate-900 border border-slate-800 p-8 space-y-6">
+            {clubDataSuccessMsg && (
+              <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/50 text-emerald-300 text-sm flex items-center justify-between shadow-lg shadow-emerald-950/30">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">✓</span>
+                  <span>{clubDataSuccessMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setClubDataSuccessMsg(null)}
+                  className="text-slate-400 hover:text-white text-xs ml-4 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {clubDataErrorMsg && (
+              <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/50 text-rose-300 text-sm flex items-center justify-between shadow-lg shadow-rose-950/30">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">⚠️</span>
+                  <span>{clubDataErrorMsg}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setClubDataErrorMsg(null)}
+                  className="text-slate-400 hover:text-white text-xs ml-4 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Formulario Editable */}
+            <form onSubmit={handleSaveClubData} className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-6 shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                  <span>✏️</span> Datos Generales & Medios de Contacto
+                </h3>
+                <span className="text-xs text-slate-500 hidden sm:inline">
+                  Visible para jugadores y en el portal central
+                </span>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <span className="text-xs font-bold uppercase text-slate-400">Nombre del Complejo</span>
-                  <div className="text-lg font-black text-white mt-1">{complejo?.nombre}</div>
+                {/* Nombre del Complejo */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold uppercase text-slate-300 flex items-center justify-between">
+                    <span>Nombre del Complejo *</span>
+                    <span className="text-[10px] text-slate-500 font-normal">Obligatorio</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={clubNombre}
+                    onChange={(e) => updateClubNombre(e.target.value)}
+                    placeholder="Ej: Nico Pádel Club"
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-bold text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
+                  />
                 </div>
-                <div>
-                  <span className="text-xs font-bold uppercase text-slate-400">Subdominio Dedicado</span>
-                  <div className="text-lg font-black text-emerald-400 mt-1">{complejo?.subdominio}.localhost:8080</div>
+
+                {/* Deporte Principal */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase text-slate-300">
+                    Deporte Principal
+                  </label>
+                  <select
+                    value={clubDeportePrincipal}
+                    onChange={(e) => updateClubDeportePrincipal(e.target.value)}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-medium text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                  >
+                    <option value="padel">🎾 Pádel</option>
+                    <option value="tenis">🎾 Tenis</option>
+                    <option value="futbol">⚽ Fútbol 11</option>
+                    <option value="futbol_5">⚽ Fútbol 5</option>
+                    <option value="futbol_7">⚽ Fútbol 7</option>
+                    <option value="basquet">🏀 Básquetbol</option>
+                    <option value="crossfit">🏋️ Gimnasio / Entrenamiento</option>
+                    <option value="multideporte">🏅 Multideporte</option>
+                  </select>
                 </div>
-                <div>
-                  <span className="text-xs font-bold uppercase text-slate-400">Deporte Principal</span>
-                  <div className="text-base font-bold text-white mt-1 capitalize">{complejo?.deporte_principal || "Pádel"}</div>
+
+                {/* Tipo de Establecimiento */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase text-slate-300">
+                    Tipo de Establecimiento
+                  </label>
+                  <select
+                    value={clubTipoNegocioId}
+                    onChange={(e) => updateClubTipoNegocioId(e.target.value ? Number(e.target.value) : "")}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-medium text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                  >
+                    <option value="">Seleccionar tipo...</option>
+                    {tiposNegocio.length > 0 ? (
+                      tiposNegocio.map((tn) => (
+                        <option key={tn.id} value={tn.id}>
+                          {tn.nombre}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="1">Club</option>
+                        <option value="2">Complejo</option>
+                        <option value="3">Gimnasio / Centro de Entrenamiento</option>
+                      </>
+                    )}
+                  </select>
                 </div>
-                <div>
-                  <span className="text-xs font-bold uppercase text-slate-400">Teléfono de Contacto</span>
-                  <div className="text-base font-bold text-white mt-1">{complejo?.telefono || "No especificado"}</div>
+
+                {/* Teléfono / WhatsApp */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-bold uppercase text-slate-300 flex items-center justify-between">
+                    <span>Teléfono de Contacto / WhatsApp</span>
+                    <span className="text-[10px] text-emerald-400 font-medium">Recomendado formato internacional (+54 9 11 4979-0220)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={clubTelefono}
+                    onChange={(e) => updateClubTelefono(e.target.value)}
+                    placeholder="+54 9 11 1234-5678"
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-medium text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Los clientes podrán comunicarse directamente a este número y se utilizará para notificaciones de lista de espera por WhatsApp.
+                  </p>
                 </div>
-                <div>
-                  <span className="text-xs font-bold uppercase text-slate-400">Tipo de Establecimiento</span>
-                  <div className="text-base font-bold text-emerald-400 mt-1">{complejo?.tipo_negocio?.nombre || "Club"}</div>
+
+                {/* Ciudad */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase text-slate-300">
+                    Ciudad / Localidad
+                  </label>
+                  <input
+                    type="text"
+                    value={clubCiudad}
+                    onChange={(e) => updateClubCiudad(e.target.value)}
+                    placeholder="Ej: Luján, Buenos Aires"
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-medium text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
+                  />
                 </div>
-                <div>
-                  <span className="text-xs font-bold uppercase text-slate-400">Ciudad</span>
-                  <div className="text-base font-bold text-white mt-1">{complejo?.ciudad || "No especificada"}</div>
-                </div>
-                <div>
-                  <span className="text-xs font-bold uppercase text-slate-400">Dirección</span>
-                  <div className="text-base font-bold text-white mt-1">{complejo?.direccion || "No especificada"}</div>
+
+                {/* Dirección */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase text-slate-300">
+                    Dirección Física
+                  </label>
+                  <input
+                    type="text"
+                    value={clubDireccion}
+                    onChange={(e) => updateClubDireccion(e.target.value)}
+                    placeholder="Ej: Av. Constitución 1234"
+                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-medium text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
+                  />
                 </div>
               </div>
 
-              <div className="border-t border-slate-800 pt-6 flex items-center justify-between">
-                <span className="text-xs text-slate-500">
-                  ✓ Configuración y estado operativo activo en la plataforma.
+              {/* Botón de Guardado & Alerta */}
+              <div className="border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <span>ℹ️</span> Los cambios se aplicarán de inmediato en la grilla y el portal público.
+                </div>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  {isClubDataDirty && (
+                    <button
+                      type="button"
+                      onClick={descartarCambiosClubData}
+                      disabled={isSavingClubData}
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold transition cursor-pointer"
+                    >
+                      Descartar cambios
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isSavingClubData}
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-black tracking-wide shadow-lg shadow-emerald-950/40 flex items-center justify-center gap-2 transition cursor-pointer"
+                  >
+                    {isSavingClubData ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <span>💾</span> Guardar Datos del Club
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* Parámetros del Sistema (Protegidos - Solo Lectura) */}
+            <div className="rounded-3xl bg-slate-900/60 border border-slate-800/80 p-6 sm:p-8 space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                  <span>🔒</span> Parámetros del Sistema & Aislamiento Multi-tenant
+                </h3>
+                <span className="text-[10px] uppercase font-bold bg-slate-800 text-slate-400 px-2.5 py-1 rounded-md">
+                  Solo Lectura
                 </span>
-                <span className="text-xs font-mono text-slate-400">
-                  ID: {complejo?.uuid?.slice(0, 8)}...
-                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-500">Subdominio Dedicado (URL Oficial)</span>
+                  <div className="text-base font-black text-emerald-400 mt-1 font-mono flex items-center gap-1.5">
+                    <span>{complejo?.subdominio}.localhost:8080</span>
+                    <span className="text-xs text-slate-600">🔒</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Dirección única de ruteo en el servidor. Para vincular un dominio propio (ej: padelclub.com) contactar al soporte.
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-500">Identificador Global (UUID)</span>
+                  <div className="text-base font-mono text-slate-300 mt-1 truncate">
+                    {complejo?.uuid || "No asignado"}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Clave interna inmutable de aislamiento de inquilino.
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-500">Titular de la Cuenta / Administrador</span>
+                  <div className="text-sm font-bold text-white mt-1">
+                    {complejo?.owner?.name || user?.name || "Administrador"}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {complejo?.owner?.email || user?.email || "Email no disponible"}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-500">Plan Contratado</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-sm font-black text-emerald-400 capitalize">
+                      Plan {plan?.nombre || "Estándar"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("modulos")}
+                      className="text-[11px] text-slate-400 hover:text-emerald-400 underline transition cursor-pointer"
+                    >
+                      Ver módulos activos →
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Estado operativo: <span className="text-emerald-400 font-bold uppercase">{complejo?.estado || "Activo"}</span>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
