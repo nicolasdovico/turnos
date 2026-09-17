@@ -1693,9 +1693,28 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     const dirInput = screen.getByPlaceholderText("Ej: Av. Constitución 1234") as HTMLInputElement;
     expect(dirInput.value).toBe("Calle Falsa 123");
 
-    // Modify values
-    fireEvent.change(nombreInput, { target: { value: "Nico Sport & Pádel Center" } });
+    // Test invalid characters in phone
+    fireEvent.change(telInput, { target: { value: "telefono-invalido" } });
+    expect(await screen.findByText(/Solo se permiten números, espacios, guiones, paréntesis y el prefijo '\+'/i)).toBeDefined();
+
+    // Test insufficient digits
+    fireEvent.change(telInput, { target: { value: "123" } });
+    expect(await screen.findByText(/El teléfono debe contener al menos 8 dígitos numéricos/i)).toBeDefined();
+
+    // Enter valid phone number
     fireEvent.change(telInput, { target: { value: "+54 9 11 4979-0220" } });
+    expect(await screen.findByText(/Abrir chat \(wa\.me\/5491149790220\)/i)).toBeDefined();
+
+    // Test opening and closing QR modal
+    const qrBtn = screen.getByRole("button", { name: /Ver Código QR/i });
+    fireEvent.click(qrBtn);
+    expect(await screen.findByText(/Código QR de WhatsApp/i)).toBeDefined();
+    expect(screen.getByAltText(/Código QR WhatsApp 5491149790220/i)).toBeDefined();
+    const closeQrBtn = screen.getByRole("button", { name: /Cerrar/i });
+    fireEvent.click(closeQrBtn);
+
+    // Modify remaining values
+    fireEvent.change(nombreInput, { target: { value: "Nico Sport & Pádel Center" } });
     fireEvent.change(ciudadInput, { target: { value: "Mercedes" } });
     fireEvent.change(dirInput, { target: { value: "Av. 29 Nro 456" } });
 

@@ -292,6 +292,36 @@ const ALL_MODULOS = [
   },
 ];
 
+export const formatWhatsAppNumber = (phone: string): string => {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  let d = digits.startsWith("0") ? digits.slice(1) : digits;
+  if (d.length === 10 && /^(11|[23])/.test(d)) {
+    d = "549" + d;
+  } else if (d.length === 11 && d.startsWith("9")) {
+    d = "54" + d;
+  } else if (d.length === 12 && d.startsWith("54") && !d.startsWith("549")) {
+    d = "549" + d.slice(2);
+  }
+  return d;
+};
+
+export const getPhoneValidationError = (phone: string): string | null => {
+  const trimmed = phone.trim();
+  if (!trimmed) return null;
+  if (!/^[+0-9\s\-()]+$/.test(trimmed)) {
+    return "Solo se permiten números, espacios, guiones, paréntesis y el prefijo '+'.";
+  }
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 8) {
+    return "El teléfono debe contener al menos 8 dígitos numéricos.";
+  }
+  if (digits.length > 15) {
+    return "El teléfono no puede superar los 15 dígitos numéricos (estándar internacional E.164).";
+  }
+  return null;
+};
+
 export default function ClubAdminPanel() {
   const params = useParams();
   const subdomain = (params?.subdomain as string) || "demo";
@@ -337,6 +367,11 @@ export default function ClubAdminPanel() {
   const isClubDataDirtyRef = React.useRef<boolean>(false);
   const [clubDataSuccessMsg, setClubDataSuccessMsg] = useState<string | null>(null);
   const [clubDataErrorMsg, setClubDataErrorMsg] = useState<string | null>(null);
+  const [showQrModal, setShowQrModal] = useState<boolean>(false);
+
+  const phoneValidationError = useMemo(() => getPhoneValidationError(clubTelefono), [clubTelefono]);
+  const cleanWaNumber = useMemo(() => formatWhatsAppNumber(clubTelefono), [clubTelefono]);
+  const isPhoneValid = Boolean(clubTelefono.trim() && !phoneValidationError && cleanWaNumber.length >= 8);
 
   // Estados para Turnos Fijos
   const [turnosFijos, setTurnosFijos] = useState<TurnoFijoSerie[]>([]);
@@ -1152,6 +1187,11 @@ export default function ClubAdminPanel() {
     e.preventDefault();
     if (!clubNombre.trim()) {
       setClubDataErrorMsg("El nombre del club es obligatorio.");
+      return;
+    }
+    const phoneErr = getPhoneValidationError(clubTelefono);
+    if (phoneErr) {
+      setClubDataErrorMsg(phoneErr);
       return;
     }
     setIsSavingClubData(true);
@@ -4155,15 +4195,61 @@ export default function ClubAdminPanel() {
                     <span>Teléfono de Contacto / WhatsApp</span>
                     <span className="text-[10px] text-emerald-400 font-medium">Recomendado formato internacional (+54 9 11 4979-0220)</span>
                   </label>
-                  <input
-                    type="text"
-                    value={clubTelefono}
-                    onChange={(e) => updateClubTelefono(e.target.value)}
-                    placeholder="+54 9 11 1234-5678"
-                    className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-medium text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={clubTelefono}
+                      onChange={(e) => updateClubTelefono(e.target.value)}
+                      placeholder="+54 9 11 1234-5678"
+                      className={`w-full rounded-xl bg-slate-950 border px-4 py-3 text-sm font-medium text-white placeholder-slate-500 focus:outline-none transition ${
+                        phoneValidationError
+                          ? "border-rose-500/80 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                          : "border-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                      }`}
+                    />
+                    {isPhoneValid && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-emerald-400 pointer-events-none">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span className="text-[11px] font-bold">Válido</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {phoneValidationError && (
+                    <div className="text-xs text-rose-400 flex items-center gap-1.5 font-medium mt-1">
+                      <span>⚠️</span>
+                      <span>{phoneValidationError}</span>
+                    </div>
+                  )}
+
+                  {isPhoneValid && (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2.5 p-3 rounded-2xl bg-emerald-950/20 border border-emerald-500/30">
+                      <span className="text-xs text-slate-400">Acciones de WhatsApp:</span>
+                      <a
+                        href={`https://wa.me/${cleanWaNumber}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-bold border border-emerald-500/40 transition cursor-pointer"
+                        title="Abrir chat en WhatsApp Web"
+                      >
+                        <span>💬</span>
+                        <span>Abrir chat (wa.me/{cleanWaNumber})</span>
+                        <span className="text-[10px]">↗</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setShowQrModal(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer"
+                        title="Ver y escanear código QR"
+                      >
+                        <span>📱</span>
+                        <span>Ver Código QR</span>
+                      </button>
+                    </div>
+                  )}
+
                   <p className="text-[11px] text-slate-500">
-                    Los clientes podrán comunicarse directamente a este número y se utilizará para notificaciones de lista de espera por WhatsApp.
+                    Los clientes podrán comunicarse directamente a este número desde el portal y se utilizará para notificaciones de lista de espera por WhatsApp.
                   </p>
                 </div>
 
@@ -4295,6 +4381,67 @@ export default function ClubAdminPanel() {
                 </div>
               </div>
             </div>
+
+            {/* Modal Código QR de WhatsApp */}
+            {showQrModal && isPhoneValid && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+                <div className="relative w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl text-center space-y-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowQrModal(false)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white text-base p-2 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    ✕
+                  </button>
+
+                  <div className="space-y-2">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto text-2xl shadow-inner">
+                      💬
+                    </div>
+                    <h3 className="text-lg font-black text-white">Código QR de WhatsApp</h3>
+                    <p className="text-xs text-slate-400">
+                      Escanea este código con la cámara de tu celular para abrir directamente el chat con <strong className="text-emerald-400">{complejo?.nombre || "el Club"}</strong>
+                    </p>
+                  </div>
+
+                  {/* Imagen QR generada dinámicamente */}
+                  <div className="p-4 bg-white rounded-2xl inline-block shadow-2xl border border-slate-200">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https%3A%2F%2Fwa.me%2F${cleanWaNumber}`}
+                      alt={`Código QR WhatsApp ${cleanWaNumber}`}
+                      width={220}
+                      height={220}
+                      className="w-48 h-48 mx-auto"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="font-mono text-xs text-slate-300 bg-slate-950 border border-slate-800 py-2 px-3 rounded-xl flex items-center justify-center gap-2">
+                      <span className="text-emerald-400">wa.me/</span>
+                      <span className="font-bold text-white">{cleanWaNumber}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <a
+                        href={`https://wa.me/${cleanWaNumber}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black tracking-wide flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-950/40 cursor-pointer"
+                      >
+                        <span>💬</span> Abrir en WhatsApp Web ↗
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setShowQrModal(false)}
+                        className="w-full py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

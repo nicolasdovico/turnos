@@ -218,10 +218,17 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
                   </span>
                 )}
                 {complejo.telefono && (
-                  <span className="flex items-center gap-1">
-                    <span>📞</span>
-                    <span>{complejo.telefono}</span>
-                  </span>
+                  <a
+                    href={`https://wa.me/${complejo.telefono.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 transition text-xs font-semibold shadow-sm cursor-pointer"
+                    title="Abrir chat de WhatsApp con el club"
+                  >
+                    <span>💬</span>
+                    <span>WhatsApp: {complejo.telefono}</span>
+                    <span className="text-[10px]">↗</span>
+                  </a>
                 )}
               </div>
             )}

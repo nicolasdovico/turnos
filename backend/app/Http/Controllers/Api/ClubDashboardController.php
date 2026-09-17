@@ -732,7 +732,24 @@ class ClubDashboardController extends Controller
 
         $validated = $request->validate([
             'nombre' => 'nullable|string|max:255',
-            'telefono' => 'nullable|string|max:50',
+            'telefono' => [
+                'nullable',
+                'string',
+                'max:50',
+                function ($attribute, $value, $fail) {
+                    if ($value === null || trim($value) === '') {
+                        return;
+                    }
+                    if (!preg_match('/^[+0-9\s\-()]+$/', $value)) {
+                        $fail('El teléfono solo puede contener números, espacios, guiones, paréntesis y el prefijo "+".');
+                        return;
+                    }
+                    $digits = preg_replace('/\D+/', '', $value);
+                    if (strlen($digits) < 8 || strlen($digits) > 15) {
+                        $fail('El teléfono debe tener entre 8 y 15 dígitos numéricos.');
+                    }
+                },
+            ],
             'ciudad' => 'nullable|string|max:100',
             'direccion' => 'nullable|string|max:255',
             'deporte_principal' => 'nullable|string|max:50',

@@ -233,6 +233,47 @@ class ClubDashboardTest extends TestCase
         ]);
     }
 
+    public function test_validates_telefono_format_and_digit_length(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Nicolás Dueño',
+            'email' => 'nico@telval.com',
+        ]);
+
+        Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Nico Pádel Tel',
+            'subdominio' => 'nico-padel-tel',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        // 1. Invalid characters (letters) -> 422
+        $resLetters = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-padel-tel/configuracion', [
+                'telefono' => 'mi-telefono-invalido',
+            ]);
+        $resLetters->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono']);
+
+        // 2. Insufficient digits (< 8) -> 422
+        $resShort = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-padel-tel/configuracion', [
+                'telefono' => '12345',
+            ]);
+        $resShort->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono']);
+
+        // 3. Valid telephone -> 200
+        $resValid = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-padel-tel/configuracion', [
+                'telefono' => '+54 9 11 4979-0220',
+            ]);
+        $resValid->assertStatus(200)
+            ->assertJsonPath('complejo.telefono', '+54 9 11 4979-0220');
+    }
+
     public function test_non_owner_cannot_update_club_policies(): void
     {
         $owner = User::factory()->create([

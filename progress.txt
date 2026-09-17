@@ -1806,6 +1806,31 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Next.js 14 Production Build: `npm run build` exitoso (11/11 páginas estáticas generadas, 0 errores).
   * Frontend Mobile: 20/20 tests Jest pasados al 100% (4 suites).
 ===============================================================================
-
-
-
+-------------------------------------------------------------------------------
+[2026-09-17] - VALIDACIÓN ESTRICTA DE TELÉFONO/WHATSAPP, ENLACE DIRECTO Y CÓDIGO QR EN PANEL Y LANDING
+-------------------------------------------------------------------------------
+- Diagnóstico y Requerimiento:
+  * En el campo "Teléfono de Contacto / WhatsApp" de la solapa "Datos del club" del panel de administración (/panel), se permitía el ingreso libre de cualquier carácter o formatos incompletos.
+  * Se solicitó implementar validación para garantizar un número de teléfono válido (estándar internacional E.164), habilitar apertura directa de WhatsApp Web (wa.me) con un solo clic y generar un código QR escaneable por clientes/jugadores para iniciar chat directo con el club.
+- Soluciones Implementadas:
+  * Backend (Laravel 11):
+    - ClubDashboardController::updateConfiguracion:
+      * Validación regex regex:/^[+0-9\s\-()]+$/ asegurando únicamente caracteres telefónicos válidos (+, números, guiones, espacios, paréntesis).
+      * Validación personalizada que extrae sólo los dígitos (preg_replace('/\D/', '', $value)) y restringe la longitud a un rango internacional estándar de 8 a 15 dígitos. Retorna HTTP 422 con mensaje descriptivo si no cumple.
+  * Frontend Web (Next.js 14):
+    - frontend/app/tenants/[subdomain]/panel/page.tsx:
+      * Funciones utilitarias formatWhatsAppNumber (conversión inteligente a formato internacional con soporte de números argentinos 549) y getPhoneValidationError.
+      * Validación en tiempo real con indicador visual (borde rojo, badge de error) y deshabilitación del botón de guardar si el formato es inválido.
+      * Botón interactivo "💬 Abrir chat (wa.me/...) ↗" que permite verificar y probar el enlace directo a WhatsApp Web.
+      * Botón "📱 Ver Código QR" y Modal dedicado con visualización del código QR dinámico de alta resolución para que el club pueda exhibirlo o descargarlo para recepción/mostrador.
+    - frontend/app/tenants/[subdomain]/page.tsx:
+      * En la landing page pública del club, el teléfono de contacto fue mejorado de texto plano a un botón/badge interactivo que abre directamente el chat de WhatsApp (https://wa.me/...) en una nueva pestaña.
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (tests/Feature/ClubDashboardTest.php):
+    - test_validates_telefono_format_and_digit_length: verifica rechazo con 422 para caracteres no permitidos y menos de 8 dígitos, y aceptación 200 con persistencia para números válidos.
+    - Total Backend: 195/195 tests exitosos (1065 aserciones).
+  * Frontend Web (tests/authAndOnboarding.test.tsx):
+    - validates phone number, generates direct WhatsApp web link and shows QR code modal: comprueba validación en vivo, prevención de guardado con teléfono inválido, botón de WhatsApp Web, apertura y cierre del modal de QR, y guardado exitoso con teléfono corregido.
+    - Total Frontend: 67/67 tests exitosos (4 suites).
+  * Build de producción Next.js (npm run build): 100% exitoso.
+===============================================================================
