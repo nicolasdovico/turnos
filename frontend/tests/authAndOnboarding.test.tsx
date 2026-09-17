@@ -756,6 +756,99 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(putHorariosPayload.horarios).toHaveLength(7);
   });
 
+  it("shows conflict modal when modifying business hours clashes with active bookings", async () => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any, options?: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("/horarios") && options?.method === "PUT") {
+        return {
+          ok: false,
+          status: 422,
+          json: async () => ({
+            success: false,
+            message: "No es posible modificar los horarios: se detectaron 1 conflictos con reservas existentes fuera del nuevo rango.",
+            conflictos: [
+              {
+                dia_semana: 6,
+                dia_nombre: "Sábado",
+                tipo: "turno_fijo",
+                cliente: "Marcos Sábado",
+                cliente_telefono: "+5491149790220",
+                cancha: "Cancha 1",
+                hora_inicio: "21:00",
+                hora_fin: "22:00",
+                fecha_inicio: "19-09-2026",
+                fecha_fin: "13-03-2027",
+                total_fechas: 26,
+                motivo: "Turno fijo (serie de 26 semanas del 19-09-2026 al 13-03-2027): Finaliza a las 22:00 hs, después del nuevo horario de cierre (20:00 hs).",
+              },
+            ],
+          }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Nico Padel",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+              },
+              plan: {
+                id: 1,
+                nombre: "Oro",
+                slug: "oro",
+                modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }],
+              },
+              canchas: [],
+              horarios_atencion: [
+                { id: 1, dia_semana: 6, hora_apertura: "08:00:00", hora_cierre: "23:00:00", duracion_turno_minutos: 60 },
+              ],
+              stats: { total_canchas: 0, total_turnos: 0, modulos_count: 1 },
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Switch to Horarios tab
+    const horariosTabBtn = await screen.findByRole("button", { name: /Horarios de Atención/i });
+    fireEvent.click(horariosTabBtn);
+
+    // Click submit
+    const saveHorariosBtn = await screen.findByRole("button", { name: /Guardar Horarios de Atención/i });
+    fireEvent.click(saveHorariosBtn);
+
+    // Verify conflict modal is shown
+    expect(await screen.findByTestId("horarios-conflict-modal")).toBeDefined();
+    expect(screen.getByText(/Conflicto con Reservas Existentes/i)).toBeDefined();
+    expect(screen.getByText(/Marcos Sábado/i)).toBeDefined();
+    expect(screen.getByText(/Cancha 1/i)).toBeDefined();
+    expect(screen.getByText(/🔁 Turno Fijo/i)).toBeDefined();
+    expect(screen.getByText(/Finaliza a las 22:00 hs, después del nuevo horario de cierre/i)).toBeDefined();
+
+    // Close modal
+    const closeModalBtn = screen.getByRole("button", { name: "Cerrar" });
+    fireEvent.click(closeModalBtn);
+    expect(screen.queryByTestId("horarios-conflict-modal")).toBeNull();
+  });
+
   it("preserves unsaved changes in horarios against background polling and window focus revalidation", async () => {
     let fetchCount = 0;
     vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {

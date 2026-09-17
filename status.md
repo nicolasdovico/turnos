@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Lista de Espera Inteligente Multicanal con Evolution API WhatsApp & Email Mailpit 100% Operativa)
-- **Última Actualización:** 2026-09-17 (Botón flotante de WhatsApp permanente, botón QR en encabezado público, modal con descarga de imagen PNG e impresión de cartel para mostrador en panel del club; 195 tests backend, 67 tests frontend web y 20 tests mobile al 100% en verde).
+- **Última Actualización:** 2026-09-17 (Validación estricta al editar Horarios de Atención del club contra reservas activas fijas y casuales en backend y modal informativo de resolución de conflictos en panel; 200 tests backend, 68 tests frontend web y 20 tests mobile al 100% en verde).
 
 ---
 

@@ -6,11 +6,13 @@ use App\Mail\EmailVerificationOtpMail;
 use App\Models\Cancha;
 use App\Models\Complejo;
 use App\Models\EmailVerification;
+use App\Models\HorarioAtencion;
 use App\Models\Modulo;
 use App\Models\Plan;
 use App\Models\Turno;
 use App\Models\User;
 use App\Models\UserCredito;
+use Carbon\Carbon;
 use Database\Seeders\ModuloSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -416,6 +418,231 @@ class ClubDashboardTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonPath('success', false);
+    }
+
+    public function test_cannot_update_horarios_if_fixed_turn_exceeds_new_closing_time(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_closing@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Sabados',
+            'subdominio' => 'club-sabados',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha 1',
+            'deporte' => 'padel',
+            'superficie' => 'sintetico',
+            'precio_base' => 10000,
+            'estado' => 'activo',
+        ]);
+
+        // Sábado abierto de 08:00 a 23:00
+        HorarioAtencion::create([
+            'complejo_id' => $complejo->id,
+            'dia_semana' => 6, // Sábado
+            'hora_apertura' => '08:00',
+            'hora_cierre' => '23:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        // Crear turno fijo para el próximo sábado de 21:00 a 22:00
+        $proximoSabado = Carbon::today()->next(Carbon::SATURDAY)->toDateString();
+        Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'cliente_nombre' => 'Marcos Sábado',
+            'cliente_telefono' => '+5491149790220',
+            'fecha' => $proximoSabado,
+            'hora_inicio' => '21:00',
+            'hora_fin' => '22:00',
+            'precio' => 10000,
+            'estado' => 'confirmado',
+            'es_fijo' => true,
+        ]);
+
+        // Intentar acotar el horario del sábado para cerrar a las 20:00 (el turno de 21 a 22 queda afuera)
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/club-sabados/horarios', [
+                'horarios' => [
+                    ['dia_semana' => 6, 'abierto' => true, 'hora_apertura' => '08:00', 'hora_cierre' => '20:00', 'duracion_turno_minutos' => 60],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonStructure(['message', 'conflictos'])
+            ->assertJsonFragment(['tipo' => 'turno_fijo', 'cancha' => 'Cancha 1', 'cliente' => 'Marcos Sábado']);
+    }
+
+    public function test_cannot_update_horarios_if_casual_turn_starts_before_new_opening_time(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_opening@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Apertura',
+            'subdominio' => 'club-apertura',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha Central',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 12000,
+            'estado' => 'activo',
+        ]);
+
+        HorarioAtencion::create([
+            'complejo_id' => $complejo->id,
+            'dia_semana' => 1, // Lunes
+            'hora_apertura' => '08:00',
+            'hora_cierre' => '23:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        // Crear turno casual para el próximo lunes a las 08:00
+        $proximoLunes = Carbon::today()->next(Carbon::MONDAY)->toDateString();
+        Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'cliente_nombre' => 'Ana Tempranera',
+            'fecha' => $proximoLunes,
+            'hora_inicio' => '08:00',
+            'hora_fin' => '09:00',
+            'precio' => 12000,
+            'estado' => 'reservado',
+            'es_fijo' => false,
+        ]);
+
+        // Intentar abrir el lunes a las 10:00 (el turno de 08:00 a 09:00 queda afuera)
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/club-apertura/horarios', [
+                'horarios' => [
+                    ['dia_semana' => 1, 'abierto' => true, 'hora_apertura' => '10:00', 'hora_cierre' => '23:00', 'duracion_turno_minutos' => 60],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonFragment(['tipo' => 'casual', 'cliente' => 'Ana Tempranera']);
+    }
+
+    public function test_cannot_close_day_if_active_turnos_exist(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_closeday@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Domingo',
+            'subdominio' => 'club-domingo',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha 3',
+            'deporte' => 'padel',
+            'superficie' => 'sintetico',
+            'precio_base' => 9000,
+            'estado' => 'activo',
+        ]);
+
+        HorarioAtencion::create([
+            'complejo_id' => $complejo->id,
+            'dia_semana' => 0, // Domingo
+            'hora_apertura' => '09:00',
+            'hora_cierre' => '20:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        $proximoDomingo = Carbon::today()->next(Carbon::SUNDAY)->toDateString();
+        Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'cliente_nombre' => 'Domingo Perez',
+            'fecha' => $proximoDomingo,
+            'hora_inicio' => '10:00',
+            'hora_fin' => '11:00',
+            'precio' => 9000,
+            'estado' => 'confirmado',
+            'es_fijo' => false,
+        ]);
+
+        // Intentar cerrar el domingo (abierto = false)
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/club-domingo/horarios', [
+                'horarios' => [
+                    ['dia_semana' => 0, 'abierto' => false],
+                ],
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonFragment(['dia_nombre' => 'Domingo', 'cliente' => 'Domingo Perez']);
+    }
+
+    public function test_can_update_horarios_if_turnos_are_in_the_past(): void
+    {
+        $owner = User::factory()->create(['email' => 'owner_past@club.com']);
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club Pasado',
+            'subdominio' => 'club-pasado',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha 1',
+            'deporte' => 'padel',
+            'superficie' => 'sintetico',
+            'precio_base' => 8000,
+            'estado' => 'activo',
+        ]);
+
+        HorarioAtencion::create([
+            'complejo_id' => $complejo->id,
+            'dia_semana' => 6, // Sábado
+            'hora_apertura' => '08:00',
+            'hora_cierre' => '23:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        // Crear turno en un sábado pasado (hace 2 semanas) a las 22:00
+        $sabadoPasado = Carbon::today()->subWeeks(2)->startOfWeek()->addDays(5)->toDateString();
+        Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'cliente_nombre' => 'Jugador Antiguo',
+            'fecha' => $sabadoPasado,
+            'hora_inicio' => '22:00',
+            'hora_fin' => '23:00',
+            'precio' => 8000,
+            'estado' => 'completado',
+            'es_fijo' => false,
+        ]);
+
+        // Cambiar horario de cierre a las 20:00 (el turno pasado no debe interferir)
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/club-pasado/horarios', [
+                'horarios' => [
+                    ['dia_semana' => 6, 'abierto' => true, 'hora_apertura' => '08:00', 'hora_cierre' => '20:00', 'duracion_turno_minutos' => 60],
+                ],
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true);
     }
 
     public function test_enviar_otp_cliente_desde_mostrador_dispatches_mail(): void

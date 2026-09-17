@@ -1857,3 +1857,38 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - 67/67 tests frontend aprobados al 100% (4 suites).
     - 195/195 tests backend aprobados al 100%.
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-17] - VALIDACIÓN ESTRICTA DE HORARIOS DE ATENCIÓN CONTRA RESERVAS ACTIVAS (FIJAS Y CASUALES)
+-------------------------------------------------------------------------------
+- Diagnóstico y Requerimiento:
+  * Al editar los horarios de atención semanales del club (/panel), el sistema permitía acotar el horario de cierre (ej. cerrar a las 20:00 hs cuando existían turnos de 21:00 a 22:00 hs), retrasar la apertura, cerrar días completos o alterar la duración de los turnos sin comprobar reservas existentes.
+  * Esto causaba incoherencias graves en el negocio, dejando turnos confirmados y abonados fuera de los horarios oficiales del establecimiento.
+- Soluciones Implementadas:
+  * Backend (Laravel 11):
+    - ClubDashboardController::updateHorarios:
+      * Consulta atómica previa en tabla turnos filtrando por complejo_id, estado NOT IN ('cancelado', 'disponible'), fecha >= hoy (y para hoy hora_fin > now()), y EXTRACT(DOW FROM fecha) = dia_semana.
+      * Detección de 4 tipos de conflictos:
+        1. Día marcado como CERRADO (abierto = false) con reservas activas.
+        2. Hora de apertura retrasada con turnos iniciados antes de la nueva apertura.
+        3. Hora de cierre adelantada con turnos finalizados después del nuevo cierre.
+        4. Modificación de duración de turno estándar incompatible con turnos ya otorgados.
+      * Agrupación inteligente de series de turnos fijos (indicando cantidad de semanas de alcance y fecha fin) y turnos casuales puntuales con nombre de cliente, teléfono, cancha y horario.
+      * Respuesta con HTTP 422 Unprocessable Entity y payload estructurado con array de conflictos detallados.
+  * Frontend Web (Next.js 14):
+    - frontend/app/tenants/[subdomain]/panel/page.tsx:
+      * Captura de respuesta HTTP 422 con array de conflictos en handleSaveHorarios.
+      * Nuevo Modal Interactivo de Conflictos de Horarios (data-testid="horarios-conflict-modal"):
+        - Exhibe la lista de turnos que impiden la modificación con badges distintivos (🔁 Turno Fijo / 📅 Reserva Ocasional), cliente, teléfono, horario y cancha.
+        - Cuadro de recomendaciones claras sobre cómo reubicar o cancelar los turnos antes de cambiar el horario.
+        - Botones de navegación directa a "🔁 Ir a Turnos Fijos" o "⚡ Ir a Grilla de Canchas".
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (tests/Feature/ClubDashboardTest.php):
+    - test_cannot_update_horarios_if_fixed_turn_exceeds_new_closing_time: valida bloqueo ante turno fijo fuera de horario de cierre.
+    - test_cannot_update_horarios_if_casual_turn_starts_before_new_opening_time: valida bloqueo ante turno casual previo a la apertura.
+    - test_cannot_close_day_if_active_turnos_exist: valida rechazo al marcar abierto=false con turnos activos.
+    - test_can_update_horarios_if_turnos_are_in_the_past: valida que reservas pasadas no interfieran.
+    - Total Backend: 200/200 tests exitosos (1090 aserciones).
+  * Frontend Web (tests/authAndOnboarding.test.tsx):
+    - shows conflict modal when modifying business hours clashes with active bookings: valida recepción de HTTP 422, renderizado del modal, badges de conflicto y cierre del modal.
+    - Total Frontend: 68/68 tests exitosos (4 suites).
+===============================================================================

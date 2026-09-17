@@ -31,6 +31,22 @@ interface TipoNegocioItem {
   slug: string;
 }
 
+interface HorarioConflicto {
+  dia_semana: number;
+  dia_nombre: string;
+  tipo: "turno_fijo" | "casual";
+  cliente: string;
+  cliente_telefono?: string | null;
+  cancha: string;
+  hora_inicio: string;
+  hora_fin: string;
+  fecha?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  total_fechas?: number;
+  motivo: string;
+}
+
 interface PlanData {
   id: number;
   nombre: string;
@@ -351,6 +367,8 @@ export default function ClubAdminPanel() {
   const isHorariosDirtyRef = React.useRef<boolean>(false);
   const [horariosSuccessMsg, setHorariosSuccessMsg] = useState<string | null>(null);
   const [horariosErrorMsg, setHorariosErrorMsg] = useState<string | null>(null);
+  const [horariosConflictos, setHorariosConflictos] = useState<HorarioConflicto[]>([]);
+  const [showHorariosConflictModal, setShowHorariosConflictModal] = useState<boolean>(false);
   const [stats, setStats] = useState({ total_canchas: 0, total_turnos: 0, modulos_count: 0 });
 
   // Estados para Datos del Club
@@ -1522,10 +1540,16 @@ export default function ClubAdminPanel() {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
+        if (data.conflictos && Array.isArray(data.conflictos) && data.conflictos.length > 0) {
+          setHorariosConflictos(data.conflictos);
+          setShowHorariosConflictModal(true);
+        }
         throw new Error(data.message || "Error al actualizar los horarios de atención.");
       }
 
       setHorarios(data.horarios || []);
+      setHorariosConflictos([]);
+      setShowHorariosConflictModal(false);
       setHorariosSuccessMsg("¡Horarios de atención actualizados exitosamente!");
       setIsHorariosDirty(false);
       isHorariosDirtyRef.current = false;
@@ -2920,6 +2944,138 @@ export default function ClubAdminPanel() {
                 </div>
               </div>
             </form>
+
+            {/* Modal de Conflictos de Horarios */}
+            {showHorariosConflictModal && horariosConflictos.length > 0 && (
+              <div
+                data-testid="horarios-conflict-modal"
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in"
+              >
+                <div className="relative w-full max-w-2xl rounded-3xl bg-slate-900 border border-amber-500/40 p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowHorariosConflictModal(false)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white text-base p-2 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    ✕
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 text-2xl border border-amber-500/30">
+                      ⚠️
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-white">
+                        Conflicto con Reservas Existentes
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        No es posible aplicar el nuevo horario porque existen {horariosConflictos.length} reserva(s) activa(s) fuera del rango modificado.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* List of conflicting reservations */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                      Turnos que impiden la modificación:
+                    </p>
+                    <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                      {horariosConflictos.map((conflicto, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-2xl bg-slate-950/80 border border-slate-800 p-4 space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              {conflicto.tipo === "turno_fijo" ? (
+                                <span className="rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 text-[11px] font-bold">
+                                  🔁 Turno Fijo
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-bold">
+                                  📅 Reserva Ocasional
+                                </span>
+                              )}
+                              <span className="text-xs font-bold text-white">
+                                {conflicto.dia_nombre} • {conflicto.hora_inicio} a {conflicto.hora_fin} hs
+                              </span>
+                            </div>
+                            <span className="text-xs text-slate-400 font-medium">
+                              🏟️ {conflicto.cancha}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-slate-300">
+                            <span className="flex items-center gap-1.5">
+                              <span>👤</span>
+                              <strong>{conflicto.cliente}</strong>
+                              {conflicto.cliente_telefono && (
+                                <span className="text-slate-500 font-mono text-[11px]">
+                                  ({conflicto.cliente_telefono})
+                                </span>
+                              )}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-rose-400/90 font-medium bg-rose-500/10 rounded-xl px-3 py-1.5 border border-rose-500/20">
+                            ⛔ {conflicto.motivo}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Recommendations */}
+                  <div className="rounded-2xl bg-slate-950 p-4 border border-slate-800 space-y-2 text-xs text-slate-400">
+                    <p className="font-bold text-amber-400 flex items-center gap-1.5">
+                      <span>💡</span> ¿Cómo proceder?
+                    </p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>
+                        Para turnos fijos: ve a la solapa <strong className="text-white">Turnos Fijos</strong> para reubicar la serie o darla de baja.
+                      </li>
+                      <li>
+                        Para reservas casuales: ve a la <strong className="text-white">Grilla de Canchas</strong> para liberar el horario o coordinar con el cliente.
+                      </li>
+                      <li>
+                        O bien, mantén el horario del club lo suficientemente amplio para cubrir estos turnos.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowHorariosConflictModal(false);
+                        setActiveTab("turnos-fijos");
+                      }}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition shadow-md cursor-pointer"
+                    >
+                      🔁 Ir a Turnos Fijos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowHorariosConflictModal(false);
+                        setActiveTab("canchas");
+                      }}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-md cursor-pointer"
+                    >
+                      ⚡ Ir a Grilla de Canchas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowHorariosConflictModal(false)}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold transition cursor-pointer"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

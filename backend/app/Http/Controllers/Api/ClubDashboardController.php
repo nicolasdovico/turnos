@@ -853,6 +853,137 @@ class ClubDashboardController extends Controller
             }
         }
 
+        $diasNombres = [
+            0 => 'Domingo',
+            1 => 'Lunes',
+            2 => 'Martes',
+            3 => 'Miércoles',
+            4 => 'Jueves',
+            5 => 'Viernes',
+            6 => 'Sábado',
+        ];
+
+        $hoy = Carbon::today()->toDateString();
+        $ahoraHora = Carbon::now()->format('H:i');
+        $conflictosMap = [];
+
+        foreach ($validated['horarios'] as $item) {
+            $diaSemana = (int) $item['dia_semana'];
+            $abierto = (bool) $item['abierto'];
+            $nuevaApertura = !empty($item['hora_apertura']) ? substr($item['hora_apertura'], 0, 5) : '08:00';
+            $nuevoCierre = !empty($item['hora_cierre']) ? substr($item['hora_cierre'], 0, 5) : '23:00';
+            $nuevaDuracion = !empty($item['duracion_turno_minutos']) ? (int) $item['duracion_turno_minutos'] : null;
+
+            $horarioActual = HorarioAtencion::where('complejo_id', $complejo->id)
+                ->where('dia_semana', $diaSemana)
+                ->first();
+
+            // Buscar turnos activos en este día de la semana (desde hoy en adelante)
+            $turnosActivos = Turno::withoutGlobalScopes()
+                ->with(['cancha', 'cliente'])
+                ->where('complejo_id', $complejo->id)
+                ->whereNotIn('estado', ['cancelado', 'disponible'])
+                ->where('fecha', '>=', $hoy)
+                ->whereRaw('EXTRACT(DOW FROM fecha) = ?', [$diaSemana])
+                ->orderBy('fecha', 'asc')
+                ->orderBy('hora_inicio', 'asc')
+                ->get();
+
+            foreach ($turnosActivos as $turno) {
+                $fechaStr = $turno->fecha instanceof Carbon ? $turno->fecha->format('Y-m-d') : (string) $turno->fecha;
+                $horaInicioFmt = substr((string)$turno->hora_inicio, 0, 5);
+                $horaFinFmt = substr((string)$turno->hora_fin, 0, 5);
+
+                // Si la reserva es de hoy pero ya terminó, no genera conflicto
+                if ($fechaStr === $hoy && $horaFinFmt <= $ahoraHora) {
+                    continue;
+                }
+
+                $canchaNombre = $turno->cancha?->nombre ?? 'Cancha';
+                $clienteNombre = $turno->cliente_nombre ?: ($turno->cliente?->name ?: 'Cliente Mostrador');
+                $fechaFmt = Carbon::parse($fechaStr)->format('d-m-Y');
+
+                $motivoBase = null;
+                if (!$abierto) {
+                    $motivoBase = "El club se marca como CERRADO este día, pero existen reservas activas.";
+                } elseif ($horaInicioFmt < $nuevaApertura) {
+                    $motivoBase = "Comienza a las {$horaInicioFmt} hs, antes del nuevo horario de apertura ({$nuevaApertura} hs).";
+                } elseif ($horaFinFmt > $nuevoCierre) {
+                    $motivoBase = "Finaliza a las {$horaFinFmt} hs, después del nuevo horario de cierre ({$nuevoCierre} hs).";
+                } elseif ($nuevaDuracion && $horarioActual && (int)$horarioActual->duracion_turno_minutos !== $nuevaDuracion) {
+                    $duracionTurnoMin = Carbon::parse($turno->hora_inicio)->diffInMinutes(Carbon::parse($turno->hora_fin));
+                    if ($duracionTurnoMin !== $nuevaDuracion) {
+                        $motivoBase = "El turno dura {$duracionTurnoMin} min, incompatible con la nueva duración estándar de {$nuevaDuracion} min.";
+                    }
+                }
+
+                if ($motivoBase) {
+                    if ($turno->es_fijo) {
+                        $serieKey = "fijo_{$diaSemana}_{$turno->cancha_id}_{$horaInicioFmt}_{$horaFinFmt}_{$clienteNombre}";
+                        if (!isset($conflictosMap[$serieKey])) {
+                            $conflictosMap[$serieKey] = [
+                                'dia_semana' => $diaSemana,
+                                'dia_nombre' => $diasNombres[$diaSemana] ?? "Día {$diaSemana}",
+                                'tipo' => 'turno_fijo',
+                                'cliente' => $clienteNombre,
+                                'cliente_telefono' => $turno->cliente_telefono ?: ($turno->cliente?->telefono ?: null),
+                                'cancha' => $canchaNombre,
+                                'hora_inicio' => $horaInicioFmt,
+                                'hora_fin' => $horaFinFmt,
+                                'fecha_inicio' => $fechaFmt,
+                                'fecha_fin' => $fechaFmt,
+                                'total_fechas' => 1,
+                                'motivo_base' => $motivoBase,
+                            ];
+                        } else {
+                            $conflictosMap[$serieKey]['total_fechas']++;
+                            $conflictosMap[$serieKey]['fecha_fin'] = $fechaFmt;
+                        }
+                    } else {
+                        $casualKey = "casual_{$turno->id}";
+                        $conflictosMap[$casualKey] = [
+                            'dia_semana' => $diaSemana,
+                            'dia_nombre' => $diasNombres[$diaSemana] ?? "Día {$diaSemana}",
+                            'tipo' => 'casual',
+                            'cliente' => $clienteNombre,
+                            'cliente_telefono' => $turno->cliente_telefono ?: ($turno->cliente?->telefono ?: null),
+                            'cancha' => $canchaNombre,
+                            'hora_inicio' => $horaInicioFmt,
+                            'hora_fin' => $horaFinFmt,
+                            'fecha' => $fechaFmt,
+                            'total_fechas' => 1,
+                            'motivo_base' => $motivoBase,
+                        ];
+                    }
+                }
+            }
+        }
+
+        if (!empty($conflictosMap)) {
+            $conflictos = array_values(array_map(function ($c) {
+                if ($c['tipo'] === 'turno_fijo') {
+                    $fechasTexto = $c['total_fechas'] > 1
+                        ? "serie de {$c['total_fechas']} semanas del {$c['fecha_inicio']} al {$c['fecha_fin']}"
+                        : "fecha {$c['fecha_inicio']}";
+                    $c['motivo'] = "Turno fijo ({$fechasTexto}): {$c['motivo_base']}";
+                } else {
+                    $c['motivo'] = "Reserva puntual ({$c['fecha']}): {$c['motivo_base']}";
+                }
+                return $c;
+            }, $conflictosMap));
+
+            $primerConflicto = $conflictos[0];
+            $msgDetalle = count($conflictos) === 1
+                ? "No es posible modificar los horarios: hay un conflicto con una reserva en {$primerConflicto['dia_nombre']} ({$primerConflicto['hora_inicio']} a {$primerConflicto['hora_fin']} hs)."
+                : "No es posible modificar los horarios: se detectaron " . count($conflictos) . " conflictos con reservas existentes fuera del nuevo rango.";
+
+            return response()->json([
+                'success' => false,
+                'message' => $msgDetalle,
+                'conflictos' => $conflictos,
+            ], 422);
+        }
+
         \Illuminate\Support\Facades\DB::transaction(function () use ($complejo, $validated) {
             foreach ($validated['horarios'] as $item) {
                 $dia = (int) $item['dia_semana'];
