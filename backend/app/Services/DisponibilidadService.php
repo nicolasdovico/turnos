@@ -325,7 +325,7 @@ class DisponibilidadService
         }
 
         // Formatted occupied turnos list (with client details for admin view and current user view)
-        $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($cancha, $esAdmin, $currentUserId) {
+        $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($cancha, $esAdmin, $currentUserId, $fechaCarbon) {
             $precio = (float) $t->precio;
             $montoPagado = (float) ($t->monto_pagado ?? 0);
             if (in_array($t->estado_pago, ['pagado', 'pagado_total']) || in_array($t->estado, ['pagado', 'completado'])) {
@@ -349,8 +349,13 @@ class DisponibilidadService
                 }
             }
 
+            $fechaTurno = $t->fecha ? Carbon::parse($t->fecha)->format('Y-m-d') : $fechaCarbon->format('Y-m-d');
+
             $data = [
                 'id' => $t->id,
+                'cancha_id' => $cancha->id,
+                'cancha_nombre' => $cancha->nombre,
+                'fecha' => $fechaTurno,
                 'hora_inicio' => Carbon::parse($t->hora_inicio)->format('H:i'),
                 'hora_fin' => $t->hora_fin ? Carbon::parse($t->hora_fin)->format('H:i') : null,
                 'duracion_minutos' => $t->duracion_minutos ?: $cancha->duracion_minutos,
@@ -363,11 +368,16 @@ class DisponibilidadService
                 'es_fijo' => (bool) $t->es_fijo,
             ];
 
-            $isMine = $currentUserId && (int) $t->cliente_id === (int) $currentUserId;
+            $userModel = $currentUserId ? \App\Models\User::find($currentUserId) : null;
+            $isMine = $currentUserId && (
+                ((int) $t->cliente_id === (int) $currentUserId) ||
+                ($userModel && $t->cliente_email && strtolower(trim($t->cliente_email)) === strtolower(trim($userModel->email)))
+            );
+
             if ($esAdmin || $isMine) {
                 $data['cliente_id'] = $t->cliente_id;
                 $data['cliente_nombre'] = $t->cliente_nombre ?: ($t->cliente?->name ?: 'Cliente Mostrador');
-                $data['cliente_email'] = $t->cliente?->email;
+                $data['cliente_email'] = $t->cliente?->email ?: $t->cliente_email;
                 $data['cliente_telefono'] = $t->cliente_telefono ?: ($t->cliente?->telefono ?: null);
                 $data['cliente_saldo_billetera'] = $t->cliente_id
                     ? (float) $this->walletService->obtenerSaldo((int) $t->cliente_id, (int) $cancha->complejo_id)

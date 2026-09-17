@@ -850,7 +850,9 @@ describe("Componente Reactivo GrillaHoraria", () => {
     await waitFor(() => {
       expect(screen.getByTestId("client-confirmed-turnos-section")).toBeDefined();
       expect(screen.getByTestId("client-reserved-card")).toBeDefined();
-      expect(screen.getByText(/Seña Abonada/i)).toBeDefined();
+      expect(screen.getByTestId("client-own-slot-17:00")).toBeDefined();
+      expect(screen.getByText("Tu Reserva")).toBeDefined();
+      expect(screen.getAllByText(/Seña Abonada/i).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText(/Saldo en Club/i)).toBeDefined();
       expect(screen.queryByTestId("active-lock-banner")).toBeNull();
     });
@@ -2771,6 +2773,110 @@ describe("Componente Reactivo GrillaHoraria", () => {
     expect(senaBreakdown).toBeDefined();
     expect(senaBreakdown.textContent).toContain("Seña a Cobrar (50%)");
     expect(senaBreakdown.textContent).toContain("7,000");
+  });
+
+  it("muestra a un usuario logueado sus reservas existentes en la grilla y en la sección de reservas confirmadas", async () => {
+    localStorage.setItem("saas_token", "fake-client-token");
+    localStorage.setItem("saas_user", JSON.stringify({ id: 55, name: "Nicolás Dovico", email: "nico@example.com" }));
+
+    const mockDisponibilidad = {
+      slots_disponibles: [
+        { hora_inicio: "16:30", hora_fin: "18:00", disponible: true, precio: 10000 },
+      ],
+      turnos_ocupados: [
+        {
+          id: 301,
+          cancha_id: 1,
+          cancha_nombre: "Cancha 1",
+          fecha: "2026-09-01",
+          hora_inicio: "18:00",
+          hora_fin: "19:30",
+          duracion_minutos: 90,
+          precio: 12000,
+          monto_pagado: 12000,
+          saldo_pendiente: 0,
+          estado: "reservado",
+          estado_pago: "pagado",
+          cliente_id: 55,
+          cliente_nombre: "Nicolás Dovico",
+          cliente_email: "nico@example.com",
+          is_mine: true,
+        },
+        {
+          id: 302,
+          cancha_id: 1,
+          cancha_nombre: "Cancha 1",
+          fecha: "2026-09-01",
+          hora_inicio: "20:00",
+          hora_fin: "21:30",
+          duracion_minutos: 90,
+          precio: 14000,
+          monto_pagado: 7000,
+          saldo_pendiente: 7000,
+          estado: "reservado",
+          estado_pago: "senado",
+          cliente_id: 99,
+          cliente_nombre: "Otro Cliente",
+          cliente_email: "otro@example.com",
+          is_mine: false,
+        },
+      ],
+    };
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, user: { id: 55, name: "Nicolás Dovico", email: "nico@example.com" } }),
+        });
+      }
+      if (url.includes("/turnos/mis-turnos")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, data: [mockDisponibilidad.turnos_ocupados[0]] }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockDisponibilidad),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="padel"
+        subdomain="nico-padel"
+        fechaInicial="2026-09-01"
+        isAdmin={false}
+      />
+    );
+
+    // 1. Debe mostrar el slot disponible 16:30
+    await waitFor(() => {
+      expect(screen.getByText("16:30")).toBeDefined();
+    });
+
+    // 2. El slot de las 18:00 (del usuario) debe renderizarse como propio
+    await waitFor(() => {
+      expect(screen.getByTestId("client-own-slot-18:00")).toBeDefined();
+      expect(screen.getByText("Tu Reserva")).toBeDefined();
+      expect(screen.getByText(/✓ 100% Abonado/i)).toBeDefined();
+    });
+
+    // 3. El slot de las 20:00 (de otro cliente) debe figurar como Ocupado con botón de Lista de Espera
+    expect(screen.getByTestId("waitlist-card-20:00")).toBeDefined();
+    expect(screen.getByRole("button", { name: /Avisarme/i })).toBeDefined();
+
+    // 4. Debe figurar la sección inferior "Tus Reservas Confirmadas" con la tarjeta del turno 18:00
+    expect(screen.getByTestId("client-confirmed-turnos-section")).toBeDefined();
+    expect(screen.getByTestId("client-reserved-card")).toBeDefined();
+    expect(screen.getByText(/18:00 - 19:30 hs/i)).toBeDefined();
+    expect(screen.getByText("Nicolás Dovico")).toBeDefined();
   });
 });
 

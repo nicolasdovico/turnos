@@ -14,6 +14,9 @@ export interface Slot {
   recargo_luz?: number;
   es_fijo?: boolean;
   duracion_minutos?: number;
+  is_mine?: boolean;
+  cliente_nombre?: string;
+  estado_pago?: string;
 }
 
 export interface GrillaHorariaProps {
@@ -376,7 +379,7 @@ export default function GrillaHoraria({
 
         saveConfirmedTurnos((prev) => {
           const now = Date.now();
-          const next = prev.filter((t) => {
+          const filteredPrev = prev.filter((t) => {
             const isMine =
               (t.cliente_id !== undefined && t.cliente_id !== null && Number(t.cliente_id) === Number(userToSync.id)) ||
               (t.cliente_email && userToSync.email && t.cliente_email.toLowerCase() === userToSync.email.toLowerCase()) ||
@@ -389,7 +392,42 @@ export default function GrillaHoraria({
             }
             return true;
           });
-          return next.length !== prev.length ? next : prev;
+
+          // Merge active turnos belonging to this court from the server
+          const serverCourtTurnos: TurnoOcupado[] = activeList
+            .filter((at: any) => Number(at.cancha_id) === Number(canchaId))
+            .map((at: any) => ({
+              id: at.id,
+              cancha_id: at.cancha_id,
+              cancha_nombre: canchaNombre,
+              fecha: at.fecha,
+              hora_inicio: (at.hora_inicio || "").substring(0, 5),
+              hora_fin: (at.hora_fin || "").substring(0, 5),
+              duracion_minutos: at.duracion_minutos || duracion,
+              precio: at.precio ? Number(at.precio) : undefined,
+              monto_pagado: at.monto_pagado !== undefined ? Number(at.monto_pagado) : 0,
+              saldo_pendiente: at.saldo_pendiente !== undefined ? Number(at.saldo_pendiente) : 0,
+              estado: at.estado,
+              estado_pago: at.estado_pago,
+              metodo_pago: at.metodo_pago,
+              cliente_id: userToSync.id,
+              cliente_nombre: userToSync.name,
+              cliente_email: userToSync.email,
+              is_mine: true,
+            }));
+
+          const map = new Map<string, TurnoOcupado>();
+          serverCourtTurnos.forEach((st) => {
+            map.set(`${st.fecha}_${st.hora_inicio}`, st);
+          });
+          filteredPrev.forEach((pt) => {
+            const k = `${pt.fecha}_${pt.hora_inicio}`;
+            if (!map.has(k)) {
+              map.set(k, pt);
+            }
+          });
+
+          return Array.from(map.values());
         });
       }
     } catch {
@@ -427,6 +465,7 @@ export default function GrillaHoraria({
                 fetchWalletBalance();
                 fetchMisSuscripciones();
                 syncClientActiveTurnos(data.user);
+                fetchDisponibilidad(fecha, duracion, true);
               } else {
                 setCurrentUser(null);
                 setWalletBalance(0);
@@ -452,6 +491,7 @@ export default function GrillaHoraria({
         }
       }
       syncClientActiveTurnos(globalAuthUser as CurrentUser);
+      fetchDisponibilidad(fecha, duracion, true);
     } else if (prevUserRef.current) {
       setCurrentUser(null);
       setClienteNombre("");
@@ -799,11 +839,17 @@ export default function GrillaHoraria({
         setClubHorasLimiteCancelacion(Number(data.data.horas_limite_cancelacion));
       }
 
-      const incomingTurnos: TurnoOcupado[] = Array.isArray(data.turnos_ocupados)
+      const rawTurnosOcupados = Array.isArray(data.turnos_ocupados)
         ? data.turnos_ocupados
         : Array.isArray(data.data?.turnos_ocupados)
         ? data.data.turnos_ocupados
         : [];
+      const incomingTurnos: TurnoOcupado[] = rawTurnosOcupados.map((t: any) => ({
+        ...t,
+        cancha_id: t.cancha_id || canchaId,
+        cancha_nombre: t.cancha_nombre || canchaNombre,
+        fecha: t.fecha || targetFecha,
+      }));
 
       // Detect newly booked turnos during silent polling in admin/desk mode and notify
       if (silent && isAdmin && hasLoadedInitialRef.current) {
@@ -1724,7 +1770,8 @@ export default function GrillaHoraria({
     // 1. Locally confirmed turnos in this session
     confirmedTurnos.forEach((t) => {
       const hora = (t.hora_inicio || "").substring(0, 5);
-      if (t.fecha === fecha && !seen.has(hora)) {
+      const tFecha = t.fecha || fecha;
+      if (tFecha === fecha && !seen.has(hora)) {
         const isRecentlyConfirmed = t.created_at_local && (now - t.created_at_local) < 10000;
         if (!isRecentlyConfirmed) {
           if (freeStartTimes.has(hora)) return;
@@ -1735,18 +1782,19 @@ export default function GrillaHoraria({
 
         if (currentUser) {
           const matches =
+            (t as any).is_mine ||
             !t.cliente_id ||
             Number(t.cliente_id) === Number(currentUser.id) ||
             (t.cliente_email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase());
           if (matches) {
             seen.add(hora);
-            list.push({ ...t, hora_inicio: hora });
+            list.push({ ...t, fecha: tFecha, hora_inicio: hora, is_mine: true });
           }
         } else {
           // If logged out / guest, ONLY show reservations made as an unauthenticated guest
           if (!t.cliente_id) {
             seen.add(hora);
-            list.push({ ...t, hora_inicio: hora });
+            list.push({ ...t, fecha: tFecha, hora_inicio: hora });
           }
         }
       }
@@ -1756,7 +1804,8 @@ export default function GrillaHoraria({
     if (currentUser) {
       turnosOcupados.forEach((t) => {
         const hora = (t.hora_inicio || "").substring(0, 5);
-        if (t.fecha === fecha && !seen.has(hora)) {
+        const tFecha = t.fecha || fecha;
+        if (tFecha === fecha && !seen.has(hora)) {
           if (t.estado === "cancelado" || (t as any).estado_pago === "reembolsado") return;
           const isMine =
             (t as any).is_mine ||
@@ -1764,7 +1813,7 @@ export default function GrillaHoraria({
             (t.cliente_email && currentUser.email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase());
           if (isMine) {
             seen.add(hora);
-            list.push({ ...t, hora_inicio: hora });
+            list.push({ ...t, fecha: tFecha, hora_inicio: hora, is_mine: true });
           }
         }
       });
@@ -2592,7 +2641,14 @@ export default function GrillaHoraria({
       {/* Grid of Time Slots (Available only for clients, segmented for admin) */}
       <div className="mt-8">
         {(() => {
-          const availableSlots = slots.filter((s) => s.disponible && !isSlotInPast(s.hora_inicio, fecha));
+          const availableSlots = slots.filter(
+            (s) =>
+              s.disponible &&
+              !isSlotInPast(s.hora_inicio, fecha) &&
+              !clientConfirmedTurnos.some(
+                (ct) => (ct.hora_inicio || "").substring(0, 5) === (s.hora_inicio || "").substring(0, 5)
+              )
+          );
 
           // In client view, combine available slots and occupied slots into the unified grid
           const occupiedMap = new Map<string, Slot>();
@@ -2600,12 +2656,40 @@ export default function GrillaHoraria({
             const hInicio = (t.hora_inicio || "").substring(0, 5);
             const hFin = (t.hora_fin || "").substring(0, 5);
             if (hInicio && !isSlotInPast(hInicio, fecha) && !availableSlots.some((a) => (a.hora_inicio || "").substring(0, 5) === hInicio)) {
+              const isMine =
+                Boolean((t as any).is_mine) ||
+                Boolean(currentUser && (
+                  (t.cliente_id && Number(t.cliente_id) === Number(currentUser.id)) ||
+                  (t.cliente_email && currentUser.email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase())
+                ));
               occupiedMap.set(hInicio, {
                 hora_inicio: hInicio,
                 hora_fin: hFin,
                 disponible: false,
                 precio: t.precio ? Number(t.precio) : undefined,
                 duracion_minutos: t.duracion_minutos,
+                is_mine: isMine,
+                cliente_nombre: t.cliente_nombre,
+                estado_pago: (t as any).estado_pago || t.estado,
+              });
+            }
+          });
+
+          // Also merge clientConfirmedTurnos so anything in clientConfirmedTurnos is represented in occupiedMap as is_mine: true
+          clientConfirmedTurnos.forEach((ct) => {
+            const hInicio = (ct.hora_inicio || "").substring(0, 5);
+            const hFin = (ct.hora_fin || "").substring(0, 5);
+            if (hInicio && !isSlotInPast(hInicio, fecha)) {
+              const existing = occupiedMap.get(hInicio);
+              occupiedMap.set(hInicio, {
+                hora_inicio: hInicio,
+                hora_fin: hFin || existing?.hora_fin || "",
+                disponible: false,
+                precio: ct.precio ? Number(ct.precio) : existing?.precio,
+                duracion_minutos: ct.duracion_minutos || existing?.duracion_minutos,
+                is_mine: true,
+                cliente_nombre: ct.cliente_nombre || existing?.cliente_nombre,
+                estado_pago: (ct as any).estado_pago || ct.estado || existing?.estado_pago,
               });
             }
           });
@@ -2615,13 +2699,15 @@ export default function GrillaHoraria({
             .forEach((s) => {
               const hInicio = (s.hora_inicio || "").substring(0, 5);
               if (hInicio && !availableSlots.some((a) => (a.hora_inicio || "").substring(0, 5) === hInicio)) {
-                occupiedMap.set(hInicio, {
-                  hora_inicio: hInicio,
-                  hora_fin: (s.hora_fin || "").substring(0, 5),
-                  disponible: false,
-                  precio: s.precio ? Number(s.precio) : undefined,
-                  duracion_minutos: s.duracion_minutos,
-                });
+                if (!occupiedMap.has(hInicio)) {
+                  occupiedMap.set(hInicio, {
+                    hora_inicio: hInicio,
+                    hora_fin: (s.hora_fin || "").substring(0, 5),
+                    disponible: false,
+                    precio: s.precio ? Number(s.precio) : undefined,
+                    duracion_minutos: s.duracion_minutos,
+                  });
+                }
               }
             });
 
@@ -2632,7 +2718,7 @@ export default function GrillaHoraria({
                 ...Array.from(occupiedMap.values()),
               ].sort((a, b) => (a.hora_inicio || "").localeCompare(b.hora_inicio || ""));
 
-          const hasOccupied = !isAdmin && displaySlots.some((s) => !s.disponible);
+          const hasOccupied = !isAdmin && displaySlots.some((s) => !s.disponible && !s.is_mine);
 
           return (
             <>
@@ -2727,6 +2813,43 @@ export default function GrillaHoraria({
                             </span>
                           </div>
                         </button>
+                      );
+                    }
+
+                    // Client's own reservation tile
+                    if (slot.is_mine) {
+                      const isPagado =
+                        slot.estado_pago === "pagado" ||
+                        slot.estado_pago === "pagado_total" ||
+                        slot.estado_pago === "completado";
+                      const isSenado =
+                        !isPagado &&
+                        (slot.estado_pago === "senado" || slot.estado_pago === "sena_pagada");
+
+                      return (
+                        <div
+                          key={slot.hora_inicio}
+                          data-testid={`client-own-slot-${slot.hora_inicio}`}
+                          className="relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 bg-emerald-950/40 border-emerald-500/60 ring-1 ring-emerald-500/40 text-white shadow-sm"
+                          aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Tu Reserva`}
+                        >
+                          <div className="flex justify-between items-start w-full">
+                            <span className="font-mono text-lg font-extrabold tracking-tight text-white">
+                              {slot.hora_inicio}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>Tu Reserva</span>
+                            </span>
+                          </div>
+
+                          <div className="mt-3 flex justify-between items-end w-full">
+                            <span className="text-xs text-slate-400 font-medium">hasta {slot.hora_fin}</span>
+                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                              {isPagado ? "✓ 100% Abonado" : isSenado ? "✓ Seña Abonada" : "✓ Confirmado"}
+                            </span>
+                          </div>
+                        </div>
                       );
                     }
 
