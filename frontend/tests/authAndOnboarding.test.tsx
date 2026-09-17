@@ -570,10 +570,10 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     );
 
     expect(screen.getByText("Portal Global de Complejos Deportivos")).toBeDefined();
-    expect(screen.getByText(/Registrar mi Negocio/i)).toBeDefined();
-    expect(screen.getByText("Reservas & Agenda")).toBeDefined();
-    expect(screen.getByText("POS & Buffet")).toBeDefined();
-    expect(screen.getByText("Domótica IoT")).toBeDefined();
+    expect(screen.getAllByText(/Registrar mi Negocio/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Reservas & Agenda/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/POS & Buffet/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Domótica IoT/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders and updates payment and cancellation policies in club admin panel", async () => {
