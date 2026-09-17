@@ -164,7 +164,7 @@ class WalletService
                     'name' => $c->user?->name ?: 'Cliente Desconocido',
                     'email' => $c->user?->email,
                     'telefono' => $c->user?->telefono,
-                    'created_at' => $c->user?->created_at?->format('Y-m-d H:i:s'),
+                    'created_at' => $c->user?->created_at?->format('d-m-Y H:i'),
                 ],
                 'saldo' => (float) $c->saldo,
                 'saldo_formateado' => '$' . number_format((float) $c->saldo, 2, ',', '.'),
@@ -175,9 +175,9 @@ class WalletService
                     'monto_formateado' => ($lastMov->monto > 0 ? '+' : '') . '$' . number_format((float) $lastMov->monto, 2, ',', '.'),
                     'tipo' => $lastMov->tipo,
                     'descripcion' => $lastMov->descripcion,
-                    'created_at' => $lastMov->created_at?->format('Y-m-d H:i:s'),
+                    'created_at' => $lastMov->created_at?->format('d-m-Y H:i'),
                 ] : null,
-                'updated_at' => $c->updated_at?->format('Y-m-d H:i:s'),
+                'updated_at' => $c->updated_at?->format('d-m-Y H:i'),
             ];
         })->values();
 
@@ -208,11 +208,11 @@ class WalletService
                 'monto_formateado' => ($m->monto > 0 ? '+' : '') . '$' . number_format((float) $m->monto, 2, ',', '.'),
                 'tipo' => $m->tipo,
                 'descripcion' => $m->descripcion,
-                'created_at' => $m->created_at?->format('Y-m-d H:i:s'),
+                'created_at' => $m->created_at?->format('d-m-Y H:i'),
                 'created_at_humano' => $m->created_at?->diffForHumans(),
                 'turno' => $m->turno ? [
                     'id' => $m->turno->id,
-                    'fecha' => $m->turno->fecha ? \Carbon\Carbon::parse($m->turno->fecha)->format('Y-m-d') : null,
+                    'fecha' => $m->turno->fecha ? \Carbon\Carbon::parse($m->turno->fecha)->format('d-m-Y') : null,
                     'hora_inicio' => $m->turno->hora_inicio ? substr($m->turno->hora_inicio, 0, 5) : null,
                     'hora_fin' => $m->turno->hora_fin ? substr($m->turno->hora_fin, 0, 5) : null,
                     'cancha_nombre' => $m->turno->cancha?->nombre,

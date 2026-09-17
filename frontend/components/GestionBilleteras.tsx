@@ -25,6 +25,45 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+/**
+ * Formatea fechas al estándar argentino dd-mm-aaaa
+ */
+export const formatFechaDDMMAAAA = (fechaStr?: string | null): string => {
+  if (!fechaStr) return "";
+  const delimiter = fechaStr.includes("T") ? "T" : " ";
+  const parts = fechaStr.split(delimiter);
+  const datePart = parts[0];
+  const dateSub = datePart.split("-");
+
+  if (dateSub.length === 3) {
+    if (dateSub[0].length === 4) {
+      // YYYY-MM-DD -> DD-MM-YYYY
+      return `${dateSub[2].padStart(2, "0")}-${dateSub[1].padStart(2, "0")}-${dateSub[0]}`;
+    }
+    if (dateSub[2].length === 4) {
+      // DD-MM-YYYY
+      return `${dateSub[0].padStart(2, "0")}-${dateSub[1].padStart(2, "0")}-${dateSub[2]}`;
+    }
+  }
+  return datePart;
+};
+
+/**
+ * Formatea fechas con hora al estándar argentino dd-mm-aaaa HH:mm hs
+ */
+export const formatFechaHoraDDMMAAAA = (fechaHoraStr?: string | null): string => {
+  if (!fechaHoraStr) return "";
+  const delimiter = fechaHoraStr.includes("T") ? "T" : " ";
+  const parts = fechaHoraStr.split(delimiter);
+  const dateFormatted = formatFechaDDMMAAAA(parts[0]);
+  if (parts.length > 1 && parts[1]) {
+    const rawTime = parts[1].replace(/hs/i, "").trim();
+    const timePart = rawTime.substring(0, 5);
+    return `${dateFormatted} ${timePart} hs`;
+  }
+  return dateFormatted;
+};
+
 export interface BilleteraItem {
   id: number;
   user_id: number;
@@ -635,7 +674,7 @@ export default function GestionBilleteras({
                               </span>
                             </div>
                             <div className="text-[10px] text-slate-400 truncate max-w-[190px]" title={item.ultimo_movimiento.descripcion || ""}>
-                              {item.ultimo_movimiento.created_at} • {item.ultimo_movimiento.descripcion || "Sin detalle"}
+                              {formatFechaHoraDDMMAAAA(item.ultimo_movimiento.created_at)} • {item.ultimo_movimiento.descripcion || "Sin detalle"}
                             </div>
                           </div>
                         ) : (
@@ -779,14 +818,14 @@ export default function GestionBilleteras({
                               {m.turno && (
                                 <span className="text-[10px] font-semibold text-slate-300 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-700">
                                   {m.turno.cancha_nombre ? `${m.turno.cancha_nombre} • ` : ""}
-                                  {m.turno.fecha} {m.turno.hora_inicio} hs
+                                  {formatFechaDDMMAAAA(m.turno.fecha)}{m.turno.hora_inicio ? ` ${m.turno.hora_inicio} hs` : ""}
                                 </span>
                               )}
                             </div>
                             <p className="text-[11px] text-slate-400 mt-0.5">{m.descripcion || "Sin descripción"}</p>
                             <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-1">
                               <Calendar className="w-3 h-3 text-slate-500" />
-                              <span>{m.created_at}</span>
+                              <span>{formatFechaHoraDDMMAAAA(m.created_at)}</span>
                               {m.created_at_humano && <span>({m.created_at_humano})</span>}
                             </div>
                           </div>

@@ -142,6 +142,8 @@ class ClubBilleterasAdminTest extends TestCase
         // The second movement has turno relation
         $this->assertEquals(5000, $response->json('movimientos.1.monto'));
         $this->assertEquals('Cancha Central', $response->json('movimientos.1.turno.cancha_nombre'));
+        $this->assertEquals('10-10-2026', $response->json('movimientos.1.turno.fecha'));
+        $this->assertMatchesRegularExpression('/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$/', $response->json('movimientos.0.created_at'));
     }
 
     public function test_club_owner_can_credit_and_debit_wallet_manually(): void

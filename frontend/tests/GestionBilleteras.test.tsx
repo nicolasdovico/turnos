@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import GestionBilleteras from "../components/GestionBilleteras";
+import GestionBilleteras, { formatFechaDDMMAAAA, formatFechaHoraDDMMAAAA } from "../components/GestionBilleteras";
 
 describe("GestionBilleteras Component", () => {
   const mockMetricas = {
@@ -173,6 +173,10 @@ describe("GestionBilleteras Component", () => {
       expect(screen.getAllByText("+$5.000,00").length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText("-$3.000,00")).toBeDefined();
       expect(screen.getByText(/Cancha Panorámica/i)).toBeDefined();
+      // Verificamos que la fecha del turno se muestre en dd-mm-aaaa
+      expect(screen.getByText(/18-09-2026 19:00 hs/i)).toBeDefined();
+      // Verificamos que la fecha del movimiento se muestre en dd-mm-aaaa HH:mm hs
+      expect(screen.getByText(/17-09-2026 15:00 hs/i)).toBeDefined();
     });
   });
 
@@ -217,4 +221,24 @@ describe("GestionBilleteras Component", () => {
       );
     });
   });
+
+  describe("Funciones utilitarias de formateo de fecha (dd-mm-aaaa)", () => {
+    it("formatFechaDDMMAAAA convierte YYYY-MM-DD a DD-MM-YYYY correctamente", () => {
+      expect(formatFechaDDMMAAAA("2026-09-18")).toBe("18-09-2026");
+      expect(formatFechaDDMMAAAA("2026-01-05")).toBe("05-01-2026");
+      expect(formatFechaDDMMAAAA("18-09-2026")).toBe("18-09-2026");
+      expect(formatFechaDDMMAAAA("")).toBe("");
+      expect(formatFechaDDMMAAAA(null)).toBe("");
+      expect(formatFechaDDMMAAAA(undefined)).toBe("");
+    });
+
+    it("formatFechaHoraDDMMAAAA formatea fecha con hora a DD-MM-YYYY HH:mm hs", () => {
+      expect(formatFechaHoraDDMMAAAA("2026-09-17 19:00:00")).toBe("17-09-2026 19:00 hs");
+      expect(formatFechaHoraDDMMAAAA("17-09-2026 19:00")).toBe("17-09-2026 19:00 hs");
+      expect(formatFechaHoraDDMMAAAA("2026-10-01T14:30:00Z")).toBe("01-10-2026 14:30 hs");
+      expect(formatFechaHoraDDMMAAAA("")).toBe("");
+      expect(formatFechaHoraDDMMAAAA(null)).toBe("");
+    });
+  });
 });
+
