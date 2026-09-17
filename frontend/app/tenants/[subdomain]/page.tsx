@@ -213,18 +213,6 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
               <span className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1 text-xs font-semibold capitalize">
                 🏆 {complejo.deporte_principal}
               </span>
-              {complejo.telefono && (
-                <button
-                  type="button"
-                  onClick={() => setShowPublicQrModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-500/40 px-3.5 py-1 text-xs font-bold transition shadow-sm cursor-pointer"
-                  title="Ver código QR para chatear por WhatsApp"
-                  data-testid="header-qr-button"
-                >
-                  <span>📱</span>
-                  <span>QR WhatsApp</span>
-                </button>
-              )}
             </div>
 
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white capitalize">
@@ -245,6 +233,22 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
               Portal oficial de reservas de turnos en vivo. Selecciona tu cancha, fecha y horario para asegurar tu lugar al instante con confirmación inmediata.
             </p>
+
+            {complejo.telefono && (
+              <div className="pt-1 flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowPublicQrModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 hover:border-emerald-500/60 transition shadow-sm cursor-pointer group text-xs font-semibold"
+                  title="Escanear código QR para chatear por WhatsApp desde tu celular"
+                  data-testid="header-qr-button"
+                >
+                  <span className="text-sm">📱</span>
+                  <span>¿Estás en la PC? <strong>Escaneá el Código QR de WhatsApp</strong></span>
+                  <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
