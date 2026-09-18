@@ -146,6 +146,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/resend-otp', [\App\Http\Controllers\Api\OtpVerificationController::class, 'resendOtp']);
     Route::post('/send-otp', [\App\Http\Controllers\Api\OtpVerificationController::class, 'resendOtp']);
 
+    // Google OAuth 2.0
+    Route::get('/google/redirect', [\App\Http\Controllers\Api\GoogleAuthController::class, 'redirect']);
+    Route::get('/google/callback', [\App\Http\Controllers\Api\GoogleAuthController::class, 'callback']);
+    Route::post('/google/token', [\App\Http\Controllers\Api\GoogleAuthController::class, 'tokenAuth']);
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout']);
         Route::get('/me', [\App\Http\Controllers\Api\AuthController::class, 'me']);

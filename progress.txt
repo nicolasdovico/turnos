@@ -2026,7 +2026,68 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend Mobile:
     - Total Mobile Suite: 20/20 tests exitosos al 100% (4 suites).
   * Gran Total del Ecosistema: 330/330 tests automatizados en verde con 0 regresiones.
+-------------------------------------------------------------------------------
+[2026-09-18] - MÓDULO DE AUTENTICACIÓN GOOGLE OAUTH 2.0 MULTI-TENANT & SSO
+-------------------------------------------------------------------------------
+- Contexto y Requerimiento:
+  * Permitir inicio de sesión y registro con un clic a través de Google OAuth 2.0 tanto en el portal central (localhost:8080) como en subdominios de clubes deportivos (*.localhost:8080 / *.turnos.com).
+  * Vinculación automática e inteligente con cuentas ya existentes por email (sin duplicación de registros ni pérdida de historial de reservas o saldo en billetera digital).
+  * Validación automática de correo (email_verified_at = now()) para usuarios nuevos registrados mediante Google, omitiendo flujo manual de OTP.
+- Arquitectura y Componentes Desarrollados:
+  * 1. Dependencias y Base de Datos:
+    - Instalación de `laravel/socialite` en backend.
+    - Migración `2026_09_18_170000_add_google_auth_fields_to_users_table.php`:
+      * `google_id` (string nullable, indexado, único).
+      * `avatar` (string nullable).
+      * `password` nullable para soportar usuarios creados puramente vía OAuth.
+    - Modelo `User`: actualización de `$fillable` con `google_id` y `avatar`.
+    - Configuración en `backend/config/services.php`: credenciales de proveedor `'google'` con defaults para desarrollo.
+  * 2. Backend Endpoints & Controlador (`GoogleAuthController`):
+    - `GET /api/auth/google/redirect`:
+      * Serializa la URL de retorno (`returnTo`) en el parámetro `state` de OAuth (base64).
+      * Redirección stateless hacia la pantalla de consentimiento de Google.
+    - `GET /api/auth/google/callback`:
+      * Decodifica `state` recuperando el subdominio o ruta de origen (`returnTo`).
+      * Maneja cancelaciones del usuario (`access_denied`) y errores de red redirigiendo con mensajes descriptivos.
+      * Obtiene datos del perfil de Google (`getId`, `getEmail`, `getName`, `getAvatar`).
+      * Vincula cuentas existentes por email o crea un nuevo usuario verificado.
+      * Emite Bearer token de Sanctum y setea cookie cross-subdomain `saas_auth_token` para `.localhost` / dominio raíz.
+      * Redirige al navegador a `${targetUrl}?auth_token=...&google_login=success`.
+    - `POST /api/auth/google/token`:
+      * Endpoint directo para SPA o Apps móviles que obtienen el `id_token` o `access_token` de forma nativa.
+  * 3. Frontend Web Next.js 14:
+    - Componente reusable `GoogleLoginButton` (`frontend/components/GoogleLoginButton.tsx`):
+      * Logotipo oficial SVG de Google en 4 colores.
+      * Soporta variantes visuales `light` (para login/registro) y `dark` (para modales oscuros).
+      * Detección y codificación automática del `returnTo` manteniendo el subdominio actual.
+    - Integración en `frontend/app/login/page.tsx`:
+      * Botón "Continuar con Google" con separador visual.
+      * Detección de mensajes de error o cancelación (`google_login=error`, `google_login=cancelled`).
+    - Integración en `frontend/app/registro/page.tsx`:
+      * Botón "Registrarse con Google" con separador visual.
+    - Integración en `frontend/components/GrillaHoraria.tsx`:
+      * Botón "Continuar con Google" en el modal de reserva para visitantes no autenticados, permitiendo reservar con 1 clic sin salir del contexto.
+    - Resiliencia en `formatWhatsAppNumber`:
+      * Sanitización de valores nulos/indefinidos previniendo excepciones en renderizado del header de tenant.
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (`tests/Feature/GoogleAuthTest.php`):
+    - `test_google_redirect_generates_oauth_redirect_with_encoded_state`: 100% exitoso.
+    - `test_google_callback_creates_new_user_with_verified_email`: 100% exitoso.
+    - `test_google_callback_links_existing_user_by_email`: 100% exitoso.
+    - `test_google_callback_handles_user_cancellation`: 100% exitoso.
+    - `test_google_callback_handles_socialite_failure`: 100% exitoso.
+    - `test_google_token_auth_endpoint_creates_or_authenticates_user`: 100% exitoso.
+    - `test_google_token_auth_validates_required_token`: 100% exitoso.
+    - `test_google_token_auth_handles_invalid_token`: 100% exitoso.
+    - Total Backend Suite: 233/233 tests exitosos al 100% (1.243 aserciones).
+  * Frontend Web (`tests/GoogleAuth.test.tsx`):
+    - 9 tests cubriendo renderizado, navegación, encoding de URLs de subdominios, alertas de cancelación/error e ingesta de sesión en `AuthProvider`.
+    - Total Frontend Web Suite: 96/96 tests exitosos al 100% (9 suites).
+  * Frontend Mobile:
+    - Total Mobile Suite: 20/20 tests exitosos al 100% (4 suites).
+  * Gran Total del Ecosistema: 349/349 tests automatizados en verde con 0 regresiones.
 ===============================================================================
+
 
 
 

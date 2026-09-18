@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock, DollarSign, User, Calendar, Loader2 } from "lucide-react";
 import { useAuth, setCrossDomainCookie } from "@/context/AuthContext";
+import GoogleLoginButton from "@/components/GoogleLoginButton";
 
 export interface Slot {
   hora_inicio: string;
@@ -136,7 +137,8 @@ export const formatFechaDDMMAAAA = (fechaStr?: string): string => {
   return fechaStr;
 };
 
-export const formatWhatsAppNumber = (phone: string): string => {
+export const formatWhatsAppNumber = (phone?: string | null): string => {
+  if (!phone) return "";
   const digits = phone.replace(/\D/g, "");
   if (!digits) return "";
   let d = digits.startsWith("0") ? digits.slice(1) : digits;
@@ -4405,6 +4407,22 @@ export default function GrillaHoraria({
               ) : (
                 /* CASE 3: Unauthenticated Visitor -> Model A Register or Login */
                 <>
+                  <div className="mb-3">
+                    <GoogleLoginButton
+                      variant="dark"
+                      text="Continuar con Google"
+                      dataTestId="google-login-modal-btn"
+                    />
+                    <div className="relative my-3">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-800" />
+                      </div>
+                      <div className="relative flex justify-center text-[10px] uppercase">
+                        <span className="bg-slate-900 px-2 text-slate-500 font-semibold tracking-wider">o con credenciales</span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex p-1 bg-slate-950 rounded-2xl border border-slate-800 text-xs">
                     <button
                       type="button"

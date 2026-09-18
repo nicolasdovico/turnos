@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import PasswordInput from "../../components/PasswordInput";
+import GoogleLoginButton from "../../components/GoogleLoginButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,6 +24,12 @@ export default function LoginPage() {
       const target = params.get("returnTo") || params.get("redirect");
       if (target) {
         setReturnUrl(target);
+      }
+      const googleStatus = params.get("google_login");
+      if (googleStatus === "cancelled") {
+        setError("Inicio de sesión con Google cancelado.");
+      } else if (googleStatus === "error") {
+        setError(params.get("message") || "No se pudo iniciar sesión con Google. Inténtalo nuevamente.");
       }
     }
   }, []);
@@ -192,6 +199,17 @@ export default function LoginPage() {
               {isSubmitting ? "Ingresando..." : "Ingresar a mi cuenta"}
             </button>
           </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-3 text-slate-400 font-medium tracking-wider">o continuar con</span>
+            </div>
+          </div>
+
+          <GoogleLoginButton returnTo={returnUrl || undefined} text="Continuar con Google" />
 
           {/* Links */}
           <div className="mt-6 text-center text-sm text-slate-600">

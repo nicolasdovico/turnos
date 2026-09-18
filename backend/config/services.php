@@ -56,4 +56,10 @@ return [
         'instance' => env('EVOLUTION_API_INSTANCE', 'turnos'),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID', 'test_google_client_id'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET', 'test_google_client_secret'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', 'http://localhost:8080/api/auth/google/callback'),
+    ],
+
 ];

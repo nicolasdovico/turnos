@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulo de Recordatorios Automáticos y Manuales por WhatsApp (Evolution API)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Sistema de Recordatorios Preventivos por WhatsApp con Anti-No-Show, Idempotencia y Multi-tenancy 100% Operativo)
-- **Última Actualización:** 2026-09-18 (Implementación completa de recordatorios por WhatsApp vía Evolution API: migración en BD, scheduler cada 5 min con ventana de anticipación configurable 60/120/180 min, endpoint manual en panel de control, card en Políticas del club, botón interactivo en Resumen Diario & Caja, y 330 tests automatizados en verde: 224 backend, 86 frontend, 20 mobile).
+- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulo de Recordatorios Automáticos por WhatsApp + Módulo de Autenticación Google OAuth 2.0 Multi-tenant
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Sistema de Autenticación con Google OAuth 2.0 y Recordatorios Preventivos por WhatsApp 100% Operativos)
+- **Última Actualización:** 2026-09-18 (Implementación completa de inicio de sesión y registro con Google OAuth 2.0: migración en BD para `google_id` y `avatar`, vinculación automática de cuentas existentes, redirección cross-subdomain preservando tenant mediante `state`, endpoint de autenticación directa por token, componente `GoogleLoginButton` en Login, Registro y Modal de reservas en `GrillaHoraria`, y 349 tests automatizados en verde: 233 backend, 96 frontend, 20 mobile).
 
 ---
 

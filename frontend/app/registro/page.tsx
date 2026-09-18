@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import PasswordInput from "../../components/PasswordInput";
+import GoogleLoginButton from "../../components/GoogleLoginButton";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -24,6 +25,12 @@ export default function RegisterPage() {
       const target = params.get("returnTo") || params.get("redirect");
       if (target) {
         setReturnUrl(target);
+      }
+      const googleStatus = params.get("google_login");
+      if (googleStatus === "cancelled") {
+        setError("Registro con Google cancelado.");
+      } else if (googleStatus === "error") {
+        setError(params.get("message") || "No se pudo registrar con Google. Inténtalo nuevamente.");
       }
     }
   }, []);
@@ -186,6 +193,17 @@ export default function RegisterPage() {
               {isSubmitting ? "Registrando cuenta..." : "Crear mi Cuenta"}
             </button>
           </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-3 text-slate-400 font-medium tracking-wider">o registrarse con</span>
+            </div>
+          </div>
+
+          <GoogleLoginButton returnTo={returnUrl || undefined} text="Registrarse con Google" />
 
           <div className="mt-6 text-center text-sm text-slate-600">
             ¿Ya tienes una cuenta?{" "}
