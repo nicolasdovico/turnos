@@ -1931,4 +1931,37 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Next.js 14 Production Build (`npm run build`): 100% exitoso (11/11 rutas estáticas generadas).
   * Frontend Mobile: 20/20 tests Jest exitosos al 100% (4 suites).
 ===============================================================================
+[2026-09-18] - RESOLUCIÓN DE SINCRONIZACIÓN SSO & TRANSFERENCIA DE SESIONES ENTRE SUBDOMINIOS
+-------------------------------------------------------------------------------
+- Diagnóstico:
+  * Inconsistencia de sesión en navegación multi-tenant: Un usuario autenticado en un club (ej. `http://nico-padel.localhost:8080/`) o en el portal central (`http://localhost:8080/`), al abrir en otra pestaña un segundo club (ej. `http://nico-tenis.localhost:8080/`), aparecía como visitante no autenticado en la barra de navegación superior y en la grilla de reservas.
+  * Al hacer clic en "Iniciar Sesión" desde el subdominio, era redirigido a `http://localhost:8080/login?returnTo=http://nico-tenis.localhost:8080/`. En esa pantalla se le informaba "Sesión Activa" (reconociendo su email), pero el botón "Volver al Club / Reserva" apuntaba al `returnUrl` sin adjuntar el token (`auth_token`), haciendo que al volver al club el usuario continuara sin estar autenticado.
+  * Las cookies `saas_auth_token` se creaban sin el atributo comodín `domain=.localhost` (o `domain=.turnos.com`), quedando aisladas como host-only. Además, `restoreSession()` en `AuthContext` solo leía `localStorage` y no inspeccionaba `document.cookie` como fallback.
+- Soluciones Implementadas:
+  * Frontend Web Next.js 14 (`frontend/context/AuthContext.tsx`):
+    - Creación de helpers universales: `getCookie`, `setCrossDomainCookie` y `clearCrossDomainCookie`.
+    - `setCrossDomainCookie`: Almacena la cookie `saas_auth_token` con el dominio comodín correspondiente (`domain=.localhost;` y `domain=localhost;` para desarrollo local, y `domain=.turnos.com;` o dominio base para producción).
+    - `clearCrossDomainCookie`: Purga la cookie en todas las variantes de dominio al cerrar sesión (`logout`).
+    - Hidratación automática en `restoreSession`: Si `localStorage` no posee token, inspecciona `document.cookie` buscando `saas_auth_token`. Si existe, lo almacena en `localStorage` del subdominio, consulta `/api/auth/me`, hidrata los datos del usuario y sincroniza el estado. Si la API retorna 401/403 (token inválido o expirado), purga la sesión y la cookie de forma segura.
+  * Login Central & SSO Redirect (`frontend/app/login/page.tsx` y `frontend/app/registro/page.tsx`):
+    - Detección de sesión activa con URL de retorno: Si el usuario ya está conectado y llega con `returnTo` o `redirect`, el botón "Volver al Club / Reserva" transfiere el token de autenticación: `${returnUrl}${sep}auth_token=${encodeURIComponent(token)}`.
+    - Redirección automática fluida: Muestra aviso de conexión con el club y redirige automáticamente con el token adjunto tras 1 segundo.
+    - Opción para cambiar de cuenta: Incorpora el botón "Ingresar con otra cuenta" / "Registrar otra cuenta" que invoca `logout()` y presenta el formulario limpio.
+  * Fallback de Cookie en Grilla Horaria (`frontend/components/GrillaHoraria.tsx`):
+    - `getAuthToken`: Incorpora fallback a `document.cookie` para recuperar `saas_auth_token` si `localStorage` no ha terminado de sincronizarse.
+    - Uso de `setCrossDomainCookie` en login o registro in-modal.
+- Tests Automatizados & Verificación de Calidad:
+  * Nueva Suite de Tests Unitarios (`frontend/tests/ssoCrossDomain.test.tsx`):
+    - `LoginPage with active session and returnTo transfers auth_token in return button`: 100% exitoso.
+    - `LoginPage allows switching accounts via 'Ingresar con otra cuenta'`: 100% exitoso.
+    - `RegisterPage with active session and returnTo transfers auth_token in return button`: 100% exitoso.
+    - `AuthProvider restores session from cross-subdomain cookie when localStorage is empty`: 100% exitoso.
+    - `GrillaHoraria getAuthToken falls back to cookie when localStorage is empty`: 100% exitoso.
+  * Total de Tests del Ecosistema:
+    - Frontend Web: 84/84 tests exitosos al 100% (7 suites).
+    - Backend Laravel: 215/215 tests exitosos al 100% (1.163 aserciones).
+    - Frontend Mobile: 20/20 tests exitosos al 100% (4 suites).
+    - Total: 319/319 tests en verde al 100%.
+===============================================================================
+
 

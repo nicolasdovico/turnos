@@ -8,7 +8,7 @@ import PasswordInput from "../../components/PasswordInput";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, user } = useAuth();
+  const { register, logout, user, token } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -16,8 +16,28 @@ export default function RegisterPage() {
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [returnUrl, setReturnUrl] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const target = params.get("returnTo") || params.get("redirect");
+      if (target) {
+        setReturnUrl(target);
+      }
+    }
+  }, []);
+
+  const getTransferUrl = (targetUrl: string, authToken: string | null) => {
+    if (!authToken) return targetUrl;
+    const sep = targetUrl.includes("?") ? "&" : "?";
+    return `${targetUrl}${sep}auth_token=${encodeURIComponent(authToken)}`;
+  };
 
   if (user) {
+    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
+    const destination = returnUrl ? getTransferUrl(returnUrl, activeToken) : null;
+
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-lg border border-slate-100">
@@ -25,19 +45,37 @@ export default function RegisterPage() {
             ✓
           </div>
           <h2 className="text-2xl font-bold text-slate-900">Ya tienes una sesión activa</h2>
-          <p className="mt-2 text-slate-600">
+          <p className="mt-2 text-slate-600 text-sm">
             Estás conectado como <strong className="text-slate-900">{user.email}</strong>.
           </p>
           <div className="mt-6 flex flex-col gap-3">
+            {destination ? (
+              <a
+                href={destination}
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 transition text-sm flex items-center justify-center gap-2"
+              >
+                <span>Continuar en mi Club / Reserva</span>
+                <span>↗</span>
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={async () => {
+                await logout();
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50 transition text-sm"
+            >
+              Registrar otra cuenta
+            </button>
             <Link
               href="/"
-              className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 transition"
+              className="rounded-xl bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200 transition text-sm"
             >
               Ir al Inicio
             </Link>
             <Link
               href="/registro-club"
-              className="rounded-xl bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200 transition"
+              className="rounded-xl bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200 transition text-sm"
             >
               Registrar mi Club
             </Link>

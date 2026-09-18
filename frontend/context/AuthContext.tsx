@@ -33,6 +33,54 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
+export function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^|;\\s*)" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+export function setCrossDomainCookie(name: string, value: string, maxAge = 604800) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const hostname = window.location.hostname.toLowerCase();
+
+  // Host-only cookie fallback
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+  // Shared parent domain cookies
+  if (hostname.endsWith(".localhost") || hostname === "localhost") {
+    document.cookie = `${name}=${encodeURIComponent(value)}; domain=localhost; path=/; max-age=${maxAge}; SameSite=Lax`;
+    document.cookie = `${name}=${encodeURIComponent(value)}; domain=.localhost; path=/; max-age=${maxAge}; SameSite=Lax`;
+  } else if (hostname.endsWith(".turnos.com") || hostname === "turnos.com") {
+    document.cookie = `${name}=${encodeURIComponent(value)}; domain=.turnos.com; path=/; max-age=${maxAge}; SameSite=Lax`;
+  } else {
+    const parts = hostname.split(".");
+    if (parts.length >= 2 && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+      const parentDomain = parts.slice(-2).join(".");
+      document.cookie = `${name}=${encodeURIComponent(value)}; domain=.${parentDomain}; path=/; max-age=${maxAge}; SameSite=Lax`;
+    }
+  }
+}
+
+export function clearCrossDomainCookie(name: string) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const hostname = window.location.hostname.toLowerCase();
+  const domainsToClear = [
+    "",
+    `domain=${hostname}; `,
+    "domain=localhost; ",
+    "domain=.localhost; ",
+    "domain=turnos.com; ",
+    "domain=.turnos.com; ",
+  ];
+  const parts = hostname.split(".");
+  if (parts.length >= 2 && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    domainsToClear.push(`domain=.${parts.slice(-2).join(".")}; `);
+  }
+  domainsToClear.forEach((cd) => {
+    document.cookie = `${name}=; ${cd}path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+  });
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -52,7 +100,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (urlToken) {
             savedToken = urlToken;
             localStorage.setItem("saas_token", urlToken);
-            document.cookie = `saas_auth_token=${urlToken}; path=/; max-age=604800; SameSite=Lax`;
+            localStorage.setItem("token", urlToken);
+            setCrossDomainCookie("saas_auth_token", urlToken);
 
             // Clean query param from browser URL bar without page reload
             const cleanUrl = window.location.pathname;
@@ -60,9 +109,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
+        // If no token in localStorage or URL, check cross-subdomain cookie
+        if (!savedToken && typeof window !== "undefined") {
+          const cookieToken = getCookie("saas_auth_token");
+          if (cookieToken) {
+            savedToken = cookieToken;
+            localStorage.setItem("saas_token", cookieToken);
+            localStorage.setItem("token", cookieToken);
+          }
+        }
+
         if (savedToken) {
           setToken(savedToken);
-          document.cookie = `saas_auth_token=${savedToken}; path=/; max-age=604800; SameSite=Lax`;
+          setCrossDomainCookie("saas_auth_token", savedToken);
 
           if (savedUser) {
             try {
@@ -83,7 +142,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (data && data.user) {
                 setUser(data.user);
                 localStorage.setItem("saas_user", JSON.stringify(data.user));
+                window.dispatchEvent(
+                  new CustomEvent("saas-auth-changed", { detail: { user: data.user, token: savedToken } })
+                );
               }
+            } else if (res.status === 401 || res.status === 403) {
+              // Token invalid or expired
+              setToken(null);
+              setUser(null);
+              localStorage.removeItem("saas_token");
+              localStorage.removeItem("token");
+              localStorage.removeItem("saas_user");
+              clearCrossDomainCookie("saas_auth_token");
+              window.dispatchEvent(
+                new CustomEvent("saas-auth-changed", { detail: { user: null, token: null } })
+              );
             }
           } catch (fetchErr) {
             console.error("Error al actualizar perfil en background:", fetchErr);
@@ -103,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleAuthChange = () => {
       if (typeof window === "undefined") return;
-      const savedToken = localStorage.getItem("saas_token") || localStorage.getItem("token");
+      const savedToken = localStorage.getItem("saas_token") || localStorage.getItem("token") || getCookie("saas_auth_token");
       const savedUser = localStorage.getItem("saas_user");
       if (savedToken && savedUser) {
         try {
@@ -131,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("saas_token", newToken);
     localStorage.setItem("token", newToken);
     localStorage.setItem("saas_user", JSON.stringify(newUser));
-    document.cookie = `saas_auth_token=${newToken}; path=/; max-age=604800; SameSite=Lax`;
+    setCrossDomainCookie("saas_auth_token", newToken);
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("saas-auth-changed", { detail: { user: newUser, token: newToken } })
@@ -221,18 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           sessionStorage.clear();
         } catch {}
 
-        // Expire cookie across all possible domain permutations
-        const cookieDomains = [
-          "",
-          `domain=${window.location.hostname}; `,
-          "domain=localhost; ",
-          "domain=.localhost; ",
-          "domain=turnos.com; ",
-          "domain=.turnos.com; ",
-        ];
-        cookieDomains.forEach((cd) => {
-          document.cookie = `saas_auth_token=; ${cd}path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
-        });
+        clearCrossDomainCookie("saas_auth_token");
 
         window.dispatchEvent(
           new CustomEvent("saas-auth-changed", { detail: { user: null, token: null } })

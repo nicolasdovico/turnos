@@ -8,13 +8,14 @@ import PasswordInput from "../../components/PasswordInput";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, user } = useAuth();
+  const { login, logout, user, token } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [returnUrl, setReturnUrl] = useState<string | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -26,36 +27,85 @@ export default function LoginPage() {
     }
   }, []);
 
+  const getTransferUrl = (targetUrl: string, authToken: string | null) => {
+    if (!authToken) return targetUrl;
+    const sep = targetUrl.includes("?") ? "&" : "?";
+    return `${targetUrl}${sep}auth_token=${encodeURIComponent(authToken)}`;
+  };
+
+  // Auto-transfer session to returning club if already logged in
+  React.useEffect(() => {
+    if (user && returnUrl && !isRedirecting) {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
+      if (activeToken) {
+        setIsRedirecting(true);
+        const destination = getTransferUrl(returnUrl, activeToken);
+        const timer = setTimeout(() => {
+          window.location.href = destination;
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [user, returnUrl, token, isRedirecting]);
+
   // If already logged in
   if (user) {
+    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
+    const destination = returnUrl ? getTransferUrl(returnUrl, activeToken) : null;
+
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-lg border border-slate-100">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4">
-            ✓
+            {isRedirecting ? (
+              <span className="animate-spin text-xl">⚡</span>
+            ) : (
+              <span>✓</span>
+            )}
           </div>
           <h2 className="text-2xl font-bold text-slate-900">Sesión Activa</h2>
-          <p className="mt-2 text-slate-600">
+          <p className="mt-2 text-slate-600 text-sm">
             Has iniciado sesión como <strong className="text-slate-900">{user.email}</strong>.
           </p>
+
+          {isRedirecting && returnUrl && (
+            <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-800 animate-pulse">
+              🚀 Conectando sesión con tu club... Redirigiendo automáticamente.
+            </div>
+          )}
+
           <div className="mt-6 flex flex-col gap-3">
-            {returnUrl ? (
+            {destination ? (
               <a
-                href={returnUrl}
-                className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 transition"
+                href={destination}
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition text-sm flex items-center justify-center gap-2"
               >
-                Volver al Club / Reserva
+                <span>Volver al Club / Reserva</span>
+                <span>↗</span>
               </a>
             ) : null}
+
+            <button
+              type="button"
+              onClick={async () => {
+                await logout();
+                setIsRedirecting(false);
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-50 transition text-sm"
+            >
+              Ingresar con otra cuenta
+            </button>
+
             <Link
               href="/"
-              className="rounded-xl bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200 transition"
+              className="rounded-xl bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200 transition text-sm"
             >
               Ir al Portal Principal
             </Link>
+
             <Link
               href="/registro-club"
-              className="rounded-xl bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200 transition"
+              className="rounded-xl bg-slate-100 px-4 py-2.5 font-semibold text-slate-700 hover:bg-slate-200 transition text-sm"
             >
               Registrar un Nuevo Club
             </Link>

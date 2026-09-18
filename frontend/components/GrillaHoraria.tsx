@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock, DollarSign, User, Calendar, Loader2 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, setCrossDomainCookie } from "@/context/AuthContext";
 
 export interface Slot {
   hora_inicio: string;
@@ -169,12 +169,21 @@ export const getPhoneValidationError = (phone: string): string | null => {
 export const getAuthToken = (explicitToken?: string | null): string | null => {
   if (explicitToken) return explicitToken;
   if (typeof window === "undefined") return null;
-  return (
+  const local =
     localStorage.getItem("saas_token") ||
     localStorage.getItem("token") ||
-    localStorage.getItem("auth_token") ||
-    null
-  );
+    localStorage.getItem("auth_token");
+  if (local) return local;
+
+  // Fallback to cross-subdomain cookie
+  if (typeof document !== "undefined") {
+    const match = document.cookie.match(/(?:^|;\s*)saas_auth_token=([^;]*)/);
+    if (match) {
+      return decodeURIComponent(match[1]);
+    }
+  }
+
+  return null;
 };
 
 export default function GrillaHoraria({
@@ -2085,7 +2094,7 @@ export default function GrillaHoraria({
             if (validToken) {
               localStorage.setItem("saas_token", validToken);
               localStorage.setItem("token", validToken);
-              document.cookie = `saas_auth_token=${validToken}; path=/; max-age=604800; SameSite=Lax`;
+              setCrossDomainCookie("saas_auth_token", validToken);
               activeToken = validToken;
             }
             if (validUser) {
@@ -2134,7 +2143,7 @@ export default function GrillaHoraria({
           if (loggedToken) {
             localStorage.setItem("saas_token", loggedToken);
             localStorage.setItem("token", loggedToken);
-            document.cookie = `saas_auth_token=${loggedToken}; path=/; max-age=604800; SameSite=Lax`;
+            setCrossDomainCookie("saas_auth_token", loggedToken);
             activeToken = loggedToken;
           }
           if (loggedUser) {

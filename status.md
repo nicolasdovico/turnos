@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Lista de Espera Inteligente Multicanal con Evolution API WhatsApp & Email Mailpit 100% Operativa)
-- **Última Actualización:** 2026-09-18 (Validación estricta y sanitización en tiempo real de número de WhatsApp en registro de cliente online y backend con regla ValidPhoneNumber E.164; 215 tests backend, 79 tests frontend web y 20 tests mobile al 100% en verde).
+- **Última Actualización:** 2026-09-18 (Resolución de sincronización y transferencia SSO de sesiones entre subdominios y dominio central; soporte de cookies cross-subdomain y redirección automática en LoginPage/RegisterPage con auth_token; 215 tests backend, 84 tests frontend web y 20 tests mobile al 100% en verde).
 
 ---
 
