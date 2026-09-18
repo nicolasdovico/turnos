@@ -218,4 +218,111 @@ class GoogleAuthTest extends TestCase
                 'message' => 'Token de Google inválido o expirado.',
             ]);
     }
+
+    public function test_google_redirect_to_dev_simulator_when_simulated(): void
+    {
+        $response = $this->get('/api/auth/google/redirect?simulate=1&returnTo=' . urlencode('http://nico-padel.localhost:8080/reservas'));
+
+        $response->assertStatus(302);
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('/api/auth/google/dev-simulator', $location);
+        $this->assertStringContainsString('state=', $location);
+    }
+
+    public function test_google_dev_simulator_view_renders_successfully(): void
+    {
+        $state = base64_encode(json_encode([
+            'returnTo' => 'http://nico-padel.localhost:8080/reservas',
+            'ts' => time(),
+        ]));
+
+        $response = $this->get('/api/auth/google/dev-simulator?state=' . urlencode($state));
+
+        $response->assertStatus(200);
+        $response->assertSee('Acceder con Google');
+        $response->assertSee('Simulador Dev');
+        $response->assertSee('Continuar y Autorizar');
+        $response->assertSee('Nicolás Dóvico');
+        $response->assertSee('nicolasdovico@gmail.com');
+    }
+
+    public function test_google_dev_callback_creates_and_authenticates_user(): void
+    {
+        $state = base64_encode(json_encode([
+            'returnTo' => 'http://nico-padel.localhost:8080/reservas',
+            'ts' => time(),
+        ]));
+
+        $response = $this->post('/api/auth/google/dev-callback', [
+            'state' => $state,
+            'name' => 'Nicolás Dóvico Dev',
+            'email' => 'nicolasdev@example.com',
+            'google_id' => 'dev-user-123456',
+            'avatar' => 'https://example.com/avatar.jpg',
+        ]);
+
+        $response->assertStatus(302);
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('nico-padel.localhost:8080/reservas', $location);
+        $this->assertStringContainsString('auth_token=', $location);
+        $this->assertStringContainsString('google_login=success', $location);
+
+        $response->assertCookie('saas_auth_token');
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'nicolasdev@example.com',
+            'google_id' => 'dev-user-123456',
+            'name' => 'Nicolás Dóvico Dev',
+        ]);
+
+        $user = User::where('email', 'nicolasdev@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertNotNull($user->email_verified_at);
+    }
+
+    public function test_google_dev_callback_links_existing_user(): void
+    {
+        $existingUser = User::factory()->create([
+            'name' => 'Usuario Existente Dev',
+            'email' => 'existentedev@gmail.com',
+            'google_id' => null,
+        ]);
+
+        $state = base64_encode(json_encode([
+            'returnTo' => 'http://nico-tenis.localhost:8080/turnos',
+            'ts' => time(),
+        ]));
+
+        $response = $this->post('/api/auth/google/dev-callback', [
+            'state' => $state,
+            'name' => 'Usuario Existente Dev',
+            'email' => 'existentedev@gmail.com',
+            'google_id' => 'dev-google-linked-id-555',
+            'avatar' => 'https://example.com/avatar2.jpg',
+        ]);
+
+        $response->assertStatus(302);
+        $location = $response->headers->get('Location');
+        $this->assertStringContainsString('nico-tenis.localhost:8080/turnos', $location);
+        $this->assertStringContainsString('google_login=success', $location);
+
+        $this->assertEquals(1, User::where('email', 'existentedev@gmail.com')->count());
+        $existingUser->refresh();
+        $this->assertEquals('dev-google-linked-id-555', $existingUser->google_id);
+    }
+
+    public function test_google_dev_endpoints_forbidden_in_production(): void
+    {
+        $this->app['env'] = 'production';
+
+        $responseSimulator = $this->get('/api/auth/google/dev-simulator');
+        $responseSimulator->assertStatus(404);
+
+        $responseCallback = $this->post('/api/auth/google/dev-callback', [
+            'name' => 'Test',
+            'email' => 'test@example.com',
+            'google_id' => '123',
+        ]);
+        $responseCallback->assertStatus(404);
+    }
 }

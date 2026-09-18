@@ -149,6 +149,8 @@ Route::prefix('auth')->group(function () {
     // Google OAuth 2.0
     Route::get('/google/redirect', [\App\Http\Controllers\Api\GoogleAuthController::class, 'redirect']);
     Route::get('/google/callback', [\App\Http\Controllers\Api\GoogleAuthController::class, 'callback']);
+    Route::get('/google/dev-simulator', [\App\Http\Controllers\Api\GoogleAuthController::class, 'devSimulator']);
+    Route::post('/google/dev-callback', [\App\Http\Controllers\Api\GoogleAuthController::class, 'devCallback']);
     Route::post('/google/token', [\App\Http\Controllers\Api\GoogleAuthController::class, 'tokenAuth']);
 
     Route::middleware('auth:sanctum')->group(function () {

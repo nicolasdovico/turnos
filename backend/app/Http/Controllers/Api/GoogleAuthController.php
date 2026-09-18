@@ -30,10 +30,75 @@ class GoogleAuthController extends Controller
         ];
         $state = base64_encode(json_encode($statePayload));
 
+        $clientId = config('services.google.client_id');
+        $isDummy = empty($clientId) || str_starts_with($clientId, 'test_') || $clientId === 'dummy';
+
+        if (($isDummy && app()->environment('local') && !$request->has('force_real')) || $request->has('simulate')) {
+            return redirect('/api/auth/google/dev-simulator?state=' . urlencode($state));
+        }
+
         return Socialite::driver('google')
             ->stateless()
             ->with(['state' => $state])
             ->redirect();
+    }
+
+    /**
+     * Vista de simulación de Google OAuth para desarrollo local.
+     */
+    public function devSimulator(Request $request)
+    {
+        if (!app()->environment('local', 'testing')) {
+            abort(404);
+        }
+
+        $state = $request->query('state', '');
+
+        return view('auth.google_simulator', [
+            'state' => $state,
+            'defaultName' => 'Nicolás Dóvico',
+            'defaultEmail' => 'nicolasdovico@gmail.com',
+        ]);
+    }
+
+    /**
+     * Callback de simulación de Google OAuth para desarrollo local.
+     */
+    public function devCallback(Request $request): RedirectResponse
+    {
+        if (!app()->environment('local', 'testing')) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'state' => 'nullable|string',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'google_id' => 'required|string|max:255',
+            'avatar' => 'nullable|string|max:1000',
+        ]);
+
+        $returnTo = '/';
+        $stateRaw = $validated['state'] ?? null;
+        if ($stateRaw) {
+            try {
+                $decoded = json_decode(base64_decode($stateRaw), true);
+                if (!empty($decoded['returnTo'])) {
+                    $returnTo = $decoded['returnTo'];
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Error al decodificar state en Google devCallback: " . $e->getMessage());
+            }
+        }
+
+        return $this->handleSuccessfulAuthentication(
+            $validated['google_id'],
+            $validated['email'],
+            $validated['name'],
+            $validated['avatar'] ?? null,
+            $returnTo,
+            $request
+        );
     }
 
     /**
@@ -75,6 +140,27 @@ class GoogleAuthController extends Controller
         $name = (string) ($googleUser->getName() ?: explode('@', $email)[0]);
         $avatar = $googleUser->getAvatar();
 
+        return $this->handleSuccessfulAuthentication(
+            $googleId,
+            $email,
+            $name,
+            $avatar,
+            $returnTo,
+            $request
+        );
+    }
+
+    /**
+     * Procesar autenticación exitosa (crear o vincular usuario, generar token y redirigir con cookie).
+     */
+    protected function handleSuccessfulAuthentication(
+        string $googleId,
+        string $email,
+        string $name,
+        ?string $avatar,
+        string $returnTo,
+        Request $request
+    ): RedirectResponse {
         // 1. Buscar si ya existe por google_id
         $user = User::where('google_id', $googleId)->first();
 

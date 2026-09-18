@@ -15,7 +15,11 @@ abstract class TestCase extends BaseTestCase
 
         $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-        config(['database.connections.pgsql.database' => 'saas_testing']);
+        $app['env'] = 'testing';
+        config([
+            'app.env' => 'testing',
+            'database.connections.pgsql.database' => 'saas_testing',
+        ]);
         \Illuminate\Support\Facades\DB::purge('pgsql');
 
         return $app;
