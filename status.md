@@ -7,7 +7,7 @@
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulo de Recordatorios Automáticos por WhatsApp + Módulo de Autenticación Google OAuth 2.0 Multi-tenant
 - **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Sistema de Autenticación con Google OAuth 2.0 y Recordatorios Preventivos por WhatsApp 100% Operativos)
-- **Última Actualización:** 2026-09-18 (Implementación completa de inicio de sesión y registro con Google OAuth 2.0: migración en BD para `google_id` y `avatar`, vinculación automática de cuentas existentes, redirección cross-subdomain preservando tenant mediante `state`, endpoint de autenticación directa por token, componente `GoogleLoginButton` en Login, Registro y Modal de reservas en `GrillaHoraria`, y 349 tests automatizados en verde: 233 backend, 96 frontend, 20 mobile).
+- **Última Actualización:** 2026-09-18 (Corrección y hardening del scheduler de recordatorios WhatsApp: añadido servicio contenedor `saas_scheduler` ejecutando `php artisan schedule:work` de fondo, corrección de condición de carrera en idempotencia entre comando y job con fallback de reintento, mensaje enviado exitosamente a WhatsApp vía Evolution API al 5491149790220, y 350 tests automatizados en verde: 234 backend, 96 frontend, 20 mobile).
 
 ---
 

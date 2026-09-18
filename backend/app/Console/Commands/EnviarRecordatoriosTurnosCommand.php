@@ -103,7 +103,7 @@ class EnviarRecordatoriosTurnosCommand extends Command
 
             foreach ($turnos as $turno) {
                 // Despachar Job de WhatsApp
-                EnviarRecordatorioWhatsAppJob::dispatch($turno);
+                EnviarRecordatorioWhatsAppJob::dispatch($turno, true);
 
                 // Si el cliente posee fcm_token móvil, despachar también notificación Push
                 if ($turno->cliente && !empty($turno->cliente->fcm_token)) {

@@ -14,7 +14,8 @@ class EnviarRecordatorioWhatsAppJob implements ShouldQueue
     use Queueable;
 
     public function __construct(
-        public Turno $turno
+        public Turno $turno,
+        public bool $despachadoPorComando = false
     ) {}
 
     /**
@@ -37,7 +38,8 @@ class EnviarRecordatorioWhatsAppJob implements ShouldQueue
         }
 
         // Si ya fue enviado, no reenviar (idempotencia)
-        if ($this->turno->recordatorio_enviado_at !== null) {
+        // Excepto si viene del comando que marcó el timestamp preventivo al encolar
+        if (!$this->despachadoPorComando && $this->turno->recordatorio_enviado_at !== null) {
             Log::info("EnviarRecordatorioWhatsAppJob: El turno ID {$this->turno->id} ya tiene recordatorio enviado.");
             return ['status' => 'skipped', 'reason' => 'ALREADY_SENT'];
         }
@@ -52,6 +54,11 @@ class EnviarRecordatorioWhatsAppJob implements ShouldQueue
                 'turno_id' => $this->turno->id,
                 'telefono' => $telefono,
             ];
+        }
+
+        // Si falló el envío y vino del comando, revertir la marca preventiva para permitir reintento
+        if ($this->despachadoPorComando) {
+            $this->turno->update(['recordatorio_enviado_at' => null]);
         }
 
         Log::warning("EnviarRecordatorioWhatsAppJob: Falló el envío vía Evolution API para turno ID {$this->turno->id}.");

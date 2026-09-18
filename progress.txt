@@ -2086,7 +2086,33 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend Mobile:
     - Total Mobile Suite: 20/20 tests exitosos al 100% (4 suites).
   * Gran Total del Ecosistema: 349/349 tests automatizados en verde con 0 regresiones.
+-------------------------------------------------------------------------------
+[2026-09-18] - HARDENING & CORRECCIÓN DE SCHEDULER DE RECORDATORIOS WHATSAPP
+-------------------------------------------------------------------------------
+- Diagnóstico del Problema:
+  * El usuario reportó tener un turno reservado para las 19:00 hs de hoy con su teléfono (5491149790220), pero a las 17:00 hs (2 horas antes) no recibió el recordatorio.
+  * Se identificaron dos causas de raíz:
+    1. Inexistencia de servicio Scheduler en Docker: No existía un proceso ejecutando `php artisan schedule:work` de fondo; sólo corría `saas_queue_worker`. Por ello, los cronjobs de Laravel (`turnos:enviar-recordatorios` cada 5 min e `iot:sincronizar-luces` cada 1 min) no se disparaban automáticamente en el entorno.
+    2. Condición de carrera en la verificación de idempotencia: `EnviarRecordatoriosTurnosCommand` marcaba preventivamente `recordatorio_enviado_at = now()` en la BD al momento de encolar el job para evitar selecciones superpuestas. Al procesarse asíncronamente en el Queue Worker, `EnviarRecordatorioWhatsAppJob` recargaba el modelo desde la BD, detectaba que `recordatorio_enviado_at !== null` y abortaba el envío con estado `ALREADY_SENT` sin llegar a llamar a Evolution API.
+- Solución y Componentes Actualizados:
+  * 1. Orquestación Docker Compose (`docker-compose.yml`):
+    - Creación del servicio `saas_scheduler` con la imagen del backend ejecutando el comando daemon `php artisan schedule:work`.
+    - Servicio levantado y verificado en tiempo real: dispara tareas cada minuto (`iot:sincronizar-luces`) y cada 5 minutos (`turnos:enviar-recordatorios`).
+  * 2. Desacople de Idempotencia en Job y Comando:
+    - `EnviarRecordatorioWhatsAppJob.php`: actualización del constructor con parámetro `$despachadoPorComando = false`.
+    - Si `$despachadoPorComando === true`, el job no aborta por la marca preventiva de encolado, procede a ejecutar el envío hacia Evolution API y consolida el timestamp. Si el envío fallara por cualquier motivo, revierte automáticamente `recordatorio_enviado_at = null` para permitir reintentos.
+    - `EnviarRecordatoriosTurnosCommand.php`: actualización del dispatch a `EnviarRecordatorioWhatsAppJob::dispatch($turno, true)`.
+  * 3. Ejecución y Validación en Vivo:
+    - Envío verificado en vivo al número del usuario `5491149790220` para el turno de las 19:00 hs: log confirmado en `laravel.log` y Evolution API (`result => true`).
+    - Queue Worker reiniciado con el nuevo código (`docker compose restart queue_worker`).
+- Tests Automatizados:
+  * Incorporado nuevo test `test_command_despacha_job_que_ejecuta_envio_correctamente_sin_ser_omitido` en `RecordatorioWhatsAppTest.php`.
+  * Backend: 234/234 tests exitosos al 100% (1.248 aserciones).
+  * Frontend: 96/96 tests exitosos al 100% (9 suites).
+  * Mobile: 20/20 tests exitosos al 100% (4 suites).
+  * Gran Total: 350/350 tests automatizados en verde con 0 regresiones.
 ===============================================================================
+
 
 
 

@@ -262,6 +262,47 @@ class RecordatorioWhatsAppTest extends TestCase
         $this->assertNotNull($turnoEnVentana->fresh()->recordatorio_enviado_at);
     }
 
+    public function test_command_despacha_job_que_ejecuta_envio_correctamente_sin_ser_omitido(): void
+    {
+        [$admin, $complejo, $cancha] = $this->crearComplejoYAdmin('club-e2e', [
+            'recordatorio_whatsapp_activo' => true,
+            'recordatorio_anticipacion_minutos' => 120,
+        ]);
+
+        $cliente = User::factory()->create(['telefono' => '1155443322']);
+
+        $turno = Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'cliente_id' => $cliente->id,
+            'fecha' => '2026-09-18',
+            'hora_inicio' => '12:00',
+            'hora_fin' => '13:00',
+            'precio' => 8000,
+            'estado' => 'reservado',
+            'es_fijo' => false,
+        ]);
+
+        // Ejecutar el comando (simulando 10:00)
+        $this->artisan('turnos:enviar-recordatorios', ['--momento' => '2026-09-18 10:00:00'])
+            ->assertExitCode(0);
+
+        // El turno fue marcado preventivamente al encolar
+        $this->assertNotNull($turno->fresh()->recordatorio_enviado_at);
+
+        // El Job encolado con despachadoPorComando = true debe ejecutarse y enviar el mensaje
+        $job = new EnviarRecordatorioWhatsAppJob($turno->fresh(), true);
+        $res = $job->handle(app(WhatsAppEvolutionService::class));
+
+        $this->assertEquals('sent', $res['status']);
+        $this->assertEquals($turno->id, $res['turno_id']);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/message/sendText/') &&
+                   str_contains($request->body(), '5491155443322');
+        });
+    }
+
     public function test_command_ignora_complejos_con_recordatorio_desactivado(): void
     {
         Queue::fake();
