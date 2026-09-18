@@ -197,12 +197,27 @@ class WhatsAppEvolutionService
             return '';
         }
 
-        // Si empieza con 0 en Argentina, quitar el 0 inicial
+        // Si empieza con 0 en Argentina, quitar el 0 inicial (ej. 011... -> 11...)
         if (str_starts_with($digitos, '0')) {
             $digitos = substr($digitos, 1);
         }
 
-        // Si es número argentino de 10 dígitos (ej. 1133445566), agregar 549
+        // Si contiene el prefijo móvil local '15' después del código de área de Buenos Aires (ej. 11 15 4455-6677 -> 1144556677)
+        if (strlen($digitos) === 12 && str_starts_with($digitos, '1115')) {
+            $digitos = '11' . substr($digitos, 4);
+        }
+
+        // Si tiene 10 dígitos y empieza con '15' sin código de área (ej. 15 4455-6677), asumir CABA/AMBA (11)
+        if (strlen($digitos) === 10 && str_starts_with($digitos, '15')) {
+            $digitos = '11' . substr($digitos, 2);
+        }
+
+        // Si contiene prefijo de área de 3 dígitos (ej. 341, 351, 221, 223) seguido de '15' (12 dígitos)
+        if (strlen($digitos) === 12 && (str_starts_with($digitos, '2') || str_starts_with($digitos, '3')) && substr($digitos, 3, 2) === '15') {
+            $digitos = substr($digitos, 0, 3) . substr($digitos, 5);
+        }
+
+        // Si es número argentino de 10 dígitos (ej. 1133445566, 3414567890), agregar 549
         if (strlen($digitos) === 10 && (str_starts_with($digitos, '11') || str_starts_with($digitos, '2') || str_starts_with($digitos, '3'))) {
             $digitos = '549' . $digitos;
         }

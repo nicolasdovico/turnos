@@ -377,4 +377,46 @@ class RecordatorioWhatsAppTest extends TestCase
         $this->assertFalse($complejoActualizado->recordatorio_whatsapp_activo);
         $this->assertEquals(60, $complejoActualizado->recordatorio_anticipacion_minutos);
     }
+
+    public function test_formateo_numeros_telefono_sin_codigo_pais_o_sin_signo_mas(): void
+    {
+        [$admin, $complejo, $cancha] = $this->crearComplejoYAdmin('club-format-test');
+
+        $casos = [
+            '11 4455-6677' => '5491144556677',
+            '011 4455-6677' => '5491144556677',
+            '11 15 4455-6677' => '5491144556677',
+            '15 4455-6677' => '5491144556677',
+            '341 456 7890' => '5493414567890',
+            '0341 15 456 7890' => '5493414567890',
+            '223 456 7890' => '5492234567890',
+            '54 11 4455 6677' => '5491144556677',
+            '+54 9 11 4455 6677' => '5491144556677',
+            '598 99 123 456' => '59899123456',
+        ];
+
+        $service = new WhatsAppEvolutionService();
+
+        foreach ($casos as $input => $esperado) {
+            $turno = Turno::create([
+                'complejo_id' => $complejo->id,
+                'cancha_id' => $cancha->id,
+                'cliente_telefono' => $input,
+                'cliente_nombre' => 'Test Jugador',
+                'fecha' => '2026-09-18',
+                'hora_inicio' => '19:00',
+                'hora_fin' => '20:30',
+                'precio' => 10000,
+                'estado' => 'reservado',
+                'es_fijo' => false,
+            ]);
+
+            $enviado = $service->enviarRecordatorioTurno($turno);
+            $this->assertTrue($enviado);
+
+            Http::assertSent(function ($request) use ($esperado) {
+                return isset($request['number']) && $request['number'] === $esperado;
+            });
+        }
+    }
 }

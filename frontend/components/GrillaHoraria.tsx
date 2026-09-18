@@ -140,6 +140,16 @@ export const formatWhatsAppNumber = (phone: string): string => {
   const digits = phone.replace(/\D/g, "");
   if (!digits) return "";
   let d = digits.startsWith("0") ? digits.slice(1) : digits;
+
+  // Si contiene el prefijo móvil local '15' después del código de área de Buenos Aires (ej. 11 15 4455-6677 -> 1144556677)
+  if (d.length === 12 && d.startsWith("1115")) {
+    d = "11" + d.slice(4);
+  } else if (d.length === 10 && d.startsWith("15")) {
+    d = "11" + d.slice(2);
+  } else if (d.length === 12 && (d.startsWith("2") || d.startsWith("3")) && d.slice(3, 5) === "15") {
+    d = d.slice(0, 3) + d.slice(5);
+  }
+
   if (d.length === 10 && /^(11|[23])/.test(d)) {
     d = "549" + d;
   } else if (d.length === 11 && d.startsWith("9")) {

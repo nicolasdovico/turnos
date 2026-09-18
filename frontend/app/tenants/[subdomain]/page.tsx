@@ -3,17 +3,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import GrillaHoraria from "@/components/GrillaHoraria";
+import GrillaHoraria, { formatWhatsAppNumber } from "@/components/GrillaHoraria";
 import { useAuth } from "@/context/AuthContext";
-
-const formatWhatsAppNumber = (phone: string | null | undefined): string => {
-  if (!phone) return "";
-  let digits = phone.replace(/\D/g, "");
-  if (digits.length === 10 && (digits.startsWith("11") || digits.startsWith("2") || digits.startsWith("3"))) {
-    digits = "549" + digits;
-  }
-  return digits;
-};
 
 interface ComplejoData {
   id: number;

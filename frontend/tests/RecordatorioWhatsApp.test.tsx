@@ -4,6 +4,7 @@ import React from "react";
 import ClubAdminPanel from "../app/tenants/[subdomain]/panel/page";
 import ResumenDiarioTurnos from "../components/ResumenDiarioTurnos";
 import { AuthProvider } from "../context/AuthContext";
+import { formatWhatsAppNumber } from "../components/GrillaHoraria";
 
 // Mock useParams from next/navigation
 vi.mock("next/navigation", () => ({
@@ -237,4 +238,18 @@ describe("Frontend WhatsApp Reminders Suite", () => {
     // Button should now transition to "Recordatorio enviado"
     expect(await screen.findByText(/Recordatorio enviado/i)).toBeDefined();
   });
+
+  it("formats phone numbers entered without '+' or country code correctly", () => {
+    expect(formatWhatsAppNumber("11 4455-6677")).toBe("5491144556677");
+    expect(formatWhatsAppNumber("011 4455 6677")).toBe("5491144556677");
+    expect(formatWhatsAppNumber("11 15 4455-6677")).toBe("5491144556677");
+    expect(formatWhatsAppNumber("15 4455-6677")).toBe("5491144556677");
+    expect(formatWhatsAppNumber("341 456 7890")).toBe("5493414567890");
+    expect(formatWhatsAppNumber("0341 15 456 7890")).toBe("5493414567890");
+    expect(formatWhatsAppNumber("223 456 7890")).toBe("5492234567890");
+    expect(formatWhatsAppNumber("54 11 4455 6677")).toBe("5491144556677");
+    expect(formatWhatsAppNumber("+54 9 11 4455 6677")).toBe("5491144556677");
+    expect(formatWhatsAppNumber("598 99 123 456")).toBe("59899123456");
+  });
 });
+
