@@ -446,4 +446,29 @@ class ConfirmarReservaTest extends TestCase
 
         $this->assertNull(User::where('email', $newEmail)->first());
     }
+
+    public function test_confirmar_reserva_fails_if_cliente_telefono_contains_letters(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin_tel_inv@admin.com',
+        ]);
+        $this->complejoPlata->update(['user_id' => $admin->id]);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson('/api/turnos/confirmar', [
+                'cancha_id' => $this->canchaPlata->id,
+                'fecha' => '2026-08-31',
+                'hora_inicio' => '14:00',
+                'cliente_nombre' => 'Cliente Invalido',
+                'cliente_telefono' => 'mi-telefono-1234',
+                'cliente_email' => 'invalido@test.com',
+                'metodo_pago' => 'mostrador',
+                'precio' => 10000,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['cliente_telefono']);
+    }
 }
+

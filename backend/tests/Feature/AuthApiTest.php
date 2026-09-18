@@ -87,4 +87,62 @@ class AuthApiTest extends TestCase
         $logoutResponse->assertStatus(200);
         $this->assertCount(0, $user->fresh()->tokens);
     }
+
+    public function test_registration_fails_if_telefono_contains_letters(): void
+    {
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Cliente Con Letras',
+            'email' => 'cliente.letras@turnos.test',
+            'telefono' => '11abcd2233',
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono']);
+    }
+
+    public function test_registration_fails_if_telefono_has_less_than_8_digits(): void
+    {
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Cliente Corto',
+            'email' => 'cliente.corto@turnos.test',
+            'telefono' => '12345',
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono']);
+    }
+
+    public function test_registration_fails_if_telefono_has_more_than_15_digits(): void
+    {
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Cliente Largo',
+            'email' => 'cliente.largo@turnos.test',
+            'telefono' => '12345678901234567',
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono']);
+    }
+
+    public function test_registration_succeeds_with_valid_whatsapp_telefono(): void
+    {
+        $response = $this->postJson('/api/auth/register', [
+            'name' => 'Cliente Valido',
+            'email' => 'cliente.valido@turnos.test',
+            'telefono' => '+54 9 11 2345-6789',
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('user.telefono', '+54 9 11 2345-6789');
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'cliente.valido@turnos.test',
+            'telefono' => '+54 9 11 2345-6789',
+        ]);
+    }
 }
+

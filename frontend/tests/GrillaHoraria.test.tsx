@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import GrillaHoraria, { Slot, getLocalDateString, formatFechaDDMMAAAA } from "../components/GrillaHoraria";
+import GrillaHoraria, { Slot, getLocalDateString, formatFechaDDMMAAAA, getPhoneValidationError, formatWhatsAppNumber } from "../components/GrillaHoraria";
 
 describe("Componente Reactivo GrillaHoraria", () => {
   const mockSlots: Slot[] = [
@@ -855,6 +855,119 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(screen.getAllByText(/Seña Abonada/i).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText(/Saldo en Club/i)).toBeDefined();
       expect(screen.queryByTestId("active-lock-banner")).toBeNull();
+    });
+  });
+
+  it("valida el formato de whatsapp en el registro de cliente online, filtra caracteres no numéricos y rechaza teléfonos incompletos", async () => {
+    // 1. Probar helpers unitarios
+    expect(getPhoneValidationError("")).toBeNull();
+    expect(getPhoneValidationError("11abcd2233")).toMatch(/Solo se permiten números/i);
+    expect(getPhoneValidationError("12345")).toMatch(/al menos 8 dígitos/i);
+    expect(getPhoneValidationError("12345678901234567")).toMatch(/no puede superar los 15 dígitos/i);
+    expect(getPhoneValidationError("+54 9 11 2345-6789")).toBeNull();
+    expect(formatWhatsAppNumber("01123456789")).toBe("5491123456789");
+
+    const singleSlot: Slot[] = [
+      { hora_inicio: "18:00", hora_fin: "19:00", disponible: true, precio: 9000 },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ success: true, ttl: 600, token_reserva: "lock-uuid-val-tel" }),
+        });
+      }
+      if (urlStr.includes("/auth/register")) {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: () =>
+            Promise.resolve({
+              token: "mock-token-tel",
+              user: { id: 99, name: "Lucas Tel", email: "lucas.tel@example.com" },
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ slots_disponibles: singleSlot, turnos_ocupados: [] }),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Central"
+        deporte="padel"
+        subdomain="padel-pro"
+        fechaInicial="2026-09-01"
+        initialSlots={singleSlot}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText("Turno 18:00 a 19:00 Disponible"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // Modal de registro rápido (Paso 1)
+    expect(screen.getByText("✨ Crear Cuenta Rápida")).toBeDefined();
+
+    const inputNombre = screen.getByPlaceholderText(/Lucas Martínez/i);
+    const inputTelefono = screen.getByPlaceholderText(/2345-6789/i);
+    const inputEmail = screen.getByPlaceholderText(/lucas@example.com/i);
+    const inputPassword = screen.getByPlaceholderText(/••••••••/i);
+
+    fireEvent.change(inputNombre, { target: { value: "Lucas WhatsApp" } });
+    fireEvent.change(inputEmail, { target: { value: "lucas.wa@example.com" } });
+    fireEvent.change(inputPassword, { target: { value: "pass1234" } });
+
+    // Intento 1: Ingreso de letras o caracteres inválidos en el input de WhatsApp
+    fireEvent.change(inputTelefono, { target: { value: "mi-telefono-con-letras" } });
+    
+    // Las letras son filtradas en tiempo real por el componente, conservando solo guiones
+    expect((inputTelefono as HTMLInputElement).value).toBe("---");
+
+    // Intento 2: Ingreso de teléfono incompleto (< 8 dígitos)
+    fireEvent.change(inputTelefono, { target: { value: "12345" } });
+    expect(screen.getByTestId("whatsapp-validation-badge")).toBeDefined();
+    expect(screen.getByText(/⚠️ Incompleto/i)).toBeDefined();
+    expect(screen.getByTestId("whatsapp-error-msg")).toBeDefined();
+    expect(screen.getByText(/El teléfono debe contener al menos 8 dígitos numéricos/i)).toBeDefined();
+
+    // Intentar continuar con teléfono incompleto -> No debe llamar a register
+    const btnPaso1 = screen.getByRole("button", { name: /Continuar \(Paso 1\/2\)/i });
+    fireEvent.click(btnPaso1);
+
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/auth/register"),
+      expect.anything()
+    );
+
+    // Intento 3: Ingreso de WhatsApp válido con formato internacional
+    fireEvent.change(inputTelefono, { target: { value: "+54 9 11 2345-6789" } });
+    expect(screen.getByText(/✓ Válido \(13 dígitos\)/i)).toBeDefined();
+    expect(screen.queryByTestId("whatsapp-error-msg")).toBeNull();
+
+    // Ahora sí debe avanzar a OTP y llamar a /auth/register
+    fireEvent.click(btnPaso1);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/auth/register"),
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("+54 9 11 2345-6789"),
+        })
+      );
+      expect(screen.getByText(/Código de Verificación Enviado/i)).toBeDefined();
     });
   });
 

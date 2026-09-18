@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import ResumenDiarioTurnos from "@/components/ResumenDiarioTurnos";
 import GestionBilleteras from "@/components/GestionBilleteras";
-import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
+import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 
 interface ComplejoData {
   id: number;
@@ -310,35 +310,7 @@ const ALL_MODULOS = [
   },
 ];
 
-export const formatWhatsAppNumber = (phone: string): string => {
-  const digits = phone.replace(/\D/g, "");
-  if (!digits) return "";
-  let d = digits.startsWith("0") ? digits.slice(1) : digits;
-  if (d.length === 10 && /^(11|[23])/.test(d)) {
-    d = "549" + d;
-  } else if (d.length === 11 && d.startsWith("9")) {
-    d = "54" + d;
-  } else if (d.length === 12 && d.startsWith("54") && !d.startsWith("549")) {
-    d = "549" + d.slice(2);
-  }
-  return d;
-};
 
-export const getPhoneValidationError = (phone: string): string | null => {
-  const trimmed = phone.trim();
-  if (!trimmed) return null;
-  if (!/^[+0-9\s\-()]+$/.test(trimmed)) {
-    return "Solo se permiten números, espacios, guiones, paréntesis y el prefijo '+'.";
-  }
-  const digits = trimmed.replace(/\D/g, "");
-  if (digits.length < 8) {
-    return "El teléfono debe contener al menos 8 dígitos numéricos.";
-  }
-  if (digits.length > 15) {
-    return "El teléfono no puede superar los 15 dígitos numéricos (estándar internacional E.164).";
-  }
-  return null;
-};
 
 export default function ClubAdminPanel() {
   const params = useParams();

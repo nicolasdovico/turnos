@@ -8,6 +8,7 @@ use App\Models\EmailVerification;
 use App\Models\HorarioAtencion;
 use App\Models\Turno;
 use App\Models\User;
+use App\Rules\ValidPhoneNumber;
 use App\Services\ReservaLockService;
 use App\Services\WalletService;
 use Carbon\Carbon;
@@ -36,7 +37,7 @@ class TurnoConfirmarController extends Controller
             'hora_fin' => ['nullable', 'string'],
             'cliente_id' => ['nullable', 'integer', 'exists:users,id'],
             'cliente_nombre' => ['nullable', 'string', 'max:255'],
-            'cliente_telefono' => ['nullable', 'string', 'max:50'],
+            'cliente_telefono' => ['nullable', 'string', 'max:50', new ValidPhoneNumber()],
             'cliente_email' => ['nullable', 'string', 'email', 'max:255'],
             'codigo_otp' => ['nullable', 'string', 'size:6'],
             'metodo_pago' => ['nullable', 'string', 'max:50'],

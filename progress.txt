@@ -1892,3 +1892,43 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - shows conflict modal when modifying business hours clashes with active bookings: valida recepción de HTTP 422, renderizado del modal, badges de conflicto y cierre del modal.
     - Total Frontend: 68/68 tests exitosos (4 suites).
 ===============================================================================
+-------------------------------------------------------------------------------
+[2026-09-18] - VALIDACIÓN ESTRICTA Y SANITIZACIÓN DE NÚMERO DE WHATSAPP EN REGISTRO ONLINE
+-------------------------------------------------------------------------------
+- Diagnóstico y Requerimiento:
+  * Al realizar una reserva online como cliente nuevo, el formulario de registro rápido solicitaba "Teléfono / WhatsApp *", pero no contaba con validación de formato ni filtrado de caracteres, permitiendo ingresar letras o números incompletos.
+  * En el backend (`/api/auth/register`), el campo `telefono` solo tenía `'nullable|string|max:50'`, aceptando cadenas arbitrarias sin comprobación de formato E.164 ni conteo de dígitos.
+- Soluciones Implementadas:
+  * Backend (Laravel 11):
+    - Creación de la regla de validación reutilizable `App\Rules\ValidPhoneNumber`:
+      * Filtra caracteres no válidos mediante regex `/^[+0-9\s\-()]+$/` (solo números, espacios, guiones, paréntesis y prefijo `+`).
+      * Extrae dígitos (`preg_replace('/\D+/', '', $value)`) y verifica que la longitud se encuentre en el rango estándar de 8 a 15 dígitos numéricos.
+    - Integración en `AuthController::register`: validación estricta de `telefono` con `ValidPhoneNumber` (retornando HTTP 422 con mensaje descriptivo ante datos inválidos).
+    - Integración en `TurnoConfirmarController`: validación de `cliente_telefono` con `ValidPhoneNumber` al confirmar reservas.
+  * Frontend Web (Next.js 14):
+    - `frontend/components/GrillaHoraria.tsx`:
+      * Exportación de utilidades universales `formatWhatsAppNumber` y `getPhoneValidationError`.
+      * Sanitización reactiva en el evento `onChange`: remueve letras y caracteres no numéricos en tiempo real (`e.target.value.replace(/[^0-9+\s\-()]/g, "")`), impidiendo escribir o pegar letras.
+      * Insignia dinámica de estado (`data-testid="whatsapp-validation-badge"`): muestra `⚠️ Incompleto` si los dígitos son < 8 o > 15, y `✓ Válido (X dígitos)` cuando el formato cumple los requisitos.
+      * Borde dinámico con feedback visual: rojo (`border-rose-500`) si está incompleto o con error, y verde (`border-emerald-500`) si es válido.
+      * Mensajes de error en tiempo real debajo del input ante intentos de envío o pérdida de foco (`onBlur`).
+      * Validación en `handleConfirm`: rechaza intentos de continuar en el Paso 1 de registro si el WhatsApp está vacío o incompleto, mostrando el error correspondiente sin llamar a la API.
+      * Sanitización de inputs telefónicos en asignación de mostrador (`isAdmin`) y cliente logueado.
+    - `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+      * Consumo de `formatWhatsAppNumber` y `getPhoneValidationError` desde `@/components/GrillaHoraria` para garantizar consistencia DRY en todo el ecosistema.
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (`tests/Feature/AuthApiTest.php`):
+    - `test_registration_fails_if_telefono_contains_letters`: valida rechazo HTTP 422 con letras.
+    - `test_registration_fails_if_telefono_has_less_than_8_digits`: valida rechazo HTTP 422 con < 8 dígitos.
+    - `test_registration_fails_if_telefono_has_more_than_15_digits`: valida rechazo HTTP 422 con > 15 dígitos.
+    - `test_registration_succeeds_with_valid_whatsapp_telefono`: valida HTTP 201 y persistencia en PostgreSQL con formato internacional.
+  * Backend (`tests/Feature/ConfirmarReservaTest.php`):
+    - `test_confirmar_reserva_fails_if_cliente_telefono_contains_letters`: valida rechazo HTTP 422 al confirmar turno con teléfono mal formado.
+    - Total Backend: 215/215 tests exitosos al 100% (1.163 aserciones).
+  * Frontend Web (`tests/GrillaHoraria.test.tsx`):
+    - `valida el formato de whatsapp en el registro de cliente online, filtra caracteres no numéricos y rechaza teléfonos incompletos`: valida helpers unitarios, filtrado en tiempo real de letras, badges de estado, mensaje de error y avance exitoso a OTP tras ingresar número válido.
+    - Total Frontend Web: 79/79 tests exitosos al 100% (6 suites).
+    - Next.js 14 Production Build (`npm run build`): 100% exitoso (11/11 rutas estáticas generadas).
+  * Frontend Mobile: 20/20 tests Jest exitosos al 100% (4 suites).
+===============================================================================
+

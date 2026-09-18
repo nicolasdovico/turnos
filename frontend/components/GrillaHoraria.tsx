@@ -109,6 +109,7 @@ export interface TurnoOcupado {
   cliente_telefono?: string | null;
   cliente_saldo_billetera?: number;
   created_at_local?: number;
+  is_mine?: boolean;
 }
 
 export interface CurrentUser {
@@ -133,6 +134,36 @@ export const formatFechaDDMMAAAA = (fechaStr?: string): string => {
     return `${parts[2].padStart(2, "0")}-${parts[1].padStart(2, "0")}-${parts[0]}`;
   }
   return fechaStr;
+};
+
+export const formatWhatsAppNumber = (phone: string): string => {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  let d = digits.startsWith("0") ? digits.slice(1) : digits;
+  if (d.length === 10 && /^(11|[23])/.test(d)) {
+    d = "549" + d;
+  } else if (d.length === 11 && d.startsWith("9")) {
+    d = "54" + d;
+  } else if (d.length === 12 && d.startsWith("54") && !d.startsWith("549")) {
+    d = "549" + d.slice(2);
+  }
+  return d;
+};
+
+export const getPhoneValidationError = (phone: string): string | null => {
+  const trimmed = phone.trim();
+  if (!trimmed) return null;
+  if (!/^[+0-9\s\-()]+$/.test(trimmed)) {
+    return "Solo se permiten números, espacios, guiones, paréntesis y el prefijo '+'.";
+  }
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 8) {
+    return "El teléfono debe contener al menos 8 dígitos numéricos.";
+  }
+  if (digits.length > 15) {
+    return "El teléfono no puede superar los 15 dígitos numéricos (estándar internacional E.164).";
+  }
+  return null;
 };
 
 export const getAuthToken = (explicitToken?: string | null): string | null => {
@@ -221,6 +252,7 @@ export default function GrillaHoraria({
   const otpTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [clienteNombre, setClienteNombre] = useState<string>("");
   const [clienteTelefono, setClienteTelefono] = useState<string>("");
+  const [clienteTelefonoTouched, setClienteTelefonoTouched] = useState<boolean>(false);
   const [clienteEmail, setClienteEmail] = useState<string>("");
   const [metodoPago, setMetodoPago] = useState<string>(isAdmin ? "mostrador" : "online");
   const [modalidadCobro, setModalidadCobro] = useState<"sena" | "total" | "ninguno">(isAdmin ? "total" : "sena");
@@ -238,6 +270,7 @@ export default function GrillaHoraria({
     if (isAdmin) {
       setClienteNombre("");
       setClienteTelefono("");
+      setClienteTelefonoTouched(false);
       setClienteEmail("");
       setDeskEmailStatus("idle");
       setDeskRegisteredUser(null);
@@ -1968,6 +2001,15 @@ export default function GrillaHoraria({
           if (registrationStep === "form") {
             if (!targetNombre) {
               throw new Error("Ingresa tu Nombre y Apellido para registrarte.");
+            }
+            if (!targetTelefono) {
+              setClienteTelefonoTouched(true);
+              throw new Error("Ingresa tu número de WhatsApp para registrarte.");
+            }
+            const phoneErr = getPhoneValidationError(targetTelefono);
+            if (phoneErr) {
+              setClienteTelefonoTouched(true);
+              throw new Error(phoneErr);
             }
             if (!authEmail.trim()) {
               throw new Error("Ingresa tu correo electrónico.");
@@ -4106,7 +4148,7 @@ export default function GrillaHoraria({
                       type="tel"
                       placeholder="Ej. +54 9 11 4567-8901"
                       value={clienteTelefono}
-                      onChange={(e) => setClienteTelefono(e.target.value)}
+                      onChange={(e) => setClienteTelefono(e.target.value.replace(/[^0-9+\s\-()]/g, ""))}
                       className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
@@ -4322,7 +4364,7 @@ export default function GrillaHoraria({
                       type="tel"
                       placeholder="Ej. +54 9 11 1234-5678"
                       value={clienteTelefono}
-                      onChange={(e) => setClienteTelefono(e.target.value)}
+                      onChange={(e) => setClienteTelefono(e.target.value.replace(/[^0-9+\s\-()]/g, ""))}
                       className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
@@ -4448,17 +4490,54 @@ export default function GrillaHoraria({
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-slate-300 mb-1">
-                            Teléfono / WhatsApp *
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-bold text-slate-300">
+                              Teléfono / WhatsApp *
+                            </label>
+                            {clienteTelefono.trim() && (
+                              <span
+                                data-testid="whatsapp-validation-badge"
+                                className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                                  getPhoneValidationError(clienteTelefono)
+                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                    : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                }`}
+                              >
+                                {getPhoneValidationError(clienteTelefono)
+                                  ? "⚠️ Incompleto"
+                                  : `✓ Válido (${clienteTelefono.replace(/\D/g, "").length} dígitos)`}
+                              </span>
+                            )}
+                          </div>
                           <input
                             type="tel"
                             required
                             placeholder="Ej. +54 9 11 2345-6789"
                             value={clienteTelefono}
-                            onChange={(e) => setClienteTelefono(e.target.value)}
-                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            onBlur={() => setClienteTelefonoTouched(true)}
+                            onChange={(e) => {
+                              setClienteTelefonoTouched(true);
+                              const clean = e.target.value.replace(/[^0-9+\s\-()]/g, "");
+                              setClienteTelefono(clean);
+                            }}
+                            className={`w-full rounded-xl bg-slate-950 border px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 transition ${
+                              clienteTelefonoTouched && getPhoneValidationError(clienteTelefono)
+                                ? "border-rose-500/70 focus:border-rose-500 focus:ring-rose-500"
+                                : clienteTelefono.trim() && !getPhoneValidationError(clienteTelefono)
+                                ? "border-emerald-500/60 focus:border-emerald-500 focus:ring-emerald-500"
+                                : "border-slate-800 focus:border-emerald-500 focus:ring-emerald-500"
+                            }`}
                           />
+                          {clienteTelefonoTouched && getPhoneValidationError(clienteTelefono) ? (
+                            <p className="text-[11px] text-rose-400 mt-1 flex items-center gap-1 font-medium" data-testid="whatsapp-error-msg">
+                              <span>⚠️</span>
+                              <span>{getPhoneValidationError(clienteTelefono)}</span>
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-slate-500 mt-1">
+                              Ingresá tu WhatsApp con código de área (entre 8 y 15 dígitos) para recibir confirmaciones y recordatorios.
+                            </p>
+                          )}
                         </div>
 
                         <div>
