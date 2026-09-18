@@ -30,6 +30,7 @@ class Turno extends Model
         'estado_pago',
         'estado',
         'es_fijo',
+        'recordatorio_enviado_at',
     ];
 
     protected function casts(): array
@@ -40,6 +41,7 @@ class Turno extends Model
             'monto_pagado' => 'decimal:2',
             'saldo_pendiente' => 'decimal:2',
             'es_fijo' => 'boolean',
+            'recordatorio_enviado_at' => 'datetime',
         ];
     }
 

@@ -997,6 +997,14 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
           }),
         } as any;
       }
+      if (urlStr.includes("/turnos-fijos/verificar-disponibilidad")) {
+        return {
+          ok: true,
+          json: async () => ({
+            disponible: true,
+          }),
+        } as any;
+      }
       if (urlStr.includes("/turnos-fijos") && init?.method === "POST") {
         postTurnoFijoPayload = JSON.parse(init?.body || "{}");
         return {

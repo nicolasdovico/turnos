@@ -9,4 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('iot:sincronizar-luces')->everyMinute();
+Schedule::command('turnos:enviar-recordatorios')->everyFiveMinutes();
 

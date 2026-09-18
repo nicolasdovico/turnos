@@ -121,6 +121,8 @@ class ClubDashboardController extends Controller
                     'horas_limite_cancelacion' => (int) ($complejo->horas_limite_cancelacion ?? 4),
                     'permite_mostrador_publico' => (bool) ($complejo->permite_mostrador_publico ?? true),
                     'hora_inicio_luz' => $complejo->hora_inicio_luz ? substr($complejo->hora_inicio_luz, 0, 5) : '19:00',
+                    'recordatorio_whatsapp_activo' => (bool) ($complejo->recordatorio_whatsapp_activo ?? true),
+                    'recordatorio_anticipacion_minutos' => (int) ($complejo->recordatorio_anticipacion_minutos ?? 120),
                     'created_at' => $complejo->created_at,
                     'owner' => $complejo->owner ? [
                         'id' => $complejo->owner->id,
@@ -761,6 +763,8 @@ class ClubDashboardController extends Controller
             'horas_limite_cancelacion' => 'nullable|integer|min:0|max:72',
             'permite_mostrador_publico' => 'nullable|boolean',
             'hora_inicio_luz' => ['nullable', 'string', 'regex:/^([01][0-9]|2[0-3]):[0-5][0-9]$/'],
+            'recordatorio_whatsapp_activo' => 'nullable|boolean',
+            'recordatorio_anticipacion_minutos' => 'nullable|integer|in:30,60,90,120,180,240',
         ]);
 
         $updateData = [];
@@ -799,6 +803,8 @@ class ClubDashboardController extends Controller
                 'horas_limite_cancelacion' => (int) ($complejo->horas_limite_cancelacion ?? 4),
                 'permite_mostrador_publico' => (bool) ($complejo->permite_mostrador_publico ?? true),
                 'hora_inicio_luz' => $complejo->hora_inicio_luz ? substr($complejo->hora_inicio_luz, 0, 5) : '19:00',
+                'recordatorio_whatsapp_activo' => (bool) ($complejo->recordatorio_whatsapp_activo ?? true),
+                'recordatorio_anticipacion_minutos' => (int) ($complejo->recordatorio_anticipacion_minutos ?? 120),
             ],
         ]);
     }
@@ -2140,6 +2146,78 @@ class ClubDashboardController extends Controller
                 'nuevo_saldo_formateado' => '$' . number_format($nuevoSaldo, 2, ',', '.'),
             ]);
         }
+    }
+
+    /**
+     * Enviar recordatorio de turno manual por WhatsApp desde el panel de control.
+     */
+    public function enviarRecordatorioManual(Request $request, string $subdomain, int $turnoId): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum');
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autenticado.',
+            ], 401);
+        }
+
+        $isAdmin = ($complejo->user_id && $complejo->user_id === $user->id) || ($user->role ?? '') === 'admin' || $user->email === 'admin@admin.com';
+        if (!$isAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos de administrador para este club.',
+            ], 403);
+        }
+
+        $turno = Turno::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->where('id', $turnoId)
+            ->with(['cliente', 'cancha', 'complejo'])
+            ->first();
+
+        if (!$turno) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Turno no encontrado.',
+            ], 404);
+        }
+
+        $telefono = $turno->cliente_telefono ?: $turno->cliente?->telefono;
+        if (empty($telefono)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El cliente de este turno no posee un número de WhatsApp registrado.',
+            ], 422);
+        }
+
+        $whatsAppService = app(\App\Services\WhatsAppEvolutionService::class);
+        $enviado = $whatsAppService->enviarRecordatorioTurno($turno);
+
+        if ($enviado) {
+            $turno->update(['recordatorio_enviado_at' => \Carbon\Carbon::now()]);
+            return response()->json([
+                'success' => true,
+                'message' => "Recordatorio enviado exitosamente por WhatsApp a {$telefono}.",
+                'recordatorio_enviado_at' => $turno->recordatorio_enviado_at?->toIso8601String(),
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'No se pudo enviar el WhatsApp vía Evolution API. Verifica el estado del servicio.',
+        ], 500);
     }
 }
 

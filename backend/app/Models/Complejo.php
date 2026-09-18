@@ -36,6 +36,8 @@ class Complejo extends Model
         'permite_mostrador_publico',
         'horas_limite_cancelacion',
         'hora_inicio_luz',
+        'recordatorio_whatsapp_activo',
+        'recordatorio_anticipacion_minutos',
     ];
 
     protected function casts(): array
@@ -47,6 +49,8 @@ class Complejo extends Model
             'monto_sena_fijo' => 'decimal:2',
             'permite_mostrador_publico' => 'boolean',
             'horas_limite_cancelacion' => 'integer',
+            'recordatorio_whatsapp_activo' => 'boolean',
+            'recordatorio_anticipacion_minutos' => 'integer',
         ];
     }
 

@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Lista de Espera Inteligente Multicanal con Evolution API WhatsApp & Email Mailpit 100% Operativa)
-- **Última Actualización:** 2026-09-18 (Resolución de sincronización y transferencia SSO de sesiones entre subdominios y dominio central; soporte de cookies cross-subdomain y redirección automática en LoginPage/RegisterPage con auth_token; 215 tests backend, 84 tests frontend web y 20 tests mobile al 100% en verde).
+- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulo de Recordatorios Automáticos y Manuales por WhatsApp (Evolution API)
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Sistema de Recordatorios Preventivos por WhatsApp con Anti-No-Show, Idempotencia y Multi-tenancy 100% Operativo)
+- **Última Actualización:** 2026-09-18 (Implementación completa de recordatorios por WhatsApp vía Evolution API: migración en BD, scheduler cada 5 min con ventana de anticipación configurable 60/120/180 min, endpoint manual en panel de control, card en Políticas del club, botón interactivo en Resumen Diario & Caja, y 330 tests automatizados en verde: 224 backend, 86 frontend, 20 mobile).
 
 ---
 

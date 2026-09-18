@@ -240,6 +240,7 @@ class ClubReporteService
                     'es_fijo' => $esFijo,
                     'estado' => $t->estado ?? 'reservado',
                     'es_penalidad' => $isPenalidad,
+                    'recordatorio_enviado_at' => $t->recordatorio_enviado_at ? $t->recordatorio_enviado_at->format('Y-m-d H:i:s') : null,
                 ];
             }
 

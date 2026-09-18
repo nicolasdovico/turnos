@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Cancha;
+use App\Models\Turno;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -68,6 +69,88 @@ class WhatsAppEvolutionService
             . "⏰ *Horario:* {$horaInicio}{$horaFinTexto} hs\n\n"
             . "👉 *Reservalo ya mismo antes que nadie:*\n{$reservaUrl}\n\n"
             . "⚡ _Quien complete la reserva primero se queda con el turno._";
+
+        return $this->enviarMensajeTexto($numeroLimpio, $mensaje);
+    }
+
+    /**
+     * Enviar recordatorio de turno por WhatsApp al cliente.
+     */
+    public function enviarRecordatorioTurno(Turno $turno): bool
+    {
+        $turno->loadMissing(['cliente', 'cancha', 'complejo']);
+
+        $telefono = $turno->cliente_telefono ?: $turno->cliente?->telefono;
+        $nombre = $turno->cliente_nombre ?: $turno->cliente?->name ?: 'Estimado/a cliente';
+
+        if (empty($telefono)) {
+            Log::warning("WhatsApp recordatorio no enviado: el turno {$turno->id} no tiene teléfono registrado.");
+            return false;
+        }
+
+        $numeroLimpio = $this->formatearNumeroTelefono($telefono);
+        if (empty($numeroLimpio)) {
+            Log::warning("WhatsApp recordatorio no enviado: teléfono de turno {$turno->id} ({$telefono}) no pudo ser formateado.");
+            return false;
+        }
+
+        $complejo = $turno->complejo ?: $turno->cancha?->complejo;
+        $complejoNombre = $complejo?->nombre ?: 'Tu Club Deportivo';
+        $canchaNombre = $turno->cancha?->nombre ?: 'Cancha';
+        $deporte = ucfirst($turno->cancha?->deporte ?: 'Deporte');
+        $subdominio = $complejo?->subdominio ?: 'app';
+
+        $fechaCarbon = Carbon::parse($turno->fecha);
+        $fechaFormateada = $fechaCarbon->format('d/m/Y');
+        $horaInicio = substr($turno->hora_inicio, 0, 5);
+        $horaFin = $turno->hora_fin ? substr($turno->hora_fin, 0, 5) : '';
+        $horarioTexto = $horaFin ? "{$horaInicio} a {$horaFin}" : $horaInicio;
+
+        // Estado financiero / Saldo
+        $saldoPendiente = (float) ($turno->saldo_pendiente ?? 0);
+        $infoPago = "";
+        if ($saldoPendiente > 0) {
+            $infoPago = "💰 *Saldo a abonar en el club:* $" . number_format($saldoPendiente, 2, ',', '.') . "\n";
+        } elseif ($turno->monto_pagado > 0 && $saldoPendiente <= 0) {
+            $infoPago = "✅ *Estado del Pago:* 100% Abonado\n";
+        }
+
+        // Ubicación / Dirección si existe
+        $direccionTexto = "";
+        if (!empty($complejo?->direccion)) {
+            $direccionTexto = "📍 *Ubicación:* {$complejo->direccion}\n";
+        }
+
+        // Construir URL del club
+        $frontendHost = env('FRONTEND_URL', 'http://localhost:8080');
+        if ($subdominio && $subdominio !== 'app' && !str_contains($frontendHost, $subdominio)) {
+            $parsed = parse_url($frontendHost);
+            $host = $parsed['host'] ?? 'localhost';
+            $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+            $scheme = $parsed['scheme'] ?? 'http';
+            $clubUrl = "{$scheme}://{$subdominio}.{$host}{$port}/";
+        } else {
+            $clubUrl = "{$frontendHost}/";
+        }
+
+        $iconoDeporte = match (strtolower($turno->cancha?->deporte ?? '')) {
+            'padel' => '🎾',
+            'tenis' => '🎾',
+            'futbol' => '⚽',
+            'basquet' => '🏀',
+            'squash' => '🏸',
+            default => '🏆',
+        };
+
+        $mensaje = "⏰ *¡Recordatorio de Turno en {$complejoNombre}!* {$iconoDeporte}\n\n"
+            . "Hola *{$nombre}*, te recordamos que tienes una reserva programada para hoy:\n\n"
+            . "🏟️ *Cancha:* {$canchaNombre} ({$deporte})\n"
+            . "📅 *Fecha:* {$fechaFormateada}\n"
+            . "⏰ *Horario:* {$horarioTexto} hs\n"
+            . $infoPago
+            . $direccionTexto
+            . "\n👉 *Sitio del Club:*\n{$clubUrl}\n\n"
+            . "⚡ _¡Te esperamos para jugar! Recordá asistir con ropa deportiva y calzado adecuado._";
 
         return $this->enviarMensajeTexto($numeroLimpio, $mensaje);
     }

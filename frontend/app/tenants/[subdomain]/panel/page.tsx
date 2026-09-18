@@ -24,6 +24,8 @@ interface ComplejoData {
   horas_limite_cancelacion?: number;
   permite_mostrador_publico?: boolean;
   hora_inicio_luz?: string;
+  recordatorio_whatsapp_activo?: boolean;
+  recordatorio_anticipacion_minutos?: number;
   owner: { id: number; name: string; email: string } | null;
 }
 
@@ -413,6 +415,8 @@ export default function ClubAdminPanel() {
   const [horasLimiteCancelacion, setHorasLimiteCancelacion] = useState<number>(4);
   const [permiteMostradorPublico, setPermiteMostradorPublico] = useState<boolean>(true);
   const [horaInicioLuz, setHoraInicioLuz] = useState<string>("19:00");
+  const [recordatorioWhatsappActivo, setRecordatorioWhatsappActivo] = useState<boolean>(true);
+  const [recordatorioAnticipacionMinutos, setRecordatorioAnticipacionMinutos] = useState<number>(120);
   const [isSavingPoliticas, setIsSavingPoliticas] = useState(false);
   const [isPoliticasDirty, setIsPoliticasDirty] = useState(false);
   const isPoliticasDirtyRef = React.useRef<boolean>(false);
@@ -607,6 +611,12 @@ export default function ClubAdminPanel() {
           }
           if (data.data.complejo.hora_inicio_luz) {
             setHoraInicioLuz(data.data.complejo.hora_inicio_luz.substring(0, 5));
+          }
+          if (data.data.complejo.recordatorio_whatsapp_activo !== undefined) {
+            setRecordatorioWhatsappActivo(Boolean(data.data.complejo.recordatorio_whatsapp_activo));
+          }
+          if (typeof data.data.complejo.recordatorio_anticipacion_minutos === "number") {
+            setRecordatorioAnticipacionMinutos(data.data.complejo.recordatorio_anticipacion_minutos);
           }
         }
       }
@@ -1114,6 +1124,8 @@ export default function ClubAdminPanel() {
           horas_limite_cancelacion: horasLimiteCancelacion,
           permite_mostrador_publico: permiteMostradorPublico,
           hora_inicio_luz: horaInicioLuz,
+          recordatorio_whatsapp_activo: recordatorioWhatsappActivo,
+          recordatorio_anticipacion_minutos: recordatorioAnticipacionMinutos,
         }),
       });
 
@@ -1165,6 +1177,18 @@ export default function ClubAdminPanel() {
     isPoliticasDirtyRef.current = true;
   };
 
+  const updateRecordatorioWhatsappActivo = (val: boolean) => {
+    setRecordatorioWhatsappActivo(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updateRecordatorioAnticipacionMinutos = (val: number) => {
+    setRecordatorioAnticipacionMinutos(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
   const descartarCambiosPoliticas = () => {
     if (complejo) {
       if (complejo.tipo_cobro_reserva) {
@@ -1181,6 +1205,12 @@ export default function ClubAdminPanel() {
       }
       if (complejo.hora_inicio_luz) {
         setHoraInicioLuz(complejo.hora_inicio_luz.substring(0, 5));
+      }
+      if (complejo.recordatorio_whatsapp_activo !== undefined) {
+        setRecordatorioWhatsappActivo(Boolean(complejo.recordatorio_whatsapp_activo));
+      }
+      if (typeof complejo.recordatorio_anticipacion_minutos === "number") {
+        setRecordatorioAnticipacionMinutos(complejo.recordatorio_anticipacion_minutos);
       }
     }
     setIsPoliticasDirty(false);
@@ -4371,10 +4401,93 @@ export default function ClubAdminPanel() {
                 </div>
               </div>
 
-              {/* Card 5: Mostrador Presencial */}
+              {/* Card 5: Recordatorios Automáticos por WhatsApp */}
+              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl border border-emerald-500/20 text-xl">
+                      📲
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">5. Recordatorios de Turnos por WhatsApp</h3>
+                      <p className="text-xs text-slate-400">
+                        Envía un mensaje automatizado previo a cada reserva para reducir el ausentismo (no-show) y recordar saldos pendientes
+                      </p>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto">
+                    <input
+                      type="checkbox"
+                      aria-label="Activar Recordatorios por WhatsApp"
+                      checked={recordatorioWhatsappActivo}
+                      onChange={(e) => updateRecordatorioWhatsappActivo(e.target.checked)}
+                      className="w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-950 border-slate-700 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-slate-200">
+                      {recordatorioWhatsappActivo ? "Activado" : "Desactivado"}
+                    </span>
+                  </label>
+                </div>
+
+                {recordatorioWhatsappActivo && (
+                  <div className="space-y-4 pt-2 border-t border-slate-800/80">
+                    <div className="text-xs text-slate-300">
+                      <span className="font-bold text-white">⏱️ Tiempo de Anticipación para el Envío:</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        { minutos: 60, label: "1 hora antes", desc: "Envío justo a tiempo previo al turno" },
+                        { minutos: 120, label: "2 horas antes", desc: "Tiempo óptimo para organizar el partido", badge: "⭐ Recomendado" },
+                        { minutos: 180, label: "3 horas antes", desc: "Mayor margen de preparación y viaje" },
+                      ].map((item) => (
+                        <button
+                          key={item.minutos}
+                          type="button"
+                          onClick={() => updateRecordatorioAnticipacionMinutos(item.minutos)}
+                          className={`p-4 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                            recordatorioAnticipacionMinutos === item.minutos
+                              ? "bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/50 shadow-lg"
+                              : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-white text-sm">{item.label}</span>
+                            <span className="text-xs font-mono font-bold text-emerald-400">{item.minutos} min</span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-2">{item.desc}</p>
+                          {item.badge && (
+                            <span className="mt-3 inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 w-fit">
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-200/90 space-y-1.5">
+                      <div className="font-bold flex items-center gap-1.5 text-emerald-300">
+                        <span>💬</span> Mensaje oficial enviado vía WhatsApp:
+                      </div>
+                      <ul className="space-y-1 text-[11px] list-disc list-inside text-emerald-200/80">
+                        <li>
+                          Indica el deporte, fecha, horario exacto y cancha asignada.
+                        </li>
+                        <li>
+                          Informa el <strong>estado de pago</strong> y recuerda el <strong>saldo pendiente a pagar en caja</strong> si la reserva no fue cancelada al 100%.
+                        </li>
+                        <li>
+                          Incluye la dirección del club y el enlace al sitio web para autogestión del cliente.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Card 6: Mostrador Presencial */}
               <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 flex items-center justify-between">
                 <div className="space-y-1 pr-4">
-                  <div className="font-bold text-sm text-white">5. Permitir Pago en Mostrador para Clientes Públicos</div>
+                  <div className="font-bold text-sm text-white">6. Permitir Pago en Mostrador para Clientes Públicos</div>
                   <p className="text-xs text-slate-400">
                     Si está activo, los jugadores pueden optar por reservar online y abonar presencialmente sin tarjeta previa.
                   </p>

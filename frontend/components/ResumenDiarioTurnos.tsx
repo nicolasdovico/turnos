@@ -41,6 +41,7 @@ export interface TurnoDetalle {
   es_fijo: boolean;
   estado: string;
   es_penalidad?: boolean;
+  recordatorio_enviado_at?: string | null;
 }
 
 export interface DiaResumen {
@@ -144,6 +145,7 @@ export default function ResumenDiarioTurnos({
   const [pagoMetodo, setPagoMetodo] = useState<"mostrador" | "transferencia" | "billetera" | "online">("mostrador");
   const [pagoMonto, setPagoMonto] = useState<string>("");
   const [isProcessingPago, setIsProcessingPago] = useState<boolean>(false);
+  const [sendingReminderId, setSendingReminderId] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const getAuthToken = () => {
@@ -309,6 +311,50 @@ export default function ResumenDiarioTurnos({
       showToast("error", err.message || "Error al registrar el cobro.");
     } finally {
       setIsProcessingPago(false);
+    }
+  };
+
+  const handleEnviarRecordatorio = async (e: React.MouseEvent, turnoId: number) => {
+    e.stopPropagation();
+    try {
+      setSendingReminderId(turnoId);
+      const token = getAuthToken();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      if (subdomain) headers["X-Tenant-ID"] = subdomain;
+
+      const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/turnos/${turnoId}/enviar-recordatorio`, {
+        method: "POST",
+        headers,
+      });
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        throw new Error(resData.message || "Error al enviar el recordatorio.");
+      }
+
+      showToast("success", `¡Recordatorio de WhatsApp enviado exitosamente${resData.telefono ? ` a ${resData.telefono}` : ""}!`);
+
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          dias: prev.dias.map((d) => ({
+            ...d,
+            turnos: d.turnos.map((t) =>
+              t.id === turnoId
+                ? { ...t, recordatorio_enviado_at: new Date().toISOString() }
+                : t
+            ),
+          })),
+        };
+      });
+    } catch (err: any) {
+      showToast("error", err.message || "No se pudo enviar el recordatorio por WhatsApp.");
+    } finally {
+      setSendingReminderId(null);
     }
   };
 
@@ -942,6 +988,33 @@ export default function ResumenDiarioTurnos({
                                         >
                                           💵 Cobrar
                                         </button>
+                                      </div>
+                                    )}
+
+                                    {/* WhatsApp Reminder Button / Status */}
+                                    {!isPenalidad && t.estado !== "cancelado" && (
+                                      <div className="shrink-0">
+                                        {t.recordatorio_enviado_at ? (
+                                          <span
+                                            title={`Recordatorio enviado: ${t.recordatorio_enviado_at}`}
+                                            className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1 cursor-default"
+                                          >
+                                            <span>📲</span>
+                                            <span className="hidden sm:inline">Recordatorio enviado</span>
+                                            <span className="sm:hidden">Enviado</span>
+                                          </span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => handleEnviarRecordatorio(e, t.id)}
+                                            disabled={sendingReminderId === t.id}
+                                            className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border border-slate-700 hover:border-emerald-500 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                            title="Enviar recordatorio manual por WhatsApp"
+                                          >
+                                            <span>📲</span>
+                                            <span>{sendingReminderId === t.id ? "Enviando..." : "Recordatorio"}</span>
+                                          </button>
+                                        )}
                                       </div>
                                     )}
                                   </div>

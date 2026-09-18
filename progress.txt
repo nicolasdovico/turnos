@@ -1963,5 +1963,70 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Frontend Mobile: 20/20 tests exitosos al 100% (4 suites).
     - Total: 319/319 tests en verde al 100%.
 ===============================================================================
+[2026-09-18] - SISTEMA INTEGRAL DE RECORDATORIOS POR WHATSAPP (EVOLUTION API)
+-------------------------------------------------------------------------------
+- Contexto y Requerimiento:
+  * El usuario solicitó implementar una funcionalidad para enviar recordatorios por WhatsApp a los clientes que tienen reservado un turno, aproximadamente 1 o 2 horas antes del inicio del turno.
+  * Objetivo: Reducir el ausentismo (no-show), brindar información clara del turno (deporte, horario, cancha, dirección) y recordar cualquier saldo pendiente a abonar en el club.
+- Arquitectura e Implementación:
+  * 1. Esquema de Base de Datos & Modelos:
+    - Migración `2026_09_18_160000_add_recordatorio_fields_to_turnos_and_complejos_table.php`:
+      * En `turnos`: campo `recordatorio_enviado_at` (timestamp nullable) con índice para consultas ultra-rápidas y prevención estricta de duplicados (idempotencia).
+      * En `complejos`: `recordatorio_whatsapp_activo` (boolean default true) y `recordatorio_anticipacion_minutos` (integer default 120 / 2 horas).
+    - Modelos `Turno` y `Complejo`: campos añadidos a `$fillable` y `$casts` (`recordatorio_enviado_at => datetime`, `recordatorio_whatsapp_activo => boolean`, `recordatorio_anticipacion_minutos => integer`).
+  * 2. Servicio de WhatsApp Evolution API:
+    - `WhatsAppEvolutionService::enviarRecordatorioTurno(Turno $turno): bool`:
+      * Formateo internacional de número telefónico (E.164 / Argentina `549...`).
+      * Iconos y emojis representativos según el deporte principal (🎾 Pádel / Tenis, ⚽ Fútbol, 🏀 Básquet, etc.).
+      * Detección automática del estado financiero del turno: si existe saldo pendiente, notifica el monto a abonar en mostrador; si está pagado al 100%, indica "✓ Turno pagado en su totalidad".
+      * Dirección física del club y enlace directo para autogestión de la reserva.
+  * 3. Queue Job & Idempotencia:
+    - `EnviarRecordatorioWhatsAppJob` (`App\Jobs\EnviarRecordatorioWhatsAppJob`):
+      * Valida si el turno fue cancelado, rechazado o anulado (`TURNO_CANCELLED`).
+      * Valida si el cliente posee número telefónico (`NO_PHONE`).
+      * Valida idempotencia: si `recordatorio_enviado_at !== null`, omite el envío para evitar spam (`ALREADY_SENT`).
+      * Ejecuta el envío vía `WhatsAppEvolutionService` y registra `recordatorio_enviado_at = Carbon::now()`.
+  * 4. Comando Artisan Programado & Scheduler:
+    - `EnviarRecordatoriosTurnosCommand` (`php artisan turnos:enviar-recordatorios`):
+      * Opciones: `--complejo`, `--minutos`, `--momento`.
+      * Itera complejos activos con recordatorios habilitados respetando la zona horaria de cada club (`$complejo->timezone ?: 'America/Argentina/Buenos_Aires'`).
+      * Calcula la ventana de turnos próximos (`now` a `now + anticipacion_minutos`) y selecciona reservas con teléfono registrado y `recordatorio_enviado_at IS NULL`.
+      * Despacha `EnviarRecordatorioWhatsAppJob` y, si el usuario posee app móvil (`fcm_token`), despacha concurrentemente `EnviarRecordatorioTurnoJob` (notificación push).
+      * Registrado en `backend/routes/console.php` para ejecutarse cada 5 minutos (`Schedule::command('turnos:enviar-recordatorios')->everyFiveMinutes()`).
+  * 5. API Backend & Controlador de Panel:
+    - `ClubDashboardController`:
+      * `show()`: expone `recordatorio_whatsapp_activo` y `recordatorio_anticipacion_minutos` del club.
+      * `updateConfiguracion()`: permite a los administradores del club activar/desactivar el servicio y seleccionar el tiempo de anticipación (60, 120 o 180 min).
+      * `enviarRecordatorioManual(Request $request, string $subdomain, int $turnoId)`: endpoint seguro con validación RBAC (`POST /api/clubs/{subdomain}/turnos/{id}/enviar-recordatorio`) para envío manual a demanda desde el panel de control.
+  * 6. Frontend Web Next.js 14:
+    - Pestaña "Políticas" (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+      * Tarjeta "5. Recordatorios de Turnos por WhatsApp" con switch toggle activado/desactivado.
+      * Selector visual interactivo de anticipación: 60 minutos (1 hora antes), 120 minutos (2 horas antes - Recomendado) y 180 minutos (3 horas antes).
+      * Resumen explicativo del contenido enviado (horario, cancha, saldo a pagar en caja, dirección y enlace).
+      * Persistencia en base de datos vía `PUT /api/clubs/{subdomain}/configuracion`.
+    - Pestaña "Resumen Diario & Caja" (`frontend/components/ResumenDiarioTurnos.tsx`):
+      * Serialización en `ClubReporteService`: incluye `recordatorio_enviado_at` en el detalle de cada turno.
+      * Botón interactivo "📲 Recordatorio" en cada turno del día. Al hacer clic, despacha el recordatorio vía API, emite una notificación toast de confirmación y actualiza reactivamente el botón a "📲 Recordatorio enviado" en verde.
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (`tests/Feature/RecordatorioWhatsAppTest.php`):
+    - `test_job_enviar_recordatorio_whatsapp_despacha_mensaje_correctamente`: 100% exitoso.
+    - `test_job_enviar_recordatorio_omite_si_ya_fue_enviado`: 100% exitoso.
+    - `test_job_enviar_recordatorio_omite_si_no_tiene_telefono`: 100% exitoso.
+    - `test_job_enviar_recordatorio_omite_turno_cancelado`: 100% exitoso.
+    - `test_command_turnos_enviar_recordatorios_selecciona_turnos_en_ventana`: 100% exitoso.
+    - `test_command_ignora_complejos_con_recordatorio_desactivado`: 100% exitoso.
+    - `test_endpoint_enviar_recordatorio_manual`: 100% exitoso.
+    - `test_endpoint_enviar_recordatorio_falla_si_no_es_admin`: 100% exitoso.
+    - `test_actualizar_configuracion_recordatorio_en_dashboard`: 100% exitoso.
+    - Total Backend Suite: 224/224 tests exitosos al 100% (1.190 aserciones).
+  * Frontend Web (`tests/RecordatorioWhatsApp.test.tsx`):
+    - `renders WhatsApp reminder settings in Políticas tab and saves configuration`: 100% exitoso.
+    - `renders WhatsApp reminder button in Resumen Diario and dispatches manual reminder`: 100% exitoso.
+    - Total Frontend Web Suite: 86/86 tests exitosos al 100% (8 suites).
+  * Frontend Mobile:
+    - Total Mobile Suite: 20/20 tests exitosos al 100% (4 suites).
+  * Gran Total del Ecosistema: 330/330 tests automatizados en verde con 0 regresiones.
+===============================================================================
+
 
 
