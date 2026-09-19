@@ -1,8 +1,9 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import PortalPage from "../app/portal/page";
 import { AuthProvider } from "../context/AuthContext";
+
 
 describe("Landing Page Vendedora (PortalPage)", () => {
   beforeEach(() => {
@@ -106,4 +107,70 @@ describe("Landing Page Vendedora (PortalPage)", () => {
 
     expect(screen.getByText(/Nuestra plataforma funciona 100% en la web moderna/i)).toBeDefined();
   });
+
+  it("permite navegar manualmente por las obleas de funcionalidades y soporta controles de pausa y siguiente/anterior", () => {
+    render(
+      <AuthProvider>
+        <PortalPage />
+      </AuthProvider>
+    );
+
+    // Inicialmente muestra la primera feature (1 / 6)
+    expect(screen.getByText("1 / 6")).toBeDefined();
+    expect(
+      screen.getByText(/Tus clientes ven la disponibilidad en vivo desde su celular/i)
+    ).toBeDefined();
+
+    // Hacemos click en la oblea "Cobro de Señas & Billetera Virtual"
+    const obleaSenas = screen.getByRole("button", { name: /Cobro de Señas & Billetera Virtual/i });
+    fireEvent.click(obleaSenas);
+
+    // Ahora muestra la feature 2 (2 / 6) y su detalle correspondiente
+    expect(screen.getByText("2 / 6")).toBeDefined();
+    expect(
+      screen.getByText(/Configurá el porcentaje de seña requerido o cobro total/i)
+    ).toBeDefined();
+
+    // Probamos el botón Siguiente
+    const btnNext = screen.getByRole("button", { name: /Siguiente funcionalidad/i });
+    fireEvent.click(btnNext);
+
+    expect(screen.getByText("3 / 6")).toBeDefined();
+    expect(
+      screen.getByText(/Cargá los turnos semanales fijos con un solo clic/i)
+    ).toBeDefined();
+
+    // Probamos el botón Anterior
+    const btnPrev = screen.getByRole("button", { name: /Funcionalidad anterior/i });
+    fireEvent.click(btnPrev);
+    expect(screen.getByText("2 / 6")).toBeDefined();
+
+    // Probamos alternar Pausa / Auto-rotación
+    const btnAuto = screen.getByRole("button", { name: /Pausar rotación automática/i });
+    fireEvent.click(btnAuto);
+    expect(screen.getByRole("button", { name: /Reanudar rotación automática/i })).toBeDefined();
+  });
+
+  it("rota automáticamente a la siguiente funcionalidad después de 6 segundos", () => {
+    vi.useFakeTimers();
+
+    render(
+      <AuthProvider>
+        <PortalPage />
+      </AuthProvider>
+    );
+
+    expect(screen.getByText("1 / 6")).toBeDefined();
+
+    // Avanzamos 6 segundos en el temporizador
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+
+    // Debe haber avanzado automáticamente a 2 / 6
+    expect(screen.getByText("2 / 6")).toBeDefined();
+
+    vi.useRealTimers();
+  });
 });
+

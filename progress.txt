@@ -2209,8 +2209,30 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación y Calidad:
   * Tests Frontend: 103/103 tests pasando al 100% (10 suites).
   * Tests Backend: 246/246 tests pasando al 100%.
-  * Build Next.js: Compilación de producción validada exitosamente.
+-------------------------------------------------------------------------------
+[2026-09-19] - AUTO-ROTACIÓN DINÁMICA & CONTROLES EN SHOWCASE DE FUNCIONALIDADES
+-------------------------------------------------------------------------------
+- Contexto y Requerimiento de UX:
+  * En la landing page (`http://localhost:8080/`), dentro de la sección "Todo lo que tu complejo necesita para funcionar de forma autónoma", el usuario debía hacer click manualmente en cada una de las 6 obleas para descubrir el detalle técnico de la derecha.
+  * Se solicitó que las obleas vayan rotando automáticamente cada cierto tiempo sin requerir acción del visitante, pero permitiendo seleccionar o volver a tocar cualquiera para releerla a demanda.
+- Implementación Realizada:
+  * `frontend/components/landing/FeaturesShowcase.tsx`:
+    - Auto-rotación reactiva continua cada 6 segundos (`ROTATION_INTERVAL = 6000`).
+    - Temporizador visual integrado: cada oblea seleccionada muestra una barra de progreso inferior en color esmeralda (`bg-emerald-400`) que visualiza el tiempo restante antes del próximo cambio.
+    - Pausa automática por hover (`onMouseEnter` / `onMouseLeave`): al posar el cursor sobre el bloque para leer, la rotación se congela en seco y la barra de progreso se pausa sin interrumpir la lectura del usuario.
+    - Navegación manual fluida: el usuario puede hacer click en cualquiera de las obleas para ver o releer su detalle de inmediato, reiniciando el ciclo de 6 segundos.
+    - Controles manuales directos en el detalle: agregados botones Anterior (`<`), Siguiente (`>`), botón de Pausa/Auto y contador de posición (`1 / 6`).
+  * `frontend/app/globals.css`:
+    - Animación `@keyframes featureProgress` para la barra de progreso reactiva.
+    - Animación `@keyframes featureFadeIn` para transición suave sin parpadeos al cambiar de funcionalidad.
+  * `frontend/tests/LandingPage.test.tsx`:
+    - Tests de navegación manual entre obleas y verificación de controles (Anterior, Siguiente, Pausa/Play).
+    - Test de auto-rotación continua con `vi.useFakeTimers()` verificando el avance a los 6 segundos.
+- Verificación y Calidad:
+  * Frontend: 105/105 tests pasando al 100% (10 suites en Vitest).
+  * Build Next.js (`npm run build`): 100% exitoso.
 ===============================================================================
+
 
 
 
