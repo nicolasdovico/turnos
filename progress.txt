@@ -2143,17 +2143,18 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Detección de subdominio `jugar`: peticiones a `jugar.localhost:8080` o `jugar.turnos.com` se reescriben limpiamente a `/jugar`.
     - Tests unitarios añadidos y pasando en `frontend/tests/middleware.test.ts`.
   * 6. Buscador y Marketplace B2C (`frontend/app/jugar/page.tsx`):
-    - Vista Próximamente (Coming Soon) por defecto cuando el Feature Flag está apagado, con llamado a la acción para dueños de clubes ("Registrar mi Club Gratis") y botón de "Modo Vista Previa (Desarrollo)".
-    - Vista Interactiva (cuando `NEXT_PUBLIC_ENABLE_PLAYER_MARKETPLACE=true` o `?preview=true`):
-      * Selector de radio espacial (5, 10, 20, 50 km).
-      * Filtros por deporte (Todos, Pádel, Tenis, Fútbol, Básquet).
-      * Tarjetas de complejos ordenadas de menor a mayor distancia con badge de distancia y botón a la web de reservas de cada club.
-      * Mapa interactivo embebido de OpenStreetMap centrado en el complejo seleccionado con enlace de navegación.
-    - Tests unitarios de componente pasando al 100% en `frontend/tests/jugarMarketplace.test.tsx`.
+    - Activación operativa directa: Se eliminaron etiquetas de desarrollo ("en desarrollo", "Vista Previa") para operar de inmediato como portal público en `http://jugar.localhost:8080/` (o `jugar.turnos.com`).
+    - Carga inmediata de clubes abonados: Consulta instantánea a `/api/complejos/cercanos` con coordenadas centrales y actualización fluida en segundo plano si el jugador otorga permisos GPS.
+    - Se muestran los clubes reales registrados en la plataforma (`Padel Pro Arena`, `Complejo Deportivo Central`, `Nico Tenis Park`, `Nico Pádel & Sport Club`, `Iron Gym`, `Padel Park Olivos`, `club 1 de prueba`) con cantidad de canchas disponibles, deportes, dirección y distancias reales en km/metros.
+    - Control de corte de acceso por variable: Cuando se requiera cortar el acceso público, basta con definir `NEXT_PUBLIC_ENABLE_PLAYER_MARKETPLACE="false"` para mostrar la landing de registro de clubes y modo preview con `?preview=true`.
+    - Selector de radio espacial (5, 10, 20, 50 km) y filtros por deporte (Todos, Pádel, Tenis, Fútbol, Básquet, Gimnasio).
+    - Mapa embebido de OpenStreetMap centrado en el complejo seleccionado con enlace directo "Cómo llegar" y botón de reserva "Ver Canchas".
+    - Tests unitarios actualizados y pasando al 100% en `frontend/tests/jugarMarketplace.test.tsx` (3 tests).
 - Verificación y Calidad:
   * Backend: 242/242 tests pasando al 100% (1.288 aserciones).
-  * Frontend: 101/101 tests pasando al 100% en 10 suites de Vitest.
+  * Frontend: 102/102 tests pasando al 100% en 10 suites de Vitest.
   * Compilación Next.js (`NODE_ENV=production next build`): 100% exitosa sin errores de tipado ni de renderizado.
+  * Verificación en vivo HTTP (`http://jugar.localhost:8080/` y `/api/complejos/cercanos`): 200 OK con los 7 clubes abonados listados en tiempo real.
 ===============================================================================
 
 

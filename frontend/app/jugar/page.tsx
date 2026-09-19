@@ -20,17 +20,17 @@ interface ComplejoCercano {
   canchas?: any[];
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+const API_BASE = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
 
 export default function JugarMarketplacePage() {
   const [isPreview, setIsPreview] = useState<boolean>(false);
-  const isEnvEnabled = process.env.NEXT_PUBLIC_ENABLE_PLAYER_MARKETPLACE === "true";
+  // Operativo por defecto. Cuando se requiera cortar el acceso público, basta con definir NEXT_PUBLIC_ENABLE_PLAYER_MARKETPLACE="false"
+  const isMarketplaceDisabled = process.env.NEXT_PUBLIC_ENABLE_PLAYER_MARKETPLACE === "false";
 
   // Search state
   const [deporte, setDeporte] = useState<string>("todos");
   const [radioKm, setRadioKm] = useState<number>(20);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [manualCity, setManualCity] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [complejos, setComplejos] = useState<ComplejoCercano[]>([]);
@@ -53,7 +53,7 @@ export default function JugarMarketplacePage() {
     }
   }, []);
 
-  const isMarketplaceActive = isEnvEnabled || isPreview;
+  const isMarketplaceActive = !isMarketplaceDisabled || isPreview;
 
   // Auto-fetch complexes when coords or filters change
   const fetchClubesCercanos = async (lat: number, lng: number, radio: number, deporteFiltro: string) => {
@@ -108,10 +108,31 @@ export default function JugarMarketplacePage() {
     );
   };
 
-  // Initial load when active
+  // Carga inmediata de clubes abonados al iniciar
   useEffect(() => {
-    if (isMarketplaceActive && !userCoords) {
-      handleSolicitarUbicacion();
+    if (isMarketplaceActive) {
+      const defaultCoords = { lat: -34.603722, lng: -58.381592 };
+      setUserCoords(defaultCoords);
+      fetchClubesCercanos(defaultCoords.lat, defaultCoords.lng, radioKm, deporte);
+
+      // Si el navegador soporta geolocalización, solicitamos actualización en segundo plano
+      if (
+        typeof window !== "undefined" &&
+        navigator.geolocation &&
+        typeof navigator.geolocation.getCurrentPosition === "function"
+      ) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setUserCoords(coords);
+            fetchClubesCercanos(coords.lat, coords.lng, radioKm, deporte);
+          },
+          () => {
+            // Se mantiene la vista por defecto sin interrumpir
+          },
+          { timeout: 6000, enableHighAccuracy: true }
+        );
+      }
     }
   }, [isMarketplaceActive]);
 
@@ -191,7 +212,7 @@ export default function JugarMarketplacePage() {
                 className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition text-center"
                 data-testid="btn-enable-preview"
               >
-                🛠️ Modo Vista Previa (Desarrollo)
+                Acceso Exclusivo / Vista Previa
               </button>
             </div>
           </div>
@@ -217,11 +238,6 @@ export default function JugarMarketplacePage() {
             <div>
               <span className="text-lg font-black tracking-tight text-white flex items-center gap-1.5">
                 jugar<span className="text-emerald-400">.turnos.com</span>
-                {isPreview && (
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-                    Vista Previa
-                  </span>
-                )}
               </span>
               <p className="text-[11px] text-slate-400 hidden sm:block">
                 Encontrá canchas disponibles cerca tuyo en tiempo real
@@ -287,6 +303,7 @@ export default function JugarMarketplacePage() {
               { id: "tenis", label: "Tenis", icon: "🎾" },
               { id: "futbol", label: "Fútbol", icon: "⚽" },
               { id: "basquet", label: "Básquet", icon: "🏀" },
+              { id: "gimnasio", label: "Gimnasio", icon: "💪" },
             ].map((dep) => (
               <button
                 key={dep.id}
@@ -374,11 +391,16 @@ export default function JugarMarketplacePage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-base font-bold text-white capitalize">{club.nombre}</h3>
                           <span className="rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-extrabold px-2.5 py-0.5 border border-emerald-500/30 capitalize">
                             🏆 {club.deporte_principal}
                           </span>
+                          {club.canchas && club.canchas.length > 0 && (
+                            <span className="rounded-full bg-slate-800 text-slate-300 text-[10px] font-semibold px-2 py-0.5 border border-slate-700">
+                              🏟️ {club.canchas.length} {club.canchas.length === 1 ? "cancha" : "canchas"}
+                            </span>
+                          )}
                         </div>
 
                         {(club.direccion || club.ciudad) && (
