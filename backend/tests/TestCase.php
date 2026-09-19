@@ -16,9 +16,13 @@ abstract class TestCase extends BaseTestCase
         $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
         $app['env'] = 'testing';
+        putenv('QUEUE_CONNECTION=sync');
+        $_ENV['QUEUE_CONNECTION'] = 'sync';
+        $_SERVER['QUEUE_CONNECTION'] = 'sync';
         config([
             'app.env' => 'testing',
             'database.connections.pgsql.database' => 'saas_testing',
+            'queue.default' => 'sync',
         ]);
         \Illuminate\Support\Facades\DB::purge('pgsql');
 
