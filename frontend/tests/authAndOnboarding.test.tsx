@@ -489,6 +489,8 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
                 direccion: "Ruta 5",
                 ciudad: "Lujan",
                 telefono: "+5491149790220",
+                latitud: -34.603722,
+                longitud: -58.381592,
               },
               plan: { id: 189, nombre: "Bronce", slug: "bronce", modulos: [] },
               canchas: [
@@ -529,6 +531,13 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Complejo Oficial/i)).toBeDefined();
     expect(screen.getByText(/🏆 tenis/i)).toBeDefined();
     expect(screen.getByText(/Ruta 5, Lujan/i)).toBeDefined();
+
+    // Verify 'Cómo llegar' Google Maps button
+    const comoLlegarBtn = screen.getByTestId("btn-como-llegar");
+    expect(comoLlegarBtn).toBeDefined();
+    expect(comoLlegarBtn.getAttribute("href")).toBe(
+      "https://www.google.com/maps/dir/?api=1&destination=-34.603722,-58.381592"
+    );
 
     // Verify real courts are displayed and sport is Tennis (NOT padel)
     expect(screen.getAllByText("Cancha 1 (Polvo)").length).toBeGreaterThanOrEqual(1);
@@ -1876,5 +1885,96 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
       deporte_principal: "padel",
       tipo_negocio_id: 1,
     });
+  });
+
+  test("renders and updates GPS coordinates in club admin panel", async () => {
+    let putConfigPayload: any = null;
+
+    global.fetch = vi.fn().mockImplementation(async (url: string, options?: any) => {
+      if (url.includes("/is-admin")) {
+        return { ok: true, json: async () => ({ is_admin: true }) } as any;
+      }
+      if (url.includes("/configuracion") && options?.method === "PUT") {
+        putConfigPayload = JSON.parse(options.body);
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            message: "Datos y configuración del club actualizados exitosamente.",
+            complejo: {
+              id: 1,
+              nombre: "Nico Pádel Club",
+              latitud: -34.603722,
+              longitud: -58.381592,
+            },
+          }),
+        } as any;
+      }
+      if (url.includes("/dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                uuid: "abc-123-uuid",
+                nombre: "Nico Pádel Club",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+                telefono: "11223344",
+                ciudad: "Luján",
+                direccion: "Calle Falsa 123",
+                latitud: -34.550000,
+                longitud: -58.450000,
+                estado: "activo",
+              },
+              canchas: [],
+              horarios_atencion: [],
+              stats: { total_canchas: 0, total_turnos: 0, modulos_count: 1 },
+              tipos_negocio: [{ id: 1, nombre: "Club", slug: "club" }],
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Switch to Datos del Club tab
+    const configTabBtn = await screen.findByRole("button", { name: /Datos del Club/i });
+    fireEvent.click(configTabBtn);
+
+    // Verify GPS section exists
+    expect(await screen.findByTestId("club-geo-section")).toBeDefined();
+
+    const latInput = screen.getByTestId("input-club-latitud") as HTMLInputElement;
+    const lngInput = screen.getByTestId("input-club-longitud") as HTMLInputElement;
+
+    // Verify initial values loaded from mock
+    expect(latInput.value).toBe("-34.55");
+    expect(lngInput.value).toBe("-58.45");
+
+    // Modify coordinates
+    fireEvent.change(latInput, { target: { value: "-34.603722" } });
+    fireEvent.change(lngInput, { target: { value: "-58.381592" } });
+
+    // Save
+    const saveBtn = screen.getByRole("button", { name: /Guardar Datos del Club/i });
+    fireEvent.click(saveBtn);
+
+    expect(await screen.findByText(/¡Datos institucionales del club actualizados exitosamente!/i)).toBeDefined();
+
+    expect(putConfigPayload).toEqual(
+      expect.objectContaining({
+        latitud: -34.603722,
+        longitud: -58.381592,
+      })
+    );
   });
 });

@@ -276,6 +276,85 @@ class ClubDashboardTest extends TestCase
             ->assertJsonPath('complejo.telefono', '+54 9 11 4979-0220');
     }
 
+    public function test_club_owner_can_update_latitud_and_longitud(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Nicolás Dueño Geo',
+            'email' => 'nico@geo.com',
+        ]);
+
+        $complejo = Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Nico Pádel Geo',
+            'subdominio' => 'nico-padel-geo',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'direccion' => 'Av. Corrientes 1234',
+            'ciudad' => 'CABA',
+            'estado' => 'activo',
+        ]);
+
+        $payload = [
+            'latitud' => -34.603722,
+            'longitud' => -58.381592,
+        ];
+
+        $response = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-padel-geo/configuracion', $payload);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('complejo.latitud', -34.603722)
+            ->assertJsonPath('complejo.longitud', -58.381592);
+
+        $this->assertDatabaseHas('complejos', [
+            'id' => $complejo->id,
+            'latitud' => -34.603722,
+            'longitud' => -58.381592,
+        ]);
+
+        // Verify that show/dashboard returns coordinates
+        $showRes = $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/clubs/nico-padel-geo/dashboard');
+
+        $showRes->assertStatus(200)
+            ->assertJsonPath('data.complejo.latitud', -34.603722)
+            ->assertJsonPath('data.complejo.longitud', -58.381592);
+    }
+
+    public function test_validates_latitud_and_longitud_range(): void
+    {
+        $owner = User::factory()->create([
+            'name' => 'Nicolás Dueño Geo Val',
+            'email' => 'nico@geoval.com',
+        ]);
+
+        Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Nico Pádel Geo Val',
+            'subdominio' => 'nico-geo-val',
+            'plan_id' => Plan::first()->id,
+            'deporte_principal' => 'padel',
+            'estado' => 'activo',
+        ]);
+
+        // Out of range latitud (> 90 or < -90)
+        $resLat = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-geo-val/configuracion', [
+                'latitud' => 95.5,
+            ]);
+        $resLat->assertStatus(422)
+            ->assertJsonValidationErrors(['latitud']);
+
+        // Out of range longitud (> 180 or < -180)
+        $resLng = $this->actingAs($owner, 'sanctum')
+            ->putJson('/api/clubs/nico-geo-val/configuracion', [
+                'longitud' => -185.2,
+            ]);
+        $resLng->assertStatus(422)
+            ->assertJsonValidationErrors(['longitud']);
+    }
+
     public function test_non_owner_cannot_update_club_policies(): void
     {
         $owner = User::factory()->create([

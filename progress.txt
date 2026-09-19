@@ -2111,6 +2111,49 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: 96/96 tests exitosos al 100% (9 suites).
   * Mobile: 20/20 tests exitosos al 100% (4 suites).
   * Gran Total: 350/350 tests automatizados en verde con 0 regresiones.
+-------------------------------------------------------------------------------
+[2026-09-19] - MÓDULO DE GEOLOCALIZACIÓN, NAVEGACIÓN GPS Y MARKETPLACE B2C (JUGAR.TURNOS.COM)
+-------------------------------------------------------------------------------
+- Contexto y Objetivos del Usuario:
+  * El usuario solicitó analizar la conveniencia de implementar geolocalización en clubes deportivos para jugadores ocasionales. Se elaboró informe y plan de implementación en 3 fases:
+    1. Base de datos y Panel de Gestión: Edición de coordenadas GPS (`latitud`, `longitud`) para el club en `/panel`, con autocompletado mediante OpenStreetMap Nominatim y geolocalización HTML5 del navegador.
+    2. Navegación GPS pública: Botón "🗺️ Cómo llegar" en la web pública del club (`[subdomain].turnos.com`), cálculo de distancia en vivo desde el navegador del jugador y link directo en recordatorios de WhatsApp.
+    3. Separación de dominios y Marketplace B2C: Separar el portal de ventas B2B (`turnos.com` / `localhost:8080`) del buscador de jugadores ocasionales (`jugar.turnos.com` / `localhost:8080/jugar`), implementando un Feature Flag (`NEXT_PUBLIC_ENABLE_PLAYER_MARKETPLACE=false`) para evitar el problema de marketing de "marketplace vacío" (con modo preview `?preview=true` para desarrollo/staging).
+- Componentes Implementados y Modificados:
+  * 1. Backend Laravel 11 (`backend/app/Http/Controllers/Api/ClubDashboardController.php`):
+    - Se expuso `latitud` y `longitud` en la respuesta de `show()`.
+    - Validación y guardado de coordenadas en `updateConfiguracion()` (`numeric|between:-90,90` y `numeric|between:-180,180`).
+    - Tests incorporados y pasando en `backend/tests/Feature/ClubDashboardTest.php` (`test_club_owner_can_update_latitud_and_longitud`, `test_validates_latitud_and_longitud_range`).
+  * 2. Servicio de WhatsApp (`backend/app/Services/WhatsAppEvolutionService.php`):
+    - Incorporado enlace de navegación a Google Maps en el cuerpo del mensaje de recordatorio cuando el complejo tiene coordenadas configuradas: `📍 *Cómo llegar:* https://www.google.com/maps/dir/?api=1&destination={lat},{lng}`.
+    - Test incorporado y pasando en `backend/tests/Feature/RecordatorioWhatsAppTest.php` (`test_recordatorio_whatsapp_includes_google_maps_link_when_club_has_coordinates`).
+  * 3. Panel de Administrador del Club (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+    - Sección de Coordenadas GPS dentro de "📋 Datos del Club".
+    - Inputs de `latitud` y `longitud` con botones de asistencia:
+      * "🎯 Usar mi ubicación actual" (HTML5 `navigator.geolocation`).
+      * "🔍 Autocompletar desde dirección" (consulta a API Nominatim de OpenStreetMap).
+      * Enlace de previsualización en Google Maps cuando las coordenadas son válidas.
+    - Tests de integración añadidos y pasando en `frontend/tests/authAndOnboarding.test.tsx`.
+  * 4. Web Pública del Club (`frontend/app/tenants/[subdomain]/page.tsx`):
+    - Botón "🗺️ Cómo llegar" visible para los jugadores que abre directamente la ruta de navegación en Google Maps/Waze.
+    - Cálculo de distancia en tiempo real mediante la fórmula de Haversine (`A X km de vos` / `A X m de vos`) si el usuario habilita ubicación en el navegador.
+    - Aislamiento estricto: la web de cada club nunca exhibe otros clubes ni competidores.
+  * 5. Middleware de Subdominios (`frontend/middleware.ts`):
+    - Añadida la ruta `/jugar` a `globalRoutes`.
+    - Detección de subdominio `jugar`: peticiones a `jugar.localhost:8080` o `jugar.turnos.com` se reescriben limpiamente a `/jugar`.
+    - Tests unitarios añadidos y pasando en `frontend/tests/middleware.test.ts`.
+  * 6. Buscador y Marketplace B2C (`frontend/app/jugar/page.tsx`):
+    - Vista Próximamente (Coming Soon) por defecto cuando el Feature Flag está apagado, con llamado a la acción para dueños de clubes ("Registrar mi Club Gratis") y botón de "Modo Vista Previa (Desarrollo)".
+    - Vista Interactiva (cuando `NEXT_PUBLIC_ENABLE_PLAYER_MARKETPLACE=true` o `?preview=true`):
+      * Selector de radio espacial (5, 10, 20, 50 km).
+      * Filtros por deporte (Todos, Pádel, Tenis, Fútbol, Básquet).
+      * Tarjetas de complejos ordenadas de menor a mayor distancia con badge de distancia y botón a la web de reservas de cada club.
+      * Mapa interactivo embebido de OpenStreetMap centrado en el complejo seleccionado con enlace de navegación.
+    - Tests unitarios de componente pasando al 100% en `frontend/tests/jugarMarketplace.test.tsx`.
+- Verificación y Calidad:
+  * Backend: 242/242 tests pasando al 100% (1.288 aserciones).
+  * Frontend: 101/101 tests pasando al 100% en 10 suites de Vitest.
+  * Compilación Next.js (`NODE_ENV=production next build`): 100% exitosa sin errores de tipado ni de renderizado.
 ===============================================================================
 
 

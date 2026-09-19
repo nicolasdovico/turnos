@@ -18,6 +18,8 @@ interface ComplejoData {
   telefono: string | null;
   ciudad: string | null;
   direccion: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
   estado: string;
   tipo_cobro_reserva?: string;
   porcentaje_sena?: number;
@@ -355,6 +357,10 @@ export default function ClubAdminPanel() {
   const [clubDireccion, setClubDireccion] = useState<string>("");
   const [clubDeportePrincipal, setClubDeportePrincipal] = useState<string>("padel");
   const [clubTipoNegocioId, setClubTipoNegocioId] = useState<number | "">("");
+  const [clubLatitud, setClubLatitud] = useState<string>("");
+  const [clubLongitud, setClubLongitud] = useState<string>("");
+  const [isGeolocating, setIsGeolocating] = useState<boolean>(false);
+  const [geoHelperMsg, setGeoHelperMsg] = useState<string | null>(null);
 
   const [isSavingClubData, setIsSavingClubData] = useState<boolean>(false);
   const [isClubDataDirty, setIsClubDataDirty] = useState<boolean>(false);
@@ -592,6 +598,8 @@ export default function ClubAdminPanel() {
           setClubTelefono(data.data.complejo.telefono || "");
           setClubCiudad(data.data.complejo.ciudad || "");
           setClubDireccion(data.data.complejo.direccion || "");
+          setClubLatitud(data.data.complejo.latitud != null ? String(data.data.complejo.latitud) : "");
+          setClubLongitud(data.data.complejo.longitud != null ? String(data.data.complejo.longitud) : "");
           setClubDeportePrincipal(data.data.complejo.deporte_principal || "padel");
           setClubTipoNegocioId(data.data.complejo.tipo_negocio?.id || "");
         }
@@ -1247,6 +1255,30 @@ export default function ClubAdminPanel() {
         payload.tipo_negocio_id = Number(clubTipoNegocioId);
       }
 
+      if (clubLatitud.trim() !== "") {
+        const latNum = parseFloat(clubLatitud.trim());
+        if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+          setClubDataErrorMsg("La latitud debe ser un número válido entre -90 y 90.");
+          setIsSavingClubData(false);
+          return;
+        }
+        payload.latitud = latNum;
+      } else if (complejo?.latitud != null) {
+        payload.latitud = null;
+      }
+
+      if (clubLongitud.trim() !== "") {
+        const lngNum = parseFloat(clubLongitud.trim());
+        if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+          setClubDataErrorMsg("La longitud debe ser un número válido entre -180 y 180.");
+          setIsSavingClubData(false);
+          return;
+        }
+        payload.longitud = lngNum;
+      } else if (complejo?.longitud != null) {
+        payload.longitud = null;
+      }
+
       const res = await fetch(`${API_BASE}/clubs/${subdomain}/configuracion`, {
         method: "PUT",
         headers: {
@@ -1413,12 +1445,83 @@ export default function ClubAdminPanel() {
     isClubDataDirtyRef.current = true;
   };
 
+  const updateClubLatitud = (val: string) => {
+    setClubLatitud(val);
+    setIsClubDataDirty(true);
+    isClubDataDirtyRef.current = true;
+  };
+
+  const updateClubLongitud = (val: string) => {
+    setClubLongitud(val);
+    setIsClubDataDirty(true);
+    isClubDataDirtyRef.current = true;
+  };
+
+  const handleObtenerUbicacionGPSActual = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setGeoHelperMsg("Tu navegador no soporta geolocalización.");
+      return;
+    }
+    setIsGeolocating(true);
+    setGeoHelperMsg("Obteniendo coordenadas desde el dispositivo...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        setClubLatitud(lat);
+        setClubLongitud(lng);
+        setIsClubDataDirty(true);
+        isClubDataDirtyRef.current = true;
+        setIsGeolocating(false);
+        setGeoHelperMsg(`✓ Coordenadas obtenidas: Lat ${lat}, Lng ${lng}`);
+      },
+      (err) => {
+        setIsGeolocating(false);
+        setGeoHelperMsg(`⚠️ No se pudo obtener la ubicación: ${err.message}`);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  const handleGeocodificarDireccion = async () => {
+    if (!clubDireccion.trim()) {
+      setGeoHelperMsg("Por favor, ingresá primero la dirección del club.");
+      return;
+    }
+    setIsGeolocating(true);
+    setGeoHelperMsg("Buscando coordenadas para la dirección...");
+    try {
+      const query = encodeURIComponent(`${clubDireccion.trim()}, ${clubCiudad.trim() || ""}, Argentina`);
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`, {
+        headers: { "Accept-Language": "es" },
+      });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const lat = parseFloat(data[0].lat).toFixed(6);
+        const lng = parseFloat(data[0].lon).toFixed(6);
+        setClubLatitud(lat);
+        setClubLongitud(lng);
+        setIsClubDataDirty(true);
+        isClubDataDirtyRef.current = true;
+        setGeoHelperMsg(`✓ Coordenadas encontradas: Lat ${lat}, Lng ${lng}`);
+      } else {
+        setGeoHelperMsg("No se encontraron coordenadas para esta dirección. Podés ingresarlas manualmente.");
+      }
+    } catch {
+      setGeoHelperMsg("Error al consultar el servicio de geocodificación.");
+    } finally {
+      setIsGeolocating(false);
+    }
+  };
+
   const descartarCambiosClubData = () => {
     if (complejo) {
       setClubNombre(complejo.nombre || "");
       setClubTelefono(complejo.telefono || "");
       setClubCiudad(complejo.ciudad || "");
       setClubDireccion(complejo.direccion || "");
+      setClubLatitud(complejo.latitud != null ? String(complejo.latitud) : "");
+      setClubLongitud(complejo.longitud != null ? String(complejo.longitud) : "");
       setClubDeportePrincipal(complejo.deporte_principal || "padel");
       setClubTipoNegocioId(complejo.tipo_negocio?.id || "");
     }
@@ -1426,6 +1529,7 @@ export default function ClubAdminPanel() {
     isClubDataDirtyRef.current = false;
     setClubDataSuccessMsg(null);
     setClubDataErrorMsg(null);
+    setGeoHelperMsg(null);
   };
 
   const updateDiaHorario = (dia_semana: number, fields: Partial<HorarioDiaForm>) => {
@@ -4763,6 +4867,93 @@ export default function ClubAdminPanel() {
                     className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-medium text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition"
                   />
                 </div>
+              </div>
+
+              {/* Sección de Ubicación Geográfica & Coordenadas GPS */}
+              <div className="rounded-2xl bg-slate-950/60 border border-slate-800 p-5 space-y-4" data-testid="club-geo-section">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>📍</span> Coordenadas GPS & Ubicación Geográfica
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Permite que tus clientes calculen la distancia al club y abran la ruta en Google Maps o Waze.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleObtenerUbicacionGPSActual}
+                      disabled={isGeolocating}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700 cursor-pointer"
+                      title="Usar la ubicación actual de este dispositivo"
+                    >
+                      {isGeolocating ? "⏳ Obteniendo..." : "🎯 Usar mi ubicación actual"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGeocodificarDireccion}
+                      disabled={isGeolocating || !clubDireccion.trim()}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition border border-emerald-800/50 cursor-pointer disabled:opacity-40"
+                      title="Buscar coordenadas según dirección y ciudad"
+                    >
+                      🔍 Autocompletar desde dirección
+                    </button>
+                  </div>
+                </div>
+
+                {geoHelperMsg && (
+                  <div className="text-xs px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300" data-testid="geo-helper-msg">
+                    {geoHelperMsg}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Latitud
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={clubLatitud}
+                      onChange={(e) => updateClubLatitud(e.target.value)}
+                      placeholder="Ej: -34.603722"
+                      data-testid="input-club-latitud"
+                      className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm font-medium text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Longitud
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={clubLongitud}
+                      onChange={(e) => updateClubLongitud(e.target.value)}
+                      placeholder="Ej: -58.381592"
+                      data-testid="input-club-longitud"
+                      className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-2.5 text-sm font-medium text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition font-mono"
+                    />
+                  </div>
+                </div>
+
+                {clubLatitud && clubLongitud && (
+                  <div className="pt-2 flex items-center justify-between text-xs text-slate-400">
+                    <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                      ✓ Coordenadas válidas fijadas
+                    </span>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${clubLatitud},${clubLongitud}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-400 hover:text-emerald-300 underline flex items-center gap-1 font-semibold"
+                    >
+                      🗺️ Ver en Google Maps ↗
+                    </a>
+                  </div>
+                )}
               </div>
 
               {/* Botón de Guardado & Alerta */}

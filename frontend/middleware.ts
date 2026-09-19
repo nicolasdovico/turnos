@@ -51,6 +51,7 @@ export function middleware(req: NextRequest) {
     "/login",
     "/portal",
     "/verificar-email",
+    "/jugar",
   ];
 
   if (globalRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
@@ -68,6 +69,14 @@ export function middleware(req: NextRequest) {
     tenantIdentifier = cleanHostname.replace(".localhost", "");
   } else if (cleanHostname.endsWith(".turnos.com")) {
     tenantIdentifier = cleanHostname.replace(".turnos.com", "");
+  }
+
+  // Special player marketplace subdomain (jugar.turnos.com or jugar.localhost)
+  if (tenantIdentifier === "jugar") {
+    const targetPath = `/jugar${pathname === "/" ? "" : pathname}`;
+    const response = NextResponse.rewrite(new URL(targetPath, req.url));
+    response.headers.set("x-tenant", "jugar");
+    return response;
   }
 
   // If request already points to /tenants/[tenantIdentifier], continue

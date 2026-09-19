@@ -89,17 +89,38 @@ describe("Next.js Subdomain Multi-tenant Middleware", () => {
     expect(response.headers.get("x-tenant")).toBe("club-central");
   });
 
-  it("rewrites custom domain (e.g. padelcenter.com/precios) to /tenants/padelcenter.com/precios", () => {
-    const request = new NextRequest("http://padelcenter.com/precios", {
+  it("rewrites jugar subdomain on localhost (jugar.localhost:3000) to /jugar", () => {
+    const request = new NextRequest("http://jugar.localhost:3000/", {
       headers: {
-        host: "padelcenter.com",
+        host: "jugar.localhost:3000",
       },
     });
 
     const response = middleware(request);
-    expect(response.headers.get("x-middleware-rewrite")).toBe(
-      "http://padelcenter.com/tenants/padelcenter.com/precios"
-    );
-    expect(response.headers.get("x-tenant")).toBe("padelcenter.com");
+    expect(response.headers.get("x-middleware-rewrite")).toBe("http://jugar.localhost:3000/jugar");
+    expect(response.headers.get("x-tenant")).toBe("jugar");
+  });
+
+  it("rewrites jugar subdomain on production (jugar.turnos.com) to /jugar", () => {
+    const request = new NextRequest("http://jugar.turnos.com/", {
+      headers: {
+        host: "jugar.turnos.com",
+      },
+    });
+
+    const response = middleware(request);
+    expect(response.headers.get("x-middleware-rewrite")).toBe("http://jugar.turnos.com/jugar");
+    expect(response.headers.get("x-tenant")).toBe("jugar");
+  });
+
+  it("allows direct requests to /jugar on main domain without rewriting", () => {
+    const request = new NextRequest("http://localhost:3000/jugar", {
+      headers: {
+        host: "localhost:3000",
+      },
+    });
+
+    const response = middleware(request);
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
   });
 });

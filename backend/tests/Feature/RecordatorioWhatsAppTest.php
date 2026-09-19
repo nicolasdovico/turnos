@@ -460,4 +460,36 @@ class RecordatorioWhatsAppTest extends TestCase
             });
         }
     }
+
+    public function test_recordatorio_whatsapp_includes_google_maps_link_when_club_has_coordinates(): void
+    {
+        [$admin, $complejo, $cancha] = $this->crearComplejoYAdmin('padel-geo-reminder', [
+            'direccion' => 'Av. San Martín 1500',
+            'latitud' => -34.603722,
+            'longitud' => -58.381592,
+        ]);
+
+        $turno = Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'cliente_telefono' => '1144556677',
+            'cliente_nombre' => 'Marcos Tenis',
+            'fecha' => '2026-09-18',
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:30',
+            'precio' => 12000,
+            'estado' => 'reservado',
+            'es_fijo' => false,
+        ]);
+
+        $service = new WhatsAppEvolutionService();
+        $enviado = $service->enviarRecordatorioTurno($turno);
+        $this->assertTrue($enviado);
+
+        Http::assertSent(function ($request) {
+            $text = $request['text'] ?? '';
+            return str_contains($text, '📍 *Ubicación:* Av. San Martín 1500')
+                && str_contains($text, '🗺️ *Cómo llegar:* https://www.google.com/maps/dir/?api=1&destination=-34.603722,-58.381592');
+        });
+    }
 }

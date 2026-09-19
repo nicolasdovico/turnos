@@ -16,6 +16,8 @@ interface ComplejoData {
   telefono: string | null;
   ciudad: string | null;
   direccion: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
   estado: string;
   tipo_cobro_reserva?: string;
   porcentaje_sena?: number;
@@ -59,8 +61,37 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
   const [selectedCanchaId, setSelectedCanchaId] = useState<number | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showPublicQrModal, setShowPublicQrModal] = useState<boolean>(false);
+  const [distanciaUsuario, setDistanciaUsuario] = useState<string | null>(null);
 
   const cleanWaNumber = useMemo(() => formatWhatsAppNumber(complejo?.telefono), [complejo?.telefono]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && navigator.geolocation && complejo?.latitud && complejo?.longitud) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat1 = pos.coords.latitude;
+          const lon1 = pos.coords.longitude;
+          const lat2 = Number(complejo.latitud);
+          const lon2 = Number(complejo.longitud);
+          const R = 6371;
+          const dLat = ((lat2 - lat1) * Math.PI) / 180;
+          const dLon = ((lon2 - lon1) * Math.PI) / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const d = R * c;
+          if (d < 1) {
+            setDistanciaUsuario(`A ${(d * 1000).toFixed(0)} m de vos`);
+          } else {
+            setDistanciaUsuario(`A ${d.toFixed(1)} km de vos`);
+          }
+        },
+        () => {},
+        { timeout: 5000 }
+      );
+    }
+  }, [complejo?.latitud, complejo?.longitud]);
 
   useEffect(() => {
     const fetchClubData = async () => {
@@ -210,14 +241,41 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
               {complejo.nombre}
             </h1>
 
-            {(complejo.direccion || complejo.ciudad) && (
-              <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-slate-400 flex-wrap">
-                <span className="flex items-center gap-1">
-                  <span>📍</span>
-                  <span>
-                    {[complejo.direccion, complejo.ciudad].filter(Boolean).join(", ")}
+            {(complejo.direccion || complejo.ciudad || (complejo.latitud && complejo.longitud)) && (
+              <div className="flex items-center justify-center gap-2.5 text-xs sm:text-sm text-slate-400 flex-wrap">
+                {(complejo.direccion || complejo.ciudad) && (
+                  <span className="flex items-center gap-1">
+                    <span>📍</span>
+                    <span>
+                      {[complejo.direccion, complejo.ciudad].filter(Boolean).join(", ")}
+                    </span>
                   </span>
-                </span>
+                )}
+
+                {complejo.latitud && complejo.longitud && (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${complejo.latitud},${complejo.longitud}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="btn-como-llegar"
+                    className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-xs font-semibold transition"
+                    title="Abrir cómo llegar en Google Maps"
+                  >
+                    <span>🗺️</span>
+                    <span>Cómo llegar</span>
+                    <span className="text-[10px]">↗</span>
+                  </a>
+                )}
+
+                {distanciaUsuario && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800/80 text-emerald-400 border border-slate-700 text-xs font-medium"
+                    data-testid="user-distance-badge"
+                  >
+                    <span>🧭</span>
+                    <span>{distanciaUsuario}</span>
+                  </span>
+                )}
               </div>
             )}
 

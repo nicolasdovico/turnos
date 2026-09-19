@@ -115,10 +115,13 @@ class WhatsAppEvolutionService
             $infoPago = "✅ *Estado del Pago:* 100% Abonado\n";
         }
 
-        // Ubicación / Dirección si existe
+        // Ubicación / Dirección y enlace GPS si existen
         $direccionTexto = "";
         if (!empty($complejo?->direccion)) {
             $direccionTexto = "📍 *Ubicación:* {$complejo->direccion}\n";
+        }
+        if (!empty($complejo?->latitud) && !empty($complejo?->longitud)) {
+            $direccionTexto .= "🗺️ *Cómo llegar:* https://www.google.com/maps/dir/?api=1&destination={$complejo->latitud},{$complejo->longitud}\n";
         }
 
         // Construir URL del club
