@@ -50,3 +50,5 @@ Este documento contiene las reglas arquitectónicas y técnicas inmutables para 
 
 - **TDD Obligatorio:** Ninguna tarea se considera terminada sin su test automatizado en verde.
 - **Atomicidad:** Una tarea técnica a la vez siguiendo el ciclo: Estructura $\rightarrow$ Lógica de Negocio $\rightarrow$ Tests $\rightarrow$ Actualización de Memoria (`status.md`, `progress.txt`) $\rightarrow$ Commit.
+- **Entorno de Desarrollo Frontend:** El contenedor `saas_frontend` corre en modo desarrollo continuo (`next dev` con Fast Refresh / HMR). Queda estrictamente PROHIBIDO ejecutar `npm run build` o `next build` dentro del contenedor dev activo, ya que sobrescribe `/app/.next` con artefactos de producción y destruye la caché de webpack en desarrollo, provocando errores 404 en CSS (`layout.css 404`), desprendimiento de estilos en el navegador y caída del HMR. La verificación de código en frontend se realiza exclusivamente con la suite de Vitest (`npm test`).
+
