@@ -159,6 +159,63 @@ class WhatsAppEvolutionService
     }
 
     /**
+     * Enviar notificación de cancelación por lluvia / mal clima al cliente.
+     */
+    public function enviarCancelacionLluvia(
+        Turno $turno,
+        string $tipoReembolso = 'billetera',
+        ?float $montoReembolsado = null,
+        ?string $linkVale = null,
+        ?string $codigoVale = null
+    ): bool {
+        $turno->loadMissing(['cliente', 'cancha', 'complejo']);
+
+        $telefono = $turno->cliente_telefono ?: $turno->cliente?->telefono;
+        $nombre = $turno->cliente_nombre ?: $turno->cliente?->name ?: 'Estimado/a cliente';
+
+        if (empty($telefono)) {
+            Log::warning("WhatsApp cancelación lluvia no enviado: turno {$turno->id} no tiene teléfono asignado.");
+            return false;
+        }
+
+        $numeroLimpio = $this->formatearNumeroTelefono($telefono);
+        if (empty($numeroLimpio)) {
+            Log::warning("WhatsApp cancelación lluvia no enviado: teléfono de turno {$turno->id} ({$telefono}) no es válido.");
+            return false;
+        }
+
+        $complejo = $turno->complejo ?: $turno->cancha?->complejo;
+        $complejoNombre = $complejo?->nombre ?: 'Tu Club Deportivo';
+        $canchaNombre = $turno->cancha?->nombre ?: 'Cancha';
+        $fechaCarbon = Carbon::parse($turno->fecha);
+        $fechaFormateada = $fechaCarbon->format('d/m/Y');
+        $horaInicio = substr($turno->hora_inicio, 0, 5);
+        $horaFin = $turno->hora_fin ? substr($turno->hora_fin, 0, 5) : '';
+        $horarioTexto = $horaFin ? "{$horaInicio} a {$horaFin}" : $horaInicio;
+        $montoEfectivo = $montoReembolsado ?? (float) $turno->monto_pagado;
+        $montoFormat = number_format($montoEfectivo, 2, ',', '.');
+
+        if ($tipoReembolso === 'vale' && $linkVale) {
+            $detalleCredito = "🎟️ *Tu dinero está 100% protegido:*\n"
+                . "Hemos emitido a tu nombre un *Vale Digital de Crédito* por *$" . $montoFormat . "* (Código: *{$codigoVale}*).\n\n"
+                . "👉 Accedé a tu vale en el siguiente enlace para utilizarlo online o dictarlo en recepción:\n"
+                . "{$linkVale}\n\n"
+                . "_(Válido para tu próxima reserva sin perder tu seña)_";
+        } elseif ($tipoReembolso === 'billetera' && $montoEfectivo > 0) {
+            $detalleCredito = "💰 *Reembolso automático:* Hemos acreditado *$" . $montoFormat . "* a tu Billetera Virtual del club para que reserves cuando desees sin perder tu dinero.";
+        } else {
+            $detalleCredito = "ℹ️ Tu turno ha quedado cancelado por contingencia climática. ¡Te esperamos pronto en las canchas!";
+        }
+
+        $mensaje = "🌧️ *Aviso de Suspensión por Lluvia - {$complejoNombre}*\n\n"
+            . "Hola *{$nombre}*, lamentamos informarte que debido a las condiciones climáticas (lluvia / tormenta), tu turno de hoy *{$fechaFormateada}* a las *{$horarioTexto} hs* en *{$canchaNombre}* debió ser suspendido por seguridad deportiva.\n\n"
+            . "{$detalleCredito}\n\n"
+            . "¡Muchas gracias por tu comprensión!";
+
+        return $this->enviarMensajeTexto($numeroLimpio, $mensaje);
+    }
+
+    /**
      * Envía mensaje de texto plano a través de Evolution API.
      */
     public function enviarMensajeTexto(string $numero, string $texto): bool

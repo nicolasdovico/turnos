@@ -29,6 +29,9 @@ class Turno extends Model
         'metodo_pago',
         'estado_pago',
         'estado',
+        'motivo_cancelacion',
+        'cancelado_por_user_id',
+        'cancelacion_lluvia_id',
         'es_fijo',
         'recordatorio_enviado_at',
     ];
@@ -73,6 +76,21 @@ class Turno extends Model
     public function walletMovimientos(): HasMany
     {
         return $this->hasMany(WalletMovimiento::class, 'turno_id');
+    }
+
+    public function cancelacionLluvia(): BelongsTo
+    {
+        return $this->belongsTo(CancelacionLluvia::class, 'cancelacion_lluvia_id');
+    }
+
+    public function canceladoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelado_por_user_id');
+    }
+
+    public function valeCredito(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ValeCredito::class, 'turno_origen_id');
     }
 }
 

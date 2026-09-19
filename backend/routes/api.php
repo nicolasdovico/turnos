@@ -135,7 +135,18 @@ Route::prefix('clubs')->group(function () {
     Route::get('/{subdomain}/billeteras', [\App\Http\Controllers\Api\ClubDashboardController::class, 'getBilleteras']);
     Route::get('/{subdomain}/billeteras/{userId}/movimientos', [\App\Http\Controllers\Api\ClubDashboardController::class, 'getMovimientosClienteBilletera']);
     Route::post('/{subdomain}/billeteras/ajustar', [\App\Http\Controllers\Api\ClubDashboardController::class, 'ajustarSaldoBilletera']);
+
+    // Protocolo de Cancelación Masiva por Lluvia y Vales de Crédito
+    Route::post('/{subdomain}/cancelacion-lluvia/preview', [\App\Http\Controllers\Api\CancelacionLluviaController::class, 'preview']);
+    Route::post('/{subdomain}/cancelacion-lluvia/ejecutar', [\App\Http\Controllers\Api\CancelacionLluviaController::class, 'ejecutar']);
+    Route::get('/{subdomain}/vales', [\App\Http\Controllers\Api\ValeCreditoController::class, 'index']);
+    Route::post('/{subdomain}/vales/{id}/reembolsar-efectivo', [\App\Http\Controllers\Api\ValeCreditoController::class, 'reembolsarEfectivo']);
 });
+
+// Vales Digitales de Lluvia (Acceso público y autogestión de jugadores)
+Route::get('/vales/{token}', [\App\Http\Controllers\Api\ValeCreditoController::class, 'showPublico']);
+Route::post('/vales/{token}/canjear-billetera', [\App\Http\Controllers\Api\ValeCreditoController::class, 'canjearBilletera']);
+Route::get('/clubs/{subdomain}/vales/{token}', [\App\Http\Controllers\Api\ValeCreditoController::class, 'showPublico']);
 
 Route::get('/complejos/cercanos', [\App\Http\Controllers\Api\ComplejoController::class, 'cercanos']);
 
