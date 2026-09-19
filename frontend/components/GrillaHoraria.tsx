@@ -22,6 +22,8 @@ export interface Slot {
   is_mine?: boolean;
   cliente_nombre?: string;
   estado_pago?: string;
+  motivo_cancelacion?: string | null;
+  es_bloqueado?: boolean;
 }
 
 export interface GrillaHorariaProps {
@@ -123,6 +125,7 @@ export interface TurnoOcupado {
   cliente_saldo_billetera?: number;
   created_at_local?: number;
   is_mine?: boolean;
+  motivo_cancelacion?: string | null;
 }
 
 export interface CurrentUser {
@@ -2766,6 +2769,8 @@ export default function GrillaHoraria({
                 is_mine: isMine,
                 cliente_nombre: t.cliente_nombre,
                 estado_pago: (t as any).estado_pago || t.estado,
+                motivo_cancelacion: (t as any).motivo_cancelacion,
+                es_bloqueado: t.estado === "bloqueado" || (t as any).motivo_cancelacion === "lluvia",
               });
             }
           });
@@ -2973,6 +2978,34 @@ export default function GrillaHoraria({
                     }
 
                     // Occupied Slot Tile (Same grid, identical dimensions, elegant dark styling)
+                    const isLluviaSlot = slot.motivo_cancelacion === "lluvia" || slot.es_bloqueado;
+                    if (isLluviaSlot) {
+                      return (
+                        <div
+                          key={slot.hora_inicio}
+                          data-testid={`rain-slot-${slot.hora_inicio}`}
+                          className="relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 bg-cyan-950/20 border-cyan-500/30 text-cyan-300"
+                          aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Suspendido por Lluvia`}
+                        >
+                          <div className="flex justify-between items-start w-full">
+                            <span className="font-mono text-lg font-extrabold tracking-tight text-cyan-200">
+                              {slot.hora_inicio}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                              🌧️ Lluvia
+                            </span>
+                          </div>
+
+                          <div className="mt-3 flex justify-between items-center w-full gap-1.5">
+                            <span className="text-xs text-cyan-400/80 font-medium">hasta {slot.hora_fin}</span>
+                            <span className="text-[11px] text-cyan-300/80 font-bold">
+                              Cancha suspendida
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const isSubscribed = subscribedWaitlists.has(`${fecha}-${slot.hora_inicio}`);
                     const isSubscribing = subscribingSlot === slot.hora_inicio;
 
@@ -3175,8 +3208,10 @@ export default function GrillaHoraria({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {turnosOcupados.map((turno) => {
+                const isClima = turno.motivo_cancelacion === "lluvia" || turno.estado === "bloqueado" || turno.estado === "cancelado";
                 const isFixed = Boolean(turno.es_fijo);
                 const isPagado =
+                  !isClima &&
                   (turno.estado_pago === "pagado" ||
                     turno.estado_pago === "pagado_total" ||
                     turno.estado === "pagado" ||
@@ -3185,6 +3220,7 @@ export default function GrillaHoraria({
                   (turno.monto_pagado || 0) > 0;
 
                 const isSenado =
+                  !isClima &&
                   !isPagado &&
                   (turno.estado_pago === "senado" ||
                     turno.estado_pago === "sena_pagada" ||
@@ -3195,7 +3231,9 @@ export default function GrillaHoraria({
                     key={turno.id}
                     data-testid="admin-reserved-card"
                     className={`p-4 rounded-2xl transition flex flex-col justify-between gap-3 shadow-sm ${
-                      isFixed
+                      isClima
+                        ? "bg-cyan-950/20 border border-cyan-500/30 ring-1 ring-cyan-500/20 hover:border-cyan-400"
+                        : isFixed
                         ? "bg-amber-950/20 border border-amber-500/40 ring-1 ring-amber-500/20 hover:border-amber-400"
                         : "bg-slate-950 border border-slate-800/90 hover:border-slate-700"
                     }`}
@@ -3211,17 +3249,23 @@ export default function GrillaHoraria({
                               <span>🔁</span> Fijo
                             </span>
                           )}
-                          <span
-                            className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
-                              isPagado
-                                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                                : isSenado
-                                ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
-                                : "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                            }`}
-                          >
-                            {isPagado ? "✓ Pagado" : isSenado ? "💳 Seña Pagada" : "⏳ Pendiente"}
-                          </span>
+                          {isClima ? (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                              🌧️ {turno.estado === "bloqueado" ? "Bloqueo Lluvia" : "Cancelado Lluvia"}
+                            </span>
+                          ) : (
+                            <span
+                              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                                isPagado
+                                  ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                  : isSenado
+                                  ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                                  : "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                              }`}
+                            >
+                              {isPagado ? "✓ Pagado" : isSenado ? "💳 Seña Pagada" : "⏳ Pendiente"}
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -3279,17 +3323,30 @@ export default function GrillaHoraria({
 
                     <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2 text-xs">
                       <div className="flex flex-col">
-                        <span className="font-bold text-emerald-400 font-mono text-sm">
-                          ${turno.precio ? turno.precio.toLocaleString() : "0"}
-                        </span>
-                        {isSenado && turno.saldo_pendiente !== undefined && (
-                          <span className="text-[10px] text-amber-400 font-mono">
-                            Resta: ${turno.saldo_pendiente.toLocaleString()}
-                          </span>
+                        {isClima ? (
+                          <>
+                            <span className="font-bold text-slate-400 font-mono text-xs">
+                              {(turno.monto_pagado || 0) > 0 ? `Reembolsado: $${(turno.monto_pagado || 0).toLocaleString()}` : "Sin Cargo"}
+                            </span>
+                            <span className="text-[10px] text-cyan-400 font-mono">
+                              Resta: $0
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-bold text-emerald-400 font-mono text-sm">
+                              ${turno.precio ? turno.precio.toLocaleString() : "0"}
+                            </span>
+                            {isSenado && turno.saldo_pendiente !== undefined && (
+                              <span className="text-[10px] text-amber-400 font-mono">
+                                Resta: ${turno.saldo_pendiente.toLocaleString()}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5">
-                        {!isPagado && (
+                        {!isClima && !isPagado && (
                           <button
                             type="button"
                             onClick={() => {
@@ -3338,9 +3395,13 @@ export default function GrillaHoraria({
                         <button
                           type="button"
                           onClick={() => openCancelModal(turno)}
-                          className="px-2.5 py-1 rounded-xl bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 text-[11px] font-bold transition flex items-center gap-1"
+                          className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold transition flex items-center gap-1 ${
+                            isClima
+                              ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30"
+                              : "bg-rose-500/10 text-rose-300 border-rose-500/20 hover:bg-rose-500/20"
+                          }`}
                         >
-                          <span>✕</span> Liberar Turno
+                          <span>{isClima ? "🔓" : "✕"}</span> {isClima ? "Desbloquear Horario" : "Liberar Turno"}
                         </button>
                       </div>
                     </div>

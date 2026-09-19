@@ -113,11 +113,17 @@ class DisponibilidadService
         $horaCierre = Carbon::parse($fecha . ' ' . $horario->hora_cierre, $timezone);
         $ahora = Carbon::now($timezone);
 
-        // Fetch non-available turnos in database (reservado, bloqueado, confirmado, etc.)
+        // Fetch non-available turnos in database (reservado, bloqueado, confirmado, etc. o cancelado por lluvia)
         $turnosOcupados = Turno::with('cliente')
             ->where('cancha_id', $canchaId)
             ->where('fecha', $fechaCarbon->format('Y-m-d'))
-            ->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+            ->where(function ($q) {
+                $q->whereIn('estado', ['reservado', 'bloqueado', 'confirmado', 'completado', 'pagado'])
+                  ->orWhere(function ($sub) {
+                      $sub->where('estado', 'cancelado')
+                          ->where('motivo_cancelacion', 'lluvia');
+                  });
+            })
             ->orderBy('hora_inicio', 'asc')
             ->get();
 
@@ -347,10 +353,21 @@ class DisponibilidadService
 
         // Formatted occupied turnos list (with client details for admin view and current user view)
         $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($cancha, $esAdmin, $currentUserId, $fechaCarbon) {
+            $isLluvia = ($t->motivo_cancelacion === 'lluvia');
+            $isBloqueado = ($t->estado === 'bloqueado');
+            $isCancelado = ($t->estado === 'cancelado');
             $precio = (float) $t->precio;
             $montoPagado = (float) ($t->monto_pagado ?? 0);
-            if (in_array($t->estado_pago, ['pagado', 'pagado_total']) || in_array($t->estado, ['pagado', 'completado'])) {
+
+            if ($isLluvia || $isBloqueado || $isCancelado) {
                 $saldoPendiente = 0.0;
+                $estadoPago = $montoPagado > 0 ? ($t->estado_pago ?: 'reembolsado') : 'cancelado';
+                if ($isBloqueado || $isCancelado) {
+                    $precio = 0.0;
+                }
+            } elseif (in_array($t->estado_pago, ['pagado', 'pagado_total']) || in_array($t->estado, ['pagado', 'completado'])) {
+                $saldoPendiente = 0.0;
+                $estadoPago = $t->estado_pago ?: 'pagado';
             } else {
                 $saldoCalculado = max(0.0, round($precio - $montoPagado, 2));
                 if ($t->saldo_pendiente !== null && (float) $t->saldo_pendiente > 0) {
@@ -358,15 +375,15 @@ class DisponibilidadService
                 } else {
                     $saldoPendiente = $saldoCalculado;
                 }
-            }
-            $estadoPago = $t->estado_pago;
-            if (!$estadoPago || ($estadoPago === 'pagado_total' && $saldoPendiente > 0 && $montoPagado <= 0)) {
-                if ($saldoPendiente <= 0 && $montoPagado > 0) {
-                    $estadoPago = 'pagado_total';
-                } elseif ($montoPagado > 0) {
-                    $estadoPago = 'senado';
-                } else {
-                    $estadoPago = 'pendiente';
+                $estadoPago = $t->estado_pago;
+                if (!$estadoPago || ($estadoPago === 'pagado_total' && $saldoPendiente > 0 && $montoPagado <= 0)) {
+                    if ($saldoPendiente <= 0 && $montoPagado > 0) {
+                        $estadoPago = 'pagado_total';
+                    } elseif ($montoPagado > 0) {
+                        $estadoPago = 'senado';
+                    } else {
+                        $estadoPago = 'pendiente';
+                    }
                 }
             }
 
@@ -384,7 +401,8 @@ class DisponibilidadService
                 'monto_pagado' => $montoPagado,
                 'saldo_pendiente' => $saldoPendiente,
                 'estado' => $t->estado,
-                'estado_pago' => $t->estado_pago ?: 'pendiente',
+                'estado_pago' => $estadoPago,
+                'motivo_cancelacion' => $t->motivo_cancelacion,
                 'metodo_pago' => $t->metodo_pago ?: 'mostrador',
                 'es_fijo' => (bool) $t->es_fijo,
             ];

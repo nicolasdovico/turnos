@@ -57,7 +57,7 @@ class ClubReporteService
         // Horarios de atención configurados (para cálculo de ocupación)
         $horarios = HorarioAtencion::where('complejo_id', $complejo->id)->get();
 
-        // Consulta de turnos (incluyendo turnos cancelados con seña retenida por penalidad)
+        // Consulta de turnos (incluyendo turnos cancelados con seña retenida por penalidad y cancelados por lluvia)
         $turnosQuery = Turno::where('complejo_id', $complejo->id)
             ->whereBetween('fecha', [$strDesde, $strHasta])
             ->where(function ($q) {
@@ -66,9 +66,13 @@ class ClubReporteService
                       $sub->where('estado', 'cancelado')
                           ->where('estado_pago', 'retenido_penalidad')
                           ->where('monto_pagado', '>', 0);
+                  })
+                  ->orWhere(function ($sub) {
+                      $sub->where('estado', 'cancelado')
+                          ->where('motivo_cancelacion', 'lluvia');
                   });
             })
-            ->with(['cancha']);
+            ->with(['cancha', 'cliente']);
 
         if ($canchaId) {
             $turnosQuery->where('cancha_id', $canchaId);
@@ -99,6 +103,9 @@ class ClubReporteService
         $globalCobrado = 0.0;
         $globalSaldoPendiente = 0.0;
         $globalSenasRetenidas = 0.0;
+        $globalReembolsosLluvia = 0.0;
+        $globalReembolsosBilletera = 0.0;
+        $globalReembolsosVales = 0.0;
         $globalTurnosCount = 0;
         $globalTurnosFijosCount = 0;
         $globalMinutosOcupados = 0;
@@ -134,6 +141,10 @@ class ClubReporteService
             $montoCobradoDia = 0.0;
             $saldoPendienteDia = 0.0;
             $senasRetenidasDia = 0.0;
+            $reembolsosLluviaDia = 0.0;
+            $reembolsosBilleteraDia = 0.0;
+            $reembolsosValesDia = 0.0;
+            $turnosActivosDia = 0;
             $fijosDia = 0;
             $minutosOcupadosDia = 0;
 
@@ -149,6 +160,10 @@ class ClubReporteService
 
             foreach ($turnosDelDia as $t) {
                 $isPenalidad = ($t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad');
+                $isCanceladoLluvia = ($t->estado === 'cancelado' && $t->motivo_cancelacion === 'lluvia');
+                $isBloqueadoLluvia = ($t->estado === 'bloqueado' && $t->motivo_cancelacion === 'lluvia');
+                $isBloqueado = ($t->estado === 'bloqueado');
+
                 $precioOriginal = (float) ($t->precio ?? 0);
                 $montoPagado = (float) ($t->monto_pagado ?? 0);
 
@@ -159,7 +174,28 @@ class ClubReporteService
                     $saldoPend = 0.0;
                     $senasRetenidasDia += $montoPagado;
                     $globalSenasRetenidas += $montoPagado;
+                    $turnosActivosDia++;
+                    $globalTurnosCount++;
+                } elseif ($isCanceladoLluvia || $isBloqueadoLluvia || $isBloqueado) {
+                    // Turnos cancelados o bloqueados por lluvia/mantenimiento:
+                    // El ingreso facturado efectivo es 0 y NO hay saldo pendiente por cobrar
+                    $precioEfectivo = 0.0;
+                    $saldoPend = 0.0;
+
+                    if ($isCanceladoLluvia && $montoPagado > 0) {
+                        $reembolsosLluviaDia += $montoPagado;
+                        $globalReembolsosLluvia += $montoPagado;
+                        if ($t->cliente_id) {
+                            $reembolsosBilleteraDia += $montoPagado;
+                            $globalReembolsosBilletera += $montoPagado;
+                        } else {
+                            $reembolsosValesDia += $montoPagado;
+                            $globalReembolsosVales += $montoPagado;
+                        }
+                    }
                 } else {
+                    $turnosActivosDia++;
+                    $globalTurnosCount++;
                     $precioEfectivo = $precioOriginal;
                     if (in_array($t->estado_pago, ['pagado', 'pagado_total']) || in_array($t->estado, ['pagado', 'completado'])) {
                         $saldoPend = 0.0;
@@ -174,11 +210,13 @@ class ClubReporteService
                 }
 
                 $montoTotalDia += $precioEfectivo;
-                $montoCobradoDia += $montoPagado;
+                if (!$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
+                    $montoCobradoDia += $montoPagado;
+                }
                 $saldoPendienteDia += $saldoPend;
 
                 $esFijo = !empty($t->es_fijo) || !empty($t->turno_fijo_serie_id);
-                if ($esFijo) {
+                if ($esFijo && !$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
                     $fijosDia++;
                     $globalTurnosFijosCount++;
                 }
@@ -187,28 +225,36 @@ class ClubReporteService
                 if (!isset($desgloseMetodosDia[$metodo])) {
                     $metodo = 'otro';
                 }
-                $desgloseMetodosDia[$metodo] += $montoPagado;
-                $metodosTotales[$metodo] += $montoPagado;
+                if (!$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
+                    $desgloseMetodosDia[$metodo] += $montoPagado;
+                    $metodosTotales[$metodo] += $montoPagado;
+                }
 
-                // Minutos de duración: solo computar ocupación si el turno no fue cancelado
+                // Minutos de duración: solo computar ocupación si el turno no fue cancelado ni bloqueado por lluvia
                 $inicioTurno = Carbon::parse($t->hora_inicio);
                 $finTurno = Carbon::parse($t->hora_fin);
                 $duracionMin = max(30, $inicioTurno->diffInMinutes($finTurno));
-                if (!$isPenalidad) {
+                if (!$isPenalidad && !$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
                     $minutosOcupadosDia += $duracionMin;
                 }
 
                 // Totales por cancha
                 if (isset($totalesPorCancha[$t->cancha_id])) {
-                    $totalesPorCancha[$t->cancha_id]['turnos']++;
+                    if (!$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
+                        $totalesPorCancha[$t->cancha_id]['turnos']++;
+                        $totalesPorCancha[$t->cancha_id]['total_cobrado'] += $montoPagado;
+                    }
                     $totalesPorCancha[$t->cancha_id]['total_facturado'] += $precioEfectivo;
-                    $totalesPorCancha[$t->cancha_id]['total_cobrado'] += $montoPagado;
                     $totalesPorCancha[$t->cancha_id]['saldo_pendiente'] += $saldoPend;
                 }
 
                 $estadoPago = $t->estado_pago;
                 if ($isPenalidad) {
                     $estadoPago = 'retenido_penalidad';
+                } elseif ($isCanceladoLluvia) {
+                    $estadoPago = $montoPagado > 0 ? 'reembolsado' : 'cancelado';
+                } elseif ($isBloqueadoLluvia || $isBloqueado) {
+                    $estadoPago = 'cancelado';
                 } elseif (empty($estadoPago) || ($estadoPago === 'pagado_total' && $saldoPend > 0 && $montoPagado <= 0)) {
                     if ($saldoPend <= 0.0 && $montoPagado > 0) {
                         $estadoPago = 'pagado_total';
@@ -227,19 +273,25 @@ class ClubReporteService
                     'cliente_saldo_billetera' => $t->cliente_id
                         ? (float) $this->walletService->obtenerSaldo((int) $t->cliente_id, (int) $complejo->id)
                         : 0.0,
-                    'cliente_nombre' => $t->cliente_nombre ?: ($t->user ? $t->user->name : 'Cliente Mostrador'),
-                    'cliente_telefono' => $t->cliente_telefono ?: ($t->user ? $t->user->telefono : null),
+                    'cliente_nombre' => $t->cliente_nombre ?: ($t->cliente ? $t->cliente->name : ($t->user ? $t->user->name : 'Cliente Mostrador')),
+                    'cliente_telefono' => $t->cliente_telefono ?: ($t->cliente ? $t->cliente->telefono : ($t->user ? $t->user->telefono : null)),
                     'hora_inicio' => substr((string) $t->hora_inicio, 0, 5),
                     'hora_fin' => substr((string) $t->hora_fin, 0, 5),
                     'duracion_minutos' => $duracionMin,
                     'precio' => $precioOriginal,
+                    'precio_efectivo' => $precioEfectivo,
                     'monto_pagado' => $montoPagado,
                     'saldo_pendiente' => $saldoPend,
                     'estado_pago' => $estadoPago,
                     'metodo_pago' => $t->metodo_pago ?? 'mostrador',
                     'es_fijo' => $esFijo,
                     'estado' => $t->estado ?? 'reservado',
+                    'motivo_cancelacion' => $t->motivo_cancelacion,
                     'es_penalidad' => $isPenalidad,
+                    'es_cancelado_lluvia' => $isCanceladoLluvia,
+                    'es_bloqueado_lluvia' => $isBloqueadoLluvia,
+                    'tipo_reembolso' => $isCanceladoLluvia ? ($t->cliente_id ? 'billetera' : ($montoPagado > 0 ? 'vale' : 'sin_costo')) : null,
+                    'monto_reembolsado' => $isCanceladoLluvia ? $montoPagado : 0.0,
                     'recordatorio_enviado_at' => $t->recordatorio_enviado_at ? $t->recordatorio_enviado_at->format('Y-m-d H:i:s') : null,
                 ];
             }
@@ -265,25 +317,27 @@ class ClubReporteService
             $globalMinutosDisponibles += $minutosDisponiblesDia;
 
             $estadoCobro = 'sin_turnos';
-            if ($turnosDelDia->count() > 0) {
+            if ($turnosActivosDia > 0) {
                 $estadoCobro = $saldoPendienteDia <= 0 ? 'al_dia' : 'pendiente';
             }
 
             $globalFacturado += $montoTotalDia;
             $globalCobrado += $montoCobradoDia;
             $globalSaldoPendiente += $saldoPendienteDia;
-            $globalTurnosCount += $turnosDelDia->count();
 
             $diasResumen[] = [
                 'fecha' => $fechaStr,
                 'dia_semana_numero' => $diaSemana,
                 'dia_nombre' => $diasNombres[$diaSemana] ?? '',
-                'total_turnos' => $turnosDelDia->count(),
+                'total_turnos' => $turnosActivosDia,
                 'turnos_fijos' => $fijosDia,
                 'monto_total' => $montoTotalDia,
                 'monto_cobrado' => $montoCobradoDia,
                 'saldo_pendiente' => $saldoPendienteDia,
                 'senas_retenidas' => round($senasRetenidasDia, 2),
+                'reembolsos_lluvia' => round($reembolsosLluviaDia, 2),
+                'reembolsos_billetera' => round($reembolsosBilleteraDia, 2),
+                'reembolsos_vales' => round($reembolsosValesDia, 2),
                 'estado_cobro' => $estadoCobro,
                 'ocupacion_porcentaje' => $ocupacionPorcentaje,
                 'minutos_ocupados' => $minutosOcupadosDia,
@@ -309,6 +363,9 @@ class ClubReporteService
                 'total_cobrado' => round($globalCobrado, 2),
                 'total_saldo_pendiente' => round($globalSaldoPendiente, 2),
                 'total_senas_retenidas' => round($globalSenasRetenidas, 2),
+                'total_reembolsos_lluvia' => round($globalReembolsosLluvia, 2),
+                'total_reembolsos_billetera' => round($globalReembolsosBilletera, 2),
+                'total_reembolsos_vales' => round($globalReembolsosVales, 2),
                 'total_turnos' => $globalTurnosCount,
                 'total_turnos_fijos' => $globalTurnosFijosCount,
                 'ocupacion_promedio' => $ocupacionPromedio,

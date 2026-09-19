@@ -2245,6 +2245,113 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación y Calidad:
   * Frontend: 105/105 tests pasando al 100% (10 suites en Vitest).
   * Build Next.js (`npm run build`): 100% exitoso.
+-------------------------------------------------------------------------------
+[2026-09-19] - MÓDULO DE TARIFAS DINÁMICAS (HORARIOS PICO/VALLE) & RECARGO DE LUZ DESACOPLADO
+-------------------------------------------------------------------------------
+- Contexto y Objetivos de Negocio:
+  * Permitir a los clubes deportivos maximizar la rentabilidad de sus canchas mediante tarifas diferenciadas por horario y día de la semana (horarios pico vs valle, fines de semana vs días hábiles).
+  * Desacoplar estructuralmente el recargo por iluminación artificial (`precio_luz_adicional`) del precio base de la cancha, eliminando inconsistencias cuando los slots se reservan de noche o en canchas techadas con luz.
+- Componentes Implementados y Modificados:
+  * 1. Base de Datos & Modelos Backend (Laravel 11):
+    - Migración `2026_09_19_160000_add_dynamic_pricing_to_canchas_and_complejos_tables.php`:
+      * `canchas`: `precio_luz_adicional` (decimal 10,2), `tarifa_pico` (decimal 10,2 nullable), `hora_inicio_pico` (time nullable), `hora_fin_pico` (time nullable), `dias_pico` (json nullable).
+      * `complejos`: `precio_luz_adicional_default` y horarios pico por defecto.
+    - Migración `2026_09_19_171000_backfill_precio_luz_adicional_in_canchas_table.php`:
+      * Backfill de canchas existentes con `precio_con_luz` histórico para computar automáticamente `precio_luz_adicional = precio_con_luz - precio_base`.
+    - Modelo `Cancha` (`backend/app/Models/Cancha.php`):
+      * Helper `calcularPrecioTurno(Carbon|string $fecha, string $horaInicio, bool $aplicaLuz = false): array`: computa en milisegundos si el turno cae en horario pico y/o días pico configurados, suma el adicional de luz desacoplado y devuelve un desglose transparente (`precio_final`, `es_pico`, `tiene_recargo_luz`, `adicional_luz`).
+  * 2. Servicios y Controladores Backend:
+    - `DisponibilidadService.php`: integración del motor tarifario dinámico en `obtenerSlotsDisponibles` y `obtenerSlotsCanchasDisponibles`, calculando el precio exacto de cada slot en tiempo real según su franja horaria y fecha.
+    - `TurnoConfirmarController.php`: preservación del precio dinámico calculado durante la confirmación transaccional con `lockForUpdate`.
+    - `ClubDashboardController.php`: exposición y guardado de `precio_luz_adicional`, `tarifa_pico`, `hora_inicio_pico`, `hora_fin_pico` y `dias_pico` en alta y edición de canchas.
+  * 3. Frontend Web Next.js 14:
+    - Panel Administrativo (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+      * Modal de Canchas actualizado con sección dedicada a "Tarifas Dinámicas Específicas" (Tarifa pico, Horario inicio/fin pico, Días aplicables).
+      * Campo "Adicional Luz Artificial ($)" sincronizado y desacoplado del precio base.
+    - Grilla Horaria (`frontend/components/GrillaHoraria.tsx`):
+      * Badges visuales en cada slot indicando tarifas especiales (`⚡ Pico`, `💡 Luz`) y desglose claro previo al checkout.
+- Tests Automatizados & Calidad:
+  * Backend (`tests/Feature/DynamicPricingTest.php`): 8 tests con 45 aserciones validando cálculo dinámico en días hábiles/fines de semana, franja pico vs valle, recargo de luz desacoplado y fallback a precio base.
+  * Total Backend Suite: 254 tests pasados.
+  * Total Frontend Suite: 106 tests pasados.
+-------------------------------------------------------------------------------
+[2026-09-19] - PROTOCOLO DE CANCELACIÓN MASIVA POR LLUVIA & VALES DIGITALES TOKENIZADOS (RAIN CHECK)
+-------------------------------------------------------------------------------
+- Contexto y Objetivos de Negocio:
+  * Resolver de forma ágil y automatizada la cancelación masiva de turnos ante inclemencias meteorológicas repentinas (lluvia/tormenta) en canchas descubiertas.
+  * Diseñar un esquema inteligente que permita al administrador elegir canchas afectadas (con preselección inteligente de canchas al aire libre), hora de inicio de la suspensión y bloqueo preventivo del resto de los slots del día.
+  * Tratar de forma justa tanto a clientes registrados en el sistema como a clientes de mostrador / sin cuenta:
+    - Clientes registrados: acreditación automática inmediata de la seña o pago total en su Billetera Virtual (`reembolso_lluvia`).
+    - Clientes sin cuenta / de mostrador: generación de Vale Digital Tokenizado con UUID criptográfico (`ValeCredito`) con notificación automática por WhatsApp y portal público para consulta, canje o reclamo.
+- Componentes Implementados y Desarrollados:
+  * 1. Base de Datos & Modelos Backend (Laravel 11):
+    - Migración `2026_09_19_180000_create_cancelaciones_lluvia_and_vales_credito_tables.php`:
+      * Tabla `cancelaciones_lluvia`: registro de auditoría (`complejo_id`, `admin_id`, `fecha`, `hora_desde`, `canchas_afectadas`, `total_turnos_cancelados`, `monto_total_reembolsado`, `vales_emitidos_count`, `motivo`).
+      * Tabla `vales_credito`: tokens seguros UUID (`token`, `monto_original`, `monto_disponible`, `estado` [activo, canjeado, reembolsado, vencido], `fecha_emision`, `fecha_vencimiento`).
+    - Modelos `CancelacionLluvia` y `ValeCredito` vinculados a `Turno`, `Complejo` y `User`.
+  * 2. Servicios y Endpoints Backend:
+    - `CancelacionLluviaService.php`:
+      * `calcularImpacto(...)`: previsualización sin efectos secundarios de turnos afectados, montos abonados a reintegrar y desglose por usuario registrado vs cliente de mostrador.
+      * `ejecutarCancelacionMasiva(...)`: ejecución transaccional pesimista con bloqueo de registros (`lockForUpdate`), cancelación de turnos, acreditación en `BilleteraVirtual`, emisión de `ValeCredito` y bloqueo preventivo de slots libres restantes.
+    - `NotificarCancelacionLluviaWhatsAppJob.php` & `WhatsAppEvolutionService.php`:
+      * Despacho asíncrono de mensajes por WhatsApp con mensaje de solidaridad por el clima y link directo al Vale Digital (`/vales/{token}`).
+    - `ValeCreditoController.php` (`routes/api.php`):
+      * `GET /api/vales/{token}`: consulta pública de validez y saldo del vale.
+      * `POST /api/vales/{token}/canjear`: canje en checkout público para saldar una nueva reserva.
+      * `POST /api/vales/{token}/reclamar-billetera`: acreditación del saldo del vale en la billetera virtual al iniciar sesión o registrarse.
+      * `POST /api/vales/{token}/reembolso-efectivo`: registro de devolución física en mostrador por parte del administrador del club.
+  * 3. Frontend Web Next.js 14:
+    - `ModalProtocoloLluvia.tsx` (`frontend/components/ModalProtocoloLluvia.tsx`):
+      * Modal interactivo accesible desde el panel de control ("🌧️ Protocolo por Lluvia").
+      * Selector de fecha, horario desde, listado de canchas con selector rápido "Solo descubiertas" / "Todas las canchas".
+      * Checkbox para bloquear preventivamente los horarios restantes de las canchas afectadas.
+      * Previsualización dinámica de impacto financiero antes de confirmar.
+    - `app/vales/[token]/page.tsx` (`frontend/app/vales/[token]/page.tsx`):
+      * Portal público del Vale Digital con diseño de ticket premium, estado en tiempo real, saldo disponible y botones de acción (usar en reserva / transferir a billetera / solicitar devolución).
+- Tests Automatizados & Calidad:
+  * Backend (`tests/Feature/CancelacionLluviaTest.php`): 9 tests con 70 aserciones validando cálculo de impacto, cancelación, emisión de vales, canje, reembolso en efectivo y notificaciones.
+  * Frontend (`tests/ProtocoloLluvia.test.tsx`): tests de interacción de modal y previsualización de impacto.
+  * Total Backend Suite: 265 tests pasados.
+  * Total Frontend Suite: 111 tests pasados.
+-------------------------------------------------------------------------------
+[2026-09-19] - HARDENING CONTABLE, CONTROL DE CAJA & GRILLA OPERATIVA ANTE CONTINGENCIAS METEOROLÓGICAS
+-------------------------------------------------------------------------------
+- Contexto y Diagnóstico del Problema:
+  * Al realizar una cancelación por lluvia en el club `nico-padel` a partir de las 20:00 hs, se identificaron cuatro inconsistencias contables y operativas críticas:
+    1. Resumen Diario & Control de Caja: los turnos cancelados o bloqueados por lluvia figuraban como deuda pendiente a cobrar ($25.000 / $30.000 c/u) con botones "Cobrar" habilitados, inflando ficticiamente los saldos a percibir del club por servicios no prestados.
+    2. Omisión de Reembolsos en Reportes: las devoluciones a billeteras virtuales y la emisión de vales de lluvia no se computaban ni reflejaban en los KPIs del reporte diario de caja.
+    3. Billetera Virtual: las acreditaciones en billetera figuraban bajo la etiqueta genérica "Ajuste manual" en lugar de "Cancelación por Lluvia".
+    4. Grilla Horaria & Admin: los turnos bloqueados permanecían con saldos a cobrar, sin diferenciación visual adecuada y con slots duplicados por el bucle de bloqueo preventivo.
+- Solución e Implementación Realizada:
+  * 1. Backend Laravel 11 (`backend/app/Services/ClubReporteService.php`):
+    - Exclusión explícita de turnos con `estado = 'cancelado'` o `estado = 'bloqueado'` y `motivo_cancelacion = 'lluvia'` del cálculo de `total_facturado`, `total_cobrado` y `total_saldo_pendiente`.
+    - Nuevas métricas consolidadas en el reporte: `total_reembolsos_lluvia`, `total_reembolsos_billetera` y `total_reembolsos_vales`.
+    - Corrección en el cálculo de saldos: se corrigió la condición que recalculaba `saldoCalculado = precio - montoPagado` cuando `saldo_pendiente` era explícitamente `0.00`.
+    - Corrección de la relación Eloquent en `Turno`: corrección de `->with('user')` a `->with('cliente')`.
+  * 2. Backend Laravel 11 (`backend/app/Services/CancelacionLluviaService.php` & `DisponibilidadService.php`):
+    - Detección y omisión de slots ya cancelados en el bucle de bloqueo preventivo (`$slotsYaCancelados`), evitando la creación de turnos bloqueados duplicados sobre un mismo horario.
+    - Asignación explícita de `precio = 0.00`, `monto_pagado = 0.00`, `saldo_pendiente = 0.00`, `estado = 'bloqueado'` y `estado_pago = 'cancelado'` en los slots bloqueados por clima.
+    - En `DisponibilidadService`: slots cancelados por lluvia se preservan como no disponibles al público para evitar reservas indebidas, pero con precio y saldo en `$0.00`.
+  * 3. Frontend Web Next.js 14 (`frontend/components/ResumenDiarioTurnos.tsx`):
+    - Nueva tarjeta KPI interactiva: **"🌧️ Reembolsos por Lluvia"** con desglose en Billetera Virtual y Vales de Crédito.
+    - Ocultamiento de botones "💵 Cobrar" y botones de recordatorio WhatsApp para turnos cancelados/bloqueados por lluvia.
+    - Badges claros `"🌧️ Cancelado Lluvia"` y `"🌧️ Bloqueo Lluvia"`, precios tachados y leyenda explicativa de devolución (`👛 En Billetera: $X` / `🎟️ Vale: $X` / `Sin cargo`).
+  * 4. Frontend Web Next.js 14 (`frontend/components/GestionBilleteras.tsx`):
+    - Integración de iconos `CloudRain` y `Ticket`.
+    - Mapeo explícito en `getBadgeForTipo`:
+      * `reembolso_lluvia` -> Badge cian con icono `CloudRain` y texto `"Cancelación por Lluvia"`.
+      * `canje_vale_lluvia` -> Badge teal con icono `Ticket` y texto `"Canje Vale de Lluvia"`.
+  * 5. Frontend Web Next.js 14 (`frontend/components/GrillaHoraria.tsx`):
+    - Renderizado estilizado de slots bloqueados por lluvia: `"🌧️ Lluvia • Cancha suspendida"` sin acceso a lista de espera.
+    - En el panel de gestión del administrador: badge de lluvia, saldo en `$0` y botón contextual `"🔓 Desbloquear Horario"` para rehabilitar canchas si las condiciones mejoran.
+  * 6. Sanitización de Base de Datos:
+    - Eliminación de registros duplicados y corrección de saldos pendientes en el club de pruebas `nico-padel` (complejo 113) para la fecha 2026-09-19.
+- Verificación y Calidad:
+  * Backend (`CancelacionLluviaTest` y `PoliticaCancelacionBilleteraTest`): 100% pasando.
+  * Suite Completa de Backend: 265 tests pasados (1.479 aserciones).
+  * Suite Completa de Frontend: 111 tests pasados en 11 suites de Vitest.
+  * Suite Completa de Mobile: 20 tests pasados en 4 suites de Jest.
+  * Gran Total del Ecosistema: 396/396 tests automatizados en verde con 0 regresiones.
 ===============================================================================
 
 

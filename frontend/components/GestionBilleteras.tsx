@@ -23,6 +23,8 @@ import {
   MessageCircle,
   History,
   ShieldCheck,
+  CloudRain,
+  Ticket,
 } from "lucide-react";
 
 /**
@@ -343,6 +345,18 @@ export default function GestionBilleteras({
   // Helper badge for movement types
   const getBadgeForTipo = (tipo: string) => {
     switch (tipo) {
+      case "reembolso_lluvia":
+        return {
+          label: "Cancelación por Lluvia",
+          bg: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+          icon: <CloudRain className="w-3 h-3 text-cyan-400" />,
+        };
+      case "canje_vale_lluvia":
+        return {
+          label: "Canje Vale de Lluvia",
+          bg: "bg-teal-500/10 text-teal-300 border-teal-500/20",
+          icon: <Ticket className="w-3 h-3 text-teal-400" />,
+        };
       case "reembolso_cancelacion":
         return {
           label: "Reembolso Cancelación",

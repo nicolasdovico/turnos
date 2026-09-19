@@ -40,13 +40,19 @@ export interface TurnoDetalle {
   hora_fin: string;
   duracion_minutos: number;
   precio: number;
+  precio_efectivo?: number;
   monto_pagado: number;
   saldo_pendiente: number;
   estado_pago: string;
   metodo_pago: string;
   es_fijo: boolean;
   estado: string;
+  motivo_cancelacion?: string | null;
   es_penalidad?: boolean;
+  es_cancelado_lluvia?: boolean;
+  es_bloqueado_lluvia?: boolean;
+  tipo_reembolso?: string | null;
+  monto_reembolsado?: number;
   recordatorio_enviado_at?: string | null;
 }
 
@@ -60,6 +66,9 @@ export interface DiaResumen {
   monto_cobrado: number;
   saldo_pendiente: number;
   senas_retenidas?: number;
+  reembolsos_lluvia?: number;
+  reembolsos_billetera?: number;
+  reembolsos_vales?: number;
   estado_cobro: "al_dia" | "pendiente" | "sin_turnos";
   ocupacion_porcentaje: number;
   minutos_ocupados: number;
@@ -90,6 +99,9 @@ export interface ResumenDiarioData {
     total_cobrado: number;
     total_saldo_pendiente: number;
     total_senas_retenidas?: number;
+    total_reembolsos_lluvia?: number;
+    total_reembolsos_billetera?: number;
+    total_reembolsos_vales?: number;
     total_turnos: number;
     total_turnos_fijos: number;
     ocupacion_promedio: number;
@@ -614,7 +626,7 @@ export default function ResumenDiarioTurnos({
 
       {/* KPI Cards Grid */}
       {data && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${(data.kpis.total_reembolsos_lluvia ?? 0) > 0 ? "lg:grid-cols-3 xl:grid-cols-5" : "lg:grid-cols-4"} gap-4`}>
           {/* Facturado Total */}
           <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-5 shadow-lg relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition" />
@@ -678,6 +690,28 @@ export default function ResumenDiarioTurnos({
                 : "✓ Todos los turnos están 100% saldados"}
             </p>
           </div>
+
+          {/* Reembolsos por Lluvia */}
+          {(data.kpis.total_reembolsos_lluvia ?? 0) > 0 && (
+            <div className="rounded-3xl bg-cyan-950/40 border border-cyan-500/30 p-5 shadow-lg relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition" />
+              <div className="flex items-center justify-between text-xs text-cyan-300 font-semibold mb-2">
+                <span>🌧️ Reembolsos por Lluvia</span>
+                <CloudRain className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div className="text-2xl font-black text-cyan-200 tracking-tight font-mono">
+                ${(data.kpis.total_reembolsos_lluvia || 0).toLocaleString()}
+              </div>
+              <div className="mt-2 text-[11px] text-cyan-300/80 space-y-0.5">
+                {(data.kpis.total_reembolsos_billetera ?? 0) > 0 && (
+                  <div>👛 Billeteras: ${(data.kpis.total_reembolsos_billetera || 0).toLocaleString()}</div>
+                )}
+                {(data.kpis.total_reembolsos_vales ?? 0) > 0 && (
+                  <div>🎟️ Vales: ${(data.kpis.total_reembolsos_vales || 0).toLocaleString()}</div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Ocupación Promedio */}
           <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-5 shadow-lg relative overflow-hidden group">
@@ -952,12 +986,16 @@ export default function ResumenDiarioTurnos({
                           <div className="space-y-2">
                             {dia.turnos.map((t) => {
                               const isPenalidad = t.estado === "cancelado" && (t.estado_pago === "retenido_penalidad" || !!t.es_penalidad);
-                              const saldoReal = isPenalidad
+                              const isCanceladoLluvia = t.estado === "cancelado" && (t.motivo_cancelacion === "lluvia" || !!t.es_cancelado_lluvia);
+                              const isBloqueadoLluvia = (t.estado === "bloqueado" && (t.motivo_cancelacion === "lluvia" || !!t.es_bloqueado_lluvia)) || t.estado === "bloqueado";
+                              const isClima = isCanceladoLluvia || isBloqueadoLluvia;
+
+                              const saldoReal = isPenalidad || isClima
                                 ? 0
                                 : (typeof t.saldo_pendiente === "number" && t.saldo_pendiente > 0
                                     ? t.saldo_pendiente
                                     : Math.max(0, Number(t.precio || 0) - Number(t.monto_pagado || 0)));
-                              const isPaid = !isPenalidad && (
+                              const isPaid = !isPenalidad && !isClima && (
                                 Number(t.precio || 0) === 0 ||
                                 (saldoReal <= 0 && Number(t.monto_pagado || 0) > 0) ||
                                 ((t.estado_pago === "pagado" || t.estado_pago === "pagado_total" || t.estado === "pagado" || t.estado === "completado") && Number(t.monto_pagado || 0) >= Number(t.precio || 0))
@@ -969,6 +1007,10 @@ export default function ResumenDiarioTurnos({
                                   className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border transition ${
                                     isPenalidad
                                       ? "bg-slate-900/60 border-rose-900/40 hover:border-rose-700/60"
+                                      : isCanceladoLluvia
+                                      ? "bg-cyan-950/20 border-cyan-500/30 hover:border-cyan-500/50"
+                                      : isBloqueadoLluvia
+                                      ? "bg-slate-950/40 border-slate-800/80 opacity-70"
                                       : "bg-slate-900/90 border-slate-800 hover:border-slate-700"
                                   }`}
                                 >
@@ -985,6 +1027,16 @@ export default function ResumenDiarioTurnos({
                                         {isPenalidad && (
                                           <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[10px] font-black border border-rose-500/30 uppercase">
                                             Cancelado
+                                          </span>
+                                        )}
+                                        {isCanceladoLluvia && (
+                                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30 flex items-center gap-1">
+                                            🌧️ Cancelado Lluvia
+                                          </span>
+                                        )}
+                                        {isBloqueadoLluvia && (
+                                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400 text-[10px] font-bold border border-cyan-500/20 flex items-center gap-1">
+                                            🌧️ Bloqueo Lluvia
                                           </span>
                                         )}
                                         {t.es_fijo && (
@@ -1013,6 +1065,22 @@ export default function ResumenDiarioTurnos({
                                           <div className="text-[10px] text-amber-400 font-bold">
                                             Seña retenida: ${t.monto_pagado.toLocaleString()}
                                           </div>
+                                        </>
+                                      ) : isCanceladoLluvia ? (
+                                        <>
+                                          <div className="text-xs font-bold text-slate-500 line-through">${t.precio.toLocaleString()}</div>
+                                          {(t.monto_reembolsado ?? t.monto_pagado) > 0 ? (
+                                            <div className="text-[10px] text-cyan-300 font-bold">
+                                              {t.tipo_reembolso === "billetera" ? "👛 En Billetera:" : "🎟️ Vale:"} ${(t.monto_reembolsado ?? t.monto_pagado).toLocaleString()}
+                                            </div>
+                                          ) : (
+                                            <div className="text-[10px] text-slate-400">Sin costo / cancelado</div>
+                                          )}
+                                        </>
+                                      ) : isBloqueadoLluvia ? (
+                                        <>
+                                          <div className="text-xs font-bold text-slate-500">Sin cargo</div>
+                                          <div className="text-[10px] text-slate-500">Slot preventivo</div>
                                         </>
                                       ) : (
                                         <>
@@ -1043,6 +1111,14 @@ export default function ResumenDiarioTurnos({
                                     {isPenalidad ? (
                                       <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-extrabold flex items-center gap-1">
                                         ⚠️ Seña Retenida (Penalidad)
+                                      </span>
+                                    ) : isCanceladoLluvia ? (
+                                      <span className="px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-xs font-extrabold flex items-center gap-1">
+                                        🌧️ {(t.monto_reembolsado ?? t.monto_pagado) > 0 ? "Reembolsado" : "Cancelado"}
+                                      </span>
+                                    ) : isBloqueadoLluvia ? (
+                                      <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 text-xs font-bold flex items-center gap-1">
+                                        🚫 Bloqueado
                                       </span>
                                     ) : isPaid ? (
                                       <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold flex items-center gap-1">
@@ -1090,7 +1166,7 @@ export default function ResumenDiarioTurnos({
                                     )}
 
                                     {/* WhatsApp Reminder Button / Status */}
-                                    {!isPenalidad && t.estado !== "cancelado" && (
+                                    {!isPenalidad && !isClima && t.estado !== "cancelado" && (
                                       <div className="shrink-0">
                                         {t.recordatorio_enviado_at ? (
                                           <span

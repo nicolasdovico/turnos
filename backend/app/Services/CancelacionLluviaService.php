@@ -188,8 +188,10 @@ class CancelacionLluviaService
 
             $turnos = $turnosQuery->with(['cliente', 'cancha'])->get();
             $totalTurnosCancelados = $turnos->count();
+            $slotsYaCancelados = [];
 
             foreach ($turnos as $turno) {
+                $slotsYaCancelados[$turno->cancha_id . '_' . substr($turno->hora_inicio, 0, 5)] = true;
                 $montoPagado = (float) $turno->monto_pagado;
                 $turno->update([
                     'estado' => 'cancelado',
@@ -296,6 +298,13 @@ class CancelacionLluviaService
                     try {
                         $slotsLibres = $this->disponibilidadService->obtenerSlotsDisponibles($canchaId, $fecha);
                         foreach ($slotsLibres as $slot) {
+                            $horaSlot = substr($slot['hora_inicio'], 0, 5);
+                            $keySlot = $canchaId . '_' . $horaSlot;
+                            if (isset($slotsYaCancelados[$keySlot])) {
+                                // Este horario ya fue cancelado por lluvia en este mismo lote, no duplicar registro
+                                continue;
+                            }
+
                             if (empty($horaDesde) || $slot['hora_inicio'] >= $horaDesde) {
                                 Turno::withoutGlobalScopes()->create([
                                     'complejo_id' => $complejo->id,
@@ -303,10 +312,11 @@ class CancelacionLluviaService
                                     'fecha' => $fecha,
                                     'hora_inicio' => $slot['hora_inicio'],
                                     'hora_fin' => $slot['hora_fin'],
-                                    'precio' => $slot['precio'] ?? 0,
-                                    'monto_pagado' => 0,
-                                    'saldo_pendiente' => 0,
+                                    'precio' => 0.0,
+                                    'monto_pagado' => 0.0,
+                                    'saldo_pendiente' => 0.0,
                                     'estado' => 'bloqueado',
+                                    'estado_pago' => 'cancelado',
                                     'motivo_cancelacion' => 'lluvia',
                                     'cliente_nombre' => 'Bloqueo Preventivo Lluvia',
                                     'cancelado_por_user_id' => $admin->id,
