@@ -171,7 +171,10 @@ export default function Navbar() {
           {!effectiveIsSubdomain && (
             <>
               <Link href="/" className="hover:text-emerald-600 transition font-semibold text-slate-900">
-                Portal
+                Inicio
+              </Link>
+              <Link href="/#funcionalidades" className="hover:text-emerald-600 transition">
+                Funcionalidades
               </Link>
               {!ownedClub && (
                 <a href={demoClubUrl} className="hover:text-emerald-600 transition text-emerald-700 font-semibold">

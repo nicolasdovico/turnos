@@ -2191,7 +2191,27 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Backend: 246/246 tests pasando al 100% (1.347 aserciones).
   * Frontend: 103/103 tests pasando al 100% en 10 suites de Vitest.
   * Build de producción Next.js (`npm run build`): 100% exitoso.
+-------------------------------------------------------------------------------
+[2026-09-19] - UNIFICACIÓN DE NAVEGACIÓN Y SINCRONIZACIÓN DE PRICING EN LANDING
+-------------------------------------------------------------------------------
+- Contexto y Problema Detectado:
+  * En `http://localhost:8080/` se presentaban dos barras de navegación superpuestas (sticky navbar global en `Navbar.tsx` y sub-barra en `frontend/app/portal/page.tsx`), ambas con el enlace "Planes y Precios" que conducían a información inconsistente (`/planes` vs `/#planes`).
+  * El componente `PricingOverview.tsx` de la landing exhibía textos obsoletos ("30 Días Gratis", módulos marcados como "Próximamente", omisión de cupos de canchas base y costo por canchas extras).
+- Implementación Realizada:
+  * `frontend/app/portal/page.tsx`: Se eliminó la sub-barra redundante, recuperando espacio vertical y dejando una jerarquía visual limpia.
+  * `frontend/components/Navbar.tsx`: Se unificó la barra superior para el dominio global (`!effectiveIsSubdomain`), integrando enlaces directos a Inicio (`/`), Funcionalidades (`/#funcionalidades`), Demo Club y Planes & Precios (`/planes`).
+  * `frontend/components/landing/PricingOverview.tsx`: Sincronización completa con el modelo de pricing:
+    - Inclusión de canchas base (Bronce: 2, Plata: 4, Oro: 6) y costo por cancha extra (+$8, +$10, +$12 / mes).
+    - Actualización de período de prueba gratuito a 14 días sin tarjeta de crédito.
+    - Eliminación de etiquetas "Próximamente" en módulos completados (POS Buffet, Arqueo de Caja, Torneos, Domótica IoT, Split Payment).
+    - Botón destacado hacia el simulador interactivo de presupuesto (`/planes`).
+  * `frontend/tests/authAndOnboarding.test.tsx`: Actualización de aserciones de navegación en el portal.
+- Verificación y Calidad:
+  * Tests Frontend: 103/103 tests pasando al 100% (10 suites).
+  * Tests Backend: 246/246 tests pasando al 100%.
+  * Build Next.js: Compilación de producción validada exitosamente.
 ===============================================================================
+
 
 
 

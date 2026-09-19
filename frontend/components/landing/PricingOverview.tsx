@@ -11,13 +11,15 @@ export default function PricingOverview() {
       slug: "bronce",
       precio: "$29",
       periodo: "/mes",
+      canchasBase: 2,
+      precioExtra: 8,
       desc: "Para clubes que inician y buscan digitalizar su grilla sin complicaciones.",
       features: [
         "Motor de Reservas & Grilla en Tiempo Real",
-        "Bloqueos Atómicos Anti-Sobreturno (10 min)",
+        "Bloqueos Atómicos Anti-Sobreturno (Redis)",
         "Subdominio Propio y CMS Web Multitenant",
-        "Cobro de Señas Online con Mercado Pago",
-        "Billetera Virtual de Clientes",
+        "Cobro de Señas Online & Billetera Virtual",
+        "Soporte Estándar",
       ],
       isPopular: false,
     },
@@ -26,14 +28,16 @@ export default function PricingOverview() {
       slug: "plata",
       precio: "$59",
       periodo: "/mes",
-      desc: "El plan ideal para complejos con alto volumen de turnos fijos y abonados.",
+      canchasBase: 4,
+      precioExtra: 10,
+      desc: "El plan ideal para complejos con alto volumen de turnos fijos, buffet y caja.",
       features: [
         "Todo lo incluido en el Plan Bronce",
-        "Turnos Fijos Semanales (series por 6 meses)",
-        "Liberación de Fechas Puntuales a Lista de Espera",
-        "Tarifas Inteligentes de Luz (Horario Invierno/Verano)",
-        "Arqueo y Control de Caja Diaria en Mostrador",
-        "Próximamente: Punto de Venta & Buffet (POS)",
+        "Turnos Fijos Semanales y Recurrentes",
+        "Punto de Venta (POS) & Control de Buffet",
+        "Arqueo Ciego y Control de Caja Diaria",
+        "Partidos Abiertos & Split Payment (Pago Fraccionado)",
+        "Tarifas Estacionales de Iluminación",
       ],
       isPopular: true,
     },
@@ -42,14 +46,15 @@ export default function PricingOverview() {
       slug: "oro",
       precio: "$99",
       periodo: "/mes",
+      canchasBase: 6,
+      precioExtra: 12,
       desc: "Tecnología de punta integral para clubes de primer nivel y torneos.",
       features: [
         "Todo lo incluido en el Plan Plata",
+        "Gestor de Torneos, Fixtures & Brackets",
+        "Domótica IoT: Control Automático de Luces",
+        "Subida Segura a Cloudflare R2 / AWS S3",
         "Soporte Prioritario VIP 24/7",
-        "Subida de Imágenes a Cloudflare R2 / S3",
-        "Próximamente: Gestor de Torneos, Fixtures & Brackets",
-        "Próximamente: Partidos Abiertos & Split Payment",
-        "Próximamente: Domótica IoT (Control Automático de Luces)",
       ],
       isPopular: false,
     },
@@ -66,7 +71,7 @@ export default function PricingOverview() {
           Elegí el plan que mejor se adapte al tamaño de tu club
         </h2>
         <p className="mt-3 text-sm sm:text-base text-slate-600">
-          Probá cualquier plan <strong>gratis durante 30 días</strong>. Sin costo de instalación y sin tarjeta de crédito.
+          Probá cualquier plan <strong>gratis durante 14 días</strong>. Sin costo de instalación y sin tarjeta de crédito.
         </p>
       </div>
 
@@ -95,7 +100,7 @@ export default function PricingOverview() {
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
                   p.isPopular ? "bg-slate-800 text-emerald-400" : "bg-slate-100 text-slate-600"
                 }`}>
-                  30 Días Gratis
+                  14 Días Gratis
                 </span>
               </div>
 
@@ -103,7 +108,7 @@ export default function PricingOverview() {
                 {p.desc}
               </p>
 
-              <div className="mt-5 mb-6 pt-5 border-t border-slate-200/40">
+              <div className="mt-5 mb-4 pt-5 border-t border-slate-200/40">
                 <div className="flex items-baseline gap-1">
                   <span className={`text-4xl font-black font-mono tracking-tight ${p.isPopular ? "text-white" : "text-slate-900"}`}>
                     {p.precio}
@@ -113,8 +118,29 @@ export default function PricingOverview() {
                   </span>
                 </div>
                 <span className={`text-[11px] block mt-1 ${p.isPopular ? "text-emerald-400" : "text-emerald-600 font-semibold"}`}>
-                  ✓ Primeros 30 días sin cargo
+                  ✓ Primeros 14 días sin cargo • Sin tarjeta
                 </span>
+              </div>
+
+              {/* Cupo de Canchas y Costo Extra */}
+              <div className={`mb-6 rounded-2xl p-3 border transition ${
+                p.isPopular 
+                  ? "bg-slate-800/80 border-slate-700 text-slate-200" 
+                  : "bg-emerald-50/60 border-emerald-100 text-slate-700"
+              }`}>
+                <div className="flex items-center justify-between text-xs font-bold mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <span>🏟️</span> Capacidad base:
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
+                    p.isPopular ? "bg-emerald-500 text-slate-950" : "bg-emerald-600 text-white"
+                  }`}>
+                    Hasta {p.canchasBase} canchas
+                  </span>
+                </div>
+                <div className={`text-[11px] ${p.isPopular ? "text-slate-300" : "text-slate-600"}`}>
+                  +${p.precioExtra}/mes por cancha extra
+                </div>
               </div>
 
               <ul className="space-y-3 pt-2">
@@ -135,7 +161,7 @@ export default function PricingOverview() {
 
             <div className="mt-8 pt-6 border-t border-slate-200/20">
               <Link
-                href="/registro-club"
+                href={`/registro-club?plan=${p.slug}`}
                 className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 ${
                   p.isPopular
                     ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-950"
@@ -150,13 +176,14 @@ export default function PricingOverview() {
         ))}
       </div>
 
-      <div className="mt-10 text-center">
+      {/* Enlace destacado al simulador y comparativa completa */}
+      <div className="mt-12 text-center flex flex-col sm:flex-row items-center justify-center gap-4">
         <Link
           href="/planes"
-          className="text-xs sm:text-sm font-bold text-slate-600 hover:text-emerald-600 transition inline-flex items-center gap-1.5"
+          className="rounded-2xl bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 text-xs sm:text-sm font-bold shadow-xl transition flex items-center gap-2.5 border border-slate-800"
         >
-          <span>Ver tabla comparativa detallada de todos los planes</span>
-          <ArrowRight className="w-4 h-4" />
+          <span>🧮 Simular presupuesto por cantidad de canchas y ver comparativa completa</span>
+          <ArrowRight className="w-4 h-4 text-emerald-400" />
         </Link>
       </div>
     </section>

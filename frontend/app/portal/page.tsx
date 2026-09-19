@@ -64,50 +64,6 @@ export default function PortalPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 selection:bg-emerald-500 selection:text-white">
-      {/* Barra de navegación ancla rápida */}
-      <nav className="border-b border-slate-200/80 bg-white/70 backdrop-blur-md sticky top-16 z-40 text-xs font-semibold text-slate-600 hidden md:block">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-11">
-          <div className="flex items-center gap-6">
-            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-full border border-emerald-300">
-              Portal Global de Complejos Deportivos
-            </span>
-            <a href="#comparativa" className="hover:text-emerald-600 transition">
-              El Antes vs Después
-            </a>
-            <a href="#funcionalidades" className="hover:text-emerald-600 transition">
-              Funcionalidades
-            </a>
-            <a href="#calculadora" className="hover:text-emerald-600 transition">
-              Calculadora de Pérdidas
-            </a>
-            <a href="#proximos-modulos" className="hover:text-emerald-600 transition">
-              Próximos Módulos
-            </a>
-            <a href="#planes" className="hover:text-emerald-600 transition">
-              Planes & Precios
-            </a>
-            <a href="#faq" className="hover:text-emerald-600 transition">
-              Preguntas Frecuentes
-            </a>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <a
-              href={demoClubUrl}
-              className="text-slate-500 hover:text-slate-900 transition text-[11px]"
-            >
-              Ver Demo Club
-            </a>
-            <Link
-              href="/registro-club"
-              className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition shadow-sm"
-            >
-              Prueba 30 Días Gratis
-            </Link>
-          </div>
-        </div>
-      </nav>
-
       {/* Mis Establecimientos (Si el usuario autenticado es dueño de uno o más negocios) */}
       {userClubs.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
