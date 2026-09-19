@@ -69,6 +69,22 @@ class Cancha extends Model
 
 
     /**
+     * Accesor para precio_luz_adicional con fallback retrocompatible a precio_con_luz - precio_base.
+     */
+    public function getPrecioLuzAdicionalAttribute($value)
+    {
+        if ($value !== null) {
+            return $value;
+        }
+
+        if ($this->precio_con_luz !== null && $this->precio_base !== null) {
+            return number_format(max(0.0, (float) $this->precio_con_luz - (float) $this->precio_base), 2, '.', '');
+        }
+
+        return null;
+    }
+
+    /**
      * Check if the court's sport supports/requires wall attributes.
      */
     public function requiereParedes(): bool

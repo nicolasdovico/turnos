@@ -235,17 +235,23 @@ class ClubDashboardController extends Controller
         $requiereParedes = in_array($deporte, ['padel', 'squash', 'racquetball'], true);
         $tipoPared = $requiereParedes ? ($validated['tipo_pared'] ?? null) : null;
 
+        $precioBase = (float) $validated['precio_base'];
+        $precioLuzAdicional = $validated['precio_luz_adicional'] ?? null;
+        $precioConLuz = (array_key_exists('precio_con_luz', $validated) && $validated['precio_con_luz'] !== null)
+            ? $validated['precio_con_luz']
+            : ($precioLuzAdicional !== null ? ($precioBase + (float) $precioLuzAdicional) : null);
+
         $cancha = Cancha::create([
             'complejo_id' => $complejo->id,
             'nombre' => $validated['nombre'],
             'deporte' => $deporte,
             'superficie' => $validated['superficie'] ?? 'cristal',
             'precio_base' => $validated['precio_base'],
-            'precio_con_luz' => $validated['precio_con_luz'] ?? null,
+            'precio_con_luz' => $precioConLuz,
             'precio_valle' => $validated['precio_valle'] ?? null,
             'precio_pico' => $validated['precio_pico'] ?? null,
             'precio_fin_semana' => $validated['precio_fin_semana'] ?? null,
-            'precio_luz_adicional' => $validated['precio_luz_adicional'] ?? null,
+            'precio_luz_adicional' => $precioLuzAdicional,
             'techada' => $validated['techada'] ?? false,
             'iluminacion' => $validated['iluminacion'] ?? true,
             'tipo_iluminacion' => $validated['tipo_iluminacion'] ?? 'led',
@@ -333,16 +339,25 @@ class ClubDashboardController extends Controller
         $requiereParedes = in_array($deporte, ['padel', 'squash', 'racquetball'], true);
         $tipoPared = $requiereParedes ? ($validated['tipo_pared'] ?? $cancha->tipo_pared) : null;
 
+        $precioBase = (float) $validated['precio_base'];
+        $precioLuzAdicional = array_key_exists('precio_luz_adicional', $validated)
+            ? $validated['precio_luz_adicional']
+            : $cancha->precio_luz_adicional;
+
+        $precioConLuz = (array_key_exists('precio_con_luz', $validated) && $validated['precio_con_luz'] !== null)
+            ? $validated['precio_con_luz']
+            : ($precioLuzAdicional !== null ? ($precioBase + (float) $precioLuzAdicional) : $cancha->precio_con_luz);
+
         $cancha->update([
             'nombre' => $validated['nombre'],
             'deporte' => $deporte,
             'superficie' => $validated['superficie'] ?? $cancha->superficie,
             'precio_base' => $validated['precio_base'],
-            'precio_con_luz' => array_key_exists('precio_con_luz', $validated) ? $validated['precio_con_luz'] : $cancha->precio_con_luz,
+            'precio_con_luz' => $precioConLuz,
             'precio_valle' => array_key_exists('precio_valle', $validated) ? $validated['precio_valle'] : $cancha->precio_valle,
             'precio_pico' => array_key_exists('precio_pico', $validated) ? $validated['precio_pico'] : $cancha->precio_pico,
             'precio_fin_semana' => array_key_exists('precio_fin_semana', $validated) ? $validated['precio_fin_semana'] : $cancha->precio_fin_semana,
-            'precio_luz_adicional' => array_key_exists('precio_luz_adicional', $validated) ? $validated['precio_luz_adicional'] : $cancha->precio_luz_adicional,
+            'precio_luz_adicional' => $precioLuzAdicional,
             'techada' => $validated['techada'] ?? $cancha->techada,
             'iluminacion' => $validated['iluminacion'] ?? $cancha->iluminacion,
             'tipo_iluminacion' => $validated['tipo_iluminacion'] ?? $cancha->tipo_iluminacion,

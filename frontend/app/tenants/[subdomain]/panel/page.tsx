@@ -555,7 +555,12 @@ export default function ClubAdminPanel() {
     setCanchaPrecioValle(c.precio_valle ? String(c.precio_valle) : "");
     setCanchaPrecioPico(c.precio_pico ? String(c.precio_pico) : "");
     setCanchaPrecioFinSemana(c.precio_fin_semana ? String(c.precio_fin_semana) : "");
-    setCanchaPrecioLuzAdicional(c.precio_luz_adicional ? String(c.precio_luz_adicional) : "");
+    const extraLuz = (c.precio_luz_adicional !== null && c.precio_luz_adicional !== undefined && c.precio_luz_adicional !== "")
+      ? String(c.precio_luz_adicional)
+      : (c.precio_con_luz && c.precio_base && Number(c.precio_con_luz) > Number(c.precio_base))
+      ? String(Number(c.precio_con_luz) - Number(c.precio_base))
+      : "";
+    setCanchaPrecioLuzAdicional(extraLuz);
     setCanchaDuracionMinutos(c.duracion_minutos || (dep === "padel" ? 90 : 60));
     setCanchaPermiteDuracionFlexible(Boolean(c.permite_duracion_flexible));
     setCanchaAntiBachesActivo(c.anti_baches_activo !== undefined ? Boolean(c.anti_baches_activo) : true);
@@ -1766,7 +1771,9 @@ export default function ClubAdminPanel() {
       formato: canchaFormato,
       tipo_pared: depConfig.tieneParedes ? canchaTipoPared : null,
       precio_base: parseFloat(canchaPrecioBase) || 8000,
-      precio_con_luz: canchaPrecioConLuz ? parseFloat(canchaPrecioConLuz) : null,
+      precio_con_luz: canchaPrecioLuzAdicional
+        ? ((parseFloat(canchaPrecioBase) || 8000) + parseFloat(canchaPrecioLuzAdicional))
+        : (canchaPrecioConLuz ? parseFloat(canchaPrecioConLuz) : null),
       precio_valle: canchaPrecioValle ? parseFloat(canchaPrecioValle) : null,
       precio_pico: canchaPrecioPico ? parseFloat(canchaPrecioPico) : null,
       precio_fin_semana: canchaPrecioFinSemana ? parseFloat(canchaPrecioFinSemana) : null,
@@ -1843,7 +1850,9 @@ export default function ClubAdminPanel() {
       formato: canchaFormato,
       tipo_pared: depConfig.tieneParedes ? canchaTipoPared : null,
       precio_base: parseFloat(canchaPrecioBase) || 8000,
-      precio_con_luz: canchaPrecioConLuz ? parseFloat(canchaPrecioConLuz) : null,
+      precio_con_luz: canchaPrecioLuzAdicional
+        ? ((parseFloat(canchaPrecioBase) || 8000) + parseFloat(canchaPrecioLuzAdicional))
+        : (canchaPrecioConLuz ? parseFloat(canchaPrecioConLuz) : null),
       precio_valle: canchaPrecioValle ? parseFloat(canchaPrecioValle) : null,
       precio_pico: canchaPrecioPico ? parseFloat(canchaPrecioPico) : null,
       precio_fin_semana: canchaPrecioFinSemana ? parseFloat(canchaPrecioFinSemana) : null,
