@@ -13,6 +13,10 @@ export interface Slot {
   tarifa_con_luz?: boolean;
   precio_base?: number;
   recargo_luz?: number;
+  tipo_franja?: string;
+  nombre_franja?: string;
+  porcentaje_sena?: number;
+  monto_sena?: number;
   es_fijo?: boolean;
   duracion_minutos?: number;
   is_mine?: boolean;
@@ -54,6 +58,10 @@ export interface ActiveLock {
   tarifaConLuz?: boolean;
   precioBase?: number;
   recargoLuz?: number;
+  tipoFranja?: string;
+  nombreFranja?: string;
+  porcentajeSena?: number;
+  montoSena?: number;
 }
 
 export interface ToastMessage {
@@ -84,6 +92,10 @@ export interface RetainedLock {
   tarifa_con_luz?: boolean;
   precio_base?: number;
   recargo_luz?: number;
+  tipo_franja?: string;
+  nombre_franja?: string;
+  porcentaje_sena?: number;
+  monto_sena?: number;
   ttl_segundos: number;
   expira_en_segundos?: number;
   token_reserva?: string;
@@ -977,6 +989,10 @@ export default function GrillaHoraria({
           tarifa_con_luz: Boolean(s.tarifa_con_luz),
           precio_base: s.precio_base ? Number(s.precio_base) : undefined,
           recargo_luz: s.recargo_luz ? Number(s.recargo_luz) : undefined,
+          tipo_franja: s.tipo_franja,
+          nombre_franja: s.nombre_franja,
+          porcentaje_sena: s.porcentaje_sena ? Number(s.porcentaje_sena) : undefined,
+          monto_sena: s.monto_sena ? Number(s.monto_sena) : undefined,
           duracion_minutos: s.duracion_minutos ? Number(s.duracion_minutos) : undefined,
           es_fijo: Boolean(s.es_fijo),
         }));
@@ -1764,6 +1780,10 @@ export default function GrillaHoraria({
           tarifa_con_luz: ml.tarifaConLuz ?? existing?.tarifa_con_luz,
           precio_base: ml.precioBase ?? existing?.precio_base,
           recargo_luz: ml.recargoLuz ?? existing?.recargo_luz,
+          tipo_franja: ml.tipoFranja ?? existing?.tipo_franja,
+          nombre_franja: ml.nombreFranja ?? existing?.nombre_franja,
+          porcentaje_sena: ml.porcentajeSena ?? existing?.porcentaje_sena,
+          monto_sena: ml.montoSena ?? existing?.monto_sena,
           token_reserva: ml.tokenReserva,
           is_mine: true,
           ttl_segundos: ttl,
@@ -1789,6 +1809,10 @@ export default function GrillaHoraria({
           tarifa_con_luz: activeLock.tarifaConLuz ?? existing?.tarifa_con_luz,
           precio_base: activeLock.precioBase ?? existing?.precio_base,
           recargo_luz: activeLock.recargoLuz ?? existing?.recargo_luz,
+          tipo_franja: activeLock.tipoFranja ?? existing?.tipo_franja,
+          nombre_franja: activeLock.nombreFranja ?? existing?.nombre_franja,
+          porcentaje_sena: activeLock.porcentajeSena ?? existing?.porcentaje_sena,
+          monto_sena: activeLock.montoSena ?? existing?.monto_sena,
           token_reserva: activeLock.tokenReserva,
           is_mine: true,
           ttl_segundos: ttl,
@@ -1969,6 +1993,10 @@ export default function GrillaHoraria({
         tarifaConLuz: Boolean(slot.tarifa_con_luz),
         precioBase: slot.precio_base,
         recargoLuz: slot.recargo_luz,
+        tipoFranja: slot.tipo_franja,
+        nombreFranja: slot.nombre_franja,
+        porcentajeSena: slot.porcentaje_sena,
+        montoSena: slot.monto_sena,
       };
 
       setActiveLock(newLock);
@@ -2672,6 +2700,10 @@ export default function GrillaHoraria({
                             tarifaConLuz: Boolean(lock.tarifa_con_luz ?? activeLock?.tarifaConLuz),
                             precioBase: lock.precio_base ?? activeLock?.precioBase,
                             recargoLuz: lock.recargo_luz ?? activeLock?.recargoLuz,
+                            tipoFranja: lock.tipo_franja ?? activeLock?.tipoFranja,
+                            nombreFranja: lock.nombre_franja ?? activeLock?.nombreFranja,
+                            porcentajeSena: lock.porcentaje_sena ?? activeLock?.porcentajeSena,
+                            montoSena: lock.monto_sena ?? activeLock?.montoSena,
                           };
                           setActiveLock(selectedLock);
                           if (onConfirmSuccess) {
@@ -2853,7 +2885,31 @@ export default function GrillaHoraria({
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                               </span>
                             ) : (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 flex-wrap justify-end">
+                                {slot.tipo_franja === "valle" && (
+                                  <span
+                                    title={slot.nombre_franja || "Horario Promocional (Valle)"}
+                                    className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-0.5"
+                                  >
+                                    🟢 Promo
+                                  </span>
+                                )}
+                                {slot.tipo_franja === "pico" && (
+                                  <span
+                                    title={slot.nombre_franja || "Horario Central (Pico)"}
+                                    className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 flex items-center gap-0.5"
+                                  >
+                                    🔥 Pico
+                                  </span>
+                                )}
+                                {slot.tipo_franja === "fin_semana" && (
+                                  <span
+                                    title={slot.nombre_franja || "Tarifa Fin de Semana"}
+                                    className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-0.5"
+                                  >
+                                    ⭐ FDS
+                                  </span>
+                                )}
                                 {slot.tarifa_con_luz && (
                                   <span
                                     title="Tarifa con luz artificial incluida"
@@ -4036,6 +4092,19 @@ export default function GrillaHoraria({
                   )}
 
                   <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                    {activeLock.tipoFranja && (
+                      <div className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-slate-900 border border-slate-800/80 text-slate-300">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {activeLock.tipoFranja === "valle" && <span>🟢</span>}
+                          {activeLock.tipoFranja === "pico" && <span>🔥</span>}
+                          {activeLock.tipoFranja === "fin_semana" && <span>⭐</span>}
+                          <span>{activeLock.nombreFranja || (activeLock.tipoFranja === "pico" ? "Horario Central (Pico)" : activeLock.tipoFranja === "valle" ? "Horario Promocional (Valle)" : "Tarifa Fin de Semana")}</span>
+                        </span>
+                        <span className="font-mono font-bold text-slate-200">
+                          ${(activeLock.precioBase ?? (tarifaTotal - (activeLock.recargoLuz || 0))).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                     {activeLock.tarifaConLuz && (
                       <div
                         data-testid="nocturnal-tariff-banner"
@@ -4049,9 +4118,22 @@ export default function GrillaHoraria({
                         </span>
                       </div>
                     )}
+                    {Boolean(activeLock.recargoLuz && activeLock.recargoLuz > 0) && (
+                      <div
+                        data-testid="recargo-luz-breakdown"
+                        className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300"
+                      >
+                        <span className="flex items-center gap-1.5 font-bold">
+                          <span>💡</span> Recargo Luz Artificial
+                        </span>
+                        <span className="font-mono font-extrabold text-amber-200">
+                          +${activeLock.recargoLuz.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-400">
-                        {activeLock.tarifaConLuz ? "Tarifa total del turno (con luz):" : "Tarifa total del turno:"}
+                        {activeLock.recargoLuz || activeLock.tarifaConLuz ? "Tarifa total del turno (con luz):" : "Tarifa total del turno:"}
                       </span>
                       <span className="font-bold text-slate-300">${tarifaTotal.toLocaleString()}</span>
                     </div>

@@ -26,6 +26,10 @@ interface ComplejoData {
   horas_limite_cancelacion?: number;
   permite_mostrador_publico?: boolean;
   hora_inicio_luz?: string;
+  hora_inicio_pico_semana?: string;
+  hora_fin_pico_semana?: string;
+  dias_pico_semana?: number[];
+  dias_fin_semana?: number[];
   recordatorio_whatsapp_activo?: boolean;
   recordatorio_anticipacion_minutos?: number;
   owner: { id: number; name: string; email: string } | null;
@@ -75,6 +79,10 @@ interface CanchaItem {
   superficie: string;
   precio_base: string | number;
   precio_con_luz?: string | number | null;
+  precio_valle?: string | number | null;
+  precio_pico?: string | number | null;
+  precio_fin_semana?: string | number | null;
+  precio_luz_adicional?: string | number | null;
   techada: boolean;
   iluminacion?: boolean;
   tipo_iluminacion?: string | null;
@@ -428,6 +436,8 @@ export default function ClubAdminPanel() {
   const [horasLimiteCancelacion, setHorasLimiteCancelacion] = useState<number>(4);
   const [permiteMostradorPublico, setPermiteMostradorPublico] = useState<boolean>(true);
   const [horaInicioLuz, setHoraInicioLuz] = useState<string>("19:00");
+  const [horaInicioPicoSemana, setHoraInicioPicoSemana] = useState<string>("18:00");
+  const [horaFinPicoSemana, setHoraFinPicoSemana] = useState<string>("23:00");
   const [recordatorioWhatsappActivo, setRecordatorioWhatsappActivo] = useState<boolean>(true);
   const [recordatorioAnticipacionMinutos, setRecordatorioAnticipacionMinutos] = useState<number>(120);
   const [isSavingPoliticas, setIsSavingPoliticas] = useState(false);
@@ -447,6 +457,10 @@ export default function ClubAdminPanel() {
   const [canchaTipoPared, setCanchaTipoPared] = useState("cristal_panoramico");
   const [canchaPrecioBase, setCanchaPrecioBase] = useState("8000");
   const [canchaPrecioConLuz, setCanchaPrecioConLuz] = useState("");
+  const [canchaPrecioValle, setCanchaPrecioValle] = useState("");
+  const [canchaPrecioPico, setCanchaPrecioPico] = useState("");
+  const [canchaPrecioFinSemana, setCanchaPrecioFinSemana] = useState("");
+  const [canchaPrecioLuzAdicional, setCanchaPrecioLuzAdicional] = useState("");
   const [canchaTechada, setCanchaTechada] = useState(false);
   const [canchaTipoCubierta, setCanchaTipoCubierta] = useState("outdoor");
   const [canchaIluminacion, setCanchaIluminacion] = useState(true);
@@ -503,6 +517,10 @@ export default function ClubAdminPanel() {
     setCanchaTipoPared(depConfig.paredes ? depConfig.paredes[0]?.id : "");
     setCanchaPrecioBase("8000");
     setCanchaPrecioConLuz("");
+    setCanchaPrecioValle("");
+    setCanchaPrecioPico("");
+    setCanchaPrecioFinSemana("");
+    setCanchaPrecioLuzAdicional("");
     setCanchaDuracionMinutos(dep === "padel" ? 90 : 60);
     setCanchaPermiteDuracionFlexible(false);
     setCanchaAntiBachesActivo(true);
@@ -534,6 +552,10 @@ export default function ClubAdminPanel() {
     setCanchaTipoPared(c.tipo_pared || (depConfig.paredes ? depConfig.paredes[0]?.id : ""));
     setCanchaPrecioBase(String(c.precio_base || "8000"));
     setCanchaPrecioConLuz(c.precio_con_luz ? String(c.precio_con_luz) : "");
+    setCanchaPrecioValle(c.precio_valle ? String(c.precio_valle) : "");
+    setCanchaPrecioPico(c.precio_pico ? String(c.precio_pico) : "");
+    setCanchaPrecioFinSemana(c.precio_fin_semana ? String(c.precio_fin_semana) : "");
+    setCanchaPrecioLuzAdicional(c.precio_luz_adicional ? String(c.precio_luz_adicional) : "");
     setCanchaDuracionMinutos(c.duracion_minutos || (dep === "padel" ? 90 : 60));
     setCanchaPermiteDuracionFlexible(Boolean(c.permite_duracion_flexible));
     setCanchaAntiBachesActivo(c.anti_baches_activo !== undefined ? Boolean(c.anti_baches_activo) : true);
@@ -639,6 +661,12 @@ export default function ClubAdminPanel() {
           }
           if (data.data.complejo.hora_inicio_luz) {
             setHoraInicioLuz(data.data.complejo.hora_inicio_luz.substring(0, 5));
+          }
+          if (data.data.complejo.hora_inicio_pico_semana) {
+            setHoraInicioPicoSemana(data.data.complejo.hora_inicio_pico_semana.substring(0, 5));
+          }
+          if (data.data.complejo.hora_fin_pico_semana) {
+            setHoraFinPicoSemana(data.data.complejo.hora_fin_pico_semana.substring(0, 5));
           }
           if (data.data.complejo.recordatorio_whatsapp_activo !== undefined) {
             setRecordatorioWhatsappActivo(Boolean(data.data.complejo.recordatorio_whatsapp_activo));
@@ -1152,6 +1180,8 @@ export default function ClubAdminPanel() {
           horas_limite_cancelacion: horasLimiteCancelacion,
           permite_mostrador_publico: permiteMostradorPublico,
           hora_inicio_luz: horaInicioLuz,
+          hora_inicio_pico_semana: horaInicioPicoSemana,
+          hora_fin_pico_semana: horaFinPicoSemana,
           recordatorio_whatsapp_activo: recordatorioWhatsappActivo,
           recordatorio_anticipacion_minutos: recordatorioAnticipacionMinutos,
         }),
@@ -1205,6 +1235,18 @@ export default function ClubAdminPanel() {
     isPoliticasDirtyRef.current = true;
   };
 
+  const updateHoraInicioPicoSemana = (val: string) => {
+    setHoraInicioPicoSemana(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updateHoraFinPicoSemana = (val: string) => {
+    setHoraFinPicoSemana(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
   const updateRecordatorioWhatsappActivo = (val: boolean) => {
     setRecordatorioWhatsappActivo(val);
     setIsPoliticasDirty(true);
@@ -1233,6 +1275,12 @@ export default function ClubAdminPanel() {
       }
       if (complejo.hora_inicio_luz) {
         setHoraInicioLuz(complejo.hora_inicio_luz.substring(0, 5));
+      }
+      if (complejo.hora_inicio_pico_semana) {
+        setHoraInicioPicoSemana(complejo.hora_inicio_pico_semana.substring(0, 5));
+      }
+      if (complejo.hora_fin_pico_semana) {
+        setHoraFinPicoSemana(complejo.hora_fin_pico_semana.substring(0, 5));
       }
       if (complejo.recordatorio_whatsapp_activo !== undefined) {
         setRecordatorioWhatsappActivo(Boolean(complejo.recordatorio_whatsapp_activo));
@@ -1719,6 +1767,10 @@ export default function ClubAdminPanel() {
       tipo_pared: depConfig.tieneParedes ? canchaTipoPared : null,
       precio_base: parseFloat(canchaPrecioBase) || 8000,
       precio_con_luz: canchaPrecioConLuz ? parseFloat(canchaPrecioConLuz) : null,
+      precio_valle: canchaPrecioValle ? parseFloat(canchaPrecioValle) : null,
+      precio_pico: canchaPrecioPico ? parseFloat(canchaPrecioPico) : null,
+      precio_fin_semana: canchaPrecioFinSemana ? parseFloat(canchaPrecioFinSemana) : null,
+      precio_luz_adicional: canchaPrecioLuzAdicional ? parseFloat(canchaPrecioLuzAdicional) : null,
       techada: canchaTechada,
       tipo_cubierta: canchaTechada ? "indoor" : canchaTipoCubierta,
       iluminacion: canchaIluminacion,
@@ -1792,6 +1844,10 @@ export default function ClubAdminPanel() {
       tipo_pared: depConfig.tieneParedes ? canchaTipoPared : null,
       precio_base: parseFloat(canchaPrecioBase) || 8000,
       precio_con_luz: canchaPrecioConLuz ? parseFloat(canchaPrecioConLuz) : null,
+      precio_valle: canchaPrecioValle ? parseFloat(canchaPrecioValle) : null,
+      precio_pico: canchaPrecioPico ? parseFloat(canchaPrecioPico) : null,
+      precio_fin_semana: canchaPrecioFinSemana ? parseFloat(canchaPrecioFinSemana) : null,
+      precio_luz_adicional: canchaPrecioLuzAdicional ? parseFloat(canchaPrecioLuzAdicional) : null,
       techada: canchaTechada,
       tipo_cubierta: canchaTechada ? "indoor" : canchaTipoCubierta,
       iluminacion: canchaIluminacion,
@@ -2314,15 +2370,21 @@ export default function ClubAdminPanel() {
                       )}
                     </div>
 
-                    {/* SECCIÓN 2: TARIFAS Y PRECIOS */}
+                    {/* SECCIÓN 2: TARIFAS Y PRECIOS BASE Y DINÁMICAS */}
                     <div className="space-y-4 pt-4 border-t border-slate-800">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                        2. Tarifas y Precios por Turno
-                      </h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                          2. Tarifas y Precios por Turno (Base & Dinámicas)
+                        </h4>
+                        <span className="text-[11px] text-slate-400">
+                          Pico, Valle y Luz Desacoplada
+                        </span>
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
-                            Precio Base Diurno ($) *
+                            Precio Base Estándar ($) *
                           </label>
                           <input
                             type="number"
@@ -2334,22 +2396,100 @@ export default function ClubAdminPanel() {
                             onChange={(e) => setCanchaPrecioBase(e.target.value)}
                             className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
                           />
+                          <span className="text-[10px] text-slate-500 mt-1 block">
+                            Tarifa nominal predeterminada de la cancha.
+                          </span>
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
-                            Precio Nocturno / con Luz ($) <span className="text-slate-500 lowercase">(opcional)</span>
+                          <label className="block text-xs font-bold uppercase text-amber-400/90 mb-1">
+                            💡 Adicional Luz Artificial ($) <span className="text-slate-500 lowercase">(desacoplado)</span>
                           </label>
                           <input
                             type="number"
                             min="0"
                             step="100"
-                            placeholder="Ej. 10000"
-                            value={canchaPrecioConLuz}
-                            onChange={(e) => setCanchaPrecioConLuz(e.target.value)}
-                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                            placeholder="Ej. 2000 (cargo extra si requiere luz)"
+                            value={canchaPrecioLuzAdicional}
+                            onChange={(e) => setCanchaPrecioLuzAdicional(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none"
                           />
+                          <span className="text-[10px] text-slate-500 mt-1 block">
+                            Se suma automáticamente al turno si cae en horario con luz.
+                          </span>
                         </div>
+                      </div>
+
+                      {/* Sub-tarjetas de Tarifas Dinámicas por Franja */}
+                      <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                            <span>⚡</span> Tarifas Dinámicas Específicas <span className="text-slate-500 text-[11px] font-normal">(opcional)</span>
+                          </span>
+                          <span className="text-[10px] text-emerald-400/80 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            Auto-detección por día/hora
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                              🟢 Tarifa Valle ($)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="100"
+                              placeholder={`Ej. $${canchaPrecioBase || "8000"}`}
+                              value={canchaPrecioValle}
+                              onChange={(e) => setCanchaPrecioValle(e.target.value)}
+                              className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 mt-0.5 block">
+                              Días hábiles diurno
+                            </span>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-rose-300 mb-1">
+                              🔥 Tarifa Pico ($)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="100"
+                              placeholder={`Ej. $${Math.round((parseFloat(canchaPrecioBase) || 8000) * 1.3)}`}
+                              value={canchaPrecioPico}
+                              onChange={(e) => setCanchaPrecioPico(e.target.value)}
+                              className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white focus:border-rose-500 focus:outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 mt-0.5 block">
+                              Días hábiles horario central
+                            </span>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-indigo-300 mb-1">
+                              ⭐ Fin de Semana ($)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="100"
+                              placeholder={`Ej. $${Math.round((parseFloat(canchaPrecioBase) || 8000) * 1.2)}`}
+                              value={canchaPrecioFinSemana}
+                              onChange={(e) => setCanchaPrecioFinSemana(e.target.value)}
+                              className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                            />
+                            <span className="text-[9px] text-slate-400 mt-0.5 block">
+                              Sábados y Domingos
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-[10px] text-slate-500 pt-1">
+                          ℹ️ Si no se completan estas tarifas, el turno se cotizará con el <strong>Precio Base Estándar</strong> ({canchaPrecioBase ? `$${canchaPrecioBase}` : "configurado"}).
+                        </p>
                       </div>
                     </div>
 
@@ -2917,7 +3057,7 @@ export default function ClubAdminPanel() {
                           </div>
                         )}
 
-                        {c.precio_con_luz && (
+                        {c.precio_con_luz && !c.precio_luz_adicional && (
                           <div className="text-right">
                             <span className="text-[10px] uppercase font-bold text-amber-400/80">🌙 Con Luz:</span>
                             <div className="text-base font-bold text-amber-300">
@@ -2926,6 +3066,44 @@ export default function ClubAdminPanel() {
                           </div>
                         )}
                       </div>
+
+                      {/* Dynamic Pricing Chips */}
+                      {(Boolean(c.precio_valle) || Boolean(c.precio_pico) || Boolean(c.precio_fin_semana) || Boolean(c.precio_luz_adicional)) && (
+                        <div className="mt-3 pt-2.5 border-t border-slate-800/60 grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
+                          {c.precio_valle && (
+                            <div className="bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
+                              <span className="text-slate-400 block text-[10px] font-bold">🟢 Valle</span>
+                              <span className="font-bold text-emerald-300 text-xs font-mono">
+                                ${Number(c.precio_valle).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                          {c.precio_pico && (
+                            <div className="bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
+                              <span className="text-rose-400 block text-[10px] font-bold">🔥 Pico</span>
+                              <span className="font-bold text-rose-300 text-xs font-mono">
+                                ${Number(c.precio_pico).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                          {c.precio_fin_semana && (
+                            <div className="bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
+                              <span className="text-indigo-400 block text-[10px] font-bold">⭐ FDS</span>
+                              <span className="font-bold text-indigo-300 text-xs font-mono">
+                                ${Number(c.precio_fin_semana).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                          {c.precio_luz_adicional && (
+                            <div className="bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
+                              <span className="text-amber-400 block text-[10px] font-bold">💡 +Luz</span>
+                              <span className="font-bold text-amber-300 text-xs font-mono">
+                                +${Number(c.precio_luz_adicional).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions */}
@@ -4567,27 +4745,105 @@ export default function ClubAdminPanel() {
                 </div>
               </div>
 
-              {/* Card 4: Horario de Iluminación Artificial & Temporadas */}
-              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-5">
+              {/* Card 4: Tarifas Dinámicas (Horario Pico, Valle y Luz Artificial) */}
+              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="p-3 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20 text-xl">
-                      💡
+                      ⚡
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-white">4. Horario de Iluminación Artificial (Temporadas)</h3>
+                      <h3 className="text-base font-bold text-white">4. Tarifas Dinámicas (Horario Pico, Valle y Luz Artificial)</h3>
                       <p className="text-xs text-slate-400">
-                        Ajusta la hora a partir de la cual el turno pasa a tarifa con luz artificial
+                        Define el rango de mayor demanda en días de semana y el horario de encendido de luces
                       </p>
                     </div>
                   </div>
-                  <span className="text-xl font-black text-amber-400 font-mono bg-amber-950/80 px-4 py-1.5 rounded-2xl border border-amber-500/30 self-start sm:self-auto">
-                    {horaInicioLuz} hs
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-rose-400 font-mono bg-rose-950/80 px-3 py-1.5 rounded-xl border border-rose-500/30">
+                      Pico: {horaInicioPicoSemana} - {horaFinPicoSemana} hs
+                    </span>
+                    <span className="text-xs font-bold text-amber-400 font-mono bg-amber-950/80 px-3 py-1.5 rounded-xl border border-amber-500/30">
+                      Luz: {horaInicioLuz} hs
+                    </span>
+                  </div>
                 </div>
 
-                {/* Presets & Custom Picker */}
-                <div className="space-y-4 pt-2">
+                {/* Sub-sección A: Rango Horario Pico (Lunes a Viernes) */}
+                <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>🔥</span> Rango Horario Pico / Central (Lunes a Viernes)
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        Los turnos reservados dentro de este intervalo cobrarán la Tarifa Pico de cada cancha.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-400 font-medium">Desde:</span>
+                        <input
+                          type="time"
+                          aria-label="Hora de inicio pico"
+                          value={horaInicioPicoSemana}
+                          onChange={(e) => updateHoraInicioPicoSemana(e.target.value)}
+                          className="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-400 font-medium">Hasta:</span>
+                        <input
+                          type="time"
+                          aria-label="Hora de fin pico"
+                          value={horaFinPicoSemana}
+                          onChange={(e) => updateHoraFinPicoSemana(e.target.value)}
+                          className="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Presets Pico */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span className="text-[11px] text-slate-400 font-bold self-center">Presets rápidos:</span>
+                    {[
+                      { label: "18:00 a 23:00 (Estándar)", start: "18:00", end: "23:00" },
+                      { label: "17:00 a 23:30 (Extendido)", start: "17:00", end: "23:30" },
+                      { label: "19:00 a 23:00 (Nocturno)", start: "19:00", end: "23:00" },
+                    ].map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => {
+                          updateHoraInicioPicoSemana(p.start);
+                          updateHoraFinPicoSemana(p.end);
+                        }}
+                        className={`px-3 py-1 rounded-xl text-xs font-bold transition ${
+                          horaInicioPicoSemana === p.start && horaFinPicoSemana === p.end
+                            ? "bg-rose-500 text-white shadow"
+                            : "bg-slate-900 border border-slate-800 text-slate-300 hover:text-white"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sub-sección B: Iluminación Artificial */}
+                <div className="space-y-4 pt-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>💡</span> Horario de Iluminación Artificial (Temporadas)
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        Hora de corte a partir de la cual se activa el adicional por luz de la cancha
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button
                       type="button"
@@ -4603,7 +4859,7 @@ export default function ClubAdminPanel() {
                         <span className="text-xs font-mono font-bold text-amber-400">20:00 hs</span>
                       </div>
                       <p className="text-[11px] text-slate-400 mt-2">
-                        Días largos. Se enciende más tarde para aprovechar la luz natural.
+                        Días largos. Se enciende más tarde aprovechando luz diurna.
                       </p>
                     </button>
 
@@ -4617,11 +4873,11 @@ export default function ClubAdminPanel() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-white text-sm">❄️ Temporada de Invierno</span>
+                        <span className="font-bold text-white text-sm">❄️ Temporada Invierno</span>
                         <span className="text-xs font-mono font-bold text-amber-400">18:00 hs</span>
                       </div>
                       <p className="text-[11px] text-slate-400 mt-2">
-                        Días cortos. Oscurece temprano y se requiere iluminación desde la tarde.
+                        Oscurece temprano y se requiere iluminación desde la tarde.
                       </p>
                     </button>
 
@@ -4639,7 +4895,7 @@ export default function ClubAdminPanel() {
                         <span className="text-xs font-mono font-bold text-amber-400">19:00 hs</span>
                       </div>
                       <p className="text-[11px] text-slate-400 mt-2">
-                        Otoño / Primavera. Horario intermedio de transición estacional.
+                        Otoño / Primavera. Horario intermedio de transición.
                       </p>
                     </button>
                   </div>
@@ -4647,8 +4903,8 @@ export default function ClubAdminPanel() {
                   {/* Manual Time Picker */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-slate-950 border border-slate-800/80 gap-3">
                     <div className="text-xs text-slate-300">
-                      <span className="font-bold text-white">⚙️ Horario Personalizado: </span>
-                      <span className="text-slate-400">Si tu club enciende los reflectores a una hora exacta distinta:</span>
+                      <span className="font-bold text-white">⚙️ Horario Personalizado de Luz: </span>
+                      <span className="text-slate-400">Si tu club enciende los reflectores a otra hora:</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <input
@@ -4664,17 +4920,20 @@ export default function ClubAdminPanel() {
                   {/* Info / Rule details */}
                   <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 space-y-1.5">
                     <div className="font-bold flex items-center gap-1.5 text-amber-300">
-                      <span>✨</span> Regla de Tarifas Automática:
+                      <span>✨</span> Cómo interactúan las Tarifas Dinámicas:
                     </div>
                     <ul className="space-y-1 text-[11px] list-disc list-inside text-amber-200/80">
                       <li>
-                        Todo turno que <strong>finalice después de las {horaInicioLuz} hs</strong> (o inicie a partir de dicha hora) se cotizará automáticamente con el <strong>Precio con Luz</strong> de la cancha.
+                        <strong>Días hábiles:</strong> Turnos de {horaInicioPicoSemana} a {horaFinPicoSemana} hs cotizan con <strong>Tarifa Pico</strong>. Turnos previos cotizan con <strong>Tarifa Valle</strong>.
                       </li>
                       <li>
-                        El porcentaje de seña configurado se calculará automáticamente sobre la tarifa con luz y el saldo pendiente en el club se actualizará solo.
+                        <strong>Fines de semana:</strong> Sábados y domingos cotizan con la <strong>Tarifa Fin de Semana</strong>.
                       </li>
                       <li>
-                        Canchas que no tengan configurado &apos;Precio con Luz&apos; (o techadas con precio único) mantendrán siempre su precio base.
+                        <strong>Adicional de Luz:</strong> Todo turno que finalice después de las {horaInicioLuz} hs sumará el <strong>Adicional por Luz Artificial</strong> configurado en la cancha.
+                      </li>
+                      <li>
+                        <strong>Retrocompatibilidad:</strong> Canchas que no definan tarifas dinámicas conservarán su <strong>Precio Base</strong> estándar en todo momento.
                       </li>
                     </ul>
                   </div>

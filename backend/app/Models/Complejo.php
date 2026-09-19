@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
+
 
 class Complejo extends Model
 {
@@ -36,6 +38,10 @@ class Complejo extends Model
         'permite_mostrador_publico',
         'horas_limite_cancelacion',
         'hora_inicio_luz',
+        'hora_inicio_pico_semana',
+        'hora_fin_pico_semana',
+        'dias_pico_semana',
+        'dias_fin_semana',
         'recordatorio_whatsapp_activo',
         'recordatorio_anticipacion_minutos',
     ];
@@ -49,10 +55,13 @@ class Complejo extends Model
             'monto_sena_fijo' => 'decimal:2',
             'permite_mostrador_publico' => 'boolean',
             'horas_limite_cancelacion' => 'integer',
+            'dias_pico_semana' => 'array',
+            'dias_fin_semana' => 'array',
             'recordatorio_whatsapp_activo' => 'boolean',
             'recordatorio_anticipacion_minutos' => 'integer',
         ];
     }
+
 
     protected static function booted(): void
     {
@@ -185,4 +194,33 @@ class Complejo extends Model
 
         return false;
     }
+
+    /**
+     * Determina si una fecha específica corresponde a fin de semana para este complejo.
+     */
+    public function esFinDeSemana(Carbon|string $fecha): bool
+    {
+        $dt = is_string($fecha) ? Carbon::parse($fecha) : $fecha->copy();
+        $diasFinde = $this->dias_fin_semana ?: [0, 6]; // 0: Domingo, 6: Sábado
+        return in_array($dt->dayOfWeek, $diasFinde);
+    }
+
+    /**
+     * Determina si un horario en un día dado corresponde a horario pico en este complejo.
+     */
+    public function esHorarioPico(Carbon|string $fecha, string $horaInicio): bool
+    {
+        $dt = is_string($fecha) ? Carbon::parse($fecha) : $fecha->copy();
+        $diasPico = $this->dias_pico_semana ?: [1, 2, 3, 4, 5]; // Lunes a Viernes
+        if (!in_array($dt->dayOfWeek, $diasPico)) {
+            return false;
+        }
+
+        $hInicio = substr(trim($horaInicio), 0, 5);
+        $picoInicio = $this->hora_inicio_pico_semana ?: '17:00';
+        $picoFin = $this->hora_fin_pico_semana ?: '23:30';
+
+        return ($hInicio >= $picoInicio && $hInicio < $picoFin);
+    }
 }
+

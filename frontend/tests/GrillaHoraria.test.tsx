@@ -2991,5 +2991,126 @@ describe("Componente Reactivo GrillaHoraria", () => {
     expect(screen.getByText(/18:00 - 19:30 hs/i)).toBeDefined();
     expect(screen.getByText("Nicolás Dovico")).toBeDefined();
   });
+
+  it("muestra badges de tarifas dinámicas (valle, pico, luz) y detalle desglosado en el modal de checkout", async () => {
+    localStorage.clear();
+
+    const dynamicSlots: Slot[] = [
+      {
+        hora_inicio: "14:00",
+        hora_fin: "15:00",
+        duracion_minutos: 60,
+        disponible: true,
+        precio: 8000,
+        tipo_franja: "valle",
+        nombre_franja: "Horario Promocional (Valle)",
+        precio_base: 8000,
+        recargo_luz: 0,
+        tarifa_con_luz: false,
+      },
+      {
+        hora_inicio: "20:00",
+        hora_fin: "21:00",
+        duracion_minutos: 60,
+        disponible: true,
+        precio: 16000,
+        tipo_franja: "pico",
+        nombre_franja: "Horario Central (Pico)",
+        precio_base: 14000,
+        recargo_luz: 2000,
+        tarifa_con_luz: true,
+      },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              user: {
+                id: 88,
+                name: "Lucas Campagnolo",
+                email: "campa@padel.com",
+              },
+            }),
+        });
+      }
+      if (urlStr.includes("/disponibilidad")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              hora_inicio_luz: "19:00",
+              porcentaje_sena: 50,
+              slots_disponibles: dynamicSlots,
+              turnos_ocupados: [],
+              turnos_retenidos: [],
+            }),
+        });
+      }
+      if (urlStr.includes("/turnos/bloquear-temporal")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              token_reserva: "lock-dynamic-pico",
+              ttl_segundos: 600,
+              expira_en_segundos: 600,
+            }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+    });
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Panorámica 1"
+        deporte="padel"
+        subdomain="nico-padel"
+        fechaInicial="2026-09-23"
+        initialSlots={dynamicSlots}
+        isAdmin={false}
+        porcentajeSena={50}
+      />
+    );
+
+    // 1. Debe renderizar los badges de Valle y Pico + Luz
+    expect(screen.getByText(/🟢 Promo/i)).toBeDefined();
+    expect(screen.getByText(/🔥 Pico/i)).toBeDefined();
+    expect(screen.getByText(/💡 Con Luz/i)).toBeDefined();
+    expect(screen.getByText("$8,000")).toBeDefined();
+    expect(screen.getByText("$16,000")).toBeDefined();
+
+    // 2. Al seleccionar el turno de las 20:00 (pico con luz), se adquiere el lock y se abre el modal
+    const slotPicoBtn = screen.getByLabelText("Turno 20:00 a 21:00 Disponible");
+    fireEvent.click(slotPicoBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // 3. Confirmar que el modal de checkout muestre el desglose transparente:
+    await waitFor(() => {
+      expect(screen.getByText(/Confirmar Reserva de Turno/i)).toBeDefined();
+      expect(screen.getByText(/Horario Central \(Pico\)/i)).toBeDefined();
+      expect(screen.getByText(/\$14,000/i)).toBeDefined(); // Base de franja pico
+      expect(screen.getByText(/Recargo Luz Artificial/i)).toBeDefined();
+      expect(screen.getByText(/\+\$2,000/i)).toBeDefined(); // Adicional luz
+      expect(screen.getAllByText(/\$16,000/i).length).toBeGreaterThanOrEqual(1); // Total calculado
+      expect(screen.getAllByText(/\$8,000/i).length).toBeGreaterThanOrEqual(1); // Seña (50%)
+    });
+  });
 });
 

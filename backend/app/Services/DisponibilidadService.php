@@ -144,8 +144,15 @@ class DisponibilidadService
             }
             $horaFinFormatted = $slotEnd->format('H:i');
 
-            $cotizacionSlot = $cancha->calcularCotizacionTurno($duracionMinutos, $horaInicioFormatted, $horaFinFormatted, $horaInicioLuz);
-            $precioSlot = $cotizacionSlot['precio'];
+            $cotizacionSlot = $cancha->calcularCotizacionTurno(
+                $duracionMinutos,
+                $fechaCarbon,
+                $horaInicioFormatted,
+                $horaFinFormatted,
+                $horaInicioLuz,
+                $cancha->complejo
+            );
+            $precioSlot = $cotizacionSlot['precio_total'];
 
             // 1. Check if overlaps with any occupied turno in DB
             $startTs = $currentSlotStart->timestamp;
@@ -175,9 +182,11 @@ class DisponibilidadService
                     $durLock = $overlappingLock['duracion_minutos'] ?? $duracionMinutos;
                     $cotLock = $cancha->calcularCotizacionTurno(
                         $durLock,
+                        $fechaCarbon,
                         $overlappingLock['hora_inicio'],
                         $overlappingLock['hora_fin'],
-                        $horaInicioLuz
+                        $horaInicioLuz,
+                        $cancha->complejo
                     );
                     $turnosRetenidos[] = [
                         'cancha_id' => $canchaId,
@@ -186,10 +195,12 @@ class DisponibilidadService
                         'hora_inicio' => $overlappingLock['hora_inicio'],
                         'hora_fin' => $overlappingLock['hora_fin'],
                         'duracion_minutos' => $durLock,
-                        'precio' => $cotLock['precio'],
+                        'precio' => $cotLock['precio_total'],
                         'tarifa_con_luz' => $cotLock['aplica_luz'],
                         'precio_base' => $cotLock['precio_base'],
                         'recargo_luz' => $cotLock['recargo_luz'],
+                        'tipo_franja' => $cotLock['tipo_franja'],
+                        'nombre_franja' => $cotLock['nombre_franja'],
                         'ttl_segundos' => $overlappingLock['ttl'] ?? 600,
                         'expira_en_segundos' => $overlappingLock['ttl'] ?? 600,
                         'token_reserva' => $overlappingLock['token'] ?? null,
@@ -198,6 +209,7 @@ class DisponibilidadService
                     ];
                 }
             }
+
 
             if (!$estaOcupadoEnDb && !$estaBloqueadoEnRedis) {
                 // 3. Regla Anti-Baches (Gap Prevention): Verificar si este turno deja un hueco huérfano < 60 min
@@ -269,6 +281,10 @@ class DisponibilidadService
                         'tarifa_con_luz' => $cotizacionSlot['aplica_luz'],
                         'precio_base' => $cotizacionSlot['precio_base'],
                         'recargo_luz' => $cotizacionSlot['recargo_luz'],
+                        'tipo_franja' => $cotizacionSlot['tipo_franja'],
+                        'nombre_franja' => $cotizacionSlot['nombre_franja'],
+                        'porcentaje_sena' => $cotizacionSlot['porcentaje_sena'],
+                        'monto_sena' => $cotizacionSlot['monto_sena'],
                         'estado' => 'disponible',
                         'disponible' => true,
                     ];
@@ -300,9 +316,11 @@ class DisponibilidadService
                 $durLock = $lock['duracion_minutos'] ?? $duracionMinutos;
                 $cotLock = $cancha->calcularCotizacionTurno(
                     $durLock,
+                    $fechaCarbon,
                     $lock['hora_inicio'],
                     $lock['hora_fin'],
-                    $horaInicioLuz
+                    $horaInicioLuz,
+                    $cancha->complejo
                 );
                 $turnosRetenidos[] = [
                     'cancha_id' => $canchaId,
@@ -311,16 +329,19 @@ class DisponibilidadService
                     'hora_inicio' => $lock['hora_inicio'],
                     'hora_fin' => $lock['hora_fin'],
                     'duracion_minutos' => $durLock,
-                    'precio' => $cotLock['precio'],
+                    'precio' => $cotLock['precio_total'],
                     'tarifa_con_luz' => $cotLock['aplica_luz'],
                     'precio_base' => $cotLock['precio_base'],
                     'recargo_luz' => $cotLock['recargo_luz'],
+                    'tipo_franja' => $cotLock['tipo_franja'],
+                    'nombre_franja' => $cotLock['nombre_franja'],
                     'ttl_segundos' => $lock['ttl'] ?? 600,
                     'expira_en_segundos' => $lock['ttl'] ?? 600,
                     'token_reserva' => $lock['token'] ?? null,
                     'user_id' => $lock['user_id'] ?? null,
                     'estado' => 'bloqueado_temporal',
                 ];
+
             }
         }
 

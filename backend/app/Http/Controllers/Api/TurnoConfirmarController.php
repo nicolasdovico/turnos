@@ -198,11 +198,13 @@ class TurnoConfirmarController extends Controller
         $horaInicioLuz = $complejo?->hora_inicio_luz ?? '19:00';
         $cotizacion = $cancha->calcularCotizacionTurno(
             $duracionEfectiva,
+            $fechaCarbon,
             $horaInicioNormalizada,
             $horaFinNormalizada,
-            $horaInicioLuz
+            $horaInicioLuz,
+            $complejo
         );
-        $precioCalculado = $cotizacion['precio'];
+        $precioCalculado = $cotizacion['precio_total'];
 
         $precio = isset($validated['precio']) && is_numeric($validated['precio'])
             ? (float) $validated['precio']
