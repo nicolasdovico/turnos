@@ -11,6 +11,8 @@ interface PlanItem {
   nombre: string;
   slug: string;
   precio_mensual: number;
+  canchas_incluidas?: number;
+  precio_cancha_adicional?: number;
   modulos?: { id: number; nombre: string; slug: string }[];
 }
 
@@ -43,6 +45,8 @@ export default function RegistroClubPage() {
       nombre: "Bronce",
       slug: "bronce",
       precio_mensual: 29,
+      canchas_incluidas: 2,
+      precio_cancha_adicional: 8,
       modulos: [{ id: 1, nombre: "Reservas y Agenda", slug: "reservas" }, { id: 2, nombre: "CMS Web", slug: "cms_web" }],
     },
     {
@@ -50,6 +54,8 @@ export default function RegistroClubPage() {
       nombre: "Plata",
       slug: "plata",
       precio_mensual: 59,
+      canchas_incluidas: 4,
+      precio_cancha_adicional: 10,
       modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }, { id: 2, nombre: "Turnos Fijos", slug: "turnos_fijos" }, { id: 3, nombre: "Split Payment", slug: "split_payment" }, { id: 4, nombre: "POS & Buffet", slug: "pos_buffet" }],
     },
     {
@@ -57,6 +63,8 @@ export default function RegistroClubPage() {
       nombre: "Oro",
       slug: "oro",
       precio_mensual: 99,
+      canchas_incluidas: 6,
+      precio_cancha_adicional: 12,
       modulos: [{ id: 1, nombre: "Todo Incluido", slug: "reservas" }, { id: 2, nombre: "Torneos y Brackets", slug: "torneos" }, { id: 3, nombre: "Domótica IoT", slug: "domotica" }, { id: 4, nombre: "Split Payment", slug: "split_payment" }],
     },
   ]);
@@ -573,6 +581,9 @@ export default function RegistroClubPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {planes.map((p) => {
               const isSelected = selectedPlan === p.slug;
+              const canchasBase = p.canchas_incluidas ?? (p.slug === "bronce" ? 2 : p.slug === "plata" ? 4 : 6);
+              const precioExtra = p.precio_cancha_adicional ?? (p.slug === "bronce" ? 8 : p.slug === "plata" ? 10 : 12);
+
               return (
                 <div
                   key={p.slug}
@@ -592,9 +603,19 @@ export default function RegistroClubPage() {
                         </span>
                       )}
                     </div>
-                    <div className="mb-4">
+                    <div className="mb-3">
                       <span className="text-3xl font-black text-slate-900">${p.precio_mensual}</span>
                       <span className="text-xs text-slate-500"> / mes</span>
+                    </div>
+
+                    <div className="mb-4 rounded-xl bg-slate-50 p-2.5 border border-slate-100 text-xs">
+                      <div className="font-bold text-slate-700 flex items-center justify-between">
+                        <span>🏟️ Canchas base:</span>
+                        <span className="text-emerald-700 font-extrabold">Hasta {canchasBase}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        +${precioExtra}/mes por cancha extra
+                      </div>
                     </div>
 
                     <ul className="space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-4">
@@ -738,50 +759,90 @@ export default function RegistroClubPage() {
         {/* =================================================================== */}
         {/* SECCIÓN 4: CANCHAS INICIALES (OPCIONAL) */}
         {/* =================================================================== */}
-        <div className="rounded-3xl bg-white p-8 shadow-xl border border-slate-100">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-sm">
-                4
-              </span>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Canchas Iniciales</h2>
-                <p className="text-xs text-slate-500">Podrás añadir más canchas en cualquier momento desde tu panel</p>
+        {(() => {
+          const currentPlanObj = planes.find((p) => p.slug === selectedPlan) || planes[0];
+          const canchasCupo = currentPlanObj?.canchas_incluidas ?? (selectedPlan === "bronce" ? 2 : selectedPlan === "plata" ? 4 : 6);
+          const precioExtra = currentPlanObj?.precio_cancha_adicional ?? (selectedPlan === "bronce" ? 8 : selectedPlan === "plata" ? 10 : 12);
+          const canchasExtras = Math.max(0, canchas.length - canchasCupo);
+          const costoExtraTotal = canchasExtras * precioExtra;
+          const costoTotalEstimado = Number(currentPlanObj?.precio_mensual || 29) + costoExtraTotal;
+
+          return (
+            <div className="rounded-3xl bg-white p-8 shadow-xl border border-slate-100">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-sm">
+                    4
+                  </span>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Canchas Iniciales</h2>
+                    <p className="text-xs text-slate-500">Podrás añadir más canchas en cualquier momento desde tu panel</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={addCancha}
+                  className="rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
+                >
+                  + Agregar Cancha
+                </button>
+              </div>
+
+              {/* Feedback interactivo de cupo vs canchas agregadas */}
+              <div className={`p-4 rounded-2xl border mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${
+                canchasExtras > 0 
+                  ? "bg-amber-50/90 border-amber-200 text-amber-950" 
+                  : "bg-emerald-50/90 border-emerald-200 text-emerald-950"
+              }`}>
+                <div>
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <span>{canchasExtras > 0 ? "⚠️" : "✓"}</span>
+                    <span>
+                      {canchasExtras > 0
+                        ? `${canchas.length} canchas (${canchasExtras} cancha${canchasExtras > 1 ? "s" : ""} sobre el cupo base de ${canchasCupo})`
+                        : `${canchas.length} de ${canchasCupo} canchas incluidas en tu Plan ${currentPlanObj.nombre}`
+                      }
+                    </span>
+                  </div>
+                  <p className="text-xs mt-1 text-slate-600">
+                    {canchasExtras > 0
+                      ? `Se adicionan +$${costoExtraTotal}/mes (+$${precioExtra}/mes c/u) a tu abono luego de los 14 días gratis de prueba.`
+                      : `Todas las canchas que diste de alta están 100% cubiertas por tu cuota base de $${currentPlanObj.precio_mensual}/mes.`
+                    }
+                  </p>
+                </div>
+                <div className="sm:text-right shrink-0">
+                  <span className="text-[11px] uppercase font-bold text-slate-500 block">Total mensual post-prueba:</span>
+                  <span className="text-xl font-black text-slate-900">${costoTotalEstimado} / mes</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {canchas.map((name, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => updateCancha(idx, e.target.value)}
+                      placeholder={`Cancha ${idx + 1}`}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-slate-900 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
+                    />
+                    {canchas.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeCancha(idx)}
+                        className="rounded-xl p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                        title="Eliminar cancha"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={addCancha}
-              className="rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
-            >
-              + Agregar Cancha
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {canchas.map((name, idx) => (
-              <div key={idx} className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => updateCancha(idx, e.target.value)}
-                  placeholder={`Cancha ${idx + 1}`}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-slate-900 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition"
-                />
-                {canchas.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeCancha(idx)}
-                    className="rounded-xl p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
-                    title="Eliminar cancha"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+          );
+        })()}
 
         {/* =================================================================== */}
         {/* BOTÓN FINAL DE REGISTRO */}

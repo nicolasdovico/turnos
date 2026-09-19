@@ -58,6 +58,13 @@ interface PlanData {
   nombre: string;
   slug: string;
   precio_mensual: string | number;
+  canchas_incluidas?: number;
+  precio_cancha_adicional?: number;
+  canchas_utilizadas?: number;
+  canchas_disponibles_cupo?: number;
+  canchas_excedentes?: number;
+  costo_adicional_total?: number;
+  costo_total_mensual?: number;
   modulos: { id: number; nombre: string; slug: string; descripcion: string }[];
 }
 
@@ -458,6 +465,15 @@ export default function ClubAdminPanel() {
   const [canchaSuccessMsg, setCanchaSuccessMsg] = useState<string | null>(null);
   const [canchaErrorMsg, setCanchaErrorMsg] = useState<string | null>(null);
 
+  // Confirmación de Cargo Adicional por Cancha Extra
+  const [extraCourtConfirmation, setExtraCourtConfirmation] = useState<{
+    canchas_incluidas: number;
+    canchas_actuales: number;
+    precio_cancha_adicional: number;
+    nuevo_costo_adicional: number;
+    nuevo_total_mensual: number;
+  } | null>(null);
+
   // Modal Confirmación de Eliminación
   const [canchaToDelete, setCanchaToDelete] = useState<CanchaItem | null>(null);
   const [isDeletingCancha, setIsDeletingCancha] = useState(false);
@@ -475,6 +491,8 @@ export default function ClubAdminPanel() {
 
   const openCreateModal = () => {
     setEditingCancha(null);
+    setExtraCourtConfirmation(null);
+    setCanchaErrorMsg(null);
     const dep = complejo?.deporte_principal || "padel";
     const depConfig = DEPORTES_CONFIG[dep] || DEPORTES_CONFIG.padel;
 
@@ -504,6 +522,8 @@ export default function ClubAdminPanel() {
 
   const openEditModal = (c: CanchaItem) => {
     setEditingCancha(c);
+    setExtraCourtConfirmation(null);
+    setCanchaErrorMsg(null);
     const dep = c.deporte || complejo?.deporte_principal || "padel";
     const depConfig = DEPORTES_CONFIG[dep] || DEPORTES_CONFIG.padel;
 
@@ -1735,6 +1755,10 @@ export default function ClubAdminPanel() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 422 && data.code === "REQUIRES_EXTRA_COURT_CONFIRMATION") {
+          setExtraCourtConfirmation(data.data);
+          return;
+        }
         setCanchaErrorMsg(data.message || "Error al guardar la cancha.");
         return;
       }
@@ -1742,6 +1766,70 @@ export default function ClubAdminPanel() {
       setCanchaSuccessMsg(
         editingCancha ? "¡Cancha actualizada con éxito!" : "¡Cancha agregada con éxito!"
       );
+      setExtraCourtConfirmation(null);
+      setShowCanchaModal(false);
+      setEditingCancha(null);
+      fetchDashboardData();
+    } catch (e: any) {
+      setCanchaErrorMsg(e.message || "Error de conexión con el servidor.");
+    } finally {
+      setIsSavingCancha(false);
+    }
+  };
+
+  const handleConfirmExtraCourt = async () => {
+    if (!extraCourtConfirmation) return;
+    setIsSavingCancha(true);
+    setCanchaErrorMsg(null);
+
+    const depConfig = DEPORTES_CONFIG[canchaDeporte] || DEPORTES_CONFIG.padel;
+
+    const payload = {
+      nombre: canchaNombre,
+      deporte: canchaDeporte,
+      superficie: canchaSuperficie,
+      formato: canchaFormato,
+      tipo_pared: depConfig.tieneParedes ? canchaTipoPared : null,
+      precio_base: parseFloat(canchaPrecioBase) || 8000,
+      precio_con_luz: canchaPrecioConLuz ? parseFloat(canchaPrecioConLuz) : null,
+      techada: canchaTechada,
+      tipo_cubierta: canchaTechada ? "indoor" : canchaTipoCubierta,
+      iluminacion: canchaIluminacion,
+      tipo_iluminacion: canchaIluminacion ? canchaTipoIluminacion : null,
+      camara_grabacion: canchaCamaraGrabacion,
+      marcador_digital: canchaMarcadorDigital,
+      climatizada: canchaClimatizada,
+      duracion_minutos: Number(canchaDuracionMinutos) || 60,
+      permite_duracion_flexible: canchaPermiteDuracionFlexible,
+      anti_baches_activo: canchaAntiBachesActivo,
+      duraciones_permitidas: [60, 90, 120],
+      precio_90_min: canchaPrecio90Min ? parseFloat(canchaPrecio90Min) : null,
+      precio_120_min: canchaPrecio120Min ? parseFloat(canchaPrecio120Min) : null,
+      estado: canchaEstado,
+      acepta_cargo_adicional: true,
+    };
+
+    try {
+      const url = `${API_BASE}/clubs/${subdomain}/canchas`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setCanchaErrorMsg(data.message || "Error al agregar la cancha.");
+        return;
+      }
+
+      setCanchaSuccessMsg("¡Cancha adicional agregada con éxito!");
+      setExtraCourtConfirmation(null);
       setShowCanchaModal(false);
       setEditingCancha(null);
       fetchDashboardData();
@@ -2062,6 +2150,52 @@ export default function ClubAdminPanel() {
                 <span>+ Nueva Cancha</span>
               </button>
             </div>
+
+            {/* Banner de Cupo y Abono por Canchas */}
+            {(() => {
+              const baseQuota = plan?.canchas_incluidas ?? 2;
+              const precioExtra = plan?.precio_cancha_adicional ?? 8;
+              const totalCanchas = canchas.length;
+              const excedentes = plan?.canchas_excedentes ?? Math.max(0, totalCanchas - baseQuota);
+              const costoExtra = plan?.costo_adicional_total ?? (excedentes * precioExtra);
+              const totalMensual = plan?.costo_total_mensual ?? (Number(plan?.precio_mensual || 29) + costoExtra);
+
+              return (
+                <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${
+                  excedentes > 0 
+                    ? "bg-slate-900 border-amber-500/30 text-amber-200" 
+                    : "bg-slate-900 border-slate-800 text-slate-300"
+                }`}>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{excedentes > 0 ? "⚠️" : "🏟️"}</span>
+                      <span className="font-bold text-white text-sm">
+                        Cupo de Canchas: Plan {plan?.nombre || "Bronce"}
+                      </span>
+                      <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${
+                        excedentes > 0 
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" 
+                          : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      }`}>
+                        {totalCanchas} / {baseQuota} base
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      {excedentes > 0
+                        ? `Posees ${excedentes} cancha(s) adicional(es) activa(s) (+$${costoExtra}/mes a +$${precioExtra}/mes c/u).`
+                        : `Te quedan ${Math.max(0, baseQuota - totalCanchas)} cancha(s) disponibles dentro de tu abono base sin costo adicional.`
+                      }
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4 sm:border-l sm:border-slate-800 sm:pl-4 shrink-0">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Abono mensual estimado:</span>
+                      <span className="text-lg font-black text-emerald-400">${totalMensual} / mes</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {canchaSuccessMsg && (
               <div className="rounded-2xl bg-emerald-950/60 border border-emerald-500/30 p-4 text-xs font-bold text-emerald-300 flex items-center justify-between">
@@ -2472,6 +2606,48 @@ export default function ClubAdminPanel() {
                       </div>
                     </div>
 
+                    {/* Mensaje de Error General */}
+                    {canchaErrorMsg && !extraCourtConfirmation && (
+                      <div className="rounded-xl bg-rose-950/60 border border-rose-500/40 p-4 text-xs font-bold text-rose-300">
+                        {canchaErrorMsg}
+                      </div>
+                    )}
+
+                    {/* Alerta Interactiva: Cupo de Canchas Base Excedido */}
+                    {extraCourtConfirmation && (
+                      <div className="rounded-2xl bg-amber-950/50 border border-amber-500/50 p-5 text-amber-200 space-y-3 animate-in fade-in">
+                        <div className="flex items-center gap-2 font-bold text-amber-400 text-sm">
+                          <span className="text-xl">⚠️</span> Cupo Base de Canchas Alcanzado
+                        </div>
+                        <p className="text-xs leading-relaxed text-slate-300">
+                          Tu <strong>Plan {plan?.nombre || "actual"}</strong> incluye hasta <strong>{extraCourtConfirmation.canchas_incluidas} canchas base</strong>. 
+                          Ya tienes <strong>{extraCourtConfirmation.canchas_actuales} cancha(s)</strong> registradas.
+                          Al dar de alta esta cancha adicional, se sumará <strong>+${extraCourtConfirmation.precio_cancha_adicional}/mes</strong> a tu facturación mensual.
+                        </p>
+                        <div className="rounded-xl bg-slate-950/80 p-3 border border-amber-500/20 flex items-center justify-between text-xs">
+                          <span className="text-slate-400">Nuevo total mensual estimado:</span>
+                          <span className="text-sm font-black text-amber-300">${extraCourtConfirmation.nuevo_total_mensual} / mes</span>
+                        </div>
+                        <div className="flex items-center gap-3 pt-1">
+                          <button
+                            type="button"
+                            disabled={isSavingCancha}
+                            onClick={handleConfirmExtraCourt}
+                            className="rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-4 py-2.5 text-xs transition disabled:opacity-50"
+                          >
+                            {isSavingCancha ? "Procesando..." : "Confirmar y Agregar Cancha Extra"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setExtraCourtConfirmation(null)}
+                            className="rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2.5 text-xs transition"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
                       <button
                         type="button"
@@ -2482,7 +2658,7 @@ export default function ClubAdminPanel() {
                       </button>
                       <button
                         type="submit"
-                        disabled={isSavingCancha}
+                        disabled={isSavingCancha || Boolean(extraCourtConfirmation)}
                         className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
                       >
                         {isSavingCancha ? "Guardando..." : editingCancha ? "Actualizar Cancha" : "Crear Cancha"}
@@ -5035,21 +5211,51 @@ export default function ClubAdminPanel() {
                   </div>
                 </div>
 
-                <div>
-                  <span className="text-xs font-bold uppercase text-slate-500">Plan Contratado</span>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="text-sm font-black text-emerald-400 capitalize">
-                      Plan {plan?.nombre || "Estándar"}
-                    </span>
+                <div className="rounded-2xl bg-slate-950/60 p-4 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Plan & Suscripción</span>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <span className="text-base font-black text-emerald-400 capitalize">
+                          Plan {plan?.nombre || "Bronce"}
+                        </span>
+                        <span className="text-xs font-bold text-slate-300">
+                          (${plan?.precio_mensual || 29}/mes base)
+                        </span>
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setActiveTab("modulos")}
-                      className="text-[11px] text-slate-400 hover:text-emerald-400 underline transition cursor-pointer"
+                      className="text-xs font-bold text-emerald-400 hover:text-emerald-300 underline transition cursor-pointer"
                     >
-                      Ver módulos activos →
+                      Módulos activos →
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-800 text-xs">
+                    <div>
+                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Canchas Base</span>
+                      <span className="font-bold text-slate-200">{plan?.canchas_incluidas ?? 2} canchas</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Canchas Activas</span>
+                      <span className="font-bold text-slate-200">{plan?.canchas_utilizadas ?? canchas.length} canchas</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Canchas Extra</span>
+                      <span className={`font-bold ${(plan?.canchas_excedentes ?? 0) > 0 ? "text-amber-400" : "text-slate-400"}`}>
+                        {(plan?.canchas_excedentes ?? 0) > 0 ? `+${plan?.canchas_excedentes} (+$${plan?.costo_adicional_total}/mes)` : "0"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[10px] uppercase font-bold">Total Mensual</span>
+                      <span className="font-black text-emerald-400 text-sm">
+                        ${plan?.costo_total_mensual ?? plan?.precio_mensual ?? 29}/mes
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 pt-1">
                     Estado operativo: <span className="text-emerald-400 font-bold uppercase">{complejo?.estado || "Activo"}</span>
                   </p>
                 </div>

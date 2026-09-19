@@ -127,7 +127,9 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getAllByText("Bronce").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Plata").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Oro").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Comparativa Detallada de Funcionalidades")).toBeDefined();
+    expect(screen.getAllByText(/Capacidad base:/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Calculadora de Presupuesto Transparente/i)).toBeDefined();
+    expect(screen.getByText(/Comparativa Detallada de Funcionalidades/i)).toBeDefined();
     expect(screen.getByText("Preguntas Frecuentes")).toBeDefined();
   });
 
@@ -201,6 +203,29 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText("Plata")).toBeDefined();
     expect(screen.getByText("Oro")).toBeDefined();
     expect(screen.getByText("+ Agregar Cancha")).toBeDefined();
+  });
+
+  it("calculates extra court fee when adding canchas beyond base quota in RegistroClubPage", () => {
+    render(
+      <AuthProvider>
+        <RegistroClubPage />
+      </AuthProvider>
+    );
+
+    // Default plan is Oro (cupo 6). Let's select Bronce (cupo 2, +$8 extra).
+    const bronceBtn = screen.getByRole("button", { name: /Elegir Bronce/i });
+    fireEvent.click(bronceBtn);
+
+    // Initial canchas count is 2: exactly the quota of Bronce
+    expect(screen.getByText(/2 de 2 canchas incluidas en tu Plan Bronce/i)).toBeDefined();
+
+    // Add a 3rd cancha
+    const addCanchaBtn = screen.getByText("+ Agregar Cancha");
+    fireEvent.click(addCanchaBtn);
+
+    // Now 3 canchas (1 extra cancha at $8/mo, total $29 + $8 = $37/mes)
+    expect(screen.getByText(/3 canchas \(1 cancha sobre el cupo base de 2\)/i)).toBeDefined();
+    expect(screen.getByText(/\$37 \/ mes/i)).toBeDefined();
   });
 
   it("renders Verificar Email page with 6-digit OTP input boxes and resend cooldown", () => {

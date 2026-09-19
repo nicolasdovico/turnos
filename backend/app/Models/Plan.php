@@ -17,6 +17,8 @@ class Plan extends Model
         'nombre',
         'slug',
         'precio_mensual',
+        'canchas_incluidas',
+        'precio_cancha_adicional',
         'estado',
     ];
 
@@ -24,6 +26,28 @@ class Plan extends Model
     {
         return [
             'precio_mensual' => 'decimal:2',
+            'canchas_incluidas' => 'integer',
+            'precio_cancha_adicional' => 'decimal:2',
+        ];
+    }
+
+    /**
+     * Calcula el desglose de costos según la cantidad de canchas que posee el club.
+     */
+    public function calcularCostoTotal(int $cantidadCanchas): array
+    {
+        $canchasExcedentes = max(0, $cantidadCanchas - (int) $this->canchas_incluidas);
+        $costoAdicional = $canchasExcedentes * (float) $this->precio_cancha_adicional;
+        $total = (float) $this->precio_mensual + $costoAdicional;
+
+        return [
+            'canchas_incluidas' => (int) $this->canchas_incluidas,
+            'canchas_totales' => $cantidadCanchas,
+            'canchas_excedentes' => $canchasExcedentes,
+            'precio_base' => (float) $this->precio_mensual,
+            'precio_cancha_adicional' => (float) $this->precio_cancha_adicional,
+            'costo_adicional_total' => $costoAdicional,
+            'total_mensual' => $total,
         ];
     }
 

@@ -93,9 +93,11 @@ class ClubDashboardController extends Controller
             ], 404);
         }
 
+        $plan = $complejo->plan;
         $totalCanchas = $complejo->canchas()->count();
         $totalTurnos = Turno::where('complejo_id', $complejo->id)->count();
-        $modulosActivos = $complejo->plan ? $complejo->plan->modulos : [];
+        $modulosActivos = $plan ? $plan->modulos : [];
+        $costoDetalle = $plan ? $plan->calcularCostoTotal($totalCanchas) : null;
 
         return response()->json([
             'success' => true,
@@ -132,11 +134,18 @@ class ClubDashboardController extends Controller
                         'email' => $complejo->owner->email,
                     ] : null,
                 ],
-                'plan' => $complejo->plan ? [
-                    'id' => $complejo->plan->id,
-                    'nombre' => $complejo->plan->nombre,
-                    'slug' => $complejo->plan->slug,
-                    'precio_mensual' => $complejo->plan->precio_mensual,
+                'plan' => $plan ? [
+                    'id' => $plan->id,
+                    'nombre' => $plan->nombre,
+                    'slug' => $plan->slug,
+                    'precio_mensual' => (float) $plan->precio_mensual,
+                    'canchas_incluidas' => (int) ($plan->canchas_incluidas ?? 2),
+                    'precio_cancha_adicional' => (float) ($plan->precio_cancha_adicional ?? 8.00),
+                    'canchas_utilizadas' => $totalCanchas,
+                    'canchas_disponibles_cupo' => max(0, (int) ($plan->canchas_incluidas ?? 2) - $totalCanchas),
+                    'canchas_excedentes' => $costoDetalle ? $costoDetalle['canchas_excedentes'] : 0,
+                    'costo_adicional_total' => $costoDetalle ? $costoDetalle['costo_adicional_total'] : 0.0,
+                    'costo_total_mensual' => $costoDetalle ? $costoDetalle['total_mensual'] : (float) $plan->precio_mensual,
                     'modulos' => $modulosActivos,
                 ] : null,
                 'canchas' => $complejo->canchas,
@@ -193,7 +202,26 @@ class ClubDashboardController extends Controller
             'precio_90_min' => 'nullable|numeric|min:0',
             'precio_120_min' => 'nullable|numeric|min:0',
             'estado' => 'nullable|string|in:activo,mantenimiento,inactivo',
+            'acepta_cargo_adicional' => 'nullable|boolean',
         ]);
+
+        $plan = $complejo->plan;
+        if ($plan && $plan->canchas_incluidas) {
+            $currentCanchasCount = $complejo->canchas()->count();
+            $newCanchasCount = $currentCanchasCount + 1;
+            $canchasIncluidas = (int) $plan->canchas_incluidas;
+
+            if ($newCanchasCount > $canchasIncluidas && !$request->boolean('acepta_cargo_adicional')) {
+                return response()->json([
+                    'success' => false,
+                    'code' => 'REQUIRES_EXTRA_COURT_CONFIRMATION',
+                    'message' => "La creación de esta cancha supera el cupo de {$canchasIncluidas} canchas incluidas de tu Plan {$plan->nombre}. Se sumará un cargo adicional de \${$plan->precio_cancha_adicional} USD/mes a tu abono.",
+                    'canchas_incluidas' => $canchasIncluidas,
+                    'canchas_actuales' => $currentCanchasCount,
+                    'precio_cancha_adicional' => (float) $plan->precio_cancha_adicional,
+                ], 422);
+            }
+        }
 
         $deporte = strtolower($validated['deporte'] ?? ($complejo->deporte_principal ?? 'padel'));
         $requiereParedes = in_array($deporte, ['padel', 'squash', 'racquetball'], true);

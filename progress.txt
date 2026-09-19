@@ -2155,6 +2155,42 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: 102/102 tests pasando al 100% en 10 suites de Vitest.
   * Compilación Next.js (`NODE_ENV=production next build`): 100% exitosa sin errores de tipado ni de renderizado.
   * Verificación en vivo HTTP (`http://jugar.localhost:8080/` y `/api/complejos/cercanos`): 200 OK con los 7 clubes abonados listados en tiempo real.
+-------------------------------------------------------------------------------
+[2026-09-19] - IMPLEMENTACIÓN DEL ESQUEMA DE PRICING HÍBRIDO: MÓDULOS + CUPO BASE DE CANCHAS Y CANCHAS ADICIONALES
+-------------------------------------------------------------------------------
+- Contexto y Definición Estratégica:
+  * Se aprobó e implementó la Alternativa 1 formalizada en `docs/esquema_pricing_modulos_y_canchas.md`:
+    - Bronce ($29/mes): incluye hasta 2 canchas base. Cancha adicional: +$8/mes c/u.
+    - Plata ($59/mes): incluye hasta 4 canchas base. Cancha adicional: +$10/mes c/u.
+    - Oro ($99/mes): incluye hasta 6 canchas base. Cancha adicional: +$12/mes c/u.
+  * El superadmin puede gestionar visualmente los precios y cupos de canchas en cualquier momento desde el panel Filament (`http://localhost:8080/admin/plans`).
+- Componentes Implementados:
+  * 1. Base de Datos & Backend (Laravel 11):
+    - Migración `2026_09_19_120000_add_canchas_pricing_to_planes_table.php` agregando `canchas_incluidas` (unsignedInteger default 2) y `precio_cancha_adicional` (decimal 10,2 default 8.00).
+    - Modelo `Plan` (`backend/app/Models/Plan.php`): método helper `calcularCostoTotal(int $cantidadCanchas): array` que computa canchas excedentes, costo adicional total y mensualidad final.
+    - Seeder `PlanSeeder` (`backend/database/seeders/PlanSeeder.php`): seeded con Bronce (2 canchas, $8 extra), Plata (4 canchas, $10 extra) y Oro (6 canchas, $12 extra).
+    - Panel Superadmin Filament (`backend/app/Filament/Resources/PlanResource.php`): agregados inputs numéricos en Formulario y columnas ordenables en Tabla para `canchas_incluidas` y `precio_cancha_adicional`.
+    - Controlador de Dashboard (`backend/app/Http/Controllers/Api/ClubDashboardController.php`):
+      * `show()`: payload enriquecido con métricas de cupo (`canchas_incluidas`, `precio_cancha_adicional`, `canchas_utilizadas`, `canchas_disponibles_cupo`, `canchas_excedentes`, `costo_adicional_total`, `costo_total_mensual`).
+      * `storeCancha()`: validación de cupo. Si la cantidad de canchas excede el cupo y no se envía `acepta_cargo_adicional: true`, retorna HTTP 422 con código `REQUIRES_EXTRA_COURT_CONFIRMATION` y detalle de cargos adicionales. Si se confirma con `acepta_cargo_adicional: true`, crea la cancha y calcula el nuevo abono.
+    - Tests Backend (`backend/tests/Feature/PlanPricingTest.php`): 4 tests automatizados con 59 aserciones cubriendo cálculo matemático de costos, exposición en `/api/planes`, métricas en dashboard de club y validación transaccional de canchas extras.
+  * 2. Frontend Web (Next.js 14):
+    - Página de Precios (`frontend/app/planes/page.tsx`):
+      * Badges de capacidad de canchas base y costo por cancha extra en cada tarjeta de plan.
+      * Simulador / Calculadora interactiva de Presupuesto con slider y botones +/- (1 a 25 canchas) que desglosa en vivo la tarifa base, canchas extras y total mensual estimado para cada plan.
+      * Matriz comparativa enriquecida con filas dedicadas a "Canchas base incluidas", "Costo por cancha extra" y "Límite máximo de canchas".
+    - Página de Onboarding (`frontend/app/registro-club/page.tsx`):
+      * Tarjetas de selección de planes actualizadas con cupo base y costo adicional.
+      * Sección 4 ("Canchas Iniciales"): banner dinámico de retroalimentación reactiva que compara canchas cargadas contra el cupo del plan elegido y proyecta el abono mensual post-prueba de 14 días.
+    - Panel de Administración del Club (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+      * Pestaña "Canchas": banner de cupo disponible y conteo de canchas extras activas con costo mensual estimado.
+      * Modal de Alta de Canchas: detección del código `REQUIRES_EXTRA_COURT_CONFIRMATION`, desplegando advertencia informativa del valor adicional a facturar con botones "Confirmar y Agregar Cancha Extra" o "Cancelar".
+      * Pestaña "Configuración": desglose completo de la suscripción (Plan contratado, precio base, canchas base, canchas activas, canchas excedentes y total mensual a facturar).
+    - Tests Frontend (`frontend/tests/authAndOnboarding.test.tsx`): actualizados y adicionados tests para `PlanesPage` y `RegistroClubPage` validando cupos y cálculo reactivo de adicionales.
+- Verificación y Calidad:
+  * Backend: 246/246 tests pasando al 100% (1.347 aserciones).
+  * Frontend: 103/103 tests pasando al 100% en 10 suites de Vitest.
+  * Build de producción Next.js (`npm run build`): 100% exitoso.
 ===============================================================================
 
 

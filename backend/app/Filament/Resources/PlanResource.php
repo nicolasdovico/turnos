@@ -43,6 +43,20 @@ class PlanResource extends Resource
                             ->required()
                             ->numeric()
                             ->default(0),
+                        Forms\Components\TextInput::make('canchas_incluidas')
+                            ->label('Canchas Base Incluidas')
+                            ->helperText('Cantidad de canchas que el club puede administrar sin costo adicional.')
+                            ->required()
+                            ->numeric()
+                            ->minValue(1)
+                            ->default(2),
+                        Forms\Components\TextInput::make('precio_cancha_adicional')
+                            ->label('Precio por Cancha Adicional')
+                            ->helperText('Costo mensual adicional por cada cancha que supere el cupo base.')
+                            ->prefix('$')
+                            ->required()
+                            ->numeric()
+                            ->default(8.00),
                         Forms\Components\Select::make('estado')
                             ->label('Estado')
                             ->options([
@@ -82,6 +96,16 @@ class PlanResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('precio_mensual')
                     ->label('Precio Mensual')
+                    ->money('USD')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('canchas_incluidas')
+                    ->label('Canchas Base')
+                    ->badge()
+                    ->color('info')
+                    ->formatStateUsing(fn ($state) => "Hasta {$state} canchas")
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('precio_cancha_adicional')
+                    ->label('Cancha Extra')
                     ->money('USD')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('modulos.nombre')

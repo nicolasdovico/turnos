@@ -2,7 +2,14 @@
 
 > **Documento:** `/docs/esquema_pricing_modulos_y_canchas.md`  
 > **Fecha:** Septiembre de 2026  
-> **Propósito:** Definir y estructurar la relación entre el **Control por Funcionalidad** (Planes Bronce, Plata y Oro) y la **Métrica de Capacidad** (Cantidad de Canchas) en la plataforma SaaS.
+> **Propósito:** Definir y estructurar la relación entre el **Control por Funcionalidad** (Planes Bronce, Plata y Oro) y la **Métrica de Capacidad** (Cantidad de Canchas) en la plataforma SaaS.  
+> **Estrategia Oficial Adoptada:** `Alternativa 1 (Cupo Base de Canchas por Plan + Adicional por Cancha Extra)`.
+
+---
+
+> [!IMPORTANT]
+> **ESTRATEGIA OFICIAL DEL PROYECTO:**
+> Se ratifica la adopción de la **Alternativa 1**. Los planes **Bronce, Plata y Oro** continúan gobernando el acceso a los módulos de software del sistema, incorporando un cupo máximo de canchas base incluidas en el precio mensual (2 en Bronce, 4 en Plata y 6 en Oro). Los clubes que administren canchas por encima del cupo de su plan abonarán un valor mensual adicional por cada cancha excedente ($8 en Bronce, $10 en Plata y $12 en Oro).
 
 ---
 
@@ -33,11 +40,11 @@ flowchart TD
 
 ---
 
-## 2. Las 3 Alternativas de Implementación
+## 2. Las 3 Alternativas Evaluadas y Estrategia Seleccionada
 
 ---
 
-### Alternativa 1: Cupo Base de Canchas por Plan + Adicional por Cancha Extra *(Recomendada)*
+### Alternativa 1: Cupo Base de Canchas por Plan + Adicional por Cancha Extra ✅ *(Estrategia Seleccionada)*
 
 Cada plan mantiene su conjunto de módulos exclusivos e incluye un cupo de canchas dimensionado para el tipo de club habitual que demanda esas herramientas. Si el club tiene más canchas que las del cupo base, abona un costo marginal accesible por cada cancha extra.
 

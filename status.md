@@ -69,3 +69,4 @@
 - [x] **Módulo WhatsApp:** Recordatorios preventivos con Evolution API y Daemon Scheduler *(Completado)*
 - [x] **Módulo Google Auth:** Single Sign-On con Google OAuth 2.0 y soporte multi-inquilino *(Completado)*
 - [x] **Módulo Geolocalización & Marketplace B2C:** Coordenadas GPS en `/panel`, botón público "Cómo llegar", links en WhatsApp y buscador de canchas `jugar.turnos.com` con Feature Flag *(Completado)*
+- [x] **Módulo Pricing Híbrido & Cupo de Canchas:** Planes Bronce ($29, 2 canchas), Plata ($59, 4 canchas) y Oro ($99, 6 canchas) con gestión visual en Filament (`/admin/plans`), validación de cupo y confirmación de adicionales (+$8, +$10, +$12/mes) en `/panel`, simulador interactivo de presupuesto en `/planes` y desglose dinámico en `/registro-club` *(Completado)*
