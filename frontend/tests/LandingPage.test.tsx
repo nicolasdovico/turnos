@@ -19,9 +19,10 @@ describe("Landing Page Vendedora (PortalPage)", () => {
 
     // 1. Hero Section
     expect(
-      screen.getByText(/Llená las canchas de tu club y cobrá señas/i)
+      screen.getByText(/La plataforma integral que transforma tu complejo/i)
     ).toBeDefined();
-    expect(screen.getByText(/sin vivir atado a WhatsApp/i)).toBeDefined();
+    expect(screen.getByText(/en un club de primer nivel/i)).toBeDefined();
+
 
     // Verificamos que indique explícitamente 30 días de prueba
     const btnTrial = screen.getAllByText(/Prueba 30 Días/i);

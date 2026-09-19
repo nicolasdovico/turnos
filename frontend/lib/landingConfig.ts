@@ -26,9 +26,9 @@ export const LANDING_CONFIG = {
   trialSubtext: "Sin tarjeta de crédito. Configuración en 2 minutos.",
   hero: {
     badge: "⚡ Plataforma SaaS de Gestión Deportiva & Turnos",
-    title: "Llená las canchas de tu club y cobrá señas sin vivir atado a WhatsApp",
+    title: "La plataforma integral que transforma tu complejo en un club de primer nivel",
     subtitle:
-      "Agenda online en tiempo real, cobro automático de señas, billetera virtual para tus clientes y gestión de turnos fijos. Tu complejo deportivo disponible 24/7 en tu propio subdominio web.",
+      "Agenda online en tiempo real, cobros automáticos, cantina POS, caja diaria, torneos y control de luces. Todo tu club funcionando de forma autónoma con tu propia web.",
     stats: [
       { label: "Turnos gestionados", value: "+50.000" },
       { label: "Sobreturnos o colisiones", value: "0%" },

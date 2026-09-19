@@ -72,4 +72,6 @@
 - [x] **Módulo Pricing Híbrido & Cupo de Canchas:** Planes Bronce ($29, 2 canchas), Plata ($59, 4 canchas) y Oro ($99, 6 canchas) con gestión visual en Filament (`/admin/plans`), validación de cupo y confirmación de adicionales (+$8, +$10, +$12/mes) en `/panel`, simulador interactivo de presupuesto en `/planes` y desglose dinámico en `/registro-club` *(Completado)*
 - [x] **Unificación de Navegación & Sincronización Landing:** Eliminación de sub-barra duplicada en homepage, barra superior global unificada (`/`, `/#funcionalidades`, `/planes`), sincronización del componente de pricing en landing con cupos base, canchas extras, 14 días de prueba y enlace al simulador interactivo *(Completado)*
 - [x] **Showcase de Funcionalidades Auto-rotativo & Interactivo:** Rotación automática cada 6 segundos con barra de progreso visual, pausa inteligente al posar el cursor (`onMouseEnter`), soporte de navegación manual por click en cualquier oblea y botones de control (Anterior, Siguiente, Pausa/Play) *(Completado)*
+- [x] **Propuesta de Valor Institucional en Hero Section:** Nuevo titular aspiracional ("La plataforma integral que transforma tu complejo en un club de primer nivel") y subtítulo integrador que abarca reservas, cobros, cantina POS, caja diaria, torneos y luces IoT con web propia *(Completado)*
+
 

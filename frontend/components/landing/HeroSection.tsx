@@ -29,11 +29,12 @@ export default function HeroSection({ demoClubUrl }: { demoClubUrl: string }) {
 
         {/* Main Pitch Headline */}
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 leading-[1.15]">
-          Llená las canchas de tu club y cobrá señas{" "}
+          La plataforma integral que transforma tu complejo{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">
-            sin vivir atado a WhatsApp
+            en un club de primer nivel
           </span>
         </h1>
+
 
         {/* Subtitle */}
         <p className="mt-6 text-base sm:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed">
