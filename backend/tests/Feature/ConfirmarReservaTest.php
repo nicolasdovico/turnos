@@ -214,6 +214,7 @@ class ConfirmarReservaTest extends TestCase
         $turnos = Turno::where('cancha_id', $this->canchaPlata->id)
             ->where('hora_inicio', '21:00')
             ->where('es_fijo', true)
+            ->orderBy('fecha', 'asc')
             ->get();
 
         $this->assertCount(4, $turnos);

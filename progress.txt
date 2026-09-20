@@ -2352,6 +2352,57 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Completa de Frontend: 111 tests pasados en 11 suites de Vitest.
   * Suite Completa de Mobile: 20 tests pasados en 4 suites de Jest.
   * Gran Total del Ecosistema: 396/396 tests automatizados en verde con 0 regresiones.
+-------------------------------------------------------------------------------
+[2026-09-20] - MÓDULO DE DIRECTORIO & CRM DE CLIENTES DEL CLUB (FICHA 360°, NOTAS PRIVADAS Y AUTOCOMPLETADO EN MOSTRADOR)
+-------------------------------------------------------------------------------
+- Contexto y Objetivos de Negocio:
+  * Permitir al administrador y recepcionista del club consultar, editar y gestionar el padrón de clientes/jugadores de su complejo de forma centralizada y segura.
+  * Resolver la fragmentación de datos de clientes entre reservas (`turnos`), billetera virtual (`user_creditos`) y vales de contingencia (`vales_credito`).
+  * Evitar la mutación de cuentas globales `users` que afectaría a otros complejos deportivos en el SaaS multi-tenant, creando una entidad local `Cliente` por inquilino.
+  * Facilitar la corrección de números de WhatsApp mal ingresados, registro de notas internas operativas (preferencias de cancha, historial deportivo, observaciones de pago) y detección de clientes bloqueados/morosos.
+- Componentes Desarrollados e Implementados:
+  * 1. Base de Datos & Modelos Backend (Laravel 11):
+    - Migración `2026_09_20_161500_create_clientes_table.php`:
+      * Tabla `clientes`: `complejo_id` (FK), `user_id` (FK nullable), `nombre`, `telefono`, `email`, `dni`, `notas` (privadas del club), `estado` ('activo' / 'bloqueado'), `motivo_bloqueo`, `timestamps`.
+      * Índices compuestos en `[complejo_id, nombre]`, `[complejo_id, telefono]`, `[complejo_id, email]` y `[complejo_id, estado]`.
+      * Agregado de `club_cliente_id` en la tabla `turnos` con clave foránea indexada.
+      * Script de backfill inteligente en la migración: pobló automáticamente 28 clientes históricos a partir de turnos existentes, billeteras virtuales y vales de crédito emitidos.
+    - Modelo `App\Models\Cliente`:
+      * Integración con trait `BelongsToTenant` para aislamiento estricto por `TenantScope` (`WHERE complejo_id = ?`).
+      * Relaciones Eloquent: `complejo()`, `user()`, `turnos()`, helper `getSaldoBilleteraAttribute()` y query `valesActivos()`.
+      * Relaciones añadidas en `Turno::clubCliente()` y `Complejo::clientes()`.
+  * 2. Servicios y Controladores Backend (Laravel 11):
+    - `App\Services\ClubClienteService`:
+      * `obtenerOCrearCliente(...)`: búsqueda inteligente por `user_id`, `telefono` o `email` y alta automática si es un cliente nuevo.
+      * `listarClientes(...)`: paginación, filtros por estado (`activo`, `bloqueado`), filtros especiales (`con_saldo`, `con_vales`) y cálculo de KPIs consolidados (`total_clientes`, `clientes_activos_mes`, `total_saldo_billeteras`, `vales_activos_count`, `clientes_bloqueados`).
+      * `obtenerFichaCliente(...)`: Ficha 360° con datos personales, notas, historial de últimos 30 turnos, movimientos de billetera, vales y tasa de cumplimiento.
+      * `crearCliente(...)` y `actualizarCliente(...)`: validación de duplicados en el mismo club y propagación de nombre/teléfono a turnos futuros no cancelados.
+      * `eliminarCliente(...)`: validación preventiva que impide eliminar clientes con reservas futuras activas o saldo positivo a favor en billetera.
+      * `buscarSugerencias(...)`: endpoint ultra-rápido para autocompletado en mostrador.
+    - `App\Http\Controllers\Api\ClubClienteController`:
+      * Endpoints REST: `GET /api/clubs/{subdomain}/clientes`, `GET /api/clubs/{subdomain}/clientes/{id}`, `POST /api/clubs/{subdomain}/clientes`, `PUT /api/clubs/{subdomain}/clientes/{id}`, `DELETE /api/clubs/{subdomain}/clientes/{id}` y `GET /api/clubs/{subdomain}/clientes/sugerencias`.
+    - `TurnoConfirmarController`:
+      * Inyección de `ClubClienteService` para vincular automáticamente cada turno confirmado al `club_cliente_id` correspondiente.
+  * 3. Frontend Web Next.js 14:
+    - Componente `frontend/components/GestionClientes.tsx`:
+      * 4 Tarjetas KPI interactivas (Total Clientes, Activos este Mes, Saldo en Billeteras, Bloqueados).
+      * Barra de herramientas con buscador en vivo con debounce, botones de estado (Todos, Activos, Bloqueados), filtro especial (`con_saldo`, `con_vales`) y botón `+ Nuevo Cliente`.
+      * Directorio de clientes con iniciales, link directo a chat de WhatsApp (`https://wa.me/...`), detalle de turnos (jugados vs cancelados), saldo en billetera y badges de vales activos.
+      * Modal de Ficha 360° con 3 pestañas: Resumen & Notas (con edición inline de notas privadas), Historial de Turnos y Billetera & Vales.
+      * Modal de Alta y Edición de Cliente con validación de teléfono y selector de estado con motivo de bloqueo.
+      * Modal de confirmación para eliminación segura.
+    - Panel Administrativo (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+      * Nueva pestaña `"👥 Clientes"` integrada en la barra superior de navegación y renderizado del componente.
+    - Grilla Horaria (`frontend/components/GrillaHoraria.tsx`):
+      * Autocompletado reactivo de clientes al tipear nombre o teléfono en la reserva de mostrador.
+      * Alerta visual preventiva si el cliente seleccionado está marcado como bloqueado/moroso en el club.
+- Tests Automatizados & Verificación de Calidad:
+  * Backend (`tests/Feature/ClubClienteTest.php`): 10 tests cubriendo listado, filtros, aislamiento multi-tenant, CRUD, Ficha 360°, prevención de eliminación indebida, autocompletado y auto-vinculación en reservas (56 aserciones, 100% éxito).
+  * Frontend Web (`tests/GestionClientes.test.tsx`): 5 tests en Vitest cubriendo renderizado de KPIs, listado, búsqueda reactiva, apertura de Ficha 360°, guardado de notas inline y creación de clientes.
+  * Suite Global Backend: 275 tests pasados (1.535 aserciones).
+  * Suite Global Frontend: 116 tests pasados en 12 suites de Vitest.
+  * Suite Global Mobile: 20 tests pasados en 4 suites de Jest.
+  * Gran Total del Ecosistema: 411/411 tests automatizados en verde con 0 regresiones.
 ===============================================================================
 
 

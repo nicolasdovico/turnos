@@ -302,6 +302,11 @@ export default function GrillaHoraria({
   const [isSendingDeskOtp, setIsSendingDeskOtp] = useState<boolean>(false);
   const [isCheckingDeskEmail, setIsCheckingDeskEmail] = useState<boolean>(false);
 
+  // Autocompletado de clientes del club
+  const [clientSuggestions, setClientSuggestions] = useState<{ id: number; nombre: string; telefono?: string | null; email?: string | null; estado: string; motivo_bloqueo?: string | null }[]>([]);
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const [selectedClientWarning, setSelectedClientWarning] = useState<string | null>(null);
+
   const resetDeskForm = () => {
     if (isAdmin) {
       setClienteNombre("");
@@ -313,6 +318,9 @@ export default function GrillaHoraria({
       setDeskOtpStep("none");
       setDeskOtpCode("");
       setDeskOtpCountdown(0);
+      setClientSuggestions([]);
+      setShowClientSuggestions(false);
+      setSelectedClientWarning(null);
       setWalletBalance(0);
       setUseWalletCredit(false);
       setMetodoPago("mostrador");
@@ -709,6 +717,51 @@ export default function GrillaHoraria({
     } finally {
       setIsCheckingDeskEmail(false);
     }
+  };
+
+  // Búsqueda en vivo de sugerencias de clientes del club
+  useEffect(() => {
+    if (!isAdmin || !clienteNombre.trim() || clienteNombre.length < 2) {
+      setClientSuggestions([]);
+      setShowClientSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const activeToken = getAuthToken(propToken);
+        const res = await fetch(`${apiUrl}/clubs/${subdomain || "club"}/clientes/sugerencias?q=${encodeURIComponent(clienteNombre.trim())}`, {
+          headers: {
+            Accept: "application/json",
+            ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+            "X-Tenant-ID": subdomain || "club",
+          },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.sugerencias)) {
+            setClientSuggestions(json.sugerencias);
+            setShowClientSuggestions(json.sugerencias.length > 0);
+          }
+        }
+      } catch {
+        // Silencioso para sugerencias
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [clienteNombre, isAdmin, apiUrl, subdomain, propToken]);
+
+  const handleSelectClientSuggestion = (item: { id: number; nombre: string; telefono?: string | null; email?: string | null; estado: string; motivo_bloqueo?: string | null }) => {
+    setClienteNombre(item.nombre);
+    if (item.telefono) setClienteTelefono(item.telefono);
+    if (item.email) setClienteEmail(item.email);
+    if (item.estado === "bloqueado") {
+      setSelectedClientWarning(`⚠️ Atención: Este cliente figura como BLOQUEADO (${item.motivo_bloqueo || "Sancionado por administración"}).`);
+    } else {
+      setSelectedClientWarning(null);
+    }
+    setShowClientSuggestions(false);
   };
 
   const handleSendDeskOtp = async () => {
@@ -4290,7 +4343,7 @@ export default function GrillaHoraria({
                     <span>Modo Recepción: Asignación directa a cliente en el club o por llamada.</span>
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <label className="block text-xs font-bold text-slate-300 mb-1">
                       Nombre y Apellido del Jugador *
                     </label>
@@ -4299,10 +4352,50 @@ export default function GrillaHoraria({
                       required
                       placeholder="Ej. Mariano Werner"
                       value={clienteNombre}
-                      onChange={(e) => setClienteNombre(e.target.value)}
+                      onChange={(e) => {
+                        setClienteNombre(e.target.value);
+                        setSelectedClientWarning(null);
+                      }}
+                      onFocus={() => {
+                        if (clientSuggestions.length > 0) setShowClientSuggestions(true);
+                      }}
                       className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
+
+                    {showClientSuggestions && clientSuggestions.length > 0 && (
+                      <div className="absolute z-20 left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
+                        {clientSuggestions.map((sug) => (
+                          <div
+                            key={sug.id}
+                            onClick={() => handleSelectClientSuggestion(sug)}
+                            className="p-2.5 hover:bg-slate-800/80 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                          >
+                            <div>
+                              <div className="font-semibold text-white flex items-center gap-1.5">
+                                <span>{sug.nombre}</span>
+                                {sug.estado === "bloqueado" && (
+                                  <span className="text-[10px] text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+                                    Bloqueado
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400">
+                                {sug.telefono || "Sin tel"} {sug.email ? `• ${sug.email}` : ""}
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-indigo-400 font-semibold">Seleccionar</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {selectedClientWarning && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                      <span>🚫</span>
+                      <span>{selectedClientWarning}</span>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-1">

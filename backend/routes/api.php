@@ -141,6 +141,14 @@ Route::prefix('clubs')->group(function () {
     Route::post('/{subdomain}/cancelacion-lluvia/ejecutar', [\App\Http\Controllers\Api\CancelacionLluviaController::class, 'ejecutar']);
     Route::get('/{subdomain}/vales', [\App\Http\Controllers\Api\ValeCreditoController::class, 'index']);
     Route::post('/{subdomain}/vales/{id}/reembolsar-efectivo', [\App\Http\Controllers\Api\ValeCreditoController::class, 'reembolsarEfectivo']);
+
+    // Directorio y Gestión de Clientes (CRM del Club)
+    Route::get('/{subdomain}/clientes', [\App\Http\Controllers\Api\ClubClienteController::class, 'index']);
+    Route::get('/{subdomain}/clientes/sugerencias', [\App\Http\Controllers\Api\ClubClienteController::class, 'sugerencias']);
+    Route::get('/{subdomain}/clientes/{id}', [\App\Http\Controllers\Api\ClubClienteController::class, 'show']);
+    Route::post('/{subdomain}/clientes', [\App\Http\Controllers\Api\ClubClienteController::class, 'store']);
+    Route::put('/{subdomain}/clientes/{id}', [\App\Http\Controllers\Api\ClubClienteController::class, 'update']);
+    Route::delete('/{subdomain}/clientes/{id}', [\App\Http\Controllers\Api\ClubClienteController::class, 'destroy']);
 });
 
 // Vales Digitales de Lluvia (Acceso público y autogestión de jugadores)

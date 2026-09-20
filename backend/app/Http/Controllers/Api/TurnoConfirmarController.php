@@ -12,6 +12,7 @@ use App\Rules\ValidPhoneNumber;
 use App\Services\ReservaLockService;
 use App\Services\WalletService;
 use Carbon\Carbon;
+use App\Services\ClubClienteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,8 @@ class TurnoConfirmarController extends Controller
 {
     public function __construct(
         protected ReservaLockService $reservaLockService,
-        protected WalletService $walletService
+        protected WalletService $walletService,
+        protected ClubClienteService $clubClienteService
     ) {}
 
     /**
@@ -93,9 +95,10 @@ class TurnoConfirmarController extends Controller
         if ($user) {
             $esAdminClub = (($user->role ?? '') === 'admin') || (!empty($user->is_admin)) || ($complejo && $complejo->user_id === $user->id) || ($user->email ?? '') === 'admin@admin.com';
         }
+        $cleanEmail = !empty($validated['cliente_email']) ? Str::lower(trim($validated['cliente_email'])) : null;
+        $clienteEmail = $cleanEmail ?: (!$esAdminClub && $user ? $user->email : null);
 
         if ($esAdminClub) {
-            $cleanEmail = !empty($validated['cliente_email']) ? Str::lower(trim($validated['cliente_email'])) : null;
             $codigoOtp = !empty($validated['codigo_otp']) ? trim($validated['codigo_otp']) : null;
 
             if (!empty($validated['cliente_id'])) {
@@ -285,6 +288,20 @@ class TurnoConfirmarController extends Controller
             $estadoPago = 'senado';
         }
 
+        $clubClienteId = null;
+        try {
+            $clubCliente = $this->clubClienteService->obtenerOCrearCliente(
+                $cancha->complejo_id,
+                $clienteId,
+                $clienteNombre ?: ($user?->name ?? 'Cliente Mostrador'),
+                $clienteTelefono ?: ($user?->telefono ?? null),
+                $clienteEmail ?: ($user?->email ?? null)
+            );
+            $clubClienteId = $clubCliente?->id;
+        } catch (\Throwable $e) {
+            \Log::warning("No se pudo asociar/crear ClubCliente: " . $e->getMessage());
+        }
+
         try {
             $turno = DB::transaction(function () use (
                 $cancha,
@@ -292,6 +309,7 @@ class TurnoConfirmarController extends Controller
                 $horaInicioNormalizada,
                 $horaFinNormalizada,
                 $clienteId,
+                $clubClienteId,
                 $clienteNombre,
                 $clienteTelefono,
                 $metodoPago,
@@ -323,6 +341,7 @@ class TurnoConfirmarController extends Controller
                 if ($existingTurno) {
                     $existingTurno->update([
                         'cliente_id' => $clienteId,
+                        'club_cliente_id' => $clubClienteId,
                         'cliente_nombre' => $clienteNombre,
                         'cliente_telefono' => $clienteTelefono,
                         'hora_fin' => $horaFinNormalizada,
@@ -340,6 +359,7 @@ class TurnoConfirmarController extends Controller
                         'complejo_id' => $cancha->complejo_id,
                         'cancha_id' => $cancha->id,
                         'cliente_id' => $clienteId,
+                        'club_cliente_id' => $clubClienteId,
                         'cliente_nombre' => $clienteNombre,
                         'cliente_telefono' => $clienteTelefono,
                         'fecha' => $fechaNormalizada,

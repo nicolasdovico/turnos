@@ -18,6 +18,7 @@ class Turno extends Model
         'complejo_id',
         'cancha_id',
         'cliente_id',
+        'club_cliente_id',
         'cliente_nombre',
         'cliente_telefono',
         'fecha',
@@ -91,6 +92,11 @@ class Turno extends Model
     public function valeCredito(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(ValeCredito::class, 'turno_origen_id');
+    }
+
+    public function clubCliente(): BelongsTo
+    {
+        return $this->belongsTo(Cliente::class, 'club_cliente_id');
     }
 }
 

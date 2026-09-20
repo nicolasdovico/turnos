@@ -164,6 +164,11 @@ class Complejo extends Model
         return $this->hasMany(ListaEspera::class, 'complejo_id');
     }
 
+    public function clientes(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Cliente::class, 'complejo_id');
+    }
+
 
 
 

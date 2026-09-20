@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import ResumenDiarioTurnos from "@/components/ResumenDiarioTurnos";
 import GestionBilleteras from "@/components/GestionBilleteras";
+import GestionClientes from "@/components/GestionClientes";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 
 interface ComplejoData {
@@ -336,7 +337,7 @@ export default function ClubAdminPanel() {
   const subdomain = (params?.subdomain as string) || "demo";
   const { user, token } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config">("canchas");
+  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config">("canchas");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -2120,6 +2121,16 @@ export default function ClubAdminPanel() {
             }`}
           >
             📊 Resumen Diario & Caja
+          </button>
+          <button
+            onClick={() => setActiveTab("clientes")}
+            className={`pb-4 transition border-b-2 flex items-center gap-1.5 ${
+              activeTab === "clientes"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            👥 Clientes
           </button>
           <button
             onClick={() => setActiveTab("modulos")}
@@ -5644,6 +5655,19 @@ export default function ClubAdminPanel() {
               token={token}
               apiUrl={API_BASE}
               complejoNombre={complejo?.nombre}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 7: DIRECTORIO Y CRM DE CLIENTES */}
+        {/* ========================================================================= */}
+        {activeTab === "clientes" && (
+          <div className="mt-8">
+            <GestionClientes
+              subdomain={subdomain}
+              token={token}
+              apiUrl={API_BASE}
             />
           </div>
         )}
