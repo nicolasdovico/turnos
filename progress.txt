@@ -2396,13 +2396,142 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Grilla Horaria (`frontend/components/GrillaHoraria.tsx`):
       * Autocompletado reactivo de clientes al tipear nombre o teléfono en la reserva de mostrador.
       * Alerta visual preventiva si el cliente seleccionado está marcado como bloqueado/moroso en el club.
-- Tests Automatizados & Verificación de Calidad:
-  * Backend (`tests/Feature/ClubClienteTest.php`): 10 tests cubriendo listado, filtros, aislamiento multi-tenant, CRUD, Ficha 360°, prevención de eliminación indebida, autocompletado y auto-vinculación en reservas (56 aserciones, 100% éxito).
-  * Frontend Web (`tests/GestionClientes.test.tsx`): 5 tests en Vitest cubriendo renderizado de KPIs, listado, búsqueda reactiva, apertura de Ficha 360°, guardado de notas inline y creación de clientes.
-  * Suite Global Backend: 275 tests pasados (1.535 aserciones).
-  * Suite Global Frontend: 116 tests pasados en 12 suites de Vitest.
-  * Suite Global Mobile: 20 tests pasados en 4 suites de Jest.
-  * Gran Total del Ecosistema: 411/411 tests automatizados en verde con 0 regresiones.
+===============================================================================
+[2026-09-20] - TAREA: CORRECCIÓN Y ENDURECIMIENTO DEL MODAL DE EDICIÓN DE CLIENTES
+===============================================================================
+- Diagnóstico de Causa Raíz:
+  * 1. Backend (`ClubClienteService::actualizarCliente`): Se utilizaba `isset($datos['email'])`, `isset($datos['telefono'])`, `isset($datos['dni'])`, `isset($datos['notas'])`. En PHP, `isset(null)` evalúa estrictamente a `false`. Cuando un administrador borraba o limpiaba un campo en el modal (o enviaba `null`), el servicio asumía que la clave no había sido enviada y restauraba inmediatamente el valor preexistente en la base de datos (`$cliente->email`, `$cliente->dni`, etc.), impidiendo persistir borrados y actualizaciones con campos vacíos.
+  * 2. Comparación de Teléfono/Email: Si el teléfono o email contenía espacios o caracteres en blanco en la base de datos, la comparación estricta (`$telefono !== $cliente->telefono`) generaba falsos positivos de conflicto de unicidad al editar.
+  * 3. Sincronización de `user_id`: Si se editaba el email del cliente, no se actualizaba la asociación con el usuario registrado en el sistema ni su billetera virtual.
+  * 4. Frontend (`GestionClientes.tsx`): La autenticación dependía exclusivamente de la prop `token`. Si el token estaba en cookies (`saas_auth_token`) o en `localStorage` (`saas_token`, `auth_token`), el componente enviaba `Bearer null`, resultando en un 403 silencioso. Además, no se pasaba `addToast` desde `panel/page.tsx`, por lo que cualquier fallo o éxito era completamente invisible para el usuario y el modal permanecía abierto sin feedback.
+  * 5. Actualización Reactiva: Tras el guardado exitoso en el backend, la tabla no actualizaba inmediatamente el estado local del cliente, dependiendo únicamente de una petición de red diferida de `fetchClientes()`.
+- Soluciones Implementadas:
+  * 1. Backend (`ClubClienteService.php`):
+    - Reemplazo de `isset(...)` por `array_key_exists(...)` para todos los atributos opcionales (`nombre`, `telefono`, `email`, `dni`, `notas`, `estado`, `motivo_bloqueo`), permitiendo guardar valores `null` o vacíos de manera fidedigna.
+    - Normalización con `trim(...)` para las comparaciones de unicidad contra el valor actual del cliente.
+    - Sincronización automática de `user_id` en `actualizarCliente`: si el nuevo email coincide con una cuenta de usuario existente, se vincula; si se vacía o no coincide, se desvincula.
+  * 2. Frontend (`GestionClientes.tsx`):
+    - Integración de `getAuthToken` con fallback transparente a `localStorage` (`saas_token`, `token`, `auth_token`) y cookie cross-subdomain (`saas_auth_token`).
+    - Actualización inmediata y reactiva del cliente editado en la lista local `clientes` y en `profileData` de la Ficha 360°.
+    - Sistema autónomo de notificaciones flotantes (Toasts visuales para éxito y error con auto-cierre a los 4.5 segundos).
+    - Banner de error visible `{formError && (...)}` dentro del modal para que cualquier fallo de validación (por ejemplo, teléfono duplicado o email inválido) se muestre claramente al usuario.
+    - Nuevo botón de acceso rápido `"Editar Datos"` en el encabezado de la Ficha 360° para mayor comodidad operativa.
+- Tests & Calidad:
+  * Backend: Nuevo test unitario `test_admin_can_update_client_and_clear_optional_fields` en `ClubClienteTest.php` (11/11 tests en verde). Suite completa de Laravel: 276 tests pasados (1.538 aserciones).
+  * Frontend: Nuevo test unitario `opens edit modal, modifies client data and saves successfully` en `tests/GestionClientes.test.tsx` (6/6 tests en verde). Suite completa de Vitest: 117 tests pasados en 12 suites.
+  * Total Ecosistema: 413/413 tests automatizados exitosos (0 fallas, 0 regresiones).
+===============================================================================
+[2026-09-20] - TAREA: DIFERENCIACIÓN PRECISA DE TURNOS JUGADOS VS. TURNOS EN AGENDA (FUTUROS) EN CRM DE CLIENTES
+===============================================================================
+- Diagnóstico y Verificación Solicitada:
+  * Caso detectado por el usuario: En la ficha del cliente `bela@gmail.com` (Fernando Belasteguin) figuraban turnos con fecha marzo de 2027 como "turnos ya utilizados", fecha que aún no ha ocurrido.
+  * Verificación en Base de Datos y Lógica de Negocio:
+    - Se comprobó que los turnos de marzo de 2027 NO son datos de prueba corruptos ni ficticios; son reservas legítimas recurrentes de la serie de **Turnos Fijos** (`es_fijo = true`) generadas a 6 meses vista por la regla del club.
+    - Se identificó un defecto conceptual en el cálculo y visualización:
+      1. `ClubClienteService.php`: El conteo de turnos jugados se calculaba como `$totalTurnos - $turnosCancelados`, lo que sumaba indebidamente todos los turnos futuros agendados (100 turnos fijos a futuro) como "jugados".
+      2. El campo `ultimo_turno` realizaba un `orderBy('fecha', 'desc')` sin acotar por `fecha <= now()`, por lo que seleccionaba la fecha más lejana en el futuro (13 de marzo de 2027) y la mostraba en la columna "ÚLTIMO TURNO".
+      3. En `obtenerFichaCliente`, el historial ejecutaba `orderBy('fecha', 'desc')->limit(30)`, devolviendo únicamente los 30 turnos más lejanos de 2027 y ocultando los turnos jugados del pasado.
+      4. En `GestionClientes.tsx`, el renderizado de pago mostraba `Señado` en verde para cualquier turno no cancelado cuando `estado_pago === 'pendiente'`, dando la falsa apariencia de que turnos futuros de 2027 estaban señados y jugados.
+- Soluciones Implementadas:
+  * 1. Backend (`ClubClienteService.php`):
+    - Se diferencian estrictamente los turnos pasados de los futuros:
+      * Pasados (jugados): `fecha < $hoy || (fecha == $hoy && hora_fin <= $horaActual)` con `estado != 'cancelado'`.
+      * Futuros (en agenda): `fecha > $hoy || (fecha == $hoy && hora_fin > $horaActual)` con `estado != 'cancelado'`.
+      * Cancelados: `estado == 'cancelado'`.
+      * Relación mutuamente excluyente y exhaustiva: `turnos_jugados + turnos_futuros + turnos_cancelados == total_turnos`.
+    - En `listarClientes`:
+      * `ultimo_turno`: estrictamente el turno pasado completado más reciente (`fecha desc, hora_inicio desc`).
+      * `proximo_turno`: el turno futuro en agenda más próximo (`fecha asc, hora_inicio asc`).
+      * Inclusión de métricas `turnos_futuros` y `proximo_turno` por cliente.
+    - En `obtenerFichaCliente`:
+      * Separación en `$turnos` con flag booleano `es_futuro`. Se traen los próximos turnos en agenda (orden cronológico ascendente) y los turnos históricos jugados (orden cronológico descendente).
+      * Estadísticas precisas: `total_turnos`, `turnos_jugados`, `turnos_futuros`, `turnos_cancelados` y `tasa_cumplimiento` calculada sobre turnos pasados efectivamente disputados.
+  * 2. Frontend (`GestionClientes.tsx`):
+    - Actualización de la interfaz `ClienteItem` con `turnos_futuros` y `proximo_turno`.
+    - Tabla principal de clientes:
+      * Columna "Turnos": desglose visual `✓ {jugados}` • `⏱ {futuros}` • `✗ {cancelados}`.
+      * Columna "Próximo / Último Turno": muestra claramente en badge cyan `"Próx"` (ej. 22/09/2026 12:00 Cancha 1) y en badge slate `"Jugado"` (ej. 18/09/2026 22:00 Cancha 2).
+    - Modal Ficha 360°:
+      * Tarjetas KPI: desglose en "Total Turnos" (`{jugados} jugados • {futuros} agenda`).
+      * Pestaña "Historial de Turnos": nuevo selector de sub-filtros `Todos`, `En Agenda`, `Jugados`, `Cancelados`.
+      * Badges por turno: `En Agenda` (cyan), `Jugado` (slate), `Turno Fijo` (purple).
+      * Estados de pago fidedignos: `Pagado Total` (verde), `Señado` (azul cielo), `Pago Pendiente` (ámbar), `Cancelado` (rojo).
+- Tests & Verificación:
+  * Backend: Nuevo test `test_turnos_distinguish_past_played_from_future_scheduled_and_accurately_report_ultimo_y_proximo_turno` en `ClubClienteTest.php` (12/12 en verde). Suite completa: 277 tests pasados (1.564 aserciones).
+  * Frontend: Actualización y nuevas aserciones en `tests/GestionClientes.test.tsx` (6/6 en verde). Suite completa: 117 tests pasados (12 suites).
+  * Total Ecosistema: 414/414 tests automatizados exitosos (0 fallas, 0 regresiones).
+===============================================================================
+[2026-09-20] - TAREA: AISLAMIENTO ESTRICTO DE TURNOS POR CLIENTE Y ELIMINACIÓN DE CONTAMINACIÓN CRUZADA POR TELÉFONO COMPARTIDO
+===============================================================================
+- Diagnóstico:
+  * El usuario observó que dos clientes en el club con el mismo número de teléfono de desarrollo (`1149790220`) pero emails distintos (`bela@gmail.com` y `bela@jugador.test`) mostraban exactamente los mismos datos agregados (117 turnos, ✓12, ⏱100, ✗5, y las mismas fechas de último/próximo turno).
+  * Análisis en Base de Datos:
+    - Son dos usuarios registrados distintos en `users`:
+      * Usuario 70 (`bela@gmail.com`): 86 turnos propios en club 113.
+      * Usuario 78 (`bela@jugador.test`): 29 turnos propios en club 113.
+      * (Y Usuario 81 `messi@jugador.test`: 2 turnos propios).
+    - Defecto en `ClubClienteService.php`: La consulta realizaba `$q->orWhere('cliente_telefono', $c->telefono)` incondicionalmente. Al tener en ambiente local de pruebas el mismo teléfono de WhatsApp (`1149790220`), el backend agrupaba y sumaba los turnos de todos los usuarios que compartían dicho teléfono (86 + 29 + 2 = 117 turnos).
+- Solución Implementada:
+  * Se acotó la consulta en `listarClientes` y `obtenerFichaCliente`:
+    - Un turno pertenece al cliente si `club_cliente_id == $c->id`.
+    - O si `cliente_id == $c->user_id` (y no está asignado a otro `club_cliente_id`).
+    - Y solo en turnos huérfanos de mostrador (`whereNull('club_cliente_id')->whereNull('cliente_id')`) se aplica el fallback por `cliente_telefono`.
+  * Resultado comprobado en Tinker y API:
+    - Cliente ID 12 (`bela@gmail.com`): 86 turnos (✓7 jugados, ⏱75 agenda, ✗4 cancelados). Próx: 22/09/2026 12:00 hs. Último: 18/09/2026 22:00 hs.
+    - Cliente ID 3 (`bela@jugador.test`): 29 turnos (✓4 jugados, ⏱25 agenda, ✗0 cancelados). Próx: 24/09/2026 19:00 hs. Último: 17/09/2026 19:00 hs.
+    - Cliente ID 5 (Messi): 2 turnos (✓1 jugado, ⏱0 agenda, ✗1 cancelado).
+===============================================================================
+[2026-09-20] - TAREA: CORRECCIÓN DE APILAMIENTO Z-INDEX EN MODAL DE EDICIÓN DE CLIENTE DESDE FICHA 360°
+===============================================================================
+- Diagnóstico:
+  * El usuario observó que al presionar el botón "Editar Datos" ubicado en el encabezado de la Ficha 360°, el modal de edición se abría por detrás del modal 360°, quedando oculto y bloqueado por el backdrop de la ficha.
+  * Causa raíz:
+    - Ambos modales compartían la clase de capa `z-50`. Al encontrarse la Ficha 360° posterior en el orden del DOM, el navegador pintaba la ficha por encima del formulario de edición.
+- Solución Implementada:
+  * 1. Frontend (`GestionClientes.tsx`):
+    - Se elevó la capa del Modal de Creación / Edición (`editModalOpen`) a `z-[60]` (backdrop con blur y sombra prominente).
+    - Se elevó la capa del Modal de Confirmación de Eliminación (`deleteModalOpen`) a `z-[70]`.
+    - Al presionar "Editar Datos" desde la Ficha 360°, el formulario de edición emerge directamente en primer plano con todos los campos precompletados.
+    - Al guardar con "Guardar Cambios", se sincronizan automáticamente los datos actualizados tanto en la tabla general como en la Ficha 360° subyacente de forma inmediata y reactiva, retornando al operador a la ficha ya actualizada.
+    - Al cancelar, se cierra el modal de edición y la Ficha 360° permanece intacta.
+- Tests & Verificación:
+  * Frontend: Nuevo test unitario `opens edit modal from within 360 profile modal and saves successfully` en `tests/GestionClientes.test.tsx` (7/7 tests en verde). Suite completa de Vitest: 118 tests pasados (12 suites).
+  * Backend: 277/277 tests en verde.
+  * Total Ecosistema: 415/415 tests automatizados en verde (0 fallas, 0 regresiones).
+===============================================================================
+[2026-09-20] - TAREA: VALIDACIÓN NUMÉRICA ESTRICTA DE TELÉFONO / WHATSAPP Y DNI EN MODAL DE CLIENTES
+===============================================================================
+- Diagnóstico:
+  * El usuario solicitó que en el modal de edición/creación de clientes no se permita ingresar cualquier texto en los campos Teléfono y DNI, debiendo validarse que sean numéricos y en especial que el teléfono / WhatsApp sea válido.
+- Solución Implementada:
+  * 1. Frontend (`frontend/components/GestionClientes.tsx`):
+    - Filtrado en tiempo real en los inputs de entrada:
+      * Teléfono / WhatsApp: Solo admite dígitos numéricos y prefijo '+' opcional inicial (`(?!^\+)[^\d]`), descartando letras y caracteres especiales al tipear o pegar. `type="tel"` y `inputMode="tel"`. Limita a 16 caracteres (máximo E.164 + '+').
+      * DNI / Documento: Solo admite dígitos numéricos (`/\D/g`), impidiendo letras y símbolos. `type="text"` y `inputMode="numeric"`. Limita a 12 caracteres.
+    - Leyendas orientativas en el formulario:
+      * "Solo números (8-15 dígitos). Válido para WhatsApp."
+      * "Solo números (6-12 dígitos)."
+    - Validación pre-envío en `handleSubmitForm`:
+      * Si se ingresa teléfono: verifica formato numérico y longitud entre 8 y 15 dígitos.
+      * Si se ingresa DNI: verifica que contenga entre 6 y 12 dígitos numéricos.
+      * Muestra alertas claras de validación antes de realizar la petición HTTP.
+    - Enlaces de WhatsApp directo (`wa.me`):
+      * Se integró la función estándar `formatWhatsAppNumber` para el botón de WhatsApp en la tabla de clientes y en el encabezado de la Ficha 360°, garantizando el prefijo internacional de país (`549...`) para apertura directa del chat sin error.
+  * 2. Backend (`ClubClienteController.php` & `ClubClienteService.php`):
+    - Se agregaron reglas de validación en `store` y `update`:
+      * `telefono`: `['nullable', 'string', 'max:50', 'regex:/^\+?[0-9]{8,15}$/']`. Mensaje personalizado: "El teléfono / WhatsApp debe ser numérico y contener entre 8 y 15 dígitos."
+      * `dni`: `['nullable', 'string', 'max:50', 'regex:/^[0-9]{6,12}$/']`. Mensaje personalizado: "El DNI debe ser numérico y contener entre 6 y 12 dígitos."
+    - Se reforzó la verificación en `ClubClienteService::crearCliente` y `actualizarCliente` mediante expresiones regulares para garantizar integridad de datos independiente del canal de invocación.
+- Tests & Verificación:
+  * Backend:
+    - Nuevo test `test_create_and_update_client_validates_numeric_phone_and_dni` en `ClubClienteTest.php` comprobando rechazo de letras en teléfono, rechazo de longitud corta en teléfono, rechazo de letras en DNI, rechazo de DNI corto, aceptación de números estándar e internacionales y validación en actualización (13/13 pasados).
+    - Suite completa backend: 278/278 tests pasados (1.583 aserciones exitosas).
+  * Frontend:
+    - Nuevos tests en `GestionClientes.test.tsx`:
+      * `restricts Telefono and DNI to numeric characters and validates WhatsApp length`: comprueba filtrado de letras en inputs, validación de longitudes y envío exitoso con datos válidos.
+      * `generates correct international WhatsApp URLs with formatWhatsAppNumber`: verifica links `wa.me/5491144556677`.
+    - Suite completa frontend: 120/120 tests pasados (12 suites).
+  * Total Ecosistema: 418/418 tests automatizados en verde (0 fallas, 0 regresiones).
 ===============================================================================
 
 

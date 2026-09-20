@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   CheckCircle2,
+  XCircle,
   AlertCircle,
   X,
   FileText,
@@ -29,7 +30,7 @@ import {
   RefreshCw,
   ExternalLink,
 } from "lucide-react";
-import { formatFechaDDMMAAAA, formatWhatsAppNumber } from "@/components/GrillaHoraria";
+import { formatFechaDDMMAAAA, formatWhatsAppNumber, getAuthToken } from "@/components/GrillaHoraria";
 
 export interface ClienteItem {
   id: number;
@@ -45,8 +46,15 @@ export interface ClienteItem {
   vales_activos_count: number;
   total_turnos: number;
   turnos_jugados: number;
+  turnos_futuros?: number;
   turnos_cancelados: number;
   ultimo_turno?: {
+    fecha: string | null;
+    hora_inicio: string;
+    cancha_nombre: string;
+    estado: string;
+  } | null;
+  proximo_turno?: {
     fecha: string | null;
     hora_inicio: string;
     cancha_nombre: string;
@@ -106,12 +114,36 @@ export default function GestionClientes({
   const [formEstado, setFormEstado] = useState<"activo" | "bloqueado">("activo");
   const [formMotivoBloqueo, setFormMotivoBloqueo] = useState("");
   const [submittingForm, setSubmittingForm] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Toast notifications internas (independientes de si el padre pasa addToast)
+  const [internalToasts, setInternalToasts] = useState<
+    Array<{ id: number; tipo: "success" | "error" | "info" | "warning"; mensaje: string }>
+  >([]);
+
+  const notify = useCallback(
+    (tipo: "success" | "error" | "info" | "warning", mensaje: string) => {
+      addToast?.(tipo === "warning" ? "info" : tipo, mensaje);
+      const id = Date.now() + Math.random();
+      setInternalToasts((prev) => [...prev, { id, tipo, mensaje }]);
+      setTimeout(() => {
+        setInternalToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 4500);
+    },
+    [addToast]
+  );
+
+  // Obtener token activo con soporte para props, localStorage y cookies cross-subdomain
+  const getEffectiveToken = useCallback(() => {
+    return getAuthToken(token);
+  }, [token]);
 
   // Modal Ficha 360°
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileData, setProfileData] = useState<any | null>(null);
   const [profileTab, setProfileTab] = useState<"resumen" | "turnos" | "billetera">("resumen");
+  const [modalTurnosFiltro, setModalTurnosFiltro] = useState<"todos" | "agenda" | "jugados" | "cancelados">("todos");
   const [editingNotasInline, setEditingNotasInline] = useState(false);
   const [notasTemp, setNotasTemp] = useState("");
   const [savingNotas, setSavingNotas] = useState(false);
@@ -132,7 +164,8 @@ export default function GestionClientes({
 
   // Carga de listado de clientes
   const fetchClientes = useCallback(async () => {
-    if (!token) return;
+    const activeToken = getEffectiveToken();
+    if (!activeToken) return;
     setLoading(true);
     try {
       const q = new URLSearchParams({
@@ -147,7 +180,7 @@ export default function GestionClientes({
       const res = await fetch(`${apiUrl}/clubs/${subdomain}/clientes?${q.toString()}`, {
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${activeToken}`,
           "X-Tenant-ID": subdomain,
         },
       });
@@ -162,14 +195,14 @@ export default function GestionClientes({
         }
       } else {
         const err = await res.json().catch(() => ({}));
-        addToast?.("error", err.message || "Error al cargar el padrón de clientes.");
+        notify("error", err.message || "Error al cargar el padrón de clientes.");
       }
     } catch {
-      addToast?.("error", "Error de red al consultar los clientes del club.");
+      notify("error", "Error de red al consultar los clientes del club.");
     } finally {
       setLoading(false);
     }
-  }, [apiUrl, subdomain, token, page, estadoFiltro, filtroEspecial, debouncedSearch, addToast]);
+  }, [apiUrl, subdomain, getEffectiveToken, page, estadoFiltro, filtroEspecial, debouncedSearch, notify]);
 
   useEffect(() => {
     fetchClientes();
@@ -185,6 +218,7 @@ export default function GestionClientes({
     setFormNotas("");
     setFormEstado("activo");
     setFormMotivoBloqueo("");
+    setFormError(null);
     setEditModalOpen(true);
   };
 
@@ -192,20 +226,54 @@ export default function GestionClientes({
   const handleOpenEdit = (cliente: ClienteItem) => {
     setEditingCliente(cliente);
     setFormNombre(cliente.nombre || "");
-    setFormTelefono(cliente.telefono || "");
+    setFormTelefono(cliente.telefono ? cliente.telefono.replace(/(?!^\+)[^\d]/g, "") : "");
     setFormEmail(cliente.email || "");
-    setFormDni(cliente.dni || "");
+    setFormDni(cliente.dni ? cliente.dni.replace(/\D/g, "") : "");
     setFormNotas(cliente.notas || "");
     setFormEstado(cliente.estado || "activo");
     setFormMotivoBloqueo(cliente.motivo_bloqueo || "");
+    setFormError(null);
     setEditModalOpen(true);
   };
 
   // Guardar (Crear o Editar)
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
     if (!formNombre.trim()) {
-      addToast?.("error", "El nombre completo del cliente es obligatorio.");
+      const msg = "El nombre completo del cliente es obligatorio.";
+      setFormError(msg);
+      notify("error", msg);
+      return;
+    }
+
+    if (formTelefono.trim()) {
+      const cleanPhone = formTelefono.trim();
+      const phoneDigits = cleanPhone.replace(/\D/g, "");
+      if (!/^\+?[0-9]{8,15}$/.test(cleanPhone) || phoneDigits.length < 8 || phoneDigits.length > 15) {
+        const msg = "El teléfono / WhatsApp debe ser numérico y contener entre 8 y 15 dígitos (ej. 1144556677 o +5491144556677).";
+        setFormError(msg);
+        notify("error", msg);
+        return;
+      }
+    }
+
+    if (formDni.trim()) {
+      const cleanDni = formDni.trim();
+      if (!/^[0-9]{6,12}$/.test(cleanDni)) {
+        const msg = "El DNI debe ser numérico y contener entre 6 y 12 dígitos.";
+        setFormError(msg);
+        notify("error", msg);
+        return;
+      }
+    }
+
+    const activeToken = getEffectiveToken();
+    if (!activeToken) {
+      const msg = "Sesión no detectada. Por favor, verifica que hayas iniciado sesión correctamente.";
+      setFormError(msg);
+      notify("error", msg);
       return;
     }
 
@@ -224,7 +292,7 @@ export default function GestionClientes({
         dni: formDni.trim() || null,
         notas: formNotas.trim() || null,
         estado: formEstado,
-        motivo_bloqueo: formEstado === "bloqueado" ? formMotivoBloqueo.trim() || null : null,
+        motivo_bloqueo: formEstado === "bloqueado" ? formMotivoBloqueo.trim() || "Bloqueado por administración" : null,
       };
 
       const res = await fetch(url, {
@@ -232,22 +300,69 @@ export default function GestionClientes({
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${activeToken}`,
           "X-Tenant-ID": subdomain,
         },
         body: JSON.stringify(payload),
       });
 
       const json = await res.json().catch(() => ({}));
+
       if (res.ok && json.success) {
-        addToast?.("success", json.message || "Cliente guardado exitosamente.");
+        notify("success", json.message || (isEdit ? "Datos actualizados correctamente." : "Cliente creado exitosamente."));
+
+        // Actualización inmediata en el estado local de clientes
+        if (isEdit && json.cliente) {
+          setClientes((prev) =>
+            prev.map((item) =>
+              item.id === json.cliente.id
+                ? {
+                    ...item,
+                    ...json.cliente,
+                    saldo_billetera: item.saldo_billetera,
+                    vales_activos_count: item.vales_activos_count,
+                    total_turnos: item.total_turnos,
+                    turnos_jugados: item.turnos_jugados,
+                    turnos_futuros: item.turnos_futuros,
+                    turnos_cancelados: item.turnos_cancelados,
+                    ultimo_turno: item.ultimo_turno,
+                    proximo_turno: item.proximo_turno,
+                  }
+                : item
+            )
+          );
+
+          // Si la ficha 360° está abierta con este mismo cliente, actualizarla
+          if (profileData?.cliente?.id === json.cliente.id) {
+            setProfileData((prev: any) => ({
+              ...prev,
+              cliente: {
+                ...prev.cliente,
+                ...json.cliente,
+              },
+            }));
+          }
+        }
+
         setEditModalOpen(false);
+        setEditingCliente(null);
+        setFormError(null);
         fetchClientes();
       } else {
-        addToast?.("error", json.message || "No se pudo guardar los datos del cliente.");
+        let msg = json.message || "No se pudo guardar los datos del cliente.";
+        if (json.errors && typeof json.errors === "object") {
+          const firstKey = Object.keys(json.errors)[0];
+          if (firstKey && Array.isArray(json.errors[firstKey]) && json.errors[firstKey][0]) {
+            msg = json.errors[firstKey][0];
+          }
+        }
+        setFormError(msg);
+        notify("error", msg);
       }
     } catch {
-      addToast?.("error", "Error de comunicación con el servidor.");
+      const msg = "Error de comunicación o red con el servidor.";
+      setFormError(msg);
+      notify("error", msg);
     } finally {
       setSubmittingForm(false);
     }
@@ -255,15 +370,17 @@ export default function GestionClientes({
 
   // Abrir Ficha 360°
   const handleOpenProfile = async (cliente: ClienteItem) => {
+    const activeToken = getEffectiveToken();
     setProfileModalOpen(true);
     setProfileLoading(true);
     setProfileTab("resumen");
+    setModalTurnosFiltro("todos");
     setEditingNotasInline(false);
     try {
       const res = await fetch(`${apiUrl}/clubs/${subdomain}/clientes/${cliente.id}`, {
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
           "X-Tenant-ID": subdomain,
         },
       });
@@ -276,11 +393,11 @@ export default function GestionClientes({
         }
       } else {
         const err = await res.json().catch(() => ({}));
-        addToast?.("error", err.message || "Error al cargar la ficha del cliente.");
+        notify("error", err.message || "Error al cargar la ficha del cliente.");
         setProfileModalOpen(false);
       }
     } catch {
-      addToast?.("error", "Error al conectar para obtener la ficha del cliente.");
+      notify("error", "Error al conectar para obtener la ficha del cliente.");
       setProfileModalOpen(false);
     } finally {
       setProfileLoading(false);
@@ -290,6 +407,7 @@ export default function GestionClientes({
   // Guardar Notas Directamente desde la Ficha 360°
   const handleSaveNotasInline = async () => {
     if (!profileData?.cliente?.id) return;
+    const activeToken = getEffectiveToken();
     setSavingNotas(true);
     try {
       const res = await fetch(`${apiUrl}/clubs/${subdomain}/clientes/${profileData.cliente.id}`, {
@@ -297,7 +415,7 @@ export default function GestionClientes({
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
           "X-Tenant-ID": subdomain,
         },
         body: JSON.stringify({
@@ -307,7 +425,7 @@ export default function GestionClientes({
 
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.success) {
-        addToast?.("success", "Notas actualizadas correctamente.");
+        notify("success", "Notas actualizadas correctamente.");
         setProfileData((prev: any) => ({
           ...prev,
           cliente: {
@@ -318,10 +436,10 @@ export default function GestionClientes({
         setEditingNotasInline(false);
         fetchClientes();
       } else {
-        addToast?.("error", json.message || "No se pudieron actualizar las notas.");
+        notify("error", json.message || "No se pudieron actualizar las notas.");
       }
     } catch {
-      addToast?.("error", "Error de conexión al guardar las notas.");
+      notify("error", "Error de conexión al guardar las notas.");
     } finally {
       setSavingNotas(false);
     }
@@ -330,27 +448,28 @@ export default function GestionClientes({
   // Confirmar Eliminación
   const handleConfirmDelete = async () => {
     if (!deletingCliente) return;
+    const activeToken = getEffectiveToken();
     setDeletingLoading(true);
     try {
       const res = await fetch(`${apiUrl}/clubs/${subdomain}/clientes/${deletingCliente.id}`, {
         method: "DELETE",
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
           "X-Tenant-ID": subdomain,
         },
       });
 
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.success) {
-        addToast?.("success", json.message || "Cliente eliminado del padrón.");
+        notify("success", json.message || "Cliente eliminado del padrón.");
         setDeleteModalOpen(false);
         fetchClientes();
       } else {
-        addToast?.("error", json.message || "No se pudo eliminar al cliente.");
+        notify("error", json.message || "No se pudo eliminar al cliente.");
       }
     } catch {
-      addToast?.("error", "Error al procesar la eliminación del cliente.");
+      notify("error", "Error al procesar la eliminación del cliente.");
     } finally {
       setDeletingLoading(false);
     }
@@ -512,7 +631,7 @@ export default function GestionClientes({
                 <th className="py-3.5 px-4 font-semibold">Cliente</th>
                 <th className="py-3.5 px-4 font-semibold">Contacto</th>
                 <th className="py-3.5 px-4 font-semibold text-center">Turnos</th>
-                <th className="py-3.5 px-4 font-semibold">Último Turno</th>
+                <th className="py-3.5 px-4 font-semibold">Próximo / Último Turno</th>
                 <th className="py-3.5 px-4 font-semibold text-right">Billetera / Vales</th>
                 <th className="py-3.5 px-4 font-semibold text-center">Estado</th>
                 <th className="py-3.5 px-4 font-semibold text-right">Acciones</th>
@@ -547,7 +666,7 @@ export default function GestionClientes({
                     .join("")
                     .toUpperCase();
 
-                  const cleanPhone = c.telefono ? c.telefono.replace(/\D/g, "") : null;
+                  const cleanPhone = c.telefono ? formatWhatsAppNumber(c.telefono) : null;
                   const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
 
                   return (
@@ -625,27 +744,59 @@ export default function GestionClientes({
                         <div className="inline-flex flex-col items-center">
                           <span className="font-bold text-white text-sm">{c.total_turnos}</span>
                           <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                            <span className="text-emerald-400" title="Jugados">
+                            <span className="text-emerald-400 font-medium" title="Turnos jugados / completados">
                               ✓{c.turnos_jugados}
                             </span>
-                            <span>•</span>
-                            <span className="text-rose-400" title="Cancelados">
-                              ✗{c.turnos_cancelados}
-                            </span>
+                            {c.turnos_futuros !== undefined && c.turnos_futuros > 0 && (
+                              <>
+                                <span>•</span>
+                                <span className="text-cyan-400 font-medium" title="Turnos agendados en el futuro">
+                                  ⏱{c.turnos_futuros}
+                                </span>
+                              </>
+                            )}
+                            {c.turnos_cancelados > 0 && (
+                              <>
+                                <span>•</span>
+                                <span className="text-rose-400 font-medium" title="Turnos cancelados">
+                                  ✗{c.turnos_cancelados}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </td>
 
-                      {/* ÚLTIMO TURNO */}
+                      {/* PRÓXIMO / ÚLTIMO TURNO */}
                       <td className="py-3.5 px-4">
-                        {c.ultimo_turno ? (
-                          <div className="text-xs space-y-0.5">
-                            <div className="text-white font-medium">
-                              {formatFechaDDMMAAAA(c.ultimo_turno.fecha)}
-                            </div>
-                            <div className="text-slate-400">
-                              {c.ultimo_turno.cancha_nombre} • {c.ultimo_turno.hora_inicio} hs
-                            </div>
+                        {c.proximo_turno || c.ultimo_turno ? (
+                          <div className="text-xs space-y-1">
+                            {c.proximo_turno && (
+                              <div className="flex items-center gap-1.5 text-cyan-300">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 uppercase tracking-wider">
+                                  Próx
+                                </span>
+                                <span className="font-medium text-slate-200">
+                                  {formatFechaDDMMAAAA(c.proximo_turno.fecha)}
+                                </span>
+                                <span className="text-cyan-400/90 text-[11px]">
+                                  {c.proximo_turno.hora_inicio} hs ({c.proximo_turno.cancha_nombre})
+                                </span>
+                              </div>
+                            )}
+                            {c.ultimo_turno && (
+                              <div className="flex items-center gap-1.5 text-slate-400">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 border border-slate-700 text-slate-300 uppercase tracking-wider">
+                                  Jugado
+                                </span>
+                                <span className="text-slate-300">
+                                  {formatFechaDDMMAAAA(c.ultimo_turno.fecha)}
+                                </span>
+                                <span className="text-slate-500 text-[11px]">
+                                  {c.ultimo_turno.hora_inicio} hs ({c.ultimo_turno.cancha_nombre})
+                                </span>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className="text-xs text-slate-500 italic">Sin historial</span>
@@ -757,7 +908,7 @@ export default function GestionClientes({
 
       {/* MODAL CREAR / EDITAR CLIENTE */}
       {editModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -775,6 +926,12 @@ export default function GestionClientes({
             </div>
 
             <form onSubmit={handleSubmitForm} className="p-6 space-y-4">
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5 animate-in fade-in duration-150">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed font-medium">{formError}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Nombre Completo <span className="text-rose-400">*</span>
@@ -795,13 +952,23 @@ export default function GestionClientes({
                     Teléfono / WhatsApp
                   </label>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="tel"
                     placeholder="Ej. 1144556677"
                     value={formTelefono}
-                    onChange={(e) => setFormTelefono(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      let cleaned = val.replace(/(?!^\+)[^\d]/g, "");
+                      if (cleaned.startsWith("+")) {
+                        cleaned = "+" + cleaned.slice(1).replace(/\D/g, "");
+                      } else {
+                        cleaned = cleaned.replace(/\D/g, "");
+                      }
+                      setFormTelefono(cleaned.slice(0, 16));
+                    }}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">Utilizado para recordatorios automáticos.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Solo números (8-15 dígitos). Válido para WhatsApp.</p>
                 </div>
 
                 <div>
@@ -825,11 +992,13 @@ export default function GestionClientes({
                   </label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     placeholder="Ej. 38123456"
                     value={formDni}
-                    onChange={(e) => setFormDni(e.target.value)}
+                    onChange={(e) => setFormDni(e.target.value.replace(/\D/g, "").slice(0, 12))}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  <p className="text-[11px] text-slate-500 mt-1">Solo números (6-12 dígitos).</p>
                 </div>
 
                 <div>
@@ -947,9 +1116,19 @@ export default function GestionClientes({
               </div>
 
               <div className="flex items-center gap-2">
+                {profileData?.cliente && (
+                  <button
+                    onClick={() => handleOpenEdit(profileData.cliente)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-medium text-xs transition-all"
+                    title="Editar Datos del Cliente"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-indigo-400" />
+                    Editar Datos
+                  </button>
+                )}
                 {profileData?.cliente?.telefono && (
                   <a
-                    href={`https://wa.me/${profileData.cliente.telefono.replace(/\D/g, "")}`}
+                    href={`https://wa.me/${formatWhatsAppNumber(profileData.cliente.telefono)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 font-medium text-xs transition-all"
@@ -1025,6 +1204,19 @@ export default function GestionClientes({
                           <p className="text-xl font-bold text-white mt-1">
                             {profileData.estadisticas?.total_turnos || 0}
                           </p>
+                          <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-center gap-1.5 flex-wrap">
+                            <span className="text-emerald-400 font-medium">
+                              ✓ {profileData.estadisticas?.turnos_jugados || 0} jugados
+                            </span>
+                            {Number(profileData.estadisticas?.turnos_futuros || 0) > 0 && (
+                              <>
+                                <span>•</span>
+                                <span className="text-cyan-400 font-medium">
+                                  ⏱ {profileData.estadisticas?.turnos_futuros} agenda
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                         <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 text-center">
                           <span className="text-[11px] uppercase tracking-wider font-semibold text-emerald-400">
@@ -1033,6 +1225,11 @@ export default function GestionClientes({
                           <p className="text-xl font-bold text-white mt-1">
                             {profileData.estadisticas?.tasa_cumplimiento || 100}%
                           </p>
+                          <div className="text-[10px] text-slate-400 mt-1">
+                            <span className="text-rose-400 font-medium">
+                              ✗ {profileData.estadisticas?.turnos_cancelados || 0} cancelados
+                            </span>
+                          </div>
                         </div>
                         <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 text-center">
                           <span className="text-[11px] uppercase tracking-wider font-semibold text-amber-400">
@@ -1041,6 +1238,11 @@ export default function GestionClientes({
                           <p className="text-xl font-bold text-white mt-1">
                             ${Number(profileData.cliente?.saldo_billetera || 0).toLocaleString("es-AR")}
                           </p>
+                          <div className="text-[10px] text-teal-400 mt-1">
+                            {profileData.vales?.length > 0
+                              ? `${profileData.vales.length} vales emitidos`
+                              : "Sin vales de crédito"}
+                          </div>
                         </div>
                       </div>
 
@@ -1107,50 +1309,144 @@ export default function GestionClientes({
                           No hay turnos registrados para este cliente en el club.
                         </p>
                       ) : (
-                        <div className="border border-slate-800 rounded-xl overflow-hidden">
-                          <table className="w-full text-left text-xs text-slate-300">
-                            <thead className="bg-slate-800/60 text-slate-400 uppercase tracking-wider">
-                              <tr>
-                                <th className="py-2.5 px-3">Fecha & Cancha</th>
-                                <th className="py-2.5 px-3">Horario</th>
-                                <th className="py-2.5 px-3 text-right">Monto</th>
-                                <th className="py-2.5 px-3 text-center">Estado</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800">
-                              {profileData.turnos.map((t: any) => (
-                                <tr key={t.id} className="hover:bg-slate-800/40">
-                                  <td className="py-2.5 px-3">
-                                    <div className="font-semibold text-white">
-                                      {formatFechaDDMMAAAA(t.fecha)}
-                                    </div>
-                                    <div className="text-slate-400 text-[11px]">{t.cancha_nombre}</div>
-                                  </td>
-                                  <td className="py-2.5 px-3 font-mono">
-                                    {t.hora_inicio} a {t.hora_fin} hs
-                                  </td>
-                                  <td className="py-2.5 px-3 text-right font-medium">
-                                    ${Number(t.precio || 0).toLocaleString("es-AR")}
-                                  </td>
-                                  <td className="py-2.5 px-3 text-center">
-                                    {t.estado === "cancelado" ? (
-                                      <span
-                                        title={t.motivo_cancelacion || "Cancelado"}
-                                        className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20"
-                                      >
-                                        Cancelado
-                                      </span>
-                                    ) : (
-                                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                        {t.estado_pago === "pagado_total" ? "Pagado" : "Señado"}
-                                      </span>
-                                    )}
-                                  </td>
+                        <>
+                          {/* SUB-FILTROS DE TURNOS EN EL MODAL */}
+                          <div className="flex items-center gap-1.5 p-1 bg-slate-900/80 border border-slate-800 rounded-xl text-xs overflow-x-auto">
+                            <button
+                              type="button"
+                              onClick={() => setModalTurnosFiltro("todos")}
+                              className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
+                                modalTurnosFiltro === "todos"
+                                  ? "bg-slate-700 text-white shadow-sm"
+                                  : "text-slate-400 hover:text-white"
+                              }`}
+                            >
+                              Todos ({profileData.turnos.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setModalTurnosFiltro("agenda")}
+                              className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
+                                modalTurnosFiltro === "agenda"
+                                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                                  : "text-slate-400 hover:text-cyan-300"
+                              }`}
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              En Agenda ({profileData.turnos.filter((t: any) => t.es_futuro && t.estado !== "cancelado").length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setModalTurnosFiltro("jugados")}
+                              className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
+                                modalTurnosFiltro === "jugados"
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                  : "text-slate-400 hover:text-emerald-300"
+                              }`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Jugados ({profileData.turnos.filter((t: any) => !t.es_futuro && t.estado !== "cancelado").length})
+                            </button>
+                            {profileData.turnos.filter((t: any) => t.estado === "cancelado").length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setModalTurnosFiltro("cancelados")}
+                                className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-colors ${
+                                  modalTurnosFiltro === "cancelados"
+                                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                    : "text-slate-400 hover:text-rose-300"
+                                }`}
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                Cancelados ({profileData.turnos.filter((t: any) => t.estado === "cancelado").length})
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="border border-slate-800 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto">
+                            <table className="w-full text-left text-xs text-slate-300">
+                              <thead className="bg-slate-800/60 text-slate-400 uppercase tracking-wider sticky top-0 backdrop-blur-sm z-10">
+                                <tr>
+                                  <th className="py-2.5 px-3">Fecha & Cancha</th>
+                                  <th className="py-2.5 px-3">Horario</th>
+                                  <th className="py-2.5 px-3 text-right">Monto</th>
+                                  <th className="py-2.5 px-3 text-center">Estado & Pago</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800">
+                                {profileData.turnos
+                                  .filter((t: any) => {
+                                    if (modalTurnosFiltro === "agenda") return t.es_futuro && t.estado !== "cancelado";
+                                    if (modalTurnosFiltro === "jugados") return !t.es_futuro && t.estado !== "cancelado";
+                                    if (modalTurnosFiltro === "cancelados") return t.estado === "cancelado";
+                                    return true;
+                                  })
+                                  .map((t: any) => (
+                                    <tr key={t.id} className="hover:bg-slate-800/40">
+                                      <td className="py-2.5 px-3">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="font-semibold text-white">
+                                            {formatFechaDDMMAAAA(t.fecha)}
+                                          </span>
+                                          {t.es_futuro && t.estado !== "cancelado" && (
+                                            <span className="text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-1.5 py-0.5 rounded font-medium">
+                                              En Agenda
+                                            </span>
+                                          )}
+                                          {!t.es_futuro && t.estado !== "cancelado" && (
+                                            <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded font-medium">
+                                              Jugado
+                                            </span>
+                                          )}
+                                          {t.es_fijo && (
+                                            <span className="text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 px-1.5 py-0.5 rounded font-medium">
+                                              Turno Fijo
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-slate-400 text-[11px] mt-0.5">{t.cancha_nombre}</div>
+                                      </td>
+                                      <td className="py-2.5 px-3 font-mono">
+                                        {t.hora_inicio} a {t.hora_fin} hs
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-medium">
+                                        <div className="text-white">
+                                          ${Number(t.precio || 0).toLocaleString("es-AR")}
+                                        </div>
+                                        {t.saldo_pendiente > 0 && t.estado !== "cancelado" && (
+                                          <div className="text-[10px] text-amber-400">
+                                            Resta: ${Number(t.saldo_pendiente).toLocaleString("es-AR")}
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-center">
+                                        {t.estado === "cancelado" ? (
+                                          <span
+                                            title={t.motivo_cancelacion || "Cancelado"}
+                                            className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 font-medium"
+                                          >
+                                            Cancelado
+                                          </span>
+                                        ) : t.estado_pago === "pagado_total" ? (
+                                          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">
+                                            Pagado Total
+                                          </span>
+                                        ) : t.estado_pago === "senado" ? (
+                                          <span className="text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20 font-medium">
+                                            Señado
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 font-medium">
+                                            Pago Pendiente
+                                          </span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -1214,7 +1510,7 @@ export default function GestionClientes({
 
       {/* MODAL CONFIRMAR ELIMINACIÓN */}
       {deleteModalOpen && deletingCliente && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-slate-900 border border-rose-500/30 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-3 text-rose-400">
               <AlertCircle className="w-6 h-6 flex-shrink-0" />
@@ -1246,6 +1542,33 @@ export default function GestionClientes({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* NOTIFICACIONES TOAST FLOTANTES */}
+      {internalToasts.length > 0 && (
+        <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none max-w-sm">
+          {internalToasts.map((t) => (
+            <div
+              key={t.id}
+              className={`pointer-events-auto px-4 py-3 rounded-xl shadow-2xl border text-sm flex items-center gap-2.5 animate-in slide-in-from-bottom-2 duration-200 ${
+                t.tipo === "success"
+                  ? "bg-emerald-950/95 border-emerald-500/40 text-emerald-200"
+                  : t.tipo === "error"
+                  ? "bg-rose-950/95 border-rose-500/40 text-rose-200"
+                  : "bg-slate-900/95 border-indigo-500/40 text-indigo-200"
+              }`}
+            >
+              {t.tipo === "success" ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : t.tipo === "error" ? (
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              ) : (
+                <Activity className="w-5 h-5 text-indigo-400 shrink-0" />
+              )}
+              <span className="font-medium text-xs leading-snug">{t.mensaje}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

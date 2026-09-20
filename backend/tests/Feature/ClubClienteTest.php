@@ -214,6 +214,73 @@ class ClubClienteTest extends TestCase
             ->assertJsonValidationErrors(['telefono']);
     }
 
+    public function test_create_and_update_client_validates_numeric_phone_and_dni(): void
+    {
+        [$complejo, $admin] = $this->crearComplejoConAdmin('padel-validation');
+
+        // Rechaza teléfono con letras
+        $resInvalidPhone = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/clubs/{$complejo->subdominio}/clientes", [
+                'nombre' => 'Cliente Letras Tel',
+                'telefono' => '1144telefono',
+            ]);
+        $resInvalidPhone->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono']);
+
+        // Rechaza teléfono demasiado corto
+        $resShortPhone = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/clubs/{$complejo->subdominio}/clientes", [
+                'nombre' => 'Cliente Tel Corto',
+                'telefono' => '12345',
+            ]);
+        $resShortPhone->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono']);
+
+        // Rechaza DNI con letras
+        $resInvalidDni = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/clubs/{$complejo->subdominio}/clientes", [
+                'nombre' => 'Cliente Letras DNI',
+                'dni' => '38ABCD56',
+            ]);
+        $resInvalidDni->assertStatus(422)
+            ->assertJsonValidationErrors(['dni']);
+
+        // Rechaza DNI demasiado corto
+        $resShortDni = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/clubs/{$complejo->subdominio}/clientes", [
+                'nombre' => 'Cliente DNI Corto',
+                'dni' => '123',
+            ]);
+        $resShortDni->assertStatus(422)
+            ->assertJsonValidationErrors(['dni']);
+
+        // Acepta cliente con teléfono internacional o estándar y DNI numérico
+        $resValid = $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/clubs/{$complejo->subdominio}/clientes", [
+                'nombre' => 'Cliente Válido',
+                'telefono' => '+5491144556677',
+                'dni' => '38123456',
+            ]);
+        $resValid->assertStatus(201);
+        $clienteId = $resValid->json('cliente.id');
+
+        // En actualización también valida rechazo de letras en DNI
+        $resUpdateInvalidDni = $this->actingAs($admin, 'sanctum')
+            ->putJson("/api/clubs/{$complejo->subdominio}/clientes/{$clienteId}", [
+                'dni' => 'no-numerico',
+            ]);
+        $resUpdateInvalidDni->assertStatus(422)
+            ->assertJsonValidationErrors(['dni']);
+
+        // En actualización también valida rechazo de teléfono no numérico
+        $resUpdateInvalidPhone = $this->actingAs($admin, 'sanctum')
+            ->putJson("/api/clubs/{$complejo->subdominio}/clientes/{$clienteId}", [
+                'telefono' => 'invalido-wa',
+            ]);
+        $resUpdateInvalidPhone->assertStatus(422)
+            ->assertJsonValidationErrors(['telefono']);
+    }
+
     public function test_admin_can_view_360_client_profile(): void
     {
         [$complejo, $admin] = $this->crearComplejoConAdmin('padel-360');
@@ -243,18 +310,34 @@ class ClubClienteTest extends TestCase
             'estado' => 'activo',
         ]);
 
-        // Crear turno para el cliente
+        // Crear turno jugado pasado para el cliente
         Turno::create([
             'complejo_id' => $complejo->id,
             'cancha_id' => $cancha->id,
             'cliente_id' => $user->id,
             'club_cliente_id' => $cliente->id,
-            'fecha' => now()->toDateString(),
+            'fecha' => now()->subDays(2)->toDateString(),
             'hora_inicio' => '18:00',
             'hora_fin' => '19:30',
             'precio' => 20000,
+            'monto_pagado' => 20000,
+            'saldo_pendiente' => 0,
+            'estado' => 'completado',
+            'estado_pago' => 'pagado_total',
+        ]);
+
+        // Crear turno futuro agendado para el cliente
+        Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'cliente_id' => $user->id,
+            'club_cliente_id' => $cliente->id,
+            'fecha' => now()->addDays(3)->toDateString(),
+            'hora_inicio' => '20:00',
+            'hora_fin' => '21:30',
+            'precio' => 25000,
             'monto_pagado' => 10000,
-            'saldo_pendiente' => 10000,
+            'saldo_pendiente' => 15000,
             'estado' => 'reservado',
             'estado_pago' => 'senado',
         ]);
@@ -278,8 +361,9 @@ class ClubClienteTest extends TestCase
                     'saldo_billetera' => 5000.0,
                 ],
                 'estadisticas' => [
-                    'total_turnos' => 1,
+                    'total_turnos' => 2,
                     'turnos_jugados' => 1,
+                    'turnos_futuros' => 1,
                     'turnos_cancelados' => 0,
                     'tasa_cumplimiento' => 100.0,
                 ],
@@ -287,7 +371,13 @@ class ClubClienteTest extends TestCase
             ->assertJsonStructure([
                 'success',
                 'cliente',
-                'estadisticas',
+                'estadisticas' => [
+                    'total_turnos',
+                    'turnos_jugados',
+                    'turnos_futuros',
+                    'turnos_cancelados',
+                    'tasa_cumplimiento',
+                ],
                 'turnos',
                 'billetera',
                 'vales',
@@ -331,6 +421,53 @@ class ClubClienteTest extends TestCase
             'nombre' => 'Nombre Nuevo',
             'telefono' => '1199998888',
             'estado' => 'bloqueado',
+        ]);
+    }
+
+    public function test_admin_can_update_client_and_clear_optional_fields(): void
+    {
+        [$complejo, $admin] = $this->crearComplejoConAdmin('padel-clear-fields');
+
+        $cliente = Cliente::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Jugador Completo',
+            'telefono' => '1144556677',
+            'email' => 'jugador@completo.com',
+            'dni' => '35123456',
+            'notas' => 'Alguna nota previa',
+            'estado' => 'activo',
+        ]);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->putJson("/api/clubs/{$complejo->subdominio}/clientes/{$cliente->id}", [
+                'nombre' => 'Jugador Sin Datos Extra',
+                'telefono' => null,
+                'email' => null,
+                'dni' => null,
+                'notas' => null,
+                'estado' => 'activo',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'cliente' => [
+                    'id' => $cliente->id,
+                    'nombre' => 'Jugador Sin Datos Extra',
+                    'telefono' => null,
+                    'email' => null,
+                    'dni' => null,
+                    'notas' => null,
+                ],
+            ]);
+
+        $this->assertDatabaseHas('clientes', [
+            'id' => $cliente->id,
+            'nombre' => 'Jugador Sin Datos Extra',
+            'telefono' => null,
+            'email' => null,
+            'dni' => null,
+            'notas' => null,
         ]);
     }
 
@@ -450,5 +587,121 @@ class ClubClienteTest extends TestCase
         $this->assertEquals('Leo Messi', $cliente->nombre);
         $this->assertEquals('1198765432', $cliente->telefono);
         $this->assertEquals($complejo->id, $cliente->complejo_id);
+    }
+
+    public function test_turnos_distinguish_past_played_from_future_scheduled_and_accurately_report_ultimo_y_proximo_turno(): void
+    {
+        [$complejo, $admin] = $this->crearComplejoConAdmin('padel-fechas');
+
+        $cancha = Cancha::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Cancha Central',
+            'deporte' => 'padel',
+            'superficie' => 'cristal',
+            'precio_base' => 22000,
+            'estado' => 'activo',
+        ]);
+
+        $cliente = Cliente::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Fernando Belasteguin',
+            'telefono' => '1133445566',
+            'email' => 'bela@padel.com',
+            'estado' => 'activo',
+        ]);
+
+        $fechaPasada = now()->subDays(3)->toDateString();
+        $fechaProxima = now()->addDays(2)->toDateString();
+        $fechaFuturaFija = now()->addMonths(6)->toDateString(); // e.g. 2027
+
+        // Turno pasado jugado
+        Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'club_cliente_id' => $cliente->id,
+            'fecha' => $fechaPasada,
+            'hora_inicio' => '19:00',
+            'hora_fin' => '20:30',
+            'precio' => 20000,
+            'monto_pagado' => 20000,
+            'saldo_pendiente' => 0,
+            'estado' => 'completado',
+            'estado_pago' => 'pagado_total',
+        ]);
+
+        // Turno próximo en agenda
+        Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'club_cliente_id' => $cliente->id,
+            'fecha' => $fechaProxima,
+            'hora_inicio' => '18:00',
+            'hora_fin' => '19:30',
+            'precio' => 22000,
+            'monto_pagado' => 10000,
+            'saldo_pendiente' => 12000,
+            'estado' => 'reservado',
+            'estado_pago' => 'senado',
+        ]);
+
+        // Turno fijo futuro a 6 meses (marzo 2027)
+        Turno::create([
+            'complejo_id' => $complejo->id,
+            'cancha_id' => $cancha->id,
+            'club_cliente_id' => $cliente->id,
+            'fecha' => $fechaFuturaFija,
+            'hora_inicio' => '21:00',
+            'hora_fin' => '22:30',
+            'precio' => 22000,
+            'monto_pagado' => 0,
+            'saldo_pendiente' => 22000,
+            'estado' => 'reservado',
+            'estado_pago' => 'pendiente',
+            'es_fijo' => true,
+        ]);
+
+        // 1. Probar listado general
+        $resList = $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/clubs/{$complejo->subdominio}/clientes");
+
+        $resList->assertStatus(200);
+        $item = $resList->json('clientes.0');
+
+        $this->assertEquals(3, $item['total_turnos']);
+        $this->assertEquals(1, $item['turnos_jugados']);
+        $this->assertEquals(2, $item['turnos_futuros']);
+        $this->assertEquals(0, $item['turnos_cancelados']);
+
+        // Último turno debe ser el jugado en el pasado, NUNCA el de 2027
+        $this->assertNotNull($item['ultimo_turno']);
+        $this->assertEquals($fechaPasada, $item['ultimo_turno']['fecha']);
+        $this->assertEquals('19:00', $item['ultimo_turno']['hora_inicio']);
+
+        // Próximo turno debe ser el más cercano en agenda
+        $this->assertNotNull($item['proximo_turno']);
+        $this->assertEquals($fechaProxima, $item['proximo_turno']['fecha']);
+        $this->assertEquals('18:00', $item['proximo_turno']['hora_inicio']);
+
+        // 2. Probar Ficha 360
+        $resFicha = $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/clubs/{$complejo->subdominio}/clientes/{$cliente->id}");
+
+        $resFicha->assertStatus(200);
+        $stats = $resFicha->json('estadisticas');
+        $this->assertEquals(3, $stats['total_turnos']);
+        $this->assertEquals(1, $stats['turnos_jugados']);
+        $this->assertEquals(2, $stats['turnos_futuros']);
+        $this->assertEquals(0, $stats['turnos_cancelados']);
+
+        $turnos = $resFicha->json('turnos');
+        $this->assertCount(3, $turnos);
+
+        $turnoFuturoLejano = collect($turnos)->firstWhere('fecha', $fechaFuturaFija);
+        $this->assertTrue($turnoFuturoLejano['es_futuro']);
+        $this->assertTrue($turnoFuturoLejano['es_fijo']);
+        $this->assertEquals('pendiente', $turnoFuturoLejano['estado_pago']);
+
+        $turnoPasado = collect($turnos)->firstWhere('fecha', $fechaPasada);
+        $this->assertFalse($turnoPasado['es_futuro']);
     }
 }

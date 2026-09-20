@@ -179,27 +179,91 @@ class ClubClienteService
         $paginator = $query->orderBy('nombre', 'asc')
             ->paginate($perPage);
 
-        // Enriquecer cada cliente con conteos de turnos y saldo
-        $clientesItems = collect($paginator->items())->map(function (Cliente $c) use ($complejoId) {
-            $totalTurnos = Turno::withoutGlobalScopes()
-                ->where('complejo_id', $complejoId)
-                ->where('club_cliente_id', $c->id)
-                ->count();
+        $hoy = Carbon::today()->toDateString();
+        $horaActual = Carbon::now()->toTimeString();
 
-            $turnosCancelados = Turno::withoutGlobalScopes()
+        // Enriquecer cada cliente con conteos de turnos y saldo
+        $clientesItems = collect($paginator->items())->map(function (Cliente $c) use ($complejoId, $hoy, $horaActual) {
+            $turnosBase = Turno::withoutGlobalScopes()
                 ->where('complejo_id', $complejoId)
-                ->where('club_cliente_id', $c->id)
+                ->where(function ($q) use ($c) {
+                    $q->where('club_cliente_id', $c->id);
+                    if ($c->user_id) {
+                        $q->orWhere(function ($q2) use ($c) {
+                            $q2->where('cliente_id', $c->user_id)
+                               ->where(function ($q3) use ($c) {
+                                   $q3->whereNull('club_cliente_id')
+                                      ->orWhere('club_cliente_id', $c->id);
+                               });
+                        });
+                    }
+                    if (!empty($c->telefono)) {
+                        $q->orWhere(function ($q2) use ($c) {
+                            $q2->whereNull('club_cliente_id')
+                               ->whereNull('cliente_id')
+                               ->where('cliente_telefono', $c->telefono);
+                        });
+                    }
+                });
+
+            $totalTurnos = (clone $turnosBase)->count();
+
+            $turnosCancelados = (clone $turnosBase)
                 ->where('estado', 'cancelado')
                 ->count();
 
-            $turnosJugados = max(0, $totalTurnos - $turnosCancelados);
+            // Turnos jugados: pasados y no cancelados
+            $turnosJugados = (clone $turnosBase)
+                ->where('estado', '!=', 'cancelado')
+                ->where(function ($q) use ($hoy, $horaActual) {
+                    $q->where('fecha', '<', $hoy)
+                      ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                          $q2->where('fecha', '=', $hoy)
+                             ->where('hora_fin', '<=', $horaActual);
+                      });
+                })
+                ->count();
 
-            $ultimoTurno = Turno::withoutGlobalScopes()
+            // Turnos futuros: agendados en el futuro y no cancelados
+            $turnosFuturos = (clone $turnosBase)
+                ->where('estado', '!=', 'cancelado')
+                ->where(function ($q) use ($hoy, $horaActual) {
+                    $q->where('fecha', '>', $hoy)
+                      ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                          $q2->where('fecha', '=', $hoy)
+                             ->where('hora_fin', '>', $horaActual);
+                      });
+                })
+                ->count();
+
+            // Último turno jugado (estrictamente pasado, no cancelado)
+            $ultimoTurno = (clone $turnosBase)
                 ->with('cancha:id,nombre')
-                ->where('complejo_id', $complejoId)
-                ->where('club_cliente_id', $c->id)
+                ->where('estado', '!=', 'cancelado')
+                ->where(function ($q) use ($hoy, $horaActual) {
+                    $q->where('fecha', '<', $hoy)
+                      ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                          $q2->where('fecha', '=', $hoy)
+                             ->where('hora_fin', '<=', $horaActual);
+                      });
+                })
                 ->orderBy('fecha', 'desc')
                 ->orderBy('hora_inicio', 'desc')
+                ->first();
+
+            // Próximo turno en agenda (estrictamente futuro, no cancelado)
+            $proximoTurno = (clone $turnosBase)
+                ->with('cancha:id,nombre')
+                ->where('estado', '!=', 'cancelado')
+                ->where(function ($q) use ($hoy, $horaActual) {
+                    $q->where('fecha', '>', $hoy)
+                      ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                          $q2->where('fecha', '=', $hoy)
+                             ->where('hora_fin', '>', $horaActual);
+                      });
+                })
+                ->orderBy('fecha', 'asc')
+                ->orderBy('hora_inicio', 'asc')
                 ->first();
 
             $saldo = $c->saldo_billetera;
@@ -219,12 +283,19 @@ class ClubClienteService
                 'vales_activos_count' => $valesCount,
                 'total_turnos' => $totalTurnos,
                 'turnos_jugados' => $turnosJugados,
+                'turnos_futuros' => $turnosFuturos,
                 'turnos_cancelados' => $turnosCancelados,
                 'ultimo_turno' => $ultimoTurno ? [
                     'fecha' => $ultimoTurno->fecha ? $ultimoTurno->fecha->format('Y-m-d') : null,
                     'hora_inicio' => substr($ultimoTurno->hora_inicio, 0, 5),
                     'cancha_nombre' => $ultimoTurno->cancha?->nombre ?? 'Cancha',
                     'estado' => $ultimoTurno->estado,
+                ] : null,
+                'proximo_turno' => $proximoTurno ? [
+                    'fecha' => $proximoTurno->fecha ? $proximoTurno->fecha->format('Y-m-d') : null,
+                    'hora_inicio' => substr($proximoTurno->hora_inicio, 0, 5),
+                    'cancha_nombre' => $proximoTurno->cancha?->nombre ?? 'Cancha',
+                    'estado' => $proximoTurno->estado,
                 ] : null,
                 'created_at' => $c->created_at ? $c->created_at->toIso8601String() : null,
             ];
@@ -264,40 +335,91 @@ class ClubClienteService
             ]);
         }
 
-        // Historial de turnos (últimos 30)
-        $turnos = Turno::withoutGlobalScopes()
+        $hoy = Carbon::today()->toDateString();
+        $horaActual = Carbon::now()->toTimeString();
+
+        $turnosQueryBase = function () use ($complejoId, $cliente) {
+            return Turno::withoutGlobalScopes()
+                ->where('complejo_id', $complejoId)
+                ->where(function ($q) use ($cliente) {
+                    $q->where('club_cliente_id', $cliente->id);
+                    if ($cliente->user_id) {
+                        $q->orWhere(function ($q2) use ($cliente) {
+                            $q2->where('cliente_id', $cliente->user_id)
+                               ->where(function ($q3) use ($cliente) {
+                                   $q3->whereNull('club_cliente_id')
+                                      ->orWhere('club_cliente_id', $cliente->id);
+                               });
+                        });
+                    }
+                    if (!empty($cliente->telefono)) {
+                        $q->orWhere(function ($q2) use ($cliente) {
+                            $q2->whereNull('club_cliente_id')
+                               ->whereNull('cliente_id')
+                               ->where('cliente_telefono', $cliente->telefono);
+                        });
+                    }
+                });
+        };
+
+        // Turnos futuros (próximos en agenda, ordenados cronológicamente desde el más próximo)
+        $turnosFuturos = $turnosQueryBase()
             ->with('cancha:id,nombre')
-            ->where('complejo_id', $complejoId)
-            ->where(function ($q) use ($cliente) {
-                $q->where('club_cliente_id', $cliente->id);
-                if ($cliente->user_id) {
-                    $q->orWhere('cliente_id', $cliente->user_id);
-                }
-                if (!empty($cliente->telefono)) {
-                    $q->orWhere('cliente_telefono', $cliente->telefono);
-                }
+            ->where(function ($q) use ($hoy, $horaActual) {
+                $q->where('fecha', '>', $hoy)
+                  ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                      $q2->where('fecha', '=', $hoy)
+                         ->where('hora_fin', '>', $horaActual);
+                  });
+            })
+            ->orderBy('fecha', 'asc')
+            ->orderBy('hora_inicio', 'asc')
+            ->limit(50)
+            ->get();
+
+        // Turnos pasados (historial jugado, ordenados desde el más reciente)
+        $turnosPasados = $turnosQueryBase()
+            ->with('cancha:id,nombre')
+            ->where(function ($q) use ($hoy, $horaActual) {
+                $q->where('fecha', '<', $hoy)
+                  ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                      $q2->where('fecha', '=', $hoy)
+                         ->where('hora_fin', '<=', $horaActual);
+                  });
             })
             ->orderBy('fecha', 'desc')
             ->orderBy('hora_inicio', 'desc')
-            ->limit(30)
-            ->get()
-            ->map(function ($t) {
-                return [
-                    'id' => $t->id,
-                    'fecha' => $t->fecha ? $t->fecha->format('Y-m-d') : null,
-                    'hora_inicio' => substr($t->hora_inicio, 0, 5),
-                    'hora_fin' => substr($t->hora_fin, 0, 5),
-                    'cancha_nombre' => $t->cancha?->nombre ?? 'Cancha',
-                    'precio' => (float) $t->precio,
-                    'monto_pagado' => (float) $t->monto_pagado,
-                    'saldo_pendiente' => (float) $t->saldo_pendiente,
-                    'estado' => $t->estado,
-                    'estado_pago' => $t->estado_pago,
-                    'metodo_pago' => $t->metodo_pago,
-                    'es_fijo' => (bool) $t->es_fijo,
-                    'motivo_cancelacion' => $t->motivo_cancelacion,
-                ];
-            });
+            ->limit(50)
+            ->get();
+
+        $turnos = $turnosFuturos->concat($turnosPasados)->map(function ($t) use ($hoy, $horaActual) {
+            $fechaStr = $t->fecha ? $t->fecha->format('Y-m-d') : null;
+            $esFuturo = false;
+            if ($fechaStr) {
+                if ($fechaStr > $hoy) {
+                    $esFuturo = true;
+                } elseif ($fechaStr === $hoy) {
+                    $esFuturo = ($t->hora_fin > $horaActual);
+                }
+            }
+
+            return [
+                'id' => $t->id,
+                'fecha' => $fechaStr,
+                'hora_inicio' => substr($t->hora_inicio, 0, 5),
+                'hora_fin' => substr($t->hora_fin, 0, 5),
+                'cancha_nombre' => $t->cancha?->nombre ?? 'Cancha',
+                'precio' => (float) $t->precio,
+                'monto_pagado' => (float) $t->monto_pagado,
+                'saldo_pendiente' => (float) $t->saldo_pendiente,
+                'estado' => $t->estado,
+                'estado_pago' => $t->estado_pago,
+                'metodo_pago' => $t->metodo_pago,
+                'es_fijo' => (bool) $t->es_fijo,
+                'es_futuro' => $esFuturo,
+                'motivo_cancelacion' => $t->motivo_cancelacion,
+            ];
+        });
 
         // Billetera virtual y movimientos si tiene user_id
         $saldoBilletera = $cliente->saldo_billetera;
@@ -349,10 +471,46 @@ class ClubClienteService
             });
 
         // Estadísticas agregadas
-        $totalTurnos = $turnos->count();
-        $turnosCancelados = $turnos->where('estado', 'cancelado')->count();
-        $turnosJugados = max(0, $totalTurnos - $turnosCancelados);
-        $tasaCumplimiento = $totalTurnos > 0 ? round(($turnosJugados / $totalTurnos) * 100, 1) : 100.0;
+        $totalTurnos = $turnosQueryBase()->count();
+        $turnosCancelados = $turnosQueryBase()->where('estado', 'cancelado')->count();
+
+        $turnosJugados = $turnosQueryBase()
+            ->where('estado', '!=', 'cancelado')
+            ->where(function ($q) use ($hoy, $horaActual) {
+                $q->where('fecha', '<', $hoy)
+                  ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                      $q2->where('fecha', '=', $hoy)
+                         ->where('hora_fin', '<=', $horaActual);
+                  });
+            })
+            ->count();
+
+        $turnosFuturosCount = $turnosQueryBase()
+            ->where('estado', '!=', 'cancelado')
+            ->where(function ($q) use ($hoy, $horaActual) {
+                $q->where('fecha', '>', $hoy)
+                  ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                      $q2->where('fecha', '=', $hoy)
+                         ->where('hora_fin', '>', $horaActual);
+                  });
+            })
+            ->count();
+
+        $turnosCanceladosPasados = $turnosQueryBase()
+            ->where('estado', 'cancelado')
+            ->where(function ($q) use ($hoy, $horaActual) {
+                $q->where('fecha', '<', $hoy)
+                  ->orWhere(function ($q2) use ($hoy, $horaActual) {
+                      $q2->where('fecha', '=', $hoy)
+                         ->where('hora_fin', '<=', $horaActual);
+                  });
+            })
+            ->count();
+
+        $turnosPasadosTotales = $turnosJugados + $turnosCanceladosPasados;
+        $tasaCumplimiento = $turnosPasadosTotales > 0
+            ? round(($turnosJugados / $turnosPasadosTotales) * 100, 1)
+            : 100.0;
 
         return [
             'cliente' => [
@@ -371,6 +529,7 @@ class ClubClienteService
             'estadisticas' => [
                 'total_turnos' => $totalTurnos,
                 'turnos_jugados' => $turnosJugados,
+                'turnos_futuros' => $turnosFuturosCount,
                 'turnos_cancelados' => $turnosCancelados,
                 'tasa_cumplimiento' => $tasaCumplimiento,
             ],
@@ -396,8 +555,14 @@ class ClubClienteService
         $estado = in_array($datos['estado'] ?? '', ['activo', 'bloqueado']) ? $datos['estado'] : 'activo';
         $motivoBloqueo = ($estado === 'bloqueado') ? trim($datos['motivo_bloqueo'] ?? 'Bloqueado por administración') : null;
 
-        // Validar unicidad de teléfono si se proporciona
+        // Validar formato numérico y unicidad de teléfono si se proporciona
         if (!empty($telefono)) {
+            if (!preg_match('/^\+?[0-9]{8,15}$/', $telefono)) {
+                throw ValidationException::withMessages([
+                    'telefono' => ['El teléfono / WhatsApp debe ser numérico y contener entre 8 y 15 dígitos.'],
+                ]);
+            }
+
             $existeTel = Cliente::withoutGlobalScopes()
                 ->where('complejo_id', $complejoId)
                 ->where('telefono', $telefono)
@@ -406,6 +571,15 @@ class ClubClienteService
             if ($existeTel) {
                 throw ValidationException::withMessages([
                     'telefono' => ['Ya existe un cliente registrado con este número de teléfono en el club.'],
+                ]);
+            }
+        }
+
+        // Validar formato numérico de DNI si se proporciona
+        if (!empty($dni)) {
+            if (!preg_match('/^[0-9]{6,12}$/', $dni)) {
+                throw ValidationException::withMessages([
+                    'dni' => ['El DNI debe ser numérico y contener entre 6 y 12 dígitos.'],
                 ]);
             }
         }
@@ -462,31 +636,76 @@ class ClubClienteService
             ]);
         }
 
-        $nombre = trim($datos['nombre'] ?? $cliente->nombre);
-        $telefono = isset($datos['telefono']) ? (!empty($datos['telefono']) ? trim($datos['telefono']) : null) : $cliente->telefono;
-        $email = isset($datos['email']) ? (!empty($datos['email']) ? strtolower(trim($datos['email'])) : null) : $cliente->email;
-        $dni = isset($datos['dni']) ? (!empty($datos['dni']) ? trim($datos['dni']) : null) : $cliente->dni;
-        $notas = isset($datos['notas']) ? trim($datos['notas']) : $cliente->notas;
-        $estado = isset($datos['estado']) && in_array($datos['estado'], ['activo', 'bloqueado']) ? $datos['estado'] : $cliente->estado;
-        $motivoBloqueo = ($estado === 'bloqueado') ? trim($datos['motivo_bloqueo'] ?? ($cliente->motivo_bloqueo ?: 'Bloqueado por administración')) : null;
+        $currNombre = $cliente->nombre;
+        $nombre = array_key_exists('nombre', $datos) ? trim($datos['nombre'] ?? '') : $currNombre;
+        if (empty($nombre)) {
+            $nombre = $currNombre;
+        }
 
-        // Validar que el nuevo teléfono no esté tomado por otro cliente en este club
-        if (!empty($telefono) && $telefono !== $cliente->telefono) {
-            $existeTel = Cliente::withoutGlobalScopes()
-                ->where('complejo_id', $complejoId)
-                ->where('telefono', $telefono)
-                ->where('id', '!=', $clienteId)
-                ->exists();
+        $currTel = $cliente->telefono ? trim($cliente->telefono) : null;
+        $telefono = array_key_exists('telefono', $datos)
+            ? (!empty($datos['telefono']) ? trim($datos['telefono']) : null)
+            : $currTel;
 
-            if ($existeTel) {
+        $currEmail = $cliente->email ? strtolower(trim($cliente->email)) : null;
+        $email = array_key_exists('email', $datos)
+            ? (!empty($datos['email']) ? strtolower(trim($datos['email'])) : null)
+            : $currEmail;
+
+        $dni = array_key_exists('dni', $datos)
+            ? (!empty($datos['dni']) ? trim($datos['dni']) : null)
+            : $cliente->dni;
+
+        $notas = array_key_exists('notas', $datos)
+            ? (!empty($datos['notas']) ? trim($datos['notas']) : null)
+            : $cliente->notas;
+
+        $estado = array_key_exists('estado', $datos) && in_array($datos['estado'], ['activo', 'bloqueado'])
+            ? $datos['estado']
+            : $cliente->estado;
+
+        $motivoBloqueo = ($estado === 'bloqueado')
+            ? (array_key_exists('motivo_bloqueo', $datos) ? trim($datos['motivo_bloqueo'] ?? '') : ($cliente->motivo_bloqueo ?: 'Bloqueado por administración'))
+            : null;
+
+        if ($estado === 'bloqueado' && empty($motivoBloqueo)) {
+            $motivoBloqueo = 'Bloqueado por administración';
+        }
+
+        // Validar formato numérico de teléfono y unicidad si se proporciona
+        if (!empty($telefono)) {
+            if (!preg_match('/^\+?[0-9]{8,15}$/', $telefono)) {
                 throw ValidationException::withMessages([
-                    'telefono' => ['Ya existe otro cliente registrado con este número de teléfono en el club.'],
+                    'telefono' => ['El teléfono / WhatsApp debe ser numérico y contener entre 8 y 15 dígitos.'],
+                ]);
+            }
+
+            if ($telefono !== $currTel) {
+                $existeTel = Cliente::withoutGlobalScopes()
+                    ->where('complejo_id', $complejoId)
+                    ->where('telefono', $telefono)
+                    ->where('id', '!=', $clienteId)
+                    ->exists();
+
+                if ($existeTel) {
+                    throw ValidationException::withMessages([
+                        'telefono' => ['Ya existe otro cliente registrado con este número de teléfono en el club.'],
+                    ]);
+                }
+            }
+        }
+
+        // Validar formato numérico de DNI si se proporciona
+        if (!empty($dni)) {
+            if (!preg_match('/^[0-9]{6,12}$/', $dni)) {
+                throw ValidationException::withMessages([
+                    'dni' => ['El DNI debe ser numérico y contener entre 6 y 12 dígitos.'],
                 ]);
             }
         }
 
         // Validar que el nuevo email no esté tomado por otro cliente en este club
-        if (!empty($email) && $email !== $cliente->email) {
+        if (!empty($email) && $email !== $currEmail) {
             $existeEmail = Cliente::withoutGlobalScopes()
                 ->where('complejo_id', $complejoId)
                 ->where('email', $email)
@@ -500,7 +719,19 @@ class ClubClienteService
             }
         }
 
+        // Sincronizar user_id si se proporcionó email
+        $userId = $cliente->user_id;
+        if (array_key_exists('email', $datos)) {
+            if (!empty($email)) {
+                $existingUser = User::where('email', $email)->first();
+                $userId = $existingUser ? $existingUser->id : null;
+            } else {
+                $userId = null;
+            }
+        }
+
         $cliente->update([
+            'user_id' => $userId,
             'nombre' => $nombre,
             'telefono' => $telefono,
             'email' => $email,

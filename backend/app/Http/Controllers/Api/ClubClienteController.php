@@ -116,15 +116,17 @@ class ClubClienteController extends Controller
 
         $validator = Validator::make($request->all(), [
             'nombre' => 'required|string|max:150',
-            'telefono' => 'nullable|string|max:50',
+            'telefono' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9]{8,15}$/'],
             'email' => 'nullable|email|max:150',
-            'dni' => 'nullable|string|max:50',
+            'dni' => ['nullable', 'string', 'max:50', 'regex:/^[0-9]{6,12}$/'],
             'notas' => 'nullable|string|max:2000',
             'estado' => 'nullable|in:activo,bloqueado',
             'motivo_bloqueo' => 'nullable|string|max:255',
         ], [
             'nombre.required' => 'El nombre completo del cliente es obligatorio.',
+            'telefono.regex' => 'El teléfono / WhatsApp debe ser numérico y contener entre 8 y 15 dígitos.',
             'email.email' => 'El formato del correo electrónico no es válido.',
+            'dni.regex' => 'El DNI debe ser numérico y contener entre 6 y 12 dígitos.',
             'estado.in' => 'El estado debe ser activo o bloqueado.',
         ]);
 
@@ -168,15 +170,17 @@ class ClubClienteController extends Controller
 
         $validator = Validator::make($request->all(), [
             'nombre' => 'sometimes|required|string|max:150',
-            'telefono' => 'nullable|string|max:50',
+            'telefono' => ['nullable', 'string', 'max:50', 'regex:/^\+?[0-9]{8,15}$/'],
             'email' => 'nullable|email|max:150',
-            'dni' => 'nullable|string|max:50',
+            'dni' => ['nullable', 'string', 'max:50', 'regex:/^[0-9]{6,12}$/'],
             'notas' => 'nullable|string|max:2000',
             'estado' => 'nullable|in:activo,bloqueado',
             'motivo_bloqueo' => 'nullable|string|max:255',
         ], [
             'nombre.required' => 'El nombre del cliente no puede estar vacío.',
+            'telefono.regex' => 'El teléfono / WhatsApp debe ser numérico y contener entre 8 y 15 dígitos.',
             'email.email' => 'El formato del correo electrónico no es válido.',
+            'dni.regex' => 'El DNI debe ser numérico y contener entre 6 y 12 dígitos.',
         ]);
 
         if ($validator->fails()) {

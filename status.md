@@ -6,8 +6,8 @@
 
 ## 📋 Resumen de Progreso
 - **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja y CRM / Directorio de Clientes del Club)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Padrón y Directorio de Clientes del Club con Ficha 360°, notas privadas, edición de contactos, autocompletado inteligente en mostrador, protocolo meteorológico por lluvia con vales tokenizados, reembolsos en billetera, tarifas dinámicas pico/valle y control contable en arqueo diario)
-- **Última Actualización:** 2026-09-20 (Implementación del Módulo de Directorio & CRM de Clientes del Club con Ficha 360°, notas internas operativas, edición de contactos de WhatsApp/email, estados activo/bloqueado, autocompletado en reservas de mostrador en Grilla Horaria y backfill automático multi-tenant. 411 tests automatizados en verde: 275 backend, 116 frontend, 20 mobile; 100% sin regresiones).
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Padrón y Directorio de Clientes del Club con Ficha 360°, validación numérica y WhatsApp en contactos y DNI, distinción temporal estricta de turnos pasados/jugados vs. turnos futuros en agenda, notas privadas, autocompletado inteligente en mostrador, protocolo meteorológico por lluvia con vales tokenizados, reembolsos en billetera, tarifas dinámicas pico/valle y control contable en arqueo diario)
+- **Última Actualización:** 2026-09-20 (Validación numérica estricta para Teléfono/WhatsApp y DNI en modal de clientes: filtrado de caracteres no numéricos en tiempo real, validación de longitudes internacionales E.164 y enlaces wa.me con código de país 549. 418 tests automatizados en verde: 278 backend, 120 frontend, 20 mobile; 100% sin fallas ni regresiones).
 
 ---
 
@@ -77,5 +77,59 @@
 - [x] **Protocolo de Cancelación Masiva por Lluvia & Vales Tokenizados (Rain Check):** Modal operativo en `/panel` con filtro de horario de inicio, selección de canchas (con preselección inteligente de canchas descubiertas) y bloqueo preventivo de grilla; reembolsos inmediatos a billetera virtual para usuarios registrados y emisión de vales digitales tokenizados con UUID seguro (`ValeCredito`) con notificación WhatsApp y portal público `/vales/[token]` para clientes no registrados o de mostrador *(Completado)*
 - [x] **Hardening Contable, Control de Caja & Grilla Operativa ante Contingencias Meteorológicas:** Exclusión de turnos cancelados o bloqueados por lluvia del cálculo de deudas y facturación en `ClubReporteService` (saldos en $0 y remoción de botones de cobro/recordatorio), nuevas métricas KPI (`total_reembolsos_lluvia`, billetera y vales), desglose visual en `ResumenDiarioTurnos.tsx`, categorización explícita `"Cancelación por Lluvia"` y `"Canje Vale de Lluvia"` en `GestionBilleteras.tsx`, prevención de duplicados y acción de desbloqueo de horarios en `GrillaHoraria.tsx` *(Completado)*
 - [x] **Módulo de Directorio & CRM de Clientes del Club (Ficha 360° & Autocompletado):** Tabla multi-tenant `clientes` con backfill automático inteligente; endpoints CRUD y Ficha 360° en `ClubClienteController` (historial de turnos, billetera virtual, vales de crédito, notas privadas y bloqueo de clientes); nueva pestaña "👥 Clientes" en `/panel` con componente modular `GestionClientes.tsx`, KPIs, buscador en tiempo real y botón de chat directo a WhatsApp; autocompletado en vivo de clientes habituales y alertas de clientes bloqueados al reservar desde mostrador en `GrillaHoraria.tsx` *(Completado)*
+- [x] **Diferenciación Temporal Estricta: Turnos Jugados vs. Turnos en Agenda (Ficha 360° & Directorio):** Desacople de turnos históricos pasados respecto a reservas recurrentes a futuro (turnos fijos de 6 meses). Corrección de falsos positivos donde fechas lejanas (ej. marzo de 2027) se mostraban como jugadas o como último turno; incorporación de desglose `✓ jugados` • `⏱ agenda` • `✗ cancelados`, columna bivalente `Próximo / Último Turno`, sub-filtros interactivos en Ficha 360° y etiquetas de pago auditadas (`Pago Pendiente`, `Señado`, `Pagado Total`, `Turno Fijo`) *(Completado)*
+- [x] **Validación Numérica Estricta & WhatsApp Válido en Modal de Clientes:** Filtrado en tiempo real de caracteres no numéricos al escribir o pegar en los campos Teléfono y DNI en `GestionClientes.tsx`; validación estricta de formato telefónico E.164 (8 a 15 dígitos con prefijo `+` opcional) y DNI (6 a 12 dígitos); formateo automático internacional para enlaces directos `wa.me/549...` tanto en el listado como en la Ficha 360°; validación de backend reforzada en `ClubClienteController` y `ClubClienteService` con mensajes de error explícitos en español *(Completado)*
 
+---
 
+## 🧪 Guía de Pruebas Paso a Paso para Testers
+
+### Caso de Prueba: Distinción de Turnos Pasados vs. Próximos en Agenda en Clientes con Turnos Fijos (ej. Fernando Belasteguin `bela@gmail.com`)
+1. **Acceso al Panel de Administración:**
+   - Iniciar sesión como administrador de club (ej. `padel-center` o club 113) y dirigirse a la pestaña **👥 Clientes** en `/panel`.
+2. **Búsqueda del Cliente con Turnos Fijos:**
+   - En la barra de búsqueda escribir `Bela` o `bela@gmail.com`.
+3. **Verificación en la Tabla Principal de Clientes:**
+   - **Columna Turnos:** Observar el número total de turnos (ej. 117) y el desglose en la parte inferior:
+     - `✓ 12` en verde (turnos efectivamente jugados en el pasado).
+     - `⏱ 100` en cyan (turnos futuros agendados en el calendario).
+     - `✗ 5` en rojo (turnos cancelados).
+     - Comprobar que la suma coincide exactamente: $12 + 100 + 5 = 117$.
+   - **Columna Próximo / Último Turno:**
+     - Comprobar que el badge cyan **Próx** muestra la fecha más próxima en el calendario (ej. `22/09/2026 • 12:00 hs (Cancha 1)`).
+     - Comprobar que el badge slate **Jugado** muestra la fecha pasada más reciente (ej. `18/09/2026 • 22:00 hs (Cancha 2)`).
+     - Verificar que **NUNCA** se muestra marzo de 2027 como último turno jugado.
+4. **Verificación en la Ficha 360°:**
+   - Hacer clic en el icono del ojo **Ver Ficha 360°** de Fernando Belasteguin.
+   - En la pestaña **Resumen**:
+     - La tarjeta **Total Turnos** exhibe el total con el subtítulo: `12 jugados • 100 agenda`.
+     - La tarjeta **Asistencia** refleja la tasa real de cumplimiento sobre turnos pasados.
+   - En la pestaña **Historial de Turnos**:
+     - Hacer clic en el botón sub-filtro **En Agenda**: verificar que solo aparecen turnos futuros con el badge cyan `En Agenda`, el badge violeta `Turno Fijo` y estado de pago `Pago Pendiente` (ámbar) o `Señado` (azul cielo).
+     - Hacer clic en el botón sub-filtro **Jugados**: verificar que solo aparecen turnos de fechas ya transcurridas con el badge `Jugado` (slate) y que el primero de la lista es el último jugado (18 de septiembre de 2026).
+     - Comprobar que los turnos de marzo de 2027 figuran en **En Agenda** como turnos fijos pendientes y no como turnos ya utilizados.
+
+### Caso de Prueba: Edición de Datos del Cliente desde la Ficha 360°
+1. **Abrir Ficha 360°:**
+   - Hacer clic en el botón **Ver Ficha 360°** de cualquier cliente.
+2. **Acceder a la Edición:**
+   - En el encabezado del modal 360°, hacer clic en el botón **Editar Datos**.
+3. **Verificación Visual & Jerarquía:**
+   - Comprobar que el modal de edición aparece **en primer plano por encima de la Ficha 360°**, con su propio fondo oscuro difuminado (`backdrop-blur`).
+   - Los datos actuales del cliente aparecen precompletados en los campos (Nombre, Teléfono, Email, DNI, Notas, Estado).
+4. **Guardado y Sincronización Inmediata:**
+   - Modificar cualquier campo (por ejemplo, agregar una nota o cambiar el nombre) y hacer clic en **Guardar Cambios**.
+   - Comprobar que el modal de edición se cierra, aparece la notificación toast verde `"Datos actualizados correctamente."`, y la Ficha 360° que estaba abajo queda visible con los datos ya actualizados sin necesidad de recargar la página.
+
+### Caso de Prueba: Validación Numérica y de WhatsApp en Teléfono y DNI (Creación / Edición)
+1. **Abrir Modal de Edición o Nuevo Cliente:**
+   - En la pestaña **👥 Clientes**, presionar **Nuevo Cliente** o el botón del lápiz **Editar Datos** en cualquier fila.
+2. **Verificación de Restricción al Tipear (Input Masking):**
+   - En el campo **Teléfono / WhatsApp**, intentar escribir letras (ej. `hola-test`): verificar que **no se escribe ninguna letra**, únicamente números y el prefijo `+`.
+   - En el campo **DNI / Documento**, intentar escribir letras o caracteres especiales: verificar que **solo admite dígitos numéricos** (0 al 9).
+3. **Verificación de Validación de Longitud & WhatsApp Válido:**
+   - Escribir un número incompleto o corto en Teléfono (ej. `12345`): al intentar guardar, el formulario rechaza el envío y muestra la alerta `"El teléfono / WhatsApp debe ser numérico y contener entre 8 y 15 dígitos (ej. 1144556677 o +5491144556677)."`.
+   - Escribir un DNI con menos de 6 dígitos (ej. `123`): al intentar guardar, muestra `"El DNI debe ser numérico y contener entre 6 y 12 dígitos."`.
+4. **Guardado Exitoso y Enlace Directo a WhatsApp:**
+   - Ingresar un teléfono local de 10 dígitos (ej. `1149790220`): guardar los cambios.
+   - Observar que el botón verde de WhatsApp en la tabla o en la Ficha 360° enlaza a `https://wa.me/5491149790220` (con código de país 549 preformateado para abrir directamente la conversación en WhatsApp sin error de destino).
