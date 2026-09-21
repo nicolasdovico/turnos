@@ -2623,6 +2623,21 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: 124/124 tests pasados en Vitest (13 suites).
   * Total Ecosistema: 430/430 tests automatizados en verde (0 fallas, 0 regresiones).
 ===============================================================================
+[2026-09-21] - CORRECCIÓN: WORKFLOW DE DESPLIEGUE CONTINUO (CD) EN GITHUB ACTIONS (FAIL EN 5S POR SECRETOS FALTANTES)
+===============================================================================
+- Diagnóstico:
+  * Al realizar `git push origin main`, GitHub Actions disparaba el workflow `Continuous Deployment (CD) / Zero-Downtime Production Deployment` (`.github/workflows/deploy.yml`), el cual fallaba en ~5 segundos enviando un mail de alerta de error ("All jobs have failed").
+  * Causa Raíz: En el step `Configure SSH Key`, la acción `webfactory/ssh-agent@v0.9.0` requería el secreto `SERVER_SSH_KEY`. Al no estar cargados los secretos del servidor remoto en GitHub (`Settings > Secrets and variables > Actions`), la acción fallaba de inmediato por clave SSH vacía o inexistente.
+- Solución Implementada:
+  * 1. Workflow `.github/workflows/deploy.yml`:
+    - Se agregó el step previo `Verify Deployment Secrets Configuration` que evalúa la presencia de `SERVER_SSH_KEY`, `SERVER_HOST` y `SERVER_USER`.
+    - Si alguno de los secretos falta, el job emite una advertencia formal (`::warning::`), marca `configured=false` y omite los pasos de conexión SSH y ejecución remota de forma segura, finalizando el workflow con éxito (`success`) sin disparar correos de fallo.
+    - Se agregó el disparador `workflow_dispatch` para permitir la ejecución manual del despliegue desde la pestaña Actions de GitHub en cualquier momento.
+    - Si los secretos se configuran en el repositorio, el despliegue automático hacia el servidor se ejecuta sin requerir cambios adicionales.
+- Verificación:
+  * El workflow ahora finaliza en estado exitoso (verde) tanto si los secretos no están cargados como cuando se configuren en el futuro.
+===============================================================================
+
 
 
 

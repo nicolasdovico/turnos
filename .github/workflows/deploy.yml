@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
   group: production-deployment
@@ -18,17 +19,34 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Verify Deployment Secrets Configuration
+        id: check_secrets
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$HOST" ] || [ -z "$USER" ]; then
+            echo "::warning title=CD Omitido::Los secretos de despliegue (SERVER_SSH_KEY, SERVER_HOST o SERVER_USER) no están configurados en GitHub Secrets. Se omite el despliegue automático a producción sin fallar el workflow."
+            echo "configured=false" >> $GITHUB_OUTPUT
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Configure SSH Key
+        if: steps.check_secrets.outputs.configured == 'true'
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
       - name: Add Server to Known Hosts
+        if: steps.check_secrets.outputs.configured == 'true'
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Execute Remote Deployment Commands
+        if: steps.check_secrets.outputs.configured == 'true'
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
@@ -67,6 +85,10 @@ jobs:
             echo "✅ [CD] Despliegue completado exitosamente con Zero Downtime."
           EOF
 
-      - name: Report Deployment Success
-        if: success()
-        run: echo "🎉 Despliegue a producción finalizado exitosamente."
+      - name: Report Deployment Status
+        run: |
+          if [ "${{ steps.check_secrets.outputs.configured }}" = "true" ]; then
+            echo "🎉 Despliegue a producción finalizado exitosamente."
+          else
+            echo "ℹ️ Paso de despliegue omitido de forma segura (sin secretos de servidor configurados en GitHub Secrets)."
+          fi
