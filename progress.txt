@@ -2743,7 +2743,8 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * 3. Frontend (`frontend/components/FacturacionClubPanel.tsx`):
     - En la Tarjeta de Marketplace y en el Desglose de Liquidación, se visualiza el importe convertido en USD con aclaración del monto acumulado en ARS:
       `$0.94 USD ($1.450,00 ARS)`.
-    - Al hacer clic en "Ver Turnos Marketplace", la tabla desplegable detalla explícitamente los precios y comisiones retenidas en ARS de cada turno individual.
+    - Al hacer clic en "Ver Turnos Marketplace", la tabla desplegable detalla explícitamente los precios y comisiones retenidas en ARS de cada turno individual, formateando las fechas al estándar nacional dd-mm-aaaa (ej. 21-09-2026).
+    - Mismo formateo dd-mm-aaaa aplicado a las fechas de emisión y vencimiento en la tabla histórica de facturas B2B.
     - El resultado final para el club pasó de $1.487 USD ($2.282.545 ARS) a $37.94 USD ($58.245,00 ARS).
 - Verificación:
   * 286/286 tests de backend en verde en PHPUnit.

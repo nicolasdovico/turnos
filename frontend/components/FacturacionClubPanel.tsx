@@ -21,6 +21,15 @@ import {
   Info,
 } from "lucide-react";
 
+export const formatFechaDDMMAAAA = (fechaStr?: string | null): string => {
+  if (!fechaStr) return "";
+  const parts = fechaStr.split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2].padStart(2, "0")}-${parts[1].padStart(2, "0")}-${parts[0]}`;
+  }
+  return fechaStr;
+};
+
 interface FacturacionClubPanelProps {
   subdomain: string;
   token?: string | null;
@@ -568,7 +577,7 @@ export default function FacturacionClubPanel({
                 <tbody className="divide-y divide-slate-900 font-mono text-slate-300">
                   {((mkt as any).turnos || []).map((t: any) => (
                     <tr key={t.id}>
-                      <td className="py-2 text-slate-200">{t.fecha}</td>
+                      <td className="py-2 text-slate-200 font-bold">{formatFechaDDMMAAAA(t.fecha)}</td>
                       <td className="py-2">{t.hora_inicio ? String(t.hora_inicio).substring(0, 5) : ""}</td>
                       <td className="py-2">${Number(t.precio).toLocaleString("es-AR", { minimumFractionDigits: 2 })} ARS</td>
                       <td className="py-2">{t.comision_porcentaje}%</td>
@@ -626,8 +635,8 @@ export default function FacturacionClubPanel({
                   <tr key={f.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3 font-mono font-bold text-white">{f.numero_factura}</td>
                     <td className="py-3">{f.periodo}</td>
-                    <td className="py-3">{f.fecha_emision}</td>
-                    <td className="py-3">{f.fecha_vencimiento}</td>
+                    <td className="py-3">{formatFechaDDMMAAAA(f.fecha_emision)}</td>
+                    <td className="py-3">{formatFechaDDMMAAAA(f.fecha_vencimiento)}</td>
                     <td className="py-3 font-mono font-bold text-white">${Number(f.total_usd).toFixed(2)}</td>
                     <td className="py-3 font-mono text-emerald-400">
                       ${Number(f.total_ars).toLocaleString("es-AR", { minimumFractionDigits: 2 })}

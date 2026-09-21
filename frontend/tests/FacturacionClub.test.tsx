@@ -146,8 +146,16 @@ describe("Facturación Club B2B & Pasarelas de Pago", () => {
     expect(screen.getAllByText(/turnos/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("$47.00 USD").length).toBeGreaterThanOrEqual(1);
 
-    // Validar Historial de Facturas
+    // Validar Historial de Facturas con formato dd-mm-aaaa
     expect(screen.getByText("FC-2026-0001")).toBeDefined();
+    expect(screen.getByText("20-09-2026")).toBeDefined();
+    expect(screen.getByText("25-09-2026")).toBeDefined();
+
+    // Desplegar tabla de turnos de marketplace y validar formato dd-mm-aaaa
+    const btnVerTurnos = screen.getByText(/Ver Turnos Marketplace/i);
+    fireEvent.click(btnVerTurnos);
+    expect(screen.getByText("15-09-2026")).toBeDefined();
+    expect(screen.getByText("18-09-2026")).toBeDefined();
   });
 
   it("opens payment modal and switches between Mercado Pago, Stripe and Transferencia", async () => {
