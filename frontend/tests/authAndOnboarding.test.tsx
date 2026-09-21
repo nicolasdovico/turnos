@@ -382,6 +382,132 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/Iluminación Artificial/i)).toBeDefined();
   });
 
+  it("displays interactive extra court confirmation banner and creates court when quota exceeded", async () => {
+    let courtCreated = false;
+    let postCalls = 0;
+
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any, options: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+      if (urlStr.includes("dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 1,
+                nombre: "Nico Padel",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+                tipo_negocio: { id: 1, nombre: "Club", slug: "club" },
+              },
+              plan: {
+                id: 1,
+                nombre: "Bronce",
+                slug: "bronce",
+                precio_mensual: 29,
+                canchas_incluidas: 2,
+                canchas_utilizadas: courtCreated ? 3 : 2,
+                canchas_excedentes: courtCreated ? 1 : 0,
+                costo_adicional_total: courtCreated ? 8 : 0,
+                costo_total_mensual: courtCreated ? 37 : 29,
+                precio_cancha_adicional: 8,
+                modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }],
+              },
+              canchas: [
+                { id: 1, nombre: "Cancha 1", deporte: "padel", precio_base: 8000, estado: "activo" },
+                { id: 2, nombre: "Cancha 2", deporte: "padel", precio_base: 8000, estado: "activo" },
+                ...(courtCreated ? [{ id: 3, nombre: "Cancha 3 Extra", deporte: "padel", precio_base: 8000, estado: "activo" }] : []),
+              ],
+              stats: { total_canchas: courtCreated ? 3 : 2, total_turnos: 0, modulos_count: 7 },
+            },
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/canchas") && options?.method === "POST") {
+        postCalls++;
+        const body = JSON.parse(options?.body || "{}");
+        if (!body.acepta_cargo_adicional) {
+          return {
+            ok: false,
+            status: 422,
+            json: async () => ({
+              success: false,
+              code: "REQUIRES_EXTRA_COURT_CONFIRMATION",
+              message: "La creación de esta cancha supera el cupo de 2 canchas incluidas de tu Plan Bronce. Se sumará un cargo adicional de $8 USD/mes a tu abono.",
+              canchas_incluidas: 2,
+              canchas_actuales: 2,
+              precio_cancha_adicional: 8,
+              nuevo_costo_adicional: 8,
+              nuevo_total_mensual: 37,
+              data: {
+                canchas_incluidas: 2,
+                canchas_actuales: 2,
+                precio_cancha_adicional: 8,
+                nuevo_costo_adicional: 8,
+                nuevo_total_mensual: 37,
+              },
+            }),
+          } as any;
+        } else {
+          courtCreated = true;
+          return {
+            ok: true,
+            status: 201,
+            json: async () => ({
+              success: true,
+              message: "Cancha creada exitosamente.",
+              cancha: { id: 3, nombre: "Cancha 3 Extra", deporte: "padel", precio_base: 8000, estado: "activo" },
+            }),
+          } as any;
+        }
+      }
+      return { ok: true, json: async () => ({ data: [] }) } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    expect(await screen.findByText(/Canchas Disponibles/i)).toBeDefined();
+
+    // Open court creation modal
+    const addBtn = screen.getByText(/\+ Nueva Cancha/i);
+    fireEvent.click(addBtn);
+
+    expect(await screen.findByText("➕ Nueva Cancha")).toBeDefined();
+
+    // Fill court name
+    const nameInput = screen.getByPlaceholderText(/Ej\. Cancha 1 \(Central Panorámica\)/i);
+    fireEvent.change(nameInput, { target: { value: "Cancha 3 Extra" } });
+
+    // Submit form
+    const submitBtn = screen.getByRole("button", { name: /Crear Cancha/i });
+    fireEvent.click(submitBtn);
+
+    // Confirmation banner must be displayed
+    expect(await screen.findByText(/Cupo Base de Canchas Alcanzado/i)).toBeDefined();
+    expect(screen.getByText(/2 canchas base/i)).toBeDefined();
+    expect(screen.getByText(/\$37 \/ mes/i)).toBeDefined();
+
+    // Click confirm extra court button
+    const confirmExtraBtn = screen.getByRole("button", { name: /Confirmar y Agregar Cancha Extra/i });
+    fireEvent.click(confirmExtraBtn);
+
+    // Court is created and success message shown
+    expect(await screen.findByText(/¡Cancha adicional agregada con éxito!/i)).toBeDefined();
+    expect(screen.getByText(/Tu nuevo abono mensual estimado es de \$37 USD\/mes/i)).toBeDefined();
+    expect(postCalls).toBe(2);
+  });
+
   it("displays courts sorted alphabetically by name in the admin panel", async () => {
     vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
       const urlStr = String(url);

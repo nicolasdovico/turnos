@@ -2666,6 +2666,29 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: Vitest suites pasan al 100%.
   * Backend: Tests de PHPUnit verificados en PostgreSQL y Redis.
 ===============================================================================
+[2026-09-21] - CORRECCIÓN Y ACTIVACIÓN: CREACIÓN DE CANCHAS ADICIONALES CON CONFIRMACIÓN DE CUPO & ALERTA DE ABONO
+===============================================================================
+- Diagnóstico:
+  * Al intentar crear una cancha nueva que supera el cupo base del plan contratado (ej. 3ra cancha en Plan Bronce con 2 canchas incluidas), el sistema no la creaba y no mostraba ningún mensaje de error ni cartel interactivo.
+  * Causa Raíz 1 (Frontend): En `frontend/app/tenants/[subdomain]/panel/page.tsx`, la función `handleSaveCancha` recibía el error 422 con código `REQUIRES_EXTRA_COURT_CONFIRMATION` e intentaba leer `setExtraCourtConfirmation(data.data)`. Como el backend devolvía las propiedades en la raíz del JSON (`data.canchas_incluidas`, `data.canchas_actuales`, etc.), `data.data` resultaba en `undefined`. Al setearse `undefined` y ejecutarse `return;`, ni el banner de confirmación interactiva `{extraCourtConfirmation && (...)}` ni el mensaje de error `{canchaErrorMsg && (...)}` se renderizaban, dejando el modal abierto en silencio.
+  * Causa Raíz 2 (Backend): En `backend/app/Http/Controllers/Api/ClubDashboardController.php`, la respuesta 422 no computaba `nuevo_total_mensual` ni `nuevo_costo_adicional`, por lo que el frontend carecía del total estimado del abono con la cancha extra.
+- Solución e Implementación Realizada:
+  * 1. Backend (`ClubDashboardController.php`):
+    - Se incorporó el cálculo de costos con `plan->calcularCostoTotal($newCanchasCount)` ante excesos de cupo.
+    - Se agregaron las propiedades `nuevo_costo_adicional`, `nuevo_total_mensual` y el objeto anidado `data` al payload 422 de `REQUIRES_EXTRA_COURT_CONFIRMATION`, manteniendo compatibilidad total con consumidores previos.
+  * 2. Frontend (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+    - En `handleSaveCancha`: soporte para leer `data.data || data`, cálculo seguro con fallbacks de `canchas_incluidas`, `canchas_actuales`, `precio_cancha_adicional`, `nuevo_costo_adicional` y `nuevo_total_mensual`, seteando `extraCourtConfirmation` de forma fidedigna.
+    - Manejo robusto de autenticación en `handleSaveCancha` y `handleConfirmExtraCourt` con fallback a `localStorage` (`saas_token`, `token`, `auth_token`).
+    - Al presionar `"Confirmar y Agregar Cancha Extra"`, `handleConfirmExtraCourt` envía `acepta_cargo_adicional: true`, y al recibir HTTP 201 despliega una notificación toast informativa y completa:
+      `"¡Cancha adicional agregada con éxito! Tu nuevo abono mensual estimado es de $X USD/mes (+Y USD/mes por cancha adicional)."`.
+  * 3. Tests & Verificación:
+    - Backend: `PlanPricingTest.php` actualizado y verificado (4/4 tests en verde, 59 aserciones).
+    - Frontend: Nuevo test unitario `"displays interactive extra court confirmation banner and creates court when quota exceeded"` en `authAndOnboarding.test.tsx` (27/27 tests en verde).
+    - Suite Completa Backend: 286/286 tests pasados (1.621 aserciones).
+    - Suite Completa Frontend: 125/125 tests pasados en 13 suites de Vitest.
+    - Suite Completa Mobile: 20/20 tests pasados en 4 suites de Jest.
+    - Total Ecosistema: 431/431 tests automatizados en verde (0 fallas, 0 regresiones).
+===============================================================================
 
 
 

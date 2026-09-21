@@ -160,6 +160,15 @@ class PlanPricingTest extends TestCase
             'canchas_incluidas' => 2,
             'canchas_actuales' => 2,
             'precio_cancha_adicional' => 8.00,
+            'nuevo_costo_adicional' => 8.00,
+            'nuevo_total_mensual' => 37.00,
+            'data' => [
+                'canchas_incluidas' => 2,
+                'canchas_actuales' => 2,
+                'precio_cancha_adicional' => 8.00,
+                'nuevo_costo_adicional' => 8.00,
+                'nuevo_total_mensual' => 37.00,
+            ],
         ]);
 
         // Intentar crear la 3ra cancha con acepta_cargo_adicional: true -> 201 Creada

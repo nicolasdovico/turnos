@@ -220,6 +220,7 @@ class ClubDashboardController extends Controller
             $canchasIncluidas = (int) $plan->canchas_incluidas;
 
             if ($newCanchasCount > $canchasIncluidas && !$request->boolean('acepta_cargo_adicional')) {
+                $costoNuevo = $plan->calcularCostoTotal($newCanchasCount);
                 return response()->json([
                     'success' => false,
                     'code' => 'REQUIRES_EXTRA_COURT_CONFIRMATION',
@@ -227,6 +228,15 @@ class ClubDashboardController extends Controller
                     'canchas_incluidas' => $canchasIncluidas,
                     'canchas_actuales' => $currentCanchasCount,
                     'precio_cancha_adicional' => (float) $plan->precio_cancha_adicional,
+                    'nuevo_costo_adicional' => $costoNuevo['costo_adicional_total'],
+                    'nuevo_total_mensual' => $costoNuevo['total_mensual'],
+                    'data' => [
+                        'canchas_incluidas' => $canchasIncluidas,
+                        'canchas_actuales' => $currentCanchasCount,
+                        'precio_cancha_adicional' => (float) $plan->precio_cancha_adicional,
+                        'nuevo_costo_adicional' => $costoNuevo['costo_adicional_total'],
+                        'nuevo_total_mensual' => $costoNuevo['total_mensual'],
+                    ],
                 ], 422);
             }
         }

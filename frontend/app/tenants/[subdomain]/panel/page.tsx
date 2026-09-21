@@ -1827,12 +1827,14 @@ export default function ClubAdminPanel() {
 
       const method = editingCancha ? "PUT" : "POST";
 
+      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("saas_token") || localStorage.getItem("token") || localStorage.getItem("auth_token")) : null);
+
       const res = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
         },
         body: JSON.stringify(payload),
       });
@@ -1841,7 +1843,25 @@ export default function ClubAdminPanel() {
 
       if (!res.ok) {
         if (res.status === 422 && data.code === "REQUIRES_EXTRA_COURT_CONFIRMATION") {
-          setExtraCourtConfirmation(data.data);
+          const confirmationData = data.data || data;
+          const canchasIncluidas = Number(confirmationData.canchas_incluidas || plan?.canchas_incluidas || 2);
+          const canchasActuales = Number(confirmationData.canchas_actuales ?? canchas.length);
+          const precioExtra = Number(confirmationData.precio_cancha_adicional || plan?.precio_cancha_adicional || 8);
+          const excedentesNuevos = Math.max(0, (canchasActuales + 1) - canchasIncluidas);
+          const nuevoCostoAdicional = confirmationData.nuevo_costo_adicional !== undefined
+            ? Number(confirmationData.nuevo_costo_adicional)
+            : (excedentesNuevos * precioExtra);
+          const nuevoTotalMensual = confirmationData.nuevo_total_mensual !== undefined
+            ? Number(confirmationData.nuevo_total_mensual)
+            : (Number(plan?.precio_mensual || 29) + nuevoCostoAdicional);
+
+          setExtraCourtConfirmation({
+            canchas_incluidas: canchasIncluidas,
+            canchas_actuales: canchasActuales,
+            precio_cancha_adicional: precioExtra,
+            nuevo_costo_adicional: nuevoCostoAdicional,
+            nuevo_total_mensual: nuevoTotalMensual,
+          });
           return;
         }
         setCanchaErrorMsg(data.message || "Error al guardar la cancha.");
@@ -1901,13 +1921,14 @@ export default function ClubAdminPanel() {
     };
 
     try {
+      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("saas_token") || localStorage.getItem("token") || localStorage.getItem("auth_token")) : null);
       const url = `${API_BASE}/clubs/${subdomain}/canchas`;
       const res = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
         },
         body: JSON.stringify(payload),
       });
@@ -1919,7 +1940,11 @@ export default function ClubAdminPanel() {
         return;
       }
 
-      setCanchaSuccessMsg("¡Cancha adicional agregada con éxito!");
+      const confirmationInfo = extraCourtConfirmation;
+      const nuevoTotalMsg = confirmationInfo?.nuevo_total_mensual
+        ? ` Tu nuevo abono mensual estimado es de $${confirmationInfo.nuevo_total_mensual} USD/mes (+${confirmationInfo.precio_cancha_adicional} USD/mes por cancha adicional).`
+        : "";
+      setCanchaSuccessMsg(`¡Cancha adicional agregada con éxito!${nuevoTotalMsg}`);
       setExtraCourtConfirmation(null);
       setShowCanchaModal(false);
       setEditingCancha(null);

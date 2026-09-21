@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club y Visibilidad de Contraseña en Checkout Online)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Facturación B2B y comisiones de marketplace con pasarelas Mercado Pago en ARS, Stripe en USD y transferencia bancaria, período de gracia de 7 días con banner persistente, visibilidad de contraseña con toggle de ojo en checkout de reservas online, Padrón y Directorio de Clientes del Club con Ficha 360°, validación numérica y WhatsApp en contactos y DNI, protocolo meteorológico por lluvia con vales tokenizados, reembolsos en billetera, tarifas dinámicas pico/valle y control contable en arqueo diario)
-- **Última Actualización:** 2026-09-21 (Corrección de error 'Failed to fetch' en pestaña 'Facturación & Abono' del panel de club: casteo estricto de días restantes en PHP 8.3 y resolución same-origin en Caddy. 430 tests automatizados en verde: 286 backend, 124 frontend, 20 mobile; 100% sin fallas ni regresiones).
+- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online y Creación de Canchas Adicionales con Confirmación de Cupo)
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Alta de canchas excedentes con alerta interactiva de cupo excedido y confirmación de abono adicional, facturación B2B y comisiones de marketplace con pasarelas Mercado Pago en ARS, Stripe en USD y transferencia bancaria, período de gracia de 7 días con banner persistente, visibilidad de contraseña con toggle de ojo en checkout de reservas online, Padrón y Directorio de Clientes del Club con Ficha 360°, validación numérica y WhatsApp en contactos y DNI, protocolo meteorológico por lluvia con vales tokenizados, reembolsos en billetera, tarifas dinámicas pico/valle y control contable en arqueo diario)
+- **Última Actualización:** 2026-09-21 (Corrección y activación de confirmación interactiva de canchas adicionales que superan el cupo base del plan con desglose del nuevo abono mensual en /panel. 431 tests automatizados en verde: 286 backend, 125 frontend, 20 mobile; 100% sin fallas ni regresiones).
 
 ---
 
@@ -80,6 +80,7 @@
 - [x] **Diferenciación Temporal Estricta: Turnos Jugados vs. Turnos en Agenda (Ficha 360° & Directorio):** Desacople de turnos históricos pasados respecto a reservas recurrentes a futuro (turnos fijos de 6 meses). Corrección de falsos positivos donde fechas lejanas (ej. marzo de 2027) se mostraban como jugadas o como último turno; incorporación de desglose `✓ jugados` • `⏱ agenda` • `✗ cancelados`, columna bivalente `Próximo / Último Turno`, sub-filtros interactivos en Ficha 360° y etiquetas de pago auditadas (`Pago Pendiente`, `Señado`, `Pagado Total`, `Turno Fijo`) *(Completado)*
 - [x] **Validación Numérica Estricta & WhatsApp Válido en Modal de Clientes:** Filtrado en tiempo real de caracteres no numéricos al escribir o pegar en los campos Teléfono y DNI en `GestionClientes.tsx`; validación estricta de formato telefónico E.164 (8 a 15 dígitos con prefijo `+` opcional) y DNI (6 a 12 dígitos); formateo automático internacional para enlaces directos `wa.me/549...` tanto en el listado como en la Ficha 360°; validación de backend reforzada en `ClubClienteController` y `ClubClienteService` con mensajes de error explícitos en español *(Completado)*
 - [x] **Visibilidad de Contraseña (Toggle Ojo) en Checkout Online:** Botón interactivo de mostrar/ocultar contraseña con iconos Eye y EyeOff en `GrillaHoraria.tsx` tanto en la pestaña de registro rápido ("✨ Crear Cuenta Rápida") como en la de inicio de sesión ("🔑 Ya tengo Cuenta"), con padding adecuado (`pr-10`) para evitar solapamientos y reseteo preventivo al cerrar modal o cambiar de pestaña *(Completado)*
+- [x] **Creación de Canchas Adicionales con Confirmación Interactiva de Cupo & Alerta de Abono:** Detección en backend (`ClubDashboardController::storeCancha`) del exceso de canchas base del plan devolviendo HTTP 422 con código `REQUIRES_EXTRA_COURT_CONFIRMATION`, payload estructurado y cálculo de nuevo costo mensual (`calcularCostoTotal`); corrección en frontend (`panel/page.tsx`) de la lectura del payload de confirmación, desplegando inmediatamente el banner interactivo `"⚠️ Cupo Base de Canchas Alcanzado"` con desglose de canchas incluidas, registradas, costo adicional por mes y nuevo total estimado; botón `"Confirmar y Agregar Cancha Extra"` que envía `acepta_cargo_adicional: true` con autenticación segura y notificación toast informativa al dar de alta la cancha *(Completado)*
 
 ---
 
@@ -184,3 +185,23 @@
      * `"⚠️ Período de Gracia Activo: Tu abono mensual se encuentra vencido. Cuentas con un plazo de 7 días (quedan X días) para regularizar tu pago antes de que se restrinjan las funciones operativas."`
      * El botón **Regularizar Pago Ahora →** redirige directamente a la pestaña de facturación y abre las pasarelas de cobro.
    - Si transcurren los 7 días sin regularización, el estado transiciona a `vencida` y el banner se torna rojo de emergencia indicando la suspensión de funciones.
+
+### Caso de Prueba: Creación de Cancha Adicional que Supera el Cupo Base del Plan
+1. **Acceso al Panel de Administración:**
+   - Iniciar sesión como administrador en `http://[subdominio].localhost:8080/panel` (o club con cupo base alcanzado, ej. Plan Bronce con 2 canchas registradas).
+2. **Abrir Modal de Nueva Cancha:**
+   - En la pestaña **🎾 Canchas**, hacer clic en el botón **+ Nueva Cancha**.
+3. **Cargar Datos e Intentar Crear:**
+   - Ingresar nombre de la cancha (ej. `"Cancha 3 Panorámica"`), deporte, superficie y precios.
+   - Presionar **Crear Cancha**.
+4. **Verificación de Alerta de Cupo & Costo Adicional:**
+   - Comprobar que el modal permanece abierto y se despliega de inmediato el banner de advertencia ámbar:
+     * `"⚠️ Cupo Base de Canchas Alcanzado"`
+     * `"Tu Plan Bronce incluye hasta 2 canchas base. Ya tienes 2 cancha(s) registradas. Al dar de alta esta cancha adicional, se sumará +$8 USD/mes a tu facturación mensual."`
+     * `"Nuevo total mensual estimado: $37 USD / mes"`
+   - Comprobar que el botón general "Crear Cancha" queda inhabilitado para evitar duplicaciones.
+5. **Confirmación y Alta Exitosa:**
+   - Presionar **Confirmar y Agregar Cancha Extra**.
+   - Comprobar que el modal se cierra y en la parte superior aparece la notificación toast verde:
+     * `"¡Cancha adicional agregada con éxito! Tu nuevo abono mensual estimado es de $37 USD/mes (+8 USD/mes por cancha adicional)."`
+   - Verificar que la nueva cancha aparece inmediatamente en el listado y en la pestaña **💳 Facturación & Abono** se computa la cancha excedente.
