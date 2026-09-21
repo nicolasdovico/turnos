@@ -39,15 +39,23 @@ class ClubBillingService
             ->whereNull('factura_club_id');
 
         $turnosMarketplaceCount = (int) $queryMarketplaceNoFacturado->count();
-        $totalComisionesMarketplace = (float) $queryMarketplaceNoFacturado->sum('comision_marketplace');
+        $totalComisionesMarketplaceArs = (float) $queryMarketplaceNoFacturado->sum('comision_marketplace');
 
         // Total USD estimado del período
         $basePlan = (float) ($plan?->precio_mensual ?? 0.0);
         $costoExtras = (float) ($costoDetalle['costo_adicional_total'] ?? 0.0);
-        $totalEstimadoUsd = round($basePlan + $costoExtras + $totalComisionesMarketplace, 2);
+
+        // Cotización del dólar para unificar comisiones de turnos (ARS) con abono SaaS (USD)
+        $tipoCambio = $this->cotizacionDolarService->obtenerCotizacion();
+        $comisionesMarketplaceUsd = $tipoCambio > 0
+            ? round($totalComisionesMarketplaceArs / $tipoCambio, 2)
+            : 0.0;
+
+        $totalEstimadoUsd = round($basePlan + $costoExtras + $comisionesMarketplaceUsd, 2);
 
         // Conversión a ARS para checkout local
-        $conversionArs = $this->cotizacionDolarService->convertirUsdAPesos($totalEstimadoUsd);
+        $subtotalSaaSArs = round(($basePlan + $costoExtras) * $tipoCambio, 2);
+        $totalEstimadoArs = round($subtotalSaaSArs + $totalComisionesMarketplaceArs, 2);
 
         // Factura pendiente activa si existe
         $facturaPendiente = FacturaClub::where('complejo_id', $complejo->id)
@@ -79,16 +87,19 @@ class ClubBillingService
             ],
             'marketplace' => [
                 'turnos_captados_count' => $turnosMarketplaceCount,
-                'total_comisiones_usd' => $totalComisionesMarketplace,
+                'total_comisiones_ars' => $totalComisionesMarketplaceArs,
+                'total_comisiones_usd' => $comisionesMarketplaceUsd,
                 'porcentaje_aplicado' => (float) ($plan?->comision_marketplace ?? 5.0),
+                'turnos' => (clone $queryMarketplaceNoFacturado)->select('id', 'fecha', 'hora_inicio', 'precio', 'comision_porcentaje', 'comision_marketplace')->get(),
             ],
             'totales' => [
                 'base_plan_usd' => $basePlan,
                 'canchas_extras_usd' => $costoExtras,
-                'comisiones_marketplace_usd' => $totalComisionesMarketplace,
+                'comisiones_marketplace_usd' => $comisionesMarketplaceUsd,
+                'comisiones_marketplace_ars' => $totalComisionesMarketplaceArs,
                 'total_usd' => $totalEstimadoUsd,
-                'tipo_cambio_ars' => $conversionArs['tipo_cambio'],
-                'total_ars' => $conversionArs['monto_ars'],
+                'tipo_cambio_ars' => $tipoCambio,
+                'total_ars' => $totalEstimadoArs,
             ],
             'suscripcion' => [
                 'estado' => $estadoSuscripcion, // trial, activa, gracia, vencida
@@ -152,13 +163,17 @@ class ClubBillingService
                 });
 
             $totalTurnosMkt = (int) $turnosMarketplaceQuery->count();
-            $montoComisionesMkt = (float) $turnosMarketplaceQuery->sum('comision_marketplace');
+            $montoComisionesMktArs = (float) $turnosMarketplaceQuery->sum('comision_marketplace');
 
             $basePlan = (float) ($plan?->precio_mensual ?? 0.0);
             $costoExtras = (float) ($costoDetalle['costo_adicional_total'] ?? 0.0);
-            $totalUsd = round($basePlan + $costoExtras + $montoComisionesMkt, 2);
 
-            $conversion = $this->cotizacionDolarService->convertirUsdAPesos($totalUsd);
+            $tipoCambio = $this->cotizacionDolarService->obtenerCotizacion();
+            $montoComisionesMktUsd = $tipoCambio > 0 ? round($montoComisionesMktArs / $tipoCambio, 2) : 0.0;
+            $totalUsd = round($basePlan + $costoExtras + $montoComisionesMktUsd, 2);
+
+            $subtotalSaaSArs = round(($basePlan + $costoExtras) * $tipoCambio, 2);
+            $totalArs = round($subtotalSaaSArs + $montoComisionesMktArs, 2);
 
             $fechaEmision = now()->startOfDay();
             $fechaVencimiento = now()->startOfDay()->addDays(5);
@@ -173,11 +188,11 @@ class ClubBillingService
                     'canchas_excedentes' => (int) ($costoDetalle['canchas_excedentes'] ?? 0),
                     'precio_cancha_adicional' => (float) ($costoDetalle['precio_cancha_adicional'] ?? 0.0),
                     'monto_canchas_adicionales' => $costoExtras,
-                    'monto_comisiones_marketplace' => $montoComisionesMkt,
+                    'monto_comisiones_marketplace' => $montoComisionesMktUsd,
                     'total_turnos_marketplace' => $totalTurnosMkt,
                     'total_usd' => $totalUsd,
-                    'tipo_cambio_ars' => $conversion['tipo_cambio'],
-                    'total_ars' => $conversion['monto_ars'],
+                    'tipo_cambio_ars' => $tipoCambio,
+                    'total_ars' => $totalArs,
                 ]);
             } else {
                 $factura = FacturaClub::create([
@@ -190,11 +205,11 @@ class ClubBillingService
                     'canchas_excedentes' => (int) ($costoDetalle['canchas_excedentes'] ?? 0),
                     'precio_cancha_adicional' => (float) ($costoDetalle['precio_cancha_adicional'] ?? 0.0),
                     'monto_canchas_adicionales' => $costoExtras,
-                    'monto_comisiones_marketplace' => $montoComisionesMkt,
+                    'monto_comisiones_marketplace' => $montoComisionesMktUsd,
                     'total_turnos_marketplace' => $totalTurnosMkt,
                     'total_usd' => $totalUsd,
-                    'tipo_cambio_ars' => $conversion['tipo_cambio'],
-                    'total_ars' => $conversion['monto_ars'],
+                    'tipo_cambio_ars' => $tipoCambio,
+                    'total_ars' => $totalArs,
                     'estado' => 'pendiente',
                     'fecha_emision' => $fechaEmision,
                     'fecha_vencimiento' => $fechaVencimiento,

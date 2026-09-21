@@ -58,9 +58,11 @@ interface ResumenFacturacion {
   marketplace: {
     porcentaje_comision: number;
     cantidad_turnos_no_facturados: number;
-    monto_turnos_bruto: number;
-    monto_comisiones_usd: number;
-    turnos: Array<{
+    monto_turnos_bruto?: number;
+    monto_comisiones_usd?: number;
+    total_comisiones_usd?: number;
+    total_comisiones_ars?: number;
+    turnos?: Array<{
       id: number;
       fecha: string;
       hora_inicio: string;
@@ -73,6 +75,7 @@ interface ResumenFacturacion {
     plan_base_usd: number;
     canchas_extras_usd: number;
     comisiones_marketplace_usd: number;
+    comisiones_marketplace_ars?: number;
     total_usd: number;
     tipo_cambio_ars: number;
     total_ars: number;
@@ -337,6 +340,7 @@ export default function FacturacionClubPanel({
   const mktTurnosCount = mkt?.cantidad_turnos_no_facturados ?? (mkt as any)?.turnos_captados_count ?? 0;
   const mktPorcentaje = mkt?.porcentaje_comision ?? (mkt as any)?.porcentaje_aplicado ?? pln?.comision_marketplace_porcentaje ?? (pln as any)?.comision_marketplace_pct ?? 5;
   const mktComisionesUsd = tot?.comisiones_marketplace_usd ?? (mkt as any)?.total_comisiones_usd ?? 0;
+  const mktComisionesArs = tot?.comisiones_marketplace_ars ?? (mkt as any)?.total_comisiones_ars ?? 0;
   const totalUsd = tot?.total_usd ?? (Number(planBaseUsd) + Number(montoExtrasUsd) + Number(mktComisionesUsd));
   const tipoCambioArs = tot?.tipo_cambio_ars ?? 1350;
   const totalArs = tot?.total_ars ?? (totalUsd * tipoCambioArs);
@@ -450,7 +454,14 @@ export default function FacturacionClubPanel({
           <p className="text-xs text-slate-400">
             Comisión pactada: <strong className="text-white">{mktPorcentaje}%</strong> por cliente nuevo canalizado.
           </p>
-          <div className="pt-1 text-sm font-bold text-purple-400">${Number(mktComisionesUsd).toFixed(2)} USD</div>
+          <div className="pt-1 text-sm font-bold text-purple-400 flex items-baseline gap-1.5 flex-wrap">
+            <span>${Number(mktComisionesUsd).toFixed(2)} USD</span>
+            {Number(mktComisionesArs) > 0 && (
+              <span className="text-xs text-slate-400 font-normal">
+                (${Number(mktComisionesArs).toLocaleString("es-AR", { minimumFractionDigits: 2 })} ARS)
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Card 4: Total Liquidación */}
@@ -512,9 +523,16 @@ export default function FacturacionClubPanel({
           </div>
 
           <div className="py-3 flex items-center justify-between">
-            <span className="text-slate-300">
-              Comisiones de Marketplace ({mktPorcentaje}% sobre {mktTurnosCount} turnos):
-            </span>
+            <div>
+              <span className="text-slate-300">
+                Comisiones de Marketplace ({mktPorcentaje}% sobre {mktTurnosCount} turnos):
+              </span>
+              {Number(mktComisionesArs) > 0 && (
+                <span className="text-slate-400 block text-[11px] font-normal mt-0.5">
+                  Comisión acumulada en turnos: ${Number(mktComisionesArs).toLocaleString("es-AR", { minimumFractionDigits: 2 })} ARS
+                </span>
+              )}
+            </div>
             <span className="font-bold text-white font-mono">${Number(mktComisionesUsd).toFixed(2)} USD</span>
           </div>
 
@@ -531,7 +549,7 @@ export default function FacturacionClubPanel({
         </div>
 
         {/* Detalle Desplegable de Turnos Marketplace */}
-        {showMarketplaceDetails && mkt && mkt.turnos && (
+        {showMarketplaceDetails && mkt && (mkt as any).turnos && (
           <div className="mt-4 rounded-2xl bg-slate-950 border border-slate-800 p-4 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
               Turnos canalizados por jugar.turnos.com pendientes de liquidación
@@ -542,20 +560,20 @@ export default function FacturacionClubPanel({
                   <tr className="border-b border-slate-800 text-slate-500 font-bold">
                     <th className="pb-2">Fecha</th>
                     <th className="pb-2">Hora</th>
-                    <th className="pb-2">Precio Turno</th>
+                    <th className="pb-2">Precio Turno (ARS)</th>
                     <th className="pb-2">Comisión %</th>
-                    <th className="pb-2 text-right">Comisión Retenida</th>
+                    <th className="pb-2 text-right">Comisión Retenida (ARS)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900 font-mono text-slate-300">
-                  {mkt.turnos.map((t) => (
+                  {((mkt as any).turnos || []).map((t: any) => (
                     <tr key={t.id}>
                       <td className="py-2 text-slate-200">{t.fecha}</td>
-                      <td className="py-2">{t.hora_inicio}</td>
-                      <td className="py-2">${Number(t.precio).toFixed(2)}</td>
+                      <td className="py-2">{t.hora_inicio ? String(t.hora_inicio).substring(0, 5) : ""}</td>
+                      <td className="py-2">${Number(t.precio).toLocaleString("es-AR", { minimumFractionDigits: 2 })} ARS</td>
                       <td className="py-2">{t.comision_porcentaje}%</td>
                       <td className="py-2 text-right text-emerald-400 font-bold">
-                        ${Number(t.comision_marketplace).toFixed(2)}
+                        ${Number(t.comision_marketplace).toLocaleString("es-AR", { minimumFractionDigits: 2 })} ARS
                       </td>
                     </tr>
                   ))}

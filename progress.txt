@@ -2714,3 +2714,39 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Suite Completa Frontend: 126/126 tests pasados en 13 suites de Vitest.
   * Total Ecosistema: 432/432 tests automatizados en verde (286 backend, 126 frontend, 20 mobile; 0 fallas, 0 regresiones).
 ===============================================================================
+[2026-09-21] - CORRECCIÓN CRÍTICA: UNIFICACIÓN MULTIMONEDA ARS/USD EN COMISIONES DE MARKETPLACE (FACTURACIÓN B2B)
+===============================================================================
+- Diagnóstico del Error:
+  * En la pantalla "💳 Facturación & Abono" (`/panel`), al liquidar el período con turnos originados en el marketplace, el sistema mostraba un total desorbitado:
+    - Abono Base (Bronce): $29.00 USD
+    - Canchas Adicionales: $8.00 USD
+    - Comisiones de Marketplace (5% sobre 2 turnos): $1450.00 USD (!!)
+    - Total a Pagar: $1487.00 USD ≈ $2.282.545,00 ARS.
+  * Causa Raíz (Discrepancia de Moneda entre Turnos y Abono SaaS):
+    1. Los clubes configuran los precios de las canchas y cobran a los jugadores en Pesos Argentinos (ARS). En las pruebas del usuario, los 2 turnos tenían precios de $15.000 ARS y $14.000 ARS.
+    2. La comisión del 5% calculada por `MarketplaceAttributionService` arrojó $750 ARS y $700 ARS, totalizando $1.450 ARS.
+    3. Sin embargo, en `backend/app/Services/ClubBillingService.php`, el cálculo sumaba directamente el valor numérico en pesos a las variables en dólares:
+       `$totalEstimadoUsd = round($basePlan + $costoExtras + $totalComisionesMarketplace, 2);`
+       Interpretando los $1.450 pesos como $1.450 USD.
+    4. Luego, al convertir el total a ARS multiplicándolo por la tasa oficial de cambio ($1.535 ARS/USD), generaba un cobro final de $2.282.545 ARS.
+- Solución Implementada:
+  * 1. Backend (`backend/app/Services/ClubBillingService.php`):
+    - En `obtenerResumenFacturacion` y `generarOFacturaPendiente`, se introdujo la conversión matemática precisa de comisiones de turnos de ARS a USD:
+      `$comisionesMarketplaceUsd = $tipoCambio > 0 ? round($totalComisionesMarketplaceArs / $tipoCambio, 2) : 0.0;`
+      `$totalEstimadoUsd = round($basePlan + $costoExtras + $comisionesMarketplaceUsd, 2);`
+    - Para el total en ARS, se calcula el subtotal del abono SaaS en pesos más las comisiones ya nominadas en ARS:
+      `$subtotalSaaSArs = round(($basePlan + $costoExtras) * $tipoCambio, 2);`
+      `$totalEstimadoArs = round($subtotalSaaSArs + $totalComisionesMarketplaceArs, 2);`
+    - Se exponen ambos valores en el payload (`total_comisiones_ars` y `total_comisiones_usd`), así como la colección `turnos` con fecha, hora, precio en ARS y comisión retenida.
+  * 2. Backend Tests (`backend/tests/Feature/ClubBillingTest.php`):
+    - Actualizadas las aserciones de `ClubBillingTest` para verificar `total_comisiones_ars = 1000` y el contravalor en USD convertido (~$0.65 USD) con los 2 turnos asociados.
+  * 3. Frontend (`frontend/components/FacturacionClubPanel.tsx`):
+    - En la Tarjeta de Marketplace y en el Desglose de Liquidación, se visualiza el importe convertido en USD con aclaración del monto acumulado en ARS:
+      `$0.94 USD ($1.450,00 ARS)`.
+    - Al hacer clic en "Ver Turnos Marketplace", la tabla desplegable detalla explícitamente los precios y comisiones retenidas en ARS de cada turno individual.
+    - El resultado final para el club pasó de $1.487 USD ($2.282.545 ARS) a $37.94 USD ($58.245,00 ARS).
+- Verificación:
+  * 286/286 tests de backend en verde en PHPUnit.
+  * 126/126 tests de frontend en verde en Vitest.
+  * Total Ecosistema: 432/432 tests automatizados pasando exitosamente.
+==============================================================================================================================================================

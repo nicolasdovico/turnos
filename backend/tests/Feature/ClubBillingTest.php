@@ -184,15 +184,20 @@ class ClubBillingTest extends TestCase
                     'marketplace' => [
                         'porcentaje_aplicado' => 5,
                         'turnos_captados_count' => 2,
-                        'total_comisiones_usd' => 1000,
+                        'total_comisiones_ars' => 1000,
                     ],
                     'totales' => [
                         'base_plan_usd' => 29,
                         'canchas_extras_usd' => 8,
-                        'comisiones_marketplace_usd' => 1000,
+                        'comisiones_marketplace_ars' => 1000,
                     ],
                 ],
             ]);
+
+        $responseData = $response->json('data');
+        $this->assertGreaterThan(0, (float) $responseData['marketplace']['total_comisiones_usd']);
+        $this->assertLessThan(10, (float) $responseData['marketplace']['total_comisiones_usd']);
+        $this->assertEquals(2, count($responseData['marketplace']['turnos']));
     }
 
     public function test_mercadopago_b2b_checkout_converts_usd_to_ars(): void
