@@ -18,20 +18,22 @@
         </include>
     </source>
     <php>
-        <env name="APP_ENV" value="testing" force="true"/>
-        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
-        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
-        <env name="CACHE_STORE" value="array" force="true"/>
-        <env name="DB_CONNECTION" value="pgsql" force="true"/>
-        <env name="DB_HOST" value="database" force="true"/>
-        <env name="DB_PORT" value="5432" force="true"/>
-        <env name="DB_DATABASE" value="saas_testing" force="true"/>
-        <env name="DB_USERNAME" value="saas_user" force="true"/>
-        <env name="DB_PASSWORD" value="saas_pass" force="true"/>
-        <env name="MAIL_MAILER" value="array" force="true"/>
-        <env name="PULSE_ENABLED" value="false" force="true"/>
-        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
-        <env name="SESSION_DRIVER" value="array" force="true"/>
-        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="CACHE_STORE" value="redis"/>
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <env name="DB_HOST" value="database"/>
+        <env name="DB_PORT" value="5432"/>
+        <env name="DB_DATABASE" value="saas_testing"/>
+        <env name="DB_USERNAME" value="saas_user"/>
+        <env name="DB_PASSWORD" value="saas_pass"/>
+        <env name="REDIS_HOST" value="cache"/>
+        <env name="REDIS_PORT" value="6379"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
     </php>
 </phpunit>

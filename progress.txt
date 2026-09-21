@@ -2637,6 +2637,36 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación:
   * El workflow ahora finaliza en estado exitoso (verde) tanto si los secretos no están cargados como cuando se configuren en el futuro.
 ===============================================================================
+[2026-09-21] - CORRECCIÓN: WORKFLOW DE INTEGRACIÓN CONTINUA (CI) - BACKEND & FRONTEND TESTS EN GITHUB ACTIONS
+===============================================================================
+- Diagnóstico:
+  * En GitHub Actions, el workflow `Continuous Integration (CI)` (.github/workflows/ci.yml) fallaba en los jobs `Backend Tests` y `Frontend Tests` (mientras `Mobile Tests` pasaba en 26s).
+  * Causa Raíz 1 (Backend):
+    1. En `setup-php`, faltaba la extensión `intl`, requerida estrictamente por Filament v3.
+    2. En `phpunit.xml`, las variables de entorno tenían `force="true"`, forzando `DB_HOST=database` (inaccesible en el runner ubuntu-latest de GitHub sin mapping de hostnames).
+    3. El servicio PostgreSQL en `ci.yml` definía la base de datos como `turnos_testing`, mientras que `config/database.php` y `phpunit.xml` esperaban `saas_testing`, `saas_user` y `saas_pass`.
+    4. La inicialización del archivo `.env` se ejecutaba después de `composer install`, causando advertencias y fallos en scripts de post-autoload de Laravel (`package:discover` y `filament:upgrade`).
+  * Causa Raíz 2 (Frontend):
+    1. En `frontend/tsconfig.json`, la carpeta `tests` no estaba excluida, por lo que al ejecutar `npm run build` (`next build`), el compilador de TypeScript intentaba type-checkear los archivos de pruebas de Vitest, produciendo errores de tipos globales.
+    2. Tipos de datos en `GrillaHoraria.tsx`: `formatFechaDDMMAAAA` no aceptaba `null` y `activeLock.recargoLuz` causaba un error TS18048.
+- Solución Implementada:
+  * 1. Backend (`ci.yml` & `phpunit.xml`):
+    - Se agregó `intl` en `extensions` de PHP 8.3.
+    - Se mapeó `127.0.0.1 database cache` en `/etc/hosts` en el runner para compatibilidad universal.
+    - Se sincronizó el servicio PostgreSQL con `saas_testing`, `saas_user` y `saas_pass` con healthcheck `pg_isready -U saas_user -d saas_testing`.
+    - Se removió `force="true"` en `backend/phpunit.xml` para permitir inyección limpia de variables en entornos de CI.
+    - Se movió la generación del `.env` con `APP_KEY` antes del `composer install`.
+  * 2. Frontend (`tsconfig.json`, `GrillaHoraria.tsx`, `.gitignore`):
+    - Se excluyó `"tests"` en `frontend/tsconfig.json`.
+    - Se ajustó `formatFechaDDMMAAAA` para aceptar `string | null | undefined`.
+    - Se tipó de forma segura `recargoLuz` en el desglose de luz artificial.
+    - Se ignoró `*.tsbuildinfo` en `.gitignore`.
+- Verificación:
+  * Frontend: `npx tsc --noEmit` ejecuta con código de salida 0 (cero errores de TypeScript).
+  * Frontend: Vitest suites pasan al 100%.
+  * Backend: Tests de PHPUnit verificados en PostgreSQL y Redis.
+===============================================================================
+
 
 
 

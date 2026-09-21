@@ -143,7 +143,7 @@ export const getLocalDateString = (d: Date = new Date()): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const formatFechaDDMMAAAA = (fechaStr?: string): string => {
+export const formatFechaDDMMAAAA = (fechaStr?: string | null): string => {
   if (!fechaStr) return "";
   const parts = fechaStr.split("-");
   if (parts.length === 3 && parts[0].length === 4) {
@@ -4249,7 +4249,7 @@ export default function GrillaHoraria({
                           <span>💡</span> Recargo Luz Artificial
                         </span>
                         <span className="font-mono font-extrabold text-amber-200">
-                          +${activeLock.recargoLuz.toLocaleString()}
+                          +${(activeLock.recargoLuz ?? 0).toLocaleString()}
                         </span>
                       </div>
                     )}

@@ -22,13 +22,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: turnos_testing
-          POSTGRES_USER: turnos_user
-          POSTGRES_PASSWORD: turnos_password
+          POSTGRES_DB: saas_testing
+          POSTGRES_USER: saas_user
+          POSTGRES_PASSWORD: saas_pass
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U saas_user -d saas_testing"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -47,11 +47,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Map Hostnames
+        run: echo "127.0.0.1 database cache" | sudo tee -a /etc/hosts
+
       - name: Setup PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: pdo_pgsql, redis, gd, bcmath, mbstring, curl, xml, zip, pcntl
+          extensions: pdo_pgsql, redis, gd, bcmath, mbstring, curl, xml, zip, pcntl, intl
           coverage: none
 
       - name: Get Composer Cache Directory
@@ -66,9 +69,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-composer-
 
-      - name: Install Backend Dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress --working-dir=backend
-
       - name: Setup Environment
         run: |
           cd backend
@@ -78,31 +78,43 @@ jobs:
             touch .env
           fi
           echo "APP_ENV=testing" >> .env
+          echo "APP_KEY=base64:$(openssl rand -base64 32)" >> .env
           echo "DB_CONNECTION=pgsql" >> .env
           echo "DB_HOST=127.0.0.1" >> .env
           echo "DB_PORT=5432" >> .env
-          echo "DB_DATABASE=turnos_testing" >> .env
-          echo "DB_USERNAME=turnos_user" >> .env
-          echo "DB_PASSWORD=turnos_password" >> .env
+          echo "DB_DATABASE=saas_testing" >> .env
+          echo "DB_USERNAME=saas_user" >> .env
+          echo "DB_PASSWORD=saas_pass" >> .env
           echo "REDIS_HOST=127.0.0.1" >> .env
           echo "REDIS_PORT=6379" >> .env
           echo "CACHE_STORE=redis" >> .env
           echo "SESSION_DRIVER=redis" >> .env
           echo "QUEUE_CONNECTION=sync" >> .env
-          php artisan key:generate
+
+      - name: Install Backend Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --working-dir=backend
 
       - name: Run Database Migrations
         run: php backend/artisan migrate --force --env=testing
+        env:
+          APP_ENV: testing
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: saas_testing
+          DB_USERNAME: saas_user
+          DB_PASSWORD: saas_pass
 
       - name: Execute Backend Tests (PHPUnit)
         run: php backend/artisan test
         env:
+          APP_ENV: testing
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
-          DB_DATABASE: turnos_testing
-          DB_USERNAME: turnos_user
-          DB_PASSWORD: turnos_password
+          DB_DATABASE: saas_testing
+          DB_USERNAME: saas_user
+          DB_PASSWORD: saas_pass
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
 
