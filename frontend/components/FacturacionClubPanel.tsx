@@ -24,6 +24,7 @@ import {
 interface FacturacionClubPanelProps {
   subdomain: string;
   token?: string | null;
+  apiUrl?: string;
   onRefreshSummary?: () => void;
 }
 
@@ -110,8 +111,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 export default function FacturacionClubPanel({
   subdomain,
   token,
+  apiUrl,
   onRefreshSummary,
 }: FacturacionClubPanelProps) {
+  const effectiveApiUrl = apiUrl || (typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenFacturacion | null>(null);
@@ -149,8 +152,8 @@ export default function FacturacionClubPanel({
       const headers = getAuthHeaders();
 
       const [resumenRes, facturasRes] = await Promise.all([
-        fetch(`${API_BASE}/clubs/${subdomain}/facturacion/resumen`, { headers }),
-        fetch(`${API_BASE}/clubs/${subdomain}/facturacion/facturas`, { headers }),
+        fetch(`${effectiveApiUrl}/clubs/${subdomain}/facturacion/resumen`, { headers }),
+        fetch(`${effectiveApiUrl}/clubs/${subdomain}/facturacion/facturas`, { headers }),
       ]);
 
       if (!resumenRes.ok) {
@@ -188,7 +191,7 @@ export default function FacturacionClubPanel({
       setActionAlert(null);
       const headers = getAuthHeaders();
 
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/facturacion/pagar-mercadopago`, {
+      const res = await fetch(`${effectiveApiUrl}/clubs/${subdomain}/facturacion/pagar-mercadopago`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -222,7 +225,7 @@ export default function FacturacionClubPanel({
       setActionAlert(null);
       const headers = getAuthHeaders();
 
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/facturacion/pagar-stripe`, {
+      const res = await fetch(`${effectiveApiUrl}/clubs/${subdomain}/facturacion/pagar-stripe`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -262,7 +265,7 @@ export default function FacturacionClubPanel({
       setActionAlert(null);
       const headers = getAuthHeaders();
 
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/facturacion/comprobante-transferencia`, {
+      const res = await fetch(`${effectiveApiUrl}/clubs/${subdomain}/facturacion/comprobante-transferencia`, {
         method: "POST",
         headers,
         body: JSON.stringify({

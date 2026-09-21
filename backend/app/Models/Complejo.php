@@ -250,15 +250,15 @@ class Complejo extends Model
     public function diasRestantesSuscripcion(): int
     {
         if ($this->suscripcion_estado === 'trial' && $this->suscripcion_trial_vence_at) {
-            return max(0, now()->diffInDays($this->suscripcion_trial_vence_at, false));
+            return max(0, (int) round(now()->diffInDays($this->suscripcion_trial_vence_at, false)));
         }
 
         if ($this->suscripcion_estado === 'gracia' && $this->suscripcion_gracia_vence_at) {
-            return max(0, now()->diffInDays($this->suscripcion_gracia_vence_at, false));
+            return max(0, (int) round(now()->diffInDays($this->suscripcion_gracia_vence_at, false)));
         }
 
         if ($this->suscripcion_estado === 'activa' && $this->suscripcion_proximo_vencimiento) {
-            return max(0, now()->diffInDays($this->suscripcion_proximo_vencimiento, false));
+            return max(0, (int) round(now()->diffInDays($this->suscripcion_proximo_vencimiento, false)));
         }
 
         return 0;

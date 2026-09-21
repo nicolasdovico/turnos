@@ -5750,6 +5750,7 @@ export default function ClubAdminPanel() {
             <FacturacionClubPanel
               subdomain={subdomain}
               token={token}
+              apiUrl={API_BASE}
               onRefreshSummary={() => fetchDashboardData(true)}
             />
           </div>
