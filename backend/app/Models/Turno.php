@@ -35,6 +35,10 @@ class Turno extends Model
         'cancelacion_lluvia_id',
         'es_fijo',
         'recordatorio_enviado_at',
+        'origen',
+        'comision_marketplace',
+        'comision_porcentaje',
+        'factura_club_id',
     ];
 
     protected function casts(): array
@@ -46,7 +50,14 @@ class Turno extends Model
             'saldo_pendiente' => 'decimal:2',
             'es_fijo' => 'boolean',
             'recordatorio_enviado_at' => 'datetime',
+            'comision_marketplace' => 'decimal:2',
+            'comision_porcentaje' => 'decimal:2',
         ];
+    }
+
+    public function facturaClub(): BelongsTo
+    {
+        return $this->belongsTo(FacturaClub::class, 'factura_club_id');
     }
 
     public function cancha(): BelongsTo

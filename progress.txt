@@ -2556,6 +2556,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Suite completa mobile: 20/20 tests pasados en 4 suites de Jest.
     - Total Ecosistema: 419/419 tests automatizados en verde (0 fallas, 0 regresiones).
 ===============================================================================
+[2026-09-21] - COMISIONES DE MARKETPLACE, FACTURACIÓN B2B Y PASARELAS DE PAGO DE CLUBES
+===============================================================================
+- Contexto y Requerimientos:
+  1. Modelo de Monetización B2B Multitenant:
+     - Cobro de abono mensual por complejidad/canchas: Plan Base (cupo fijo) + costo adicional por cancha excedente ($8 USD/mes).
+     - Comisión de Marketplace: Cobro porcentual al club sobre todas las reservas originadas desde el buscador global (jugar.turnos.com / jugar.localhost:8080).
+     - Porcentajes por plan: Bronce 5%, Plata 4%, Oro 3%. Las reservas directas al club mantienen 0% de comisión.
+  2. Pasarela de Pagos B2B para Clubes Abonados:
+     - Mercado Pago: Pago en moneda local (ARS) con conversión automática USD -> ARS en base a la cotización oficial/mercado en tiempo real.
+     - Stripe: Pago internacional en USD con tarjeta de crédito/débito.
+     - Transferencia Bancaria: Datos de CBU/Alias oficiales de la plataforma, carga de comprobante y aprobación manual por Superadministrador.
+  3. Política de Gracia y Avisos:
+     - 7 días de período de gracia tras el vencimiento de la factura antes de suspender funciones del club.
+     - Banner persistente de aviso en el panel de administración del club (/panel).
+- Implementación Técnica Realizada:
+  * 1. Base de Datos & Migraciones:
+    - `2026_09_21_150000_add_marketplace_commission_and_b2b_billing_tables.php`:
+      * `planes`: agregado campo `comision_marketplace` (decimal 5,2) con valores por defecto (Bronce: 5%, Plata: 4%, Oro: 3%).
+      * `complejos`: agregados campos de suscripción `suscripcion_estado`, `suscripcion_trial_vence_at`, `suscripcion_proximo_vencimiento`, `suscripcion_gracia_vence_at`.
+      * `facturas_club`: nueva tabla con períodos, desglose de canchas base, canchas excedentes, comisiones de marketplace, totales en USD y ARS, estado, método de pago, fechas de gracia y URLs de comprobante.
+      * `turnos`: agregados campos `origen` ('directo', 'marketplace'), `comision_marketplace`, `comision_porcentaje`, y `factura_club_id`.
+  * 2. Backend (Servicios, Modelos, Controladores y Filament):
+    - `CotizacionDolarService.php`: Servicio resiliente de consulta de tipo de cambio oficial/referencia con cache en Redis y fallback seguro ($1350 ARS/USD).
+    - `MarketplaceAttributionService.php`: Detección y cálculo de comisiones conforme al origen y porcentaje del plan del club.
+    - `ClubBillingService.php`: Resumen consolidado del período, auditoría de canchas en uso vs cupo, turnos de marketplace acumulados, generación y recálculo de facturas y evaluación de transiciones de gracia.
+    - `ClubPaymentGatewayService.php`: Generación de preferencias en Mercado Pago (con conversión automática a ARS), sesiones de checkout en Stripe (USD), registro de transferencias y acreditación atómica (+30 días).
+    - `PaymentWebhookService.php`: Integración en el webhook existente de Mercado Pago y Stripe para detectar `FACTURA_CLUB_{uuid}` y liquidar la factura B2B renovando el servicio del club.
+    - `TurnoConfirmarController.php`: Atribución automática en la confirmación de turnos del origen de la reserva y fijación de la comisión.
+    - `ClubFacturacionController.php`: Endpoints REST para resumen, facturas, generación, checkout de Mercado Pago, checkout de Stripe y subida de comprobante.
+    - `PlanResource.php` y `FacturaClubResource.php`: Panel de Filament Super Admin para inspeccionar planes, facturas B2B, filtrar estados y aprobar transferencias bancarias manualmente.
+  * 3. Frontend (Next.js 14+):
+    - `frontend/app/jugar/page.tsx`: Inyección de `?ref=marketplace` en todos los enlaces y botones de reserva generados desde el buscador global.
+    - `frontend/app/tenants/[subdomain]/page.tsx`: Detección de `ref=marketplace` y almacenamiento en `sessionStorage` (`saas_reserva_origen`).
+    - `frontend/components/GrillaHoraria.tsx`: Envío de `origen: 'marketplace'` al confirmar reservas si proviene del marketplace.
+    - `frontend/components/FacturacionClubPanel.tsx`: Panel completo de facturación con KPIs en tiempo real (Abono Base, Canchas Extras, Comisiones Marketplace, Total USD y conversión ARS), historial de facturas y modal interactivo con Mercado Pago, Stripe y CBU/Alias.
+    - `frontend/app/tenants/[subdomain]/panel/page.tsx`: Pestaña "💳 Facturación & Abono" y Banner Persistente de advertencia para períodos de gracia (7 días) o suscripciones vencidas con acceso directo a regularización.
+- Tests & Verificación de Calidad:
+  * Backend:
+    - Nueva suite `ClubBillingTest.php` con 8 tests completos en verde (38 aserciones): atribución de marketplace, reservas directas a 0%, cálculo de abono base + canchas extras + comisiones, checkout Mercado Pago con conversión ARS, checkout Stripe en USD, webhook de aprobación atómica +30 días, carga de transferencias y transiciones de gracia y vencimiento.
+    - Suite completa backend: 286/286 tests pasados (1.621 aserciones).
+  * Frontend:
+    - Nueva suite `FacturacionClub.test.tsx` con 3 tests completos en verde: renderizado del desglose, modal multimoneda (Mercado Pago, Stripe, Transferencia) y envío de comprobante bancario.
+    - Suite completa frontend: 124/124 tests pasados en 13 suites de Vitest.
+  * Total Ecosistema: 410/410 tests automatizados en verde (0 fallas, 0 regresiones).
+===============================================================================
 
 
 

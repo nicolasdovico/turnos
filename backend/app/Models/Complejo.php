@@ -44,6 +44,10 @@ class Complejo extends Model
         'dias_fin_semana',
         'recordatorio_whatsapp_activo',
         'recordatorio_anticipacion_minutos',
+        'suscripcion_estado',
+        'suscripcion_trial_vence_at',
+        'suscripcion_proximo_vencimiento',
+        'suscripcion_gracia_vence_at',
     ];
 
     protected function casts(): array
@@ -59,6 +63,9 @@ class Complejo extends Model
             'dias_fin_semana' => 'array',
             'recordatorio_whatsapp_activo' => 'boolean',
             'recordatorio_anticipacion_minutos' => 'integer',
+            'suscripcion_trial_vence_at' => 'datetime',
+            'suscripcion_proximo_vencimiento' => 'datetime',
+            'suscripcion_gracia_vence_at' => 'datetime',
         ];
     }
 
@@ -198,6 +205,63 @@ class Complejo extends Model
         }
 
         return false;
+    }
+
+    public function facturasClub(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(FacturaClub::class, 'complejo_id');
+    }
+
+    /**
+     * Determina si el complejo tiene su suscripción activa o en trial vigente.
+     */
+    public function suscripcionValida(): bool
+    {
+        if ($this->suscripcion_estado === 'activa') {
+            return true;
+        }
+
+        if ($this->suscripcion_estado === 'trial') {
+            return $this->suscripcion_trial_vence_at && now()->lte($this->suscripcion_trial_vence_at);
+        }
+
+        if ($this->suscripcion_estado === 'gracia') {
+            return $this->suscripcion_gracia_vence_at && now()->lte($this->suscripcion_gracia_vence_at);
+        }
+
+        return false;
+    }
+
+    /**
+     * Determina si el complejo está dentro del período de gracia de 7 días.
+     */
+    public function estaEnPeriodoDeGracia(): bool
+    {
+        if ($this->suscripcion_estado === 'gracia') {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Días restantes del trial o del período de gracia.
+     */
+    public function diasRestantesSuscripcion(): int
+    {
+        if ($this->suscripcion_estado === 'trial' && $this->suscripcion_trial_vence_at) {
+            return max(0, now()->diffInDays($this->suscripcion_trial_vence_at, false));
+        }
+
+        if ($this->suscripcion_estado === 'gracia' && $this->suscripcion_gracia_vence_at) {
+            return max(0, now()->diffInDays($this->suscripcion_gracia_vence_at, false));
+        }
+
+        if ($this->suscripcion_estado === 'activa' && $this->suscripcion_proximo_vencimiento) {
+            return max(0, now()->diffInDays($this->suscripcion_proximo_vencimiento, false));
+        }
+
+        return 0;
     }
 
     /**

@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import ResumenDiarioTurnos from "@/components/ResumenDiarioTurnos";
 import GestionBilleteras from "@/components/GestionBilleteras";
 import GestionClientes from "@/components/GestionClientes";
+import FacturacionClubPanel from "@/components/FacturacionClubPanel";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 
 interface ComplejoData {
@@ -337,7 +338,12 @@ export default function ClubAdminPanel() {
   const subdomain = (params?.subdomain as string) || "demo";
   const { user, token } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config">("canchas");
+  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion">("canchas");
+  const [suscripcionAlerta, setSuscripcionAlerta] = useState<{
+    estado: string;
+    en_gracia: boolean;
+    dias_restantes: number | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -637,6 +643,25 @@ export default function ClubAdminPanel() {
       const canchasList = (data.data.canchas || []).sort((a: CanchaItem, b: CanchaItem) =>
         (a.nombre || "").localeCompare(b.nombre || "", undefined, { numeric: true, sensitivity: "base" })
       );
+
+      // Consulta de estado de suscripción para banner de alerta persistente
+      try {
+        const billingRes = await fetch(`${API_BASE}/clubs/${subdomain}/facturacion/resumen`, {
+          headers: {
+            Accept: "application/json",
+            ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+            "X-Tenant-ID": subdomain,
+          },
+        });
+        if (billingRes.ok) {
+          const billingJson = await billingRes.json();
+          if (billingJson.data?.suscripcion) {
+            setSuscripcionAlerta(billingJson.data.suscripcion);
+          }
+        }
+      } catch {
+        // Ignorar silenciosamente si no está disponible
+      }
 
       if (data.data?.complejo) {
         setComplejo(data.data.complejo);
@@ -2032,6 +2057,40 @@ export default function ClubAdminPanel() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-20">
+      {/* Banner Persistente de Suscripción / Período de Gracia */}
+      {suscripcionAlerta && (suscripcionAlerta.en_gracia || suscripcionAlerta.estado === "gracia" || suscripcionAlerta.estado === "vencida") && (
+        <div
+          data-testid="banner-suscripcion-alerta"
+          className={`w-full py-3.5 px-4 sm:px-8 text-xs font-bold flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg z-40 relative ${
+            suscripcionAlerta.estado === "vencida"
+              ? "bg-rose-600 text-white"
+              : "bg-amber-500 text-slate-950"
+          }`}
+        >
+          <div className="flex items-center gap-2.5 text-center sm:text-left">
+            <span className="text-lg">{suscripcionAlerta.estado === "vencida" ? "🚨" : "⚠️"}</span>
+            <span>
+              {suscripcionAlerta.estado === "vencida"
+                ? "Abono Vencido: Tu período de gracia ha finalizado y las funciones operativas del club han sido suspendidas por falta de pago."
+                : `Período de Gracia Activo: Tu abono mensual se encuentra vencido. Cuentas con un plazo de 7 días (quedan ${suscripcionAlerta.dias_restantes ?? 7} días) para regularizar tu pago antes de que se restrinjan las funciones operativas.`}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("facturacion")}
+            className={`px-4 py-2 rounded-xl font-black uppercase text-[11px] tracking-wider transition shrink-0 ${
+              suscripcionAlerta.estado === "vencida"
+                ? "bg-white text-rose-700 hover:bg-slate-100"
+                : "bg-slate-950 text-amber-300 hover:bg-slate-900"
+            }`}
+            data-testid="btn-regularizar-abono-banner"
+          >
+            Regularizar Pago Ahora →
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
@@ -2191,6 +2250,17 @@ export default function ClubAdminPanel() {
             }`}
           >
             📋 Datos del Club
+          </button>
+          <button
+            onClick={() => setActiveTab("facturacion")}
+            className={`pb-4 transition border-b-2 flex items-center gap-1.5 ${
+              activeTab === "facturacion"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+            data-testid="tab-facturacion"
+          >
+            💳 Facturación & Abono
           </button>
         </div>
 
@@ -5668,6 +5738,19 @@ export default function ClubAdminPanel() {
               subdomain={subdomain}
               token={token}
               apiUrl={API_BASE}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 10: FACTURACIÓN & ABONO DEL CLUB */}
+        {/* ========================================================================= */}
+        {activeTab === "facturacion" && (
+          <div className="mt-8">
+            <FacturacionClubPanel
+              subdomain={subdomain}
+              token={token}
+              onRefreshSummary={() => fetchDashboardData(true)}
             />
           </div>
         )}

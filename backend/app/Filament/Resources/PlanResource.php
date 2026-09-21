@@ -57,6 +57,15 @@ class PlanResource extends Resource
                             ->required()
                             ->numeric()
                             ->default(8.00),
+                        Forms\Components\TextInput::make('comision_marketplace')
+                            ->label('Comisión Marketplace (%)')
+                            ->helperText('Porcentaje de comisión que se cobra al club por reservas originadas en el buscador global.')
+                            ->suffix('%')
+                            ->required()
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->default(5.00),
                         Forms\Components\Select::make('estado')
                             ->label('Estado')
                             ->options([
@@ -107,6 +116,10 @@ class PlanResource extends Resource
                 Tables\Columns\TextColumn::make('precio_cancha_adicional')
                     ->label('Cancha Extra')
                     ->money('USD')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('comision_marketplace')
+                    ->label('Comisión Mkt')
+                    ->suffix('%')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('modulos.nombre')
                     ->label('Módulos Incluidos')

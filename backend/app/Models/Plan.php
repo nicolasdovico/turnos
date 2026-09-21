@@ -19,6 +19,7 @@ class Plan extends Model
         'precio_mensual',
         'canchas_incluidas',
         'precio_cancha_adicional',
+        'comision_marketplace',
         'estado',
     ];
 
@@ -28,6 +29,7 @@ class Plan extends Model
             'precio_mensual' => 'decimal:2',
             'canchas_incluidas' => 'integer',
             'precio_cancha_adicional' => 'decimal:2',
+            'comision_marketplace' => 'decimal:2',
         ];
     }
 

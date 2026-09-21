@@ -94,6 +94,19 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
   }, [complejo?.latitud, complejo?.longitud]);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("ref") === "marketplace") {
+        try {
+          sessionStorage.setItem("saas_reserva_origen", "marketplace");
+        } catch {
+          // ignore sessionStorage errors
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const fetchClubData = async () => {
       try {
         setLoading(true);

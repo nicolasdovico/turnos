@@ -111,6 +111,17 @@ class PaymentWebhookService
     public function processApprovedPayment(array $paymentData, string $gateway): array
     {
         return DB::transaction(function () use ($paymentData, $gateway) {
+            // 0. Caso: Pago B2B de Factura / Abono Mensual de Club
+            $externalRef = $paymentData['external_reference'] ?? $paymentData['client_reference_id'] ?? ($paymentData['metadata']['external_reference'] ?? null);
+            if ($externalRef && str_starts_with($externalRef, 'FACTURA_CLUB_')) {
+                $facturaUuid = str_replace('FACTURA_CLUB_', '', $externalRef);
+                $factura = \App\Models\FacturaClub::where('uuid', $facturaUuid)->first();
+                if ($factura) {
+                    $paymentId = $paymentData['id'] ?? ($paymentData['payment_id'] ?? null);
+                    return app(ClubPaymentGatewayService::class)->procesarPagoAprobado($factura, $gateway, $paymentId);
+                }
+            }
+
             $turnoId = $paymentData['turno_id'] ?? $paymentData['metadata']['turno_id'] ?? null;
             $tokenPago = $paymentData['token_pago'] ?? $paymentData['metadata']['token_pago'] ?? null;
             $tokenReserva = $paymentData['token_reserva'] ?? $paymentData['metadata']['token_reserva'] ?? null;

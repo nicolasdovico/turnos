@@ -11,8 +11,9 @@ use App\Models\User;
 use App\Rules\ValidPhoneNumber;
 use App\Services\ReservaLockService;
 use App\Services\WalletService;
-use Carbon\Carbon;
 use App\Services\ClubClienteService;
+use App\Services\MarketplaceAttributionService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,8 @@ class TurnoConfirmarController extends Controller
     public function __construct(
         protected ReservaLockService $reservaLockService,
         protected WalletService $walletService,
-        protected ClubClienteService $clubClienteService
+        protected ClubClienteService $clubClienteService,
+        protected MarketplaceAttributionService $marketplaceAttributionService
     ) {}
 
     /**
@@ -49,6 +51,7 @@ class TurnoConfirmarController extends Controller
             'aplicar_credito_wallet' => ['nullable', 'boolean'],
             'modalidad_pago' => ['nullable', 'string', 'in:sena,total,ninguno,sin_cobro,pendiente'],
             'pago_completo' => ['nullable', 'boolean'],
+            'origen' => ['nullable', 'string', 'in:directo,marketplace'],
         ]);
 
         $cancha = Cancha::with('complejo')->find($validated['cancha_id']);
@@ -302,6 +305,9 @@ class TurnoConfirmarController extends Controller
             \Log::warning("No se pudo asociar/crear ClubCliente: " . $e->getMessage());
         }
 
+        $origenReserva = $validated['origen'] ?? ($request->header('X-Reserva-Origen') ?: 'directo');
+        $comisionData = $this->marketplaceAttributionService->calcularComision($cancha->complejo, (float) $precio, $origenReserva);
+
         try {
             $turno = DB::transaction(function () use (
                 $cancha,
@@ -317,7 +323,8 @@ class TurnoConfirmarController extends Controller
                 $montoPagado,
                 $saldoPendiente,
                 $estadoPago,
-                $tokenReserva
+                $tokenReserva,
+                $comisionData
             ) {
                 // SELECT FOR UPDATE: Check if any overlapping reserved/confirmed turno already exists
                 $overlappingTurno = Turno::where('cancha_id', $cancha->id)
@@ -352,6 +359,9 @@ class TurnoConfirmarController extends Controller
                         'estado_pago' => $estadoPago,
                         'estado' => 'reservado',
                         'es_fijo' => false,
+                        'origen' => $comisionData['origen'],
+                        'comision_marketplace' => $comisionData['comision_marketplace'],
+                        'comision_porcentaje' => $comisionData['comision_porcentaje'],
                     ]);
                     $turnoConfirmado = $existingTurno;
                 } else {
@@ -372,6 +382,9 @@ class TurnoConfirmarController extends Controller
                         'estado_pago' => $estadoPago,
                         'estado' => 'reservado',
                         'es_fijo' => false,
+                        'origen' => $comisionData['origen'],
+                        'comision_marketplace' => $comisionData['comision_marketplace'],
+                        'comision_porcentaje' => $comisionData['comision_porcentaje'],
                     ]);
                 }
 

@@ -153,3 +153,34 @@
 5. **Persistencia & Limpieza:**
    - Cerrar el modal mediante la '✕' o 'Volver' y volver a abrirlo: comprobar que el estado de visibilidad se reinicia por seguridad en modo oculto (`type="password"`).
 
+### Caso de Prueba: Facturación B2B, Comisiones de Marketplace y Pasarelas de Pago de Clubes
+1. **Atribución de Comisiones desde el Buscador Global (`jugar.turnos.com`):**
+   - Ingresar a `http://jugar.localhost:8080/`.
+   - Buscar un club y hacer clic en **Ver Canchas** o **Reservar Turno en Este Club**: verificar que la URL incluye el parámetro `?ref=marketplace`.
+   - Completar la reserva del turno.
+   - Comprobar en base de datos o API que el turno queda registrado con `origen = 'marketplace'`, el porcentaje de comisión del plan del club (ej. 5% para Bronce) y el monto de comisión retenida.
+   - Comprobar que las reservas directas realizadas ingresando a `http://[subdominio].localhost:8080/` (sin `ref=marketplace`) registran `origen = 'directo'` con comisión $0.00.
+2. **Pestaña "💳 Facturación & Abono" en el Panel de Administración del Club:**
+   - Ingresar como dueño o administrador al panel del club: `http://[subdominio].localhost:8080/panel`.
+   - Hacer clic en la pestaña **💳 Facturación & Abono**.
+   - Verificar las 4 tarjetas de métricas en tiempo real:
+     * **Abono Base**: Plan contratado, canchas incluidas y precio base mensual en USD.
+     * **Canchas Extras**: Cantidad de canchas excedentes administradas y costo unitario ($8 USD c/u).
+     * **Marketplace (jugar.)**: Cantidad de turnos captados por el buscador y total de comisiones acumuladas.
+     * **Total Período**: Suma consolidada en USD y conversión automática a Pesos Argentinos (ARS) calculada según la cotización del dólar en tiempo real.
+3. **Pasarela de Pagos Multimoneda & Opciones de Cobro:**
+   - Presionar el botón **Pagar Abono**.
+   - Verificar las 3 opciones de pago disponibles:
+     * **Mercado Pago (ARS)**: Muestra el importe en pesos argentinos convertido al tipo de cambio. Al presionar "Pagar Ahora con Mercado Pago", genera la preferencia y abre el checkout oficial.
+     * **Stripe (USD)**: Muestra el importe en dólares. Permite pagar con tarjeta internacional.
+     * **Transferencia Bancaria**: Muestra el CBU (`0000003100010000000001`), Alias (`TURNOS.SAAS.PAGOS`), y el monto exacto en ARS. Permite ingresar la URL del comprobante y notas aclaratorias. Al enviar, la factura pasa a estado `en_revision` / `revision_transferencia`.
+4. **Aprobación de Transferencias en Filament Super Admin:**
+   - Ingresar a `http://localhost:8080/admin` como Superadmin.
+   - En la sección **Facturación & Finanzas > Facturas de Clubes**, localizar la factura en revisión.
+   - Hacer clic en la acción **Aprobar Pago**: la factura pasa a `pagada` y la suscripción del club se renueva automáticamente por 30 días.
+5. **Período de Gracia de 7 Días y Banner Persistente:**
+   - Cuando un abono vence su fecha límite, el club entra en período de gracia de 7 días (`suscripcion_estado = 'gracia'`).
+   - En la parte superior de todas las vistas del panel de administración (`/panel`), aparece de forma persistente el banner de advertencia ámbar:
+     * `"⚠️ Período de Gracia Activo: Tu abono mensual se encuentra vencido. Cuentas con un plazo de 7 días (quedan X días) para regularizar tu pago antes de que se restrinjan las funciones operativas."`
+     * El botón **Regularizar Pago Ahora →** redirige directamente a la pestaña de facturación y abre las pasarelas de cobro.
+   - Si transcurren los 7 días sin regularización, el estado transiciona a `vencida` y el banner se torna rojo de emergencia indicando la suspensión de funciones.

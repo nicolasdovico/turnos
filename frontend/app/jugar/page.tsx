@@ -146,9 +146,9 @@ export default function JugarMarketplacePage() {
   const getClubReservationUrl = (subdomain: string) => {
     if (typeof window !== "undefined") {
       const protocol = window.location.protocol;
-      return `${protocol}//${subdomain}.${baseDomain}/`;
+      return `${protocol}//${subdomain}.${baseDomain}/?ref=marketplace`;
     }
-    return `http://${subdomain}.localhost:8080/`;
+    return `http://${subdomain}.localhost:8080/?ref=marketplace`;
   };
 
   // ==========================================

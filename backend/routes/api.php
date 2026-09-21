@@ -149,6 +149,14 @@ Route::prefix('clubs')->group(function () {
     Route::post('/{subdomain}/clientes', [\App\Http\Controllers\Api\ClubClienteController::class, 'store']);
     Route::put('/{subdomain}/clientes/{id}', [\App\Http\Controllers\Api\ClubClienteController::class, 'update']);
     Route::delete('/{subdomain}/clientes/{id}', [\App\Http\Controllers\Api\ClubClienteController::class, 'destroy']);
+
+    // Facturación B2B, Comisiones de Marketplace y Pasarelas de Pago de Clubes
+    Route::get('/{subdomain}/facturacion/resumen', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'resumen']);
+    Route::get('/{subdomain}/facturacion/facturas', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'facturas']);
+    Route::post('/{subdomain}/facturacion/generar-factura', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'generarFactura']);
+    Route::post('/{subdomain}/facturacion/pagar-mercadopago', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'pagarMercadoPago']);
+    Route::post('/{subdomain}/facturacion/pagar-stripe', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'pagarStripe']);
+    Route::post('/{subdomain}/facturacion/comprobante-transferencia', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'subirComprobanteTransferencia']);
 });
 
 // Vales Digitales de Lluvia (Acceso público y autogestión de jugadores)

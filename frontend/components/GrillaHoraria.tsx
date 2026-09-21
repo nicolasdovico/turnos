@@ -2317,6 +2317,11 @@ export default function GrillaHoraria({
       };
       if (subdomain) headers["X-Tenant-ID"] = subdomain;
 
+      const isMarketplaceOrigin = typeof window !== "undefined" && (
+        window.sessionStorage?.getItem("saas_reserva_origen") === "marketplace" ||
+        new URLSearchParams(window.location.search).get("ref") === "marketplace"
+      );
+
       const res = await fetch(`${apiUrl}/turnos/confirmar`, {
         method: "POST",
         headers,
@@ -2335,6 +2340,7 @@ export default function GrillaHoraria({
           aplicar_credito_wallet: useWalletCredit,
           modalidad_pago: modalidadCobro,
           pago_completo: modalidadCobro === "total",
+          origen: isMarketplaceOrigin ? "marketplace" : "directo",
         }),
       });
 
