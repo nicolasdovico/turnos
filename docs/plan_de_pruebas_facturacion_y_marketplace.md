@@ -80,6 +80,80 @@ Para cubrir exhaustivamente todos los tiers de facturación y capacidades de can
 | **COMP-02** | Complejo Plata Fútbol | `plata-futbol` | **Plata** | 6 canchas | 4 | 2 extras | $10 USD | $59 USD | $20 USD | **4.00%** |
 | **COMP-03** | Arena Golden Multi | `golden-arena` | **Oro** | 5 canchas | 6 | 0 extras | $12 USD | $99 USD | $0 USD | **3.00%** |
 
+### 3.1 Fichas Técnicas y Configuración Exhaustiva de Canchas por Complejo
+
+A continuación se detalla la configuración técnica, deportiva, lumínica y tarifaria de cada una de las canchas que integran los complejos bajo prueba. Estas características determinan tanto el cálculo de cupos de facturación mensual como la experiencia del usuario al reservar vía web o marketplace.
+
+---
+
+#### 🏟️ COMP-01: "Club Padel Bronce" (`padel-bronce`)
+* **Plan Contratado:** Bronce ($29 USD/mes) | **Cupo Base:** 2 canchas incluidas | **Costo Cancha Extra:** $8 USD/mes
+* **Total Canchas:** 3 canchas (2 dentro de cupo + **1 cancha excedente**)
+* **Comisión de Marketplace:** 5.00% sobre turnos captados en `jugar.localhost`
+
+| Parámetro | Cancha 1: "Central Panorámica" | Cancha 2: "Cristal Pro Outdoor" | Cancha 3: "Muro Tradicional" *(Excedente)* |
+| :--- | :--- | :--- | :--- |
+| **Deporte** | Pádel | Pádel | Pádel |
+| **Superficie** | Césped sintético azul texturizado (WPT) | Césped fibrilado verde | Césped sintético monofilamento verde |
+| **Paredes / Cerramiento** | Vidrio templado 12mm panorámico total | Cristal templado 10mm con columnas | Muro perimetral revocado con reja |
+| **Techada (Cubierta)** | **Sí** (Indoor / Nave metálica aislada) | **No** (Descubierta / Outdoor) | **No** (Descubierta / Outdoor) |
+| **Iluminación** | 8 proyectores LED 200W profesionales | 4 columnas LED 150W | Proyectores halógenos tradicionales |
+| **Hora Inicio Luz** | Incluida en tarifa estándar | 19:00 hs | 19:00 hs |
+| **Recargo Luz Artificial** | $0.00 (Techada con luz incluida) | **+$2,000.00 ARS** | **+$1,500.00 ARS** |
+| **Tecnología / Extras** | Marcador digital + Cámara streaming HD | Tablero de tanteo manual | Tablero manual |
+| **Duración Estándar** | 90 minutos (admite 60, 90, 120 min) | 90 minutos | 60 minutos |
+| **Tarifa Base (Valle)** | $10,000.00 ARS | $8,500.00 ARS | $7,000.00 ARS |
+| **Tarifa Estándar** | $12,000.00 ARS (90 min) | $10,000.00 ARS (90 min) | $8,500.00 ARS (60 min) |
+| **Tarifa Pico (Nocturna)**| $15,000.00 ARS | $12,000.00 ARS (+ recargo luz) | $10,000.00 ARS (+ recargo luz) |
+| **Tarifa Fin de Semana** | $14,000.00 ARS | $11,500.00 ARS | $9,000.00 ARS |
+| **Impacto Facturación** | **Incluida en abono base ($29 USD)** | **Incluida en abono base ($29 USD)** | **Cancha Excedente: +$8.00 USD/mes** |
+
+---
+
+#### ⚽ COMP-02: "Complejo Plata Fútbol" (`plata-futbol`)
+* **Plan Contratado:** Plata ($59 USD/mes) | **Cupo Base:** 4 canchas incluidas | **Costo Cancha Extra:** $10 USD/mes
+* **Total Canchas:** 6 canchas (4 dentro de cupo + **2 canchas excedentes**)
+* **Comisión de Marketplace:** 4.00% sobre turnos captados en `jugar.localhost`
+
+| Parámetro | Cancha 1: "Fútbol 5 Techada A" | Cancha 2: "Fútbol 5 Techada B" | Cancha 3: "Fútbol 5 Outdoor" | Cancha 4: "Fútbol 7 Premium" | Cancha 5: "F5 Clásica" *(Excedente 1)* | Cancha 6: "F8 Pro" *(Excedente 2)* |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Deporte** | Fútbol 5 | Fútbol 5 | Fútbol 5 | Fútbol 7 | Fútbol 5 | Fútbol 8 / 9 |
+| **Superficie** | Césped 50mm monofilamento con caucho | Césped 42mm fibrilado con arena | Césped sintético 42mm estándar | Césped bicolor 60mm con base shockpad | Césped sintético 40mm | Césped sintético profesional 60mm |
+| **Techada** | **Sí** (Estructura parabólica) | **Sí** (Estructura parabólica) | **No** (Descubierta) | **No** (Descubierta) | **No** (Descubierta) | **No** (Descubierta) |
+| **Iluminación** | Campanas LED 250W | Campanas LED 250W | 4 torres halógenas | 6 torres LED 400W | 4 columnas LED 150W | 8 torres LED 500W |
+| **Recargo Luz** | $0.00 (Luz incluida) | $0.00 (Luz incluida) | **+$3,000.00 ARS** | **+$4,500.00 ARS** | **+$2,500.00 ARS** | **+$5,000.00 ARS** |
+| **Tecnología** | Marcador digital | Marcador digital | Tablero manual | Marcador + Cámara VAR | Tablero manual | Marcador + Transmisión HD |
+| **Duración** | 60 minutos | 60 minutos | 60 minutos | 60 min (admite 90) | 60 minutos | 60 min / 90 min |
+| **Tarifa Base** | $18,000.00 ARS | $18,000.00 ARS | $15,000.00 ARS | $26,000.00 ARS (60m) | $14,000.00 ARS | $34,000.00 ARS (60m) |
+| **Tarifa Pico** | $22,000.00 ARS | $22,000.00 ARS | $18,000.00 ARS (+luz) | $32,000.00 ARS (+luz) | $17,000.00 ARS (+luz) | $42,000.00 ARS (+luz) |
+| **Fin de Semana**| $20,000.00 ARS | $20,000.00 ARS | $16,500.00 ARS | $29,000.00 ARS | $15,500.00 ARS | $38,000.00 ARS |
+| **Impacto B2B** | **Incluida (Cupo 1/4)** | **Incluida (Cupo 2/4)** | **Incluida (Cupo 3/4)** | **Incluida (Cupo 4/4)** | **Excedente 1: +$10.00 USD/m** | **Excedente 2: +$10.00 USD/m** |
+
+---
+
+#### 🏆 COMP-03: "Arena Golden Multi" (`golden-arena`)
+* **Plan Contratado:** Oro ($99 USD/mes) | **Cupo Base:** 6 canchas incluidas | **Costo Cancha Extra:** $12 USD/mes
+* **Total Canchas:** 5 canchas multideporte (5 dentro de cupo + **0 canchas excedentes**)
+* **Comisión de Marketplace:** 3.00% sobre turnos captados en `jugar.localhost`
+
+| Parámetro | Pista 1: "Pádel Panorámica WPT" | Pista 2: "Pádel Indoor Cristal" | Cancha 3: "Tenis Polvo de Ladrillo" | Cancha 4: "Tenis Cemento Hard Court" | Cancha 5: "Multiuso Pickleball / 3x3" |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Deporte** | Pádel | Pádel | Tenis | Tenis | Pickleball / Básquet 3x3 |
+| **Superficie** | Césped Mondo Supercourt XN (Oficial WPT) | Césped sintético azul 12mm | Polvo de ladrillo (Tierra batida con riego) | Resina sintética multicapa rápida | Parquet flotante de madera plastificada |
+| **Paredes** | Cristal templado 12mm sin postes | Cristal templado 10mm | Cerramiento perimetral alambre romboidal | Cerramiento perimetral de alambre | Cerramiento perimetral de red y protección |
+| **Techada** | **Sí** (Indoor Climatizado frío/calor) | **Sí** (Indoor) | **No** (Outdoor descubierto) | **No** (Outdoor descubierto) | **Sí** (Indoor Climatizado) |
+| **Domótica IoT**| **Dispositivo IoT `iot-luz-p1`** (On/Off automático) | **Dispositivo IoT `iot-luz-p2`** (On/Off automático) | Control manual con sensor crepuscular | Control manual con sensor crepuscular | Control lumínico programable |
+| **Recargo Luz** | $0.00 (Luz LED domotizada incluida) | $0.00 (Luz LED domotizada incluida) | **+$2,500.00 ARS** | **+$2,500.00 ARS** | $0.00 (Luz indoor incluida) |
+| **Tecnología** | Marcador digital + Cámara Streaming HD | Marcador digital inalámbrico | Tablero de sets digital | Marcador digital | Marcador multideporte con cronómetro |
+| **Duración** | 90 minutos (admite 60, 90, 120 min) | 90 minutos | 90 minutos (admite 60 y 120 min) | 60 minutos (admite 90 min) | 60 minutos |
+| **Tarifa Base** | $16,000.00 ARS (90m) | $14,000.00 ARS (90m) | $13,000.00 ARS (90m) | $10,000.00 ARS (60m) | $12,000.00 ARS (60m) |
+| **Tarifa Pico** | $20,000.00 ARS | $17,500.00 ARS | $15,500.00 ARS (+ recargo luz) | $12,500.00 ARS (+ recargo luz) | $15,000.00 ARS |
+| **Fin de Semana**| $18,000.00 ARS | $16,000.00 ARS | $14,500.00 ARS | $11,500.00 ARS | $13,500.00 ARS |
+| **Impacto B2B** | **Incluida (Cupo 1/6)** | **Incluida (Cupo 2/6)** | **Incluida (Cupo 3/6)** | **Incluida (Cupo 4/6)** | **Incluida (Cupo 5/6) - Margen de 1 cancha libre** |
+
+---
+
+
 ---
 
 ## 4. Casos de Prueba Detallados
@@ -87,43 +161,59 @@ Para cubrir exhaustivamente todos los tiers de facturación y capacidades de can
 ### Módulo 1: Setup y Configuración de Complejos por Plan
 
 #### Caso CP-B2B-01: Creación y Auditoría de Plan Bronce con Canchas Excedentes
-* **Objetivo:** Verificar que un club con Plan Bronce y más canchas que el cupo base calcule correctamente el costo de abono y extras.
+* **Objetivo:** Verificar que un club con Plan Bronce y más canchas que el cupo base calcule correctamente el costo de abono y extras según la configuración de sus canchas.
 * **Precondiciones:**
   - Plan Bronce activo: Base $29 USD, Cupo: 2 canchas, Cancha adicional: $8 USD, Comisión Marketplace: 5%.
 * **Pasos:**
-  1. Dar de alta o verificar el complejo `padel-bronce` con 3 canchas activas.
+  1. Dar de alta en el complejo `padel-bronce` las 3 canchas detalladas en la sección 3.1:
+     - **Cancha 1 ("Central Panorámica"):** Pádel, Césped azul WPT, Vidrio 12mm, Techada, LED, 90 min, Base $12,000 ARS.
+     - **Cancha 2 ("Cristal Pro Outdoor"):** Pádel, Césped verde, Vidrio 10mm, Descubierta, LED, 90 min, Base $10,000 ARS, Recargo luz $2,000 ARS.
+     - **Cancha 3 ("Muro Tradicional"):** Pádel, Césped clásico, Muro, Descubierta, 60 min, Base $8,500 ARS.
   2. Autenticarse como Administrador del club.
   3. Ejecutar `GET /api/clubs/padel-bronce/facturacion/resumen`.
 * **Resultado Esperado:**
   - `canchas.totales`: 3
-  - `canchas.incluidas`: 2
-  - `canchas.excedentes`: 1
+  - `canchas.incluidas`: 2 (Canchas 1 y 2 cubiertas por el abono base)
+  - `canchas.excedentes`: 1 (Cancha 3 computada como excedente)
   - `totales.base_plan_usd`: 29.00
-  - `totales.canchas_extras_usd`: 8.00
+  - `totales.canchas_extras_usd`: 8.00 (1 × $8 USD)
   - `marketplace.porcentaje_aplicado`: 5.00
 
 #### Caso CP-B2B-02: Configuración de Plan Plata con 2 Canchas Excedentes
-* **Objetivo:** Validar cálculo de múltiples canchas adicionales en Plan Plata.
+* **Objetivo:** Validar cálculo de múltiples canchas adicionales en Plan Plata con complejo multicancha de fútbol.
 * **Precondiciones:**
   - Plan Plata activo: Base $59 USD, Cupo: 4 canchas, Cancha adicional: $10 USD, Comisión Marketplace: 4%.
 * **Pasos:**
-  1. Configurar complejo `plata-futbol` con 6 canchas activas.
+  1. Configurar en el complejo `plata-futbol` las 6 canchas de fútbol especificadas en 3.1:
+     - **Canchas 1 y 2:** Fútbol 5 Techadas en estructura parabólica (60 min, Base $18,000 ARS).
+     - **Cancha 3:** Fútbol 5 Outdoor (60 min, Base $15,000 ARS + $3,000 luz).
+     - **Cancha 4:** Fútbol 7 Premium con cámara VAR (60 min, Base $26,000 ARS + $4,500 luz).
+     - **Cancha 5:** Fútbol 5 Clásica (60 min, Base $14,000 ARS + $2,500 luz) $\rightarrow$ *Excedente 1*.
+     - **Cancha 6:** Fútbol 8 / 9 Profesional (60 min, Base $34,000 ARS + $5,000 luz) $\rightarrow$ *Excedente 2*.
   2. Consultar `GET /api/clubs/plata-futbol/facturacion/resumen`.
 * **Resultado Esperado:**
-  - `canchas.excedentes`: 2
+  - `canchas.totales`: 6
+  - `canchas.incluidas`: 4 (Canchas 1, 2, 3 y 4 dentro de abono)
+  - `canchas.excedentes`: 2 (Canchas 5 y 6 computadas como extras)
   - `totales.base_plan_usd`: 59.00
-  - `totales.canchas_extras_usd`: 20.00 (2 × $10)
+  - `totales.canchas_extras_usd`: 20.00 (2 × $10 USD)
   - `marketplace.porcentaje_aplicado`: 4.00
 
 #### Caso CP-B2B-03: Configuración de Plan Oro sin Canchas Excedentes
-* **Objetivo:** Validar que un complejo con cantidad de canchas menor o igual al cupo base no tribute cargos adicionales.
+* **Objetivo:** Validar que un complejo multideporte con cantidad de canchas menor o igual al cupo base no tribute cargos adicionales.
 * **Precondiciones:**
   - Plan Oro activo: Base $99 USD, Cupo: 6 canchas, Comisión Marketplace: 3%.
 * **Pasos:**
-  1. Configurar complejo `golden-arena` con 5 canchas activas (menor al cupo de 6).
+  1. Configurar en el complejo `golden-arena` las 5 canchas multideporte de alta gama de la sección 3.1:
+     - **Pistas 1 y 2:** Pádel Indoor Climatizadas con automatización lumínica Domótica IoT (`iot-luz-p1` y `iot-luz-p2`, 90 min, Base $16,000 y $14,000 ARS).
+     - **Cancha 3:** Tenis Polvo de Ladrillo con riego (90 min, Base $13,000 ARS + $2,500 luz).
+     - **Cancha 4:** Tenis Cemento Hard Court rápida (60 min, Base $10,000 ARS + $2,500 luz).
+     - **Cancha 5:** Cancha Multiuso Pickleball / Básquet 3x3 Indoor Climatizada (60 min, Base $12,000 ARS).
   2. Consultar `GET /api/clubs/golden-arena/facturacion/resumen`.
 * **Resultado Esperado:**
-  - `canchas.excedentes`: 0
+  - `canchas.totales`: 5
+  - `canchas.incluidas`: 6
+  - `canchas.excedentes`: 0 (Todas las canchas cubiertas, con margen disponible para 1 cancha adicional sin costo extra)
   - `totales.canchas_extras_usd`: 0.00
   - `totales.base_plan_usd`: 99.00
   - `marketplace.porcentaje_aplicado`: 3.00
