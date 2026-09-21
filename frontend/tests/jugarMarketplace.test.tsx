@@ -147,4 +147,83 @@ describe("Jugar Marketplace & Buscador Espacial de Jugadores", () => {
       process.env.NEXT_PUBLIC_ENABLE_PLAYER_MARKETPLACE = originalEnv;
     }
   });
+
+  it("allows searching manual location by city name with Nominatim geocoding and expanded radius", async () => {
+    const mockComplejosLujan = [
+      {
+        id: 1,
+        uuid: "c1",
+        nombre: "Club Padel Luján",
+        subdominio: "padel-lujan",
+        deporte_principal: "padel",
+        direccion: "San Martín 500",
+        ciudad: "Luján",
+        latitud: -34.5703,
+        longitud: -59.1050,
+        distancia_km: 0.8,
+        deportes_disponibles: ["padel"],
+        canchas: [{ id: 10, nombre: "Cancha 1" }],
+      },
+    ];
+
+    global.fetch = vi.fn().mockImplementation(async (url: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("nominatim.openstreetmap.org")) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              lat: "-34.570300",
+              lon: "-59.105000",
+              display_name: "Luján, Partido de Luján, Buenos Aires, Argentina",
+            },
+          ],
+        } as any;
+      }
+      if (urlStr.includes("complejos/cercanos")) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: mockComplejosLujan,
+            total: 1,
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({ data: [] }) } as any;
+    });
+
+    render(<JugarMarketplacePage />);
+
+    // Verify 100 km and 200 km radius buttons exist
+    expect(screen.getByRole("button", { name: "100 km" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "200 km" })).toBeDefined();
+
+    // Verify manual location input
+    const locationInput = screen.getByTestId("input-manual-location") as HTMLInputElement;
+    expect(locationInput).toBeDefined();
+
+    // Type "Luján" in input
+    fireEvent.change(locationInput, { target: { value: "Luján" } });
+
+    // Submit location search
+    const form = screen.getByTestId("form-location-search");
+    fireEvent.submit(form);
+
+    const clubs = await screen.findAllByText("Club Padel Luján");
+    expect(clubs.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/800 m/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Luján/i).length).toBeGreaterThanOrEqual(1);
+
+    // Click 100 km radius button
+    const btn100 = screen.getByRole("button", { name: "100 km" });
+    fireEvent.click(btn100);
+
+    // Verify fetch called with radio_km=100
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("radio_km=100")
+      );
+    });
+  });
 });
+

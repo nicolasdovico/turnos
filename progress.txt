@@ -2689,15 +2689,28 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Suite Completa Mobile: 20/20 tests pasados en 4 suites de Jest.
     - Total Ecosistema: 431/431 tests automatizados en verde (0 fallas, 0 regresiones).
 ===============================================================================
-
-
-
-
-
-
-
-
-
-
-
-
+[2026-09-21] - MARKETPLACE DE JUGADORES (jugar.turnos.com): BUSCADOR MANUAL DE LOCALIDAD CON GEOCODIFICACIÓN & AMPLIACIÓN DE RADIOS A 100/200 KM
+===============================================================================
+- Contexto y Necesidad del Usuario:
+  * En el marketplace de jugadores (`jugar.turnos.com` / `jugar.localhost.com`), el mapa y el listado de clubes cercanos utilizaban por defecto el Obelisco de Buenos Aires (CABA) cuando el navegador del usuario en entorno desktop carecía de hardware GPS o bloqueaba los permisos de geolocalización.
+  * Como el radio máximo de búsqueda estaba prefijado en 50 km, los clubes configurados por el usuario en zonas fuera del AMBA central (como Luján, a ~67 km de CABA) no se mostraban en pantalla, imposibilitando realizar pruebas o encontrar clubes locales.
+- Solución Implementada:
+  * 1. Barra de Búsqueda Manual de Ciudad/Localidad con Geocodificación:
+    - En `frontend/app/jugar/page.tsx`, se implementó el formulario de búsqueda de localidad (`form-location-search`) con input (`input-manual-location`) y botón de envío (`btn-search-manual-location`).
+    - Integración con la API pública de geocodificación OpenStreetMap Nominatim (`https://nominatim.openstreetmap.org/search?format=json&q=...`).
+    - Al buscar una ciudad o zona (ej. "Luján", "Pilar", "Mercedes"), se obtienen latitud y longitud precisas, se actualiza el estado `userCoords`, se recalcula la consulta a `/api/complejos/cercanos` y se refresca el mapa embebido y el panel de clubes.
+  * 2. Accesos Rápidos a Ciudades Populares:
+    - Se incorporaron chips/botones de acceso inmediato para ciudades clave: "Luján", "Pilar", "Mercedes", "General Rodríguez" y "CABA".
+    - Al hacer clic en cualquiera de ellos, se geolocaliza automáticamente sin necesidad de teclear.
+  * 3. Persistencia en LocalStorage:
+    - La ubicación seleccionada se guarda en `localStorage` con la clave `jugar_user_location` (`{ lat, lng, name }`).
+    - Al recargar la página, se restaura la última ubicación manual guardada por el usuario en lugar de volver a CABA.
+  * 4. Ampliación del Selector de Radios de Búsqueda:
+    - Se añadieron las opciones de `100 km` y `200 km` a la botonera de radios (`[5, 10, 20, 50, 100, 200] km`), permitiendo búsquedas en radios interurbanos y provinciales (el backend `/api/complejos/cercanos` ya admitía hasta 500 km por validación).
+  * 5. Mensaje de Fallback Amigable en Botón "Mi Ubicación":
+    - Si el usuario presiona "Mi Ubicación" y el navegador no puede obtener coordenadas GPS, se despliega una sugerencia orientando al usuario a escribir su ciudad o hacer clic en los accesos rápidos.
+- Tests & Verificación:
+  * Frontend: Se agregó un nuevo test en `frontend/tests/jugarMarketplace.test.tsx` (`"allows searching manual location by city name with Nominatim geocoding and expanded radius"`), validando la interacción del formulario, la geocodificación mockeada, la actualización del badge, el listado de clubes y la llamada al endpoint con `radio_km=100`.
+  * Suite Completa Frontend: 126/126 tests pasados en 13 suites de Vitest.
+  * Total Ecosistema: 432/432 tests automatizados en verde (286 backend, 126 frontend, 20 mobile; 0 fallas, 0 regresiones).
+===============================================================================

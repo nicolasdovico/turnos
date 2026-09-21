@@ -29,13 +29,18 @@ export default function JugarMarketplacePage() {
 
   // Search state
   const [deporte, setDeporte] = useState<string>("todos");
-  const [radioKm, setRadioKm] = useState<number>(20);
+  const [radioKm, setRadioKm] = useState<number>(50);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [complejos, setComplejos] = useState<ComplejoCercano[]>([]);
   const [selectedClub, setSelectedClub] = useState<ComplejoCercano | null>(null);
   const [baseDomain, setBaseDomain] = useState<string>("localhost:8080");
+
+  // Manual Location Search State
+  const [searchLocationText, setSearchLocationText] = useState<string>("");
+  const [isGeocoding, setIsGeocoding] = useState<boolean>(false);
+  const [currentLocationName, setCurrentLocationName] = useState<string>("Buenos Aires (CABA)");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -72,11 +77,48 @@ export default function JugarMarketplacePage() {
       setComplejos(list);
       if (list.length > 0) {
         setSelectedClub(list[0]);
+      } else {
+        setSelectedClub(null);
       }
     } catch (err: any) {
       setErrorMsg(err.message || "No se pudo conectar con el servidor.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearchLocation = async (e?: React.FormEvent, customQuery?: string) => {
+    if (e) e.preventDefault();
+    const query = (customQuery !== undefined ? customQuery : searchLocationText).trim();
+    if (!query) return;
+
+    setIsGeocoding(true);
+    setErrorMsg(null);
+    try {
+      const q = encodeURIComponent(`${query}, Argentina`);
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`, {
+        headers: { "Accept-Language": "es" },
+      });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        const displayName = data[0].display_name ? data[0].display_name.split(",")[0] : query;
+        const newCoords = { lat, lng };
+        setUserCoords(newCoords);
+        setCurrentLocationName(displayName);
+        if (customQuery) setSearchLocationText(displayName);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("jugar_user_location", JSON.stringify({ lat, lng, name: displayName }));
+        }
+        await fetchClubesCercanos(lat, lng, radioKm, deporte);
+      } else {
+        setErrorMsg(`No se encontró la ubicación "${query}". Probá con otra ciudad o localidad.`);
+      }
+    } catch (err: any) {
+      setErrorMsg("Error al buscar la ubicación en el mapa.");
+    } finally {
+      setIsGeocoding(false);
     }
   };
 
@@ -86,9 +128,7 @@ export default function JugarMarketplacePage() {
       !navigator.geolocation ||
       typeof navigator.geolocation.getCurrentPosition !== "function"
     ) {
-      const defaultCoords = { lat: -34.603722, lng: -58.381592 };
-      setUserCoords(defaultCoords);
-      fetchClubesCercanos(defaultCoords.lat, defaultCoords.lng, radioKm, deporte);
+      setErrorMsg("La geolocalización no está disponible en este navegador. Podés escribir tu ciudad o localidad en el buscador.");
       return;
     }
     setLoading(true);
@@ -96,28 +136,51 @@ export default function JugarMarketplacePage() {
       (pos) => {
         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserCoords(coords);
+        setCurrentLocationName("Mi ubicación actual (GPS)");
+        setSearchLocationText("");
+        if (typeof window !== "undefined") {
+          localStorage.setItem("jugar_user_location", JSON.stringify({ lat: coords.lat, lng: coords.lng, name: "Mi ubicación actual (GPS)" }));
+        }
         fetchClubesCercanos(coords.lat, coords.lng, radioKm, deporte);
       },
       (err) => {
-        const defaultCoords = { lat: -34.603722, lng: -58.381592 };
-        setUserCoords(defaultCoords);
-        fetchClubesCercanos(defaultCoords.lat, defaultCoords.lng, radioKm, deporte);
-        setErrorMsg("Ubicación del dispositivo no disponible. Mostrando clubes de la región.");
+        setLoading(false);
+        setErrorMsg("Ubicación del dispositivo no disponible. Podés buscar tu ciudad o localidad directamente en el campo de búsqueda (ej. Luján).");
       },
       { timeout: 8000, enableHighAccuracy: true }
     );
   };
 
-  // Carga inmediata de clubes abonados al iniciar
+  // Carga inicial: revisa localStorage y si no, usa coordenadas de CABA
   useEffect(() => {
     if (isMarketplaceActive) {
-      const defaultCoords = { lat: -34.603722, lng: -58.381592 };
-      setUserCoords(defaultCoords);
-      fetchClubesCercanos(defaultCoords.lat, defaultCoords.lng, radioKm, deporte);
+      let initialCoords = { lat: -34.603722, lng: -58.381592 };
+      let initialName = "Buenos Aires (CABA)";
 
-      // Si el navegador soporta geolocalización, solicitamos actualización en segundo plano
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("jugar_user_location");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (parsed.lat && parsed.lng) {
+              initialCoords = { lat: parsed.lat, lng: parsed.lng };
+              if (parsed.name) {
+                initialName = parsed.name;
+                setSearchLocationText(parsed.name);
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      setUserCoords(initialCoords);
+      setCurrentLocationName(initialName);
+      fetchClubesCercanos(initialCoords.lat, initialCoords.lng, radioKm, deporte);
+
+      // Si no había guardada una ubicación manual previa y el navegador soporta GPS
       if (
         typeof window !== "undefined" &&
+        !localStorage.getItem("jugar_user_location") &&
         navigator.geolocation &&
         typeof navigator.geolocation.getCurrentPosition === "function"
       ) {
@@ -125,11 +188,10 @@ export default function JugarMarketplacePage() {
           (pos) => {
             const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
             setUserCoords(coords);
+            setCurrentLocationName("Mi ubicación actual (GPS)");
             fetchClubesCercanos(coords.lat, coords.lng, radioKm, deporte);
           },
-          () => {
-            // Se mantiene la vista por defecto sin interrumpir
-          },
+          () => {},
           { timeout: 6000, enableHighAccuracy: true }
         );
       }
@@ -272,24 +334,80 @@ export default function JugarMarketplacePage() {
               <h1 className="text-2xl sm:text-3xl font-black text-white">
                 Canchas y Complejos Deportivos Cercanos
               </h1>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                Mostrando complejos en un radio de {radioKm} km ordenados por distancia de menor a mayor.
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 flex flex-wrap items-center gap-1.5">
+                <span>Mostrando complejos en un radio de {radioKm} km desde:</span>
+                <span className="inline-flex items-center gap-1 font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800/50">
+                  <MapPin className="w-3 h-3 text-emerald-400" />
+                  <span>{currentLocationName}</span>
+                </span>
               </p>
             </div>
 
             {/* Selector de Radio */}
-            <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs self-start md:self-auto">
-              <span className="text-slate-400 px-2 font-semibold">Radio:</span>
-              {[5, 10, 20, 50].map((r) => (
+            <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs self-start md:self-auto overflow-x-auto max-w-full">
+              <span className="text-slate-400 px-2 font-semibold whitespace-nowrap">Radio:</span>
+              {[5, 10, 20, 50, 100, 200].map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => handleFilterChange(deporte, r)}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                    radioKm === r ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white"
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer whitespace-nowrap ${
+                    radioKm === r ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
                   }`}
                 >
                   {r} km
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Barra de Búsqueda Manual de Localidad */}
+          <div className="space-y-2">
+            <form onSubmit={(e) => handleSearchLocation(e)} className="flex flex-col sm:flex-row gap-2 max-w-2xl" data-testid="form-location-search">
+              <div className="relative flex-1">
+                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 pointer-events-none" />
+                <input
+                  type="text"
+                  data-testid="input-manual-location"
+                  value={searchLocationText}
+                  onChange={(e) => setSearchLocationText(e.target.value)}
+                  placeholder="Escribí tu ciudad o zona (ej. Luján, Pilar, CABA, Mercedes...)"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs sm:text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition font-medium"
+                />
+              </div>
+              <button
+                type="submit"
+                data-testid="btn-search-manual-location"
+                onClick={(e) => handleSearchLocation(e)}
+                disabled={isGeocoding || !searchLocationText.trim()}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition disabled:opacity-50 cursor-pointer shadow-md flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                {isGeocoding ? (
+                  <>
+                    <span className="animate-spin text-sm">⏳</span>
+                    <span>Buscando zona...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-3.5 h-3.5" />
+                    <span>Cambiar ubicación</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Accesos directos a ciudades / zonas populares */}
+            <div className="flex items-center gap-1.5 flex-wrap text-xs text-slate-400 pt-1">
+              <span className="text-[11px] font-semibold text-slate-500 mr-1">Ciudades rápidas:</span>
+              {["Luján", "Pilar", "Mercedes", "General Rodríguez", "CABA"].map((city) => (
+                <button
+                  key={city}
+                  type="button"
+                  data-testid={`quick-zone-${city.toLowerCase().replace(/\s+/g, "-")}`}
+                  onClick={() => handleSearchLocation(undefined, city)}
+                  className="px-2.5 py-0.5 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-emerald-500/50 hover:text-emerald-300 transition text-[11px] font-medium cursor-pointer"
+                >
+                  📍 {city}
                 </button>
               ))}
             </div>

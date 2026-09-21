@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online y Creación de Canchas Adicionales con Confirmación de Cupo)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Alta de canchas excedentes con alerta interactiva de cupo excedido y confirmación de abono adicional, facturación B2B y comisiones de marketplace con pasarelas Mercado Pago en ARS, Stripe en USD y transferencia bancaria, período de gracia de 7 días con banner persistente, visibilidad de contraseña con toggle de ojo en checkout de reservas online, Padrón y Directorio de Clientes del Club con Ficha 360°, validación numérica y WhatsApp en contactos y DNI, protocolo meteorológico por lluvia con vales tokenizados, reembolsos en billetera, tarifas dinámicas pico/valle y control contable en arqueo diario)
-- **Última Actualización:** 2026-09-21 (Corrección y activación de confirmación interactiva de canchas adicionales que superan el cupo base del plan con desglose del nuevo abono mensual en /panel. 431 tests automatizados en verde: 286 backend, 125 frontend, 20 mobile; 100% sin fallas ni regresiones).
+- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, y Buscador Manual de Ubicación con Geocodificación y Radio de 200 km en Marketplace)
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Buscador manual de ciudad/localidad con geocodificación OSM Nominatim, persistencia en localStorage, accesos directos a zonas y radio expandido hasta 200 km en jugar.turnos.com; alta de canchas excedentes con alerta interactiva de cupo y abono adicional; facturación B2B y comisiones de marketplace multimoneda; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
+- **Última Actualización:** 2026-09-21 (Implementación de buscador manual de localidad con geocodificación OSM Nominatim, persistencia en localStorage, chips de acceso rápido a ciudades y ampliación de radios a 100 y 200 km en jugar.turnos.com. 432 tests automatizados en verde: 286 backend, 126 frontend, 20 mobile; 100% sin fallas ni regresiones).
 
 ---
 
@@ -205,3 +205,23 @@
    - Comprobar que el modal se cierra y en la parte superior aparece la notificación toast verde:
      * `"¡Cancha adicional agregada con éxito! Tu nuevo abono mensual estimado es de $37 USD/mes (+8 USD/mes por cancha adicional)."`
    - Verificar que la nueva cancha aparece inmediatamente en el listado y en la pestaña **💳 Facturación & Abono** se computa la cancha excedente.
+
+### Caso de Prueba: Buscador de Localidad Manual & Ampliación de Radio en Marketplace (jugar.turnos.com)
+1. **Acceso al Buscador de Canchas:**
+   - Ingresar a `http://jugar.localhost:8080/` (o con `?preview=true` si se prueba en modo preview).
+2. **Verificación de Ubicación por Defecto y Mensaje Amigable:**
+   - Comprobar que en la cabecera se visualiza la insignia de ubicación actual: `"Mostrando complejos en un radio de 50 km desde: [📍 Buenos Aires (CABA)]"`.
+   - Si se hace clic en el botón superior `"📍 Mi Ubicación"` y el dispositivo no cuenta con hardware GPS o el navegador bloquea los permisos, verificar que se muestra la alerta descriptiva:
+     * `"ℹ️ Ubicación del dispositivo no disponible. Podés buscar tu ciudad o localidad directamente en el campo de búsqueda (ej. Luján)."`
+3. **Búsqueda Manual de Localidad con Geocodificación:**
+   - En la nueva barra de búsqueda de localidad (`input-manual-location`), escribir `"Luján"` y presionar **Enter** o hacer clic en **Cambiar ubicación**.
+   - Comprobar el feedback visual con spinner mientras consulta la API de OpenStreetMap Nominatim.
+   - Al responder, comprobar que la insignia superior se actualiza de inmediato a `[📍 Luján]`, el mapa embebido y las distancias relativas se recalculan automáticamente desde las coordenadas de Luján, mostrando los complejos de la zona.
+4. **Chips de Acceso Rápido a Ciudades:**
+   - Hacer clic en el botón rápido `"📍 Pilar"`, `"📍 Mercedes"` o `"📍 General Rodríguez"`.
+   - Comprobar que se dispara la geocodificación automática sin necesidad de escribir en el input y se listan los clubes correspondientes.
+5. **Ampliación de Radios de Búsqueda (100 km y 200 km):**
+   - Verificar que la barra de botones de radio incluye los nuevos valores: `5 km`, `10 km`, `20 km`, `50 km`, `100 km` y `200 km`.
+   - Seleccionar `100 km` o `200 km`: comprobar que el backend `/api/complejos/cercanos` es consultado con `radio_km=100` o `radio_km=200`, permitiendo descubrir clubes de un rango geográfico regional mucho más amplio.
+6. **Persistencia en LocalStorage:**
+   - Recargar la página en el navegador (F5): comprobar que la ciudad configurada previamente (ej. Luján) y sus coordenadas persisten automáticamente sin volver a CABA.
