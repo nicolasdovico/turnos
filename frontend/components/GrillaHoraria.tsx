@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock, DollarSign, User, Calendar, Loader2 } from "lucide-react";
+import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock, DollarSign, User, Calendar, Loader2, Eye, EyeOff } from "lucide-react";
 import { useAuth, setCrossDomainCookie } from "@/context/AuthContext";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 
@@ -279,6 +279,7 @@ export default function GrillaHoraria({
   const [authMode, setAuthMode] = useState<"register" | "login">("register");
   const [authEmail, setAuthEmail] = useState<string>("");
   const [authPassword, setAuthPassword] = useState<string>("");
+  const [showAuthPassword, setShowAuthPassword] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [registrationStep, setRegistrationStep] = useState<"form" | "otp">("form");
   const [otpCode, setOtpCode] = useState<string>("");
@@ -4038,6 +4039,7 @@ export default function GrillaHoraria({
                   type="button"
                   onClick={() => {
                     setIsConfirmModalOpen(false);
+                    setShowAuthPassword(false);
                     resetDeskForm();
                   }}
                   className="text-slate-400 hover:text-white transition rounded-lg p-1 text-base font-bold"
@@ -4665,6 +4667,7 @@ export default function GrillaHoraria({
                       onClick={() => {
                         setAuthMode("register");
                         setAuthError(null);
+                        setShowAuthPassword(false);
                       }}
                       className={`flex-1 py-2 font-bold rounded-xl transition ${
                         authMode === "register"
@@ -4679,6 +4682,7 @@ export default function GrillaHoraria({
                       onClick={() => {
                         setAuthMode("login");
                         setAuthError(null);
+                        setShowAuthPassword(false);
                       }}
                       className={`flex-1 py-2 font-bold rounded-xl transition ${
                         authMode === "login"
@@ -4831,15 +4835,32 @@ export default function GrillaHoraria({
                           <label className="block text-xs font-bold text-slate-300 mb-1">
                             Crear Contraseña (mínimo 6 caracteres) *
                           </label>
-                          <input
-                            type="password"
-                            required
-                            minLength={6}
-                            placeholder="••••••••"
-                            value={authPassword}
-                            onChange={(e) => setAuthPassword(e.target.value)}
-                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                          />
+                          <div className="relative flex items-center">
+                            <input
+                              type={showAuthPassword ? "text" : "password"}
+                              required
+                              minLength={6}
+                              placeholder="••••••••"
+                              value={authPassword}
+                              onChange={(e) => setAuthPassword(e.target.value)}
+                              className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 pr-10 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              onClick={() => setShowAuthPassword(!showAuthPassword)}
+                              aria-label={showAuthPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                              title={showAuthPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                              data-testid="toggle-auth-password-register"
+                              className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-200 focus:text-emerald-400 focus:outline-none transition rounded-lg"
+                            >
+                              {showAuthPassword ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
                         </div>
 
                         <div>
@@ -4877,14 +4898,31 @@ export default function GrillaHoraria({
                         <label className="block text-xs font-bold text-slate-300 mb-1">
                           Contraseña *
                         </label>
-                        <input
-                          type="password"
-                          required
-                          placeholder="••••••••"
-                          value={authPassword}
-                          onChange={(e) => setAuthPassword(e.target.value)}
-                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
+                        <div className="relative flex items-center">
+                          <input
+                            type={showAuthPassword ? "text" : "password"}
+                            required
+                            placeholder="••••••••"
+                            value={authPassword}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 pr-10 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            onClick={() => setShowAuthPassword(!showAuthPassword)}
+                            aria-label={showAuthPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                            title={showAuthPassword ? "Ocultar contraseña" : "Ver contraseña"}
+                            data-testid="toggle-auth-password-login"
+                            className="absolute right-2.5 p-1 text-slate-400 hover:text-slate-200 focus:text-emerald-400 focus:outline-none transition rounded-lg"
+                          >
+                            {showAuthPassword ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </div>
 
                       <div>
@@ -4910,6 +4948,7 @@ export default function GrillaHoraria({
                   type="button"
                   onClick={() => {
                     setIsConfirmModalOpen(false);
+                    setShowAuthPassword(false);
                     setRegistrationStep("form");
                     setOtpCode("");
                     setAuthError(null);
@@ -4923,6 +4962,7 @@ export default function GrillaHoraria({
                   type="button"
                   onClick={() => {
                     setIsConfirmModalOpen(false);
+                    setShowAuthPassword(false);
                     resetDeskForm();
                     if (activeLock) {
                       handleLiberarBloqueo(activeLock);

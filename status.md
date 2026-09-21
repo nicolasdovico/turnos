@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja y CRM / Directorio de Clientes del Club)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Padrón y Directorio de Clientes del Club con Ficha 360°, validación numérica y WhatsApp en contactos y DNI, distinción temporal estricta de turnos pasados/jugados vs. turnos futuros en agenda, notas privadas, autocompletado inteligente en mostrador, protocolo meteorológico por lluvia con vales tokenizados, reembolsos en billetera, tarifas dinámicas pico/valle y control contable en arqueo diario)
-- **Última Actualización:** 2026-09-20 (Validación numérica estricta para Teléfono/WhatsApp y DNI en modal de clientes: filtrado de caracteres no numéricos en tiempo real, validación de longitudes internacionales E.164 y enlaces wa.me con código de país 549. 418 tests automatizados en verde: 278 backend, 120 frontend, 20 mobile; 100% sin fallas ni regresiones).
+- **Tareas Completadas:** 22 / 22 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club y Visibilidad de Contraseña en Checkout Online)
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Visibilidad de contraseña con toggle de ojo en checkout de reservas online, Padrón y Directorio de Clientes del Club con Ficha 360°, validación numérica y WhatsApp en contactos y DNI, distinción temporal estricta de turnos pasados/jugados vs. turnos futuros en agenda, notas privadas, autocompletado inteligente en mostrador, protocolo meteorológico por lluvia con vales tokenizados, reembolsos en billetera, tarifas dinámicas pico/valle y control contable en arqueo diario)
+- **Última Actualización:** 2026-09-21 (Visibilidad de contraseña con toggle de ojo en checkout de reservas: botón interactivo con iconos Eye / EyeOff en el modal de reserva online en GrillaHoraria tanto para registro rápido como para login. 419 tests automatizados en verde: 278 backend, 121 frontend, 20 mobile; 100% sin fallas ni regresiones).
 
 ---
 
@@ -79,6 +79,7 @@
 - [x] **Módulo de Directorio & CRM de Clientes del Club (Ficha 360° & Autocompletado):** Tabla multi-tenant `clientes` con backfill automático inteligente; endpoints CRUD y Ficha 360° en `ClubClienteController` (historial de turnos, billetera virtual, vales de crédito, notas privadas y bloqueo de clientes); nueva pestaña "👥 Clientes" en `/panel` con componente modular `GestionClientes.tsx`, KPIs, buscador en tiempo real y botón de chat directo a WhatsApp; autocompletado en vivo de clientes habituales y alertas de clientes bloqueados al reservar desde mostrador en `GrillaHoraria.tsx` *(Completado)*
 - [x] **Diferenciación Temporal Estricta: Turnos Jugados vs. Turnos en Agenda (Ficha 360° & Directorio):** Desacople de turnos históricos pasados respecto a reservas recurrentes a futuro (turnos fijos de 6 meses). Corrección de falsos positivos donde fechas lejanas (ej. marzo de 2027) se mostraban como jugadas o como último turno; incorporación de desglose `✓ jugados` • `⏱ agenda` • `✗ cancelados`, columna bivalente `Próximo / Último Turno`, sub-filtros interactivos en Ficha 360° y etiquetas de pago auditadas (`Pago Pendiente`, `Señado`, `Pagado Total`, `Turno Fijo`) *(Completado)*
 - [x] **Validación Numérica Estricta & WhatsApp Válido en Modal de Clientes:** Filtrado en tiempo real de caracteres no numéricos al escribir o pegar en los campos Teléfono y DNI en `GestionClientes.tsx`; validación estricta de formato telefónico E.164 (8 a 15 dígitos con prefijo `+` opcional) y DNI (6 a 12 dígitos); formateo automático internacional para enlaces directos `wa.me/549...` tanto en el listado como en la Ficha 360°; validación de backend reforzada en `ClubClienteController` y `ClubClienteService` con mensajes de error explícitos en español *(Completado)*
+- [x] **Visibilidad de Contraseña (Toggle Ojo) en Checkout Online:** Botón interactivo de mostrar/ocultar contraseña con iconos Eye y EyeOff en `GrillaHoraria.tsx` tanto en la pestaña de registro rápido ("✨ Crear Cuenta Rápida") como en la de inicio de sesión ("🔑 Ya tengo Cuenta"), con padding adecuado (`pr-10`) para evitar solapamientos y reseteo preventivo al cerrar modal o cambiar de pestaña *(Completado)*
 
 ---
 
@@ -133,3 +134,22 @@
 4. **Guardado Exitoso y Enlace Directo a WhatsApp:**
    - Ingresar un teléfono local de 10 dígitos (ej. `1149790220`): guardar los cambios.
    - Observar que el botón verde de WhatsApp en la tabla o en la Ficha 360° enlaza a `https://wa.me/5491149790220` (con código de país 549 preformateado para abrir directamente la conversación en WhatsApp sin error de destino).
+
+### Caso de Prueba: Visibilidad de Contraseña (Toggle Ojo) en Checkout Online al Reservar un Turno
+1. **Acceso a la Web Pública de un Club:**
+   - Ingresar a cualquier club deportivo como visitante no logueado (ej. `http://nico-padel.localhost:8080/`).
+2. **Selección de Cancha y Horario:**
+   - Hacer clic sobre un slot de horario disponible y presionar el botón **Confirmar Reserva**.
+3. **Pestaña de Registro Rápido ("✨ Crear Cuenta Rápida"):**
+   - En el campo **Crear Contraseña (mínimo 6 caracteres)**, escribir una clave (ej. `miClave123`).
+   - Comprobar que inicialmente los caracteres aparecen ocultos como puntos/bullets (`type="password"`).
+   - Hacer clic en el icono del **ojo** ubicado a la derecha del input: verificar que la contraseña se vuelve legible en texto plano (`type="text"`), el icono cambia a `EyeOff` (ojo tachado) y el tooltip/aria-label pasa a "Ocultar contraseña".
+   - Hacer clic nuevamente: verificar que la contraseña vuelve a ocultarse.
+4. **Pestaña de Inicio de Sesión ("🔑 Ya tengo Cuenta"):**
+   - Hacer clic en la pestaña **Ya tengo Cuenta**.
+   - En el campo **Contraseña**, escribir una clave (ej. `passwordSegura`).
+   - Hacer clic en el icono del **ojo**: verificar que se revela la contraseña escrita.
+   - Hacer clic nuevamente para volver a ocultarla.
+5. **Persistencia & Limpieza:**
+   - Cerrar el modal mediante la '✕' o 'Volver' y volver a abrirlo: comprobar que el estado de visibilidad se reinicia por seguridad en modo oculto (`type="password"`).
+

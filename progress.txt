@@ -2533,6 +2533,30 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Suite completa frontend: 120/120 tests pasados (12 suites).
   * Total Ecosistema: 418/418 tests automatizados en verde (0 fallas, 0 regresiones).
 ===============================================================================
+[2026-09-21] - VISIBILIDAD DE CONTRASEÑA (TOGGLE OJO) EN CHECKOUT DE RESERVAS ONLINE
+===============================================================================
+- Contexto y Requerimiento:
+  * El usuario solicitó que cuando un cliente reserva un turno online, al momento de registrarse ("Crear Cuenta Rápida") o de loguearse ("Ya tengo Cuenta"), se agregue el botón con el icono del ojo para que pueda ver la contraseña que está ingresando.
+- Diagnóstico del Estado Previo:
+  * En `frontend/components/GrillaHoraria.tsx`, los campos de contraseña en ambos formularios (`authMode === "register"` y `authMode === "login"`) utilizaban `<input type="password" />` estático sin opción interactiva para alternar visibilidad.
+- Solución e Implementación Realizada:
+  * 1. Frontend (`frontend/components/GrillaHoraria.tsx`):
+    - Importación de iconos `Eye` y `EyeOff` desde `lucide-react`.
+    - Definición del estado reactivo `const [showAuthPassword, setShowAuthPassword] = useState<boolean>(false);`.
+    - Integración de contenedor relativo con padding derecho (`pr-10`) y botón absoluto con icono interactivo:
+      * En Registro Rápido: `<button data-testid="toggle-auth-password-register">` que conmuta `type={showAuthPassword ? "text" : "password"}`.
+      * En Ya tengo Cuenta (Login): `<button data-testid="toggle-auth-password-login">` que conmuta `type={showAuthPassword ? "text" : "password"}`.
+      * Soporte de accesibilidad con `aria-label` y `title` ("Ver contraseña" / "Ocultar contraseña") y exclusión del tabulador con `tabIndex={-1}`.
+      * Reseteo automático de seguridad: `setShowAuthPassword(false)` al cambiar de pestaña entre Registro y Login, al cerrar el modal desde la '✕', al hacer clic en 'Volver' o al liberar el turno.
+  * 2. Tests Automatizados & Verificación de Calidad:
+    - Nuevo test en `frontend/tests/GrillaHoraria.test.tsx`:
+      * `permite alternar la visibilidad de la contraseña con el botón del ojo tanto al registrarse como al iniciar sesión`: verifica el estado inicial en `type="password"`, el cambio a `type="text"` tras el clic en el ojo, el retorno a `type="password"` y la misma dinámica al alternar a la pestaña de login.
+    - Suite completa frontend: 121/121 tests pasados en 12 suites de Vitest.
+    - Suite completa backend: 278/278 tests pasados (1.583 aserciones).
+    - Suite completa mobile: 20/20 tests pasados en 4 suites de Jest.
+    - Total Ecosistema: 419/419 tests automatizados en verde (0 fallas, 0 regresiones).
+===============================================================================
+
 
 
 

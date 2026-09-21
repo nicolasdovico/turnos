@@ -3112,5 +3112,81 @@ describe("Componente Reactivo GrillaHoraria", () => {
       expect(screen.getAllByText(/\$8,000/i).length).toBeGreaterThanOrEqual(1); // Seña (50%)
     });
   });
+
+  test("permite alternar la visibilidad de la contraseña con el botón del ojo tanto al registrarse como al iniciar sesión", async () => {
+    const slots = [
+      {
+        hora_inicio: "18:00",
+        hora_fin: "19:00",
+        disponible: true,
+        precio: 10000,
+      },
+    ];
+
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha 1"
+        deporte="Pádel"
+        subdomain="nico-padel"
+        fechaInicial="2026-09-25"
+        initialSlots={slots}
+        isAdmin={false}
+      />
+    );
+
+    // 1. Seleccionar turno y abrir modal de reserva
+    const slotBtn = screen.getByLabelText("Turno 18:00 a 19:00 Disponible");
+    fireEvent.click(slotBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("Confirmar Reserva")).toBeDefined();
+    });
+    fireEvent.click(screen.getByText("Confirmar Reserva"));
+
+    // 2. Verificar que el modal de registro rápido esté abierto
+    await waitFor(() => {
+      expect(screen.getByText("✨ Crear Cuenta Rápida")).toBeDefined();
+    });
+
+    // 3. Pestaña Crear Cuenta Rápida:
+    const passInputRegister = screen.getByPlaceholderText(/••••••••/i) as HTMLInputElement;
+    expect(passInputRegister.type).toBe("password");
+
+    const toggleBtnRegister = screen.getByTestId("toggle-auth-password-register");
+    expect(toggleBtnRegister.getAttribute("aria-label")).toBe("Ver contraseña");
+
+    // Click en el ojo para ver la contraseña
+    fireEvent.click(toggleBtnRegister);
+    expect(passInputRegister.type).toBe("text");
+    expect(toggleBtnRegister.getAttribute("aria-label")).toBe("Ocultar contraseña");
+
+    // Click de nuevo para ocultarla
+    fireEvent.click(toggleBtnRegister);
+    expect(passInputRegister.type).toBe("password");
+    expect(toggleBtnRegister.getAttribute("aria-label")).toBe("Ver contraseña");
+
+    // 4. Cambiar a la pestaña "🔑 Ya tengo Cuenta" (Login)
+    const tabLogin = screen.getByText("🔑 Ya tengo Cuenta");
+    fireEvent.click(tabLogin);
+
+    // 5. Pestaña Ya tengo Cuenta:
+    const passInputLogin = screen.getByPlaceholderText(/••••••••/i) as HTMLInputElement;
+    expect(passInputLogin.type).toBe("password");
+
+    const toggleBtnLogin = screen.getByTestId("toggle-auth-password-login");
+    expect(toggleBtnLogin.getAttribute("aria-label")).toBe("Ver contraseña");
+
+    // Click en el ojo para ver la contraseña en login
+    fireEvent.click(toggleBtnLogin);
+    expect(passInputLogin.type).toBe("text");
+    expect(toggleBtnLogin.getAttribute("aria-label")).toBe("Ocultar contraseña");
+
+    // Click de nuevo para ocultarla
+    fireEvent.click(toggleBtnLogin);
+    expect(passInputLogin.type).toBe("password");
+    expect(toggleBtnLogin.getAttribute("aria-label")).toBe("Ver contraseña");
+  });
 });
+
 
