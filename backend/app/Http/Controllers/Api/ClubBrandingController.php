@@ -294,4 +294,44 @@ class ClubBrandingController extends Controller
             'branding' => $complejo->getBrandingData(),
         ], 201);
     }
+
+    /**
+     * GET /api/clubs/{subdomain}/sitemap
+     * Retorna la información para el sitemap del club (páginas publicadas, fechas de actualización).
+     * Endpoint público utilizado por el generador de sitemaps de Next.js.
+     */
+    public function sitemap(string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo deportivo no encontrado.',
+            ], 404);
+        }
+
+        $paginas = $complejo->paginas()
+            ->where('esta_publicada', true)
+            ->orderBy('orden', 'asc')
+            ->get(['slug', 'updated_at']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'subdominio' => $complejo->subdominio,
+                'nombre' => $complejo->nombre,
+                'updated_at' => $complejo->updated_at?->toISOString() ?? now()->toISOString(),
+                'paginas' => $paginas->map(fn ($p) => [
+                    'slug' => $p->slug,
+                    'updated_at' => $p->updated_at?->toISOString() ?? now()->toISOString(),
+                ]),
+            ],
+        ]);
+    }
 }
+

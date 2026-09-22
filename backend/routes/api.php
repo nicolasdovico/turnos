@@ -169,6 +169,8 @@ Route::prefix('clubs')->group(function () {
     Route::get('/{subdomain}/branding/templates', [\App\Http\Controllers\Api\ClubBrandingController::class, 'templates']);
     Route::put('/{subdomain}/branding', [\App\Http\Controllers\Api\ClubBrandingController::class, 'update']);
     Route::post('/{subdomain}/branding/upload', [\App\Http\Controllers\Api\ClubBrandingController::class, 'upload']);
+    Route::get('/{subdomain}/sitemap', [\App\Http\Controllers\Api\ClubBrandingController::class, 'sitemap']);
+
 
     // Páginas Institucionales CMS del Club (Módulo F)
     Route::get('/{subdomain}/paginas', [\App\Http\Controllers\Api\PaginaController::class, 'indexByClub']);

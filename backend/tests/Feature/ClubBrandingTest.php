@@ -405,4 +405,49 @@ class ClubBrandingTest extends TestCase
             ->deleteJson("/api/clubs/padel-norte/paginas/{$pagina->id}");
         $unauthorizedDelete->assertStatus(403);
     }
+
+    public function test_get_club_sitemap_returns_published_pages_and_metadata(): void
+    {
+        Pagina::create([
+            'complejo_id' => $this->complejoA->id,
+            'titulo' => 'Reglamento Oficial',
+            'slug' => 'reglamento-oficial',
+            'contenido_html' => '<p>Reglamento</p>',
+            'esta_publicada' => true,
+        ]);
+
+        Pagina::create([
+            'complejo_id' => $this->complejoA->id,
+            'titulo' => 'Página Borrador',
+            'slug' => 'pagina-borrador',
+            'contenido_html' => '<p>Borrador</p>',
+            'esta_publicada' => false,
+        ]);
+
+        $response = $this->getJson('/api/clubs/padel-norte/sitemap');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'subdominio' => 'padel-norte',
+                    'nombre' => 'Club Padel Norte',
+                ],
+            ]);
+
+        $paginas = $response->json('data.paginas');
+        $this->assertCount(1, $paginas);
+        $this->assertEquals('reglamento-oficial', $paginas[0]['slug']);
+    }
+
+    public function test_get_club_sitemap_returns_404_for_nonexistent_club(): void
+    {
+        $response = $this->getJson('/api/clubs/inexistente/sitemap');
+        $response->assertStatus(404)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Complejo deportivo no encontrado.',
+            ]);
+    }
 }
+

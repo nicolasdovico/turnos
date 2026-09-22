@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { POST, GET } from "../app/api/revalidate/route";
+import { revalidatePath, revalidateTag } from "next/cache";
 
-// Mock next/cache revalidatePath
+// Mock next/cache revalidatePath and revalidateTag
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
 }));
 
 describe("Next.js On-Demand ISR Revalidation API Route", () => {
@@ -58,6 +60,7 @@ describe("Next.js On-Demand ISR Revalidation API Route", () => {
     const data = await response.json();
     expect(data.revalidated).toBe(true);
     expect(data.path).toBe(targetPath);
+    expect(revalidatePath).toHaveBeenCalledWith(targetPath);
   });
 
   it("successfully purges ISR cache on valid GET request with query params (200)", async () => {
@@ -74,5 +77,28 @@ describe("Next.js On-Demand ISR Revalidation API Route", () => {
     const data = await response.json();
     expect(data.revalidated).toBe(true);
     expect(data.path).toBe(targetPath);
+    expect(revalidatePath).toHaveBeenCalledWith(targetPath);
+  });
+
+  it("revalidates root, tenant internal route, and sitemap when subdomain is supplied on root path", async () => {
+    const request = new NextRequest("http://localhost:3000/api/revalidate", {
+      method: "POST",
+      body: JSON.stringify({
+        secret: "turnos-secret-revalidate-token",
+        subdomain: "padel-norte",
+        path: "/",
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.revalidated).toBe(true);
+    expect(data.paths).toContain("/");
+    expect(data.paths).toContain("/tenants/padel-norte");
+    expect(data.paths).toContain("/sitemap.xml");
+    expect(revalidatePath).toHaveBeenCalledWith("/");
+    expect(revalidatePath).toHaveBeenCalledWith("/tenants/padel-norte");
+    expect(revalidatePath).toHaveBeenCalledWith("/sitemap.xml");
   });
 });

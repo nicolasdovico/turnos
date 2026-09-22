@@ -72,8 +72,13 @@ async function getClubBranding(subdomain: string) {
   }
 }
 
+import { buildCmsPageMetadata, buildBreadcrumbSchema } from "@/lib/tenantSeo";
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const pagina = await getPagina(params.subdomain, params.slug);
+  const [pagina, clubData] = await Promise.all([
+    getPagina(params.subdomain, params.slug),
+    getClubBranding(params.subdomain),
+  ]);
 
   if (!pagina) {
     return {
@@ -81,12 +86,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  return {
-    title: `${pagina.titulo} | ${params.subdomain}`,
-    description:
-      pagina.meta_descripcion ||
-      `Página institucional de ${pagina.titulo} en el complejo deportivo ${params.subdomain}`,
-  };
+  return buildCmsPageMetadata(params.subdomain, pagina, clubData);
 }
 
 export default async function TenantPaginaCMS({ params }: PageProps) {
@@ -119,12 +119,19 @@ export default async function TenantPaginaCMS({ params }: PageProps) {
     "--club-bg": branding.color_fondo || "#020617",
   };
 
+  const breadcrumbSchema = buildBreadcrumbSchema(subdomain, pagina, clubNombre);
+
   return (
     <div
       className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between"
       style={customStyle}
       data-testid="pagina-institucional-cms"
     >
+      <script
+        id={`schema-breadcrumb-${slug}`}
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
       <div>
         {/* Dynamic Club Header */}
         <ClubHeader
