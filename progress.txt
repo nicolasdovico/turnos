@@ -2924,4 +2924,22 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: 132 tests pasados al 100% en Vitest (14 suites).
   * Total Ecosistema: 426 tests automatizados exitosos (0 fallas).
 ==============================================================================================================================
+[2026-09-22] - CORRECCIÓN: VISUALIZACIÓN DE EMOJIS EN ATRIBUTOS Y EQUIPAMIENTOS ADICIONALES
+==============================================================================================================================
+- Diagnóstico:
+  * Al editar o crear una cancha en el modal, en la sección de "Atributos y Equipamientos Adicionales" aparecían las cadenas de texto del nombre del icono (ej. "tv", "users", "door-open", "volume-2", "maximize-2", "package") directamente delante del nombre del atributo en lugar de renderizar su emoji correspondiente.
+  * Ocurría porque la base de datos y los seeders almacenaban los nombres de claves visuales de Lucide ('zap', 'tv', 'home', etc.) y el frontend imprimía `{eq.icono || "✨"}` directamente.
+- Solución Realizada:
+  * Frontend (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+    - Se implementó la función helper `getEquipamientoEmoji(icono, slug)` con diccionario exhaustivo de mapeo (zap/iluminacion -> 💡, home/techada -> 🎪, video/camara -> 📹, hash/marcador -> 🔢, thermometer/climatizada -> ❄️, tv/streaming -> 📺, users/gradas/tribuna -> 🏟️, door-open/vestuario -> 🚪, volume-2/sonido -> 🔊, maximize-2/salidapista -> ↔️, package/material -> 🎒, etc.).
+    - Si el valor ya es un emoji (cargado por un club como atributo propio o ingresado como emoji en Filament), lo conserva de forma intacta.
+    - Se aplicó `getEquipamientoEmoji` tanto en los checkboxes de atributos adicionales del modal de cancha como en los badges de equipamientos de las tarjetas de cancha del panel.
+  * Backend:
+    - Se actualizaron los registros de `equipamientos` en la base de datos viva y en `DeportesYEquipamientosSeeder.php` con emojis limpios y descriptivos.
+    - Se incorporó `SuperficiesRelationManager` en `DeporteResource` para permitir administrar superficies directamente desde la pantalla de edición del deporte.
+- Verificación:
+  * Vitest frontend: suites pasando al 100%.
+  * Backend: 294 tests pasando al 100%.
+==============================================================================================================================
+
 
