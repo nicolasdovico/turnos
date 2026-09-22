@@ -57,6 +57,21 @@ class FacturaClub extends Model
         return $this->pagado_at;
     }
 
+    public function setFechaPagoAttribute($value): void
+    {
+        $this->attributes['pagado_at'] = $value;
+    }
+
+    public function getComprobanteTransferenciaNotasAttribute()
+    {
+        return $this->notas;
+    }
+
+    public function setComprobanteTransferenciaNotasAttribute($value): void
+    {
+        $this->attributes['notas'] = $value;
+    }
+
     public function getFechaGraciaVencimientoAttribute()
     {
         return $this->fecha_limite_gracia;

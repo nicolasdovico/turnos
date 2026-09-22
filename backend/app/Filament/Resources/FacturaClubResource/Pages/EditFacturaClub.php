@@ -32,7 +32,14 @@ class EditFacturaClub extends EditRecord
                     );
 
                     $this->record->refresh();
-                    $this->fillForm();
+                    $this->refreshFormData([
+                        'estado',
+                        'metodo_pago',
+                        'pagado_at',
+                        'fecha_pago',
+                        'notas',
+                        'comprobante_transferencia_notas',
+                    ]);
 
                     Notification::make()
                         ->title('Factura Aprobada')

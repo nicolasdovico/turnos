@@ -210,7 +210,11 @@ class ClubPaymentGatewayService
             ]);
 
             // Extender vigencia de suscripción por 30 días adicionales
-            $fechaBaseVencimiento = ($complejo->suscripcion_proximo_vencimiento && $complejo->suscripcion_proximo_vencimiento->isFuture())
+            // Si la fecha actual de vencimiento está dentro de la ventana del ciclo vigente (hasta 35 días a futuro),
+            // sumamos 30 días a dicha fecha. Si no tiene fecha, está vencida o supera un ciclo regular, se calculan 30 días desde hoy.
+            $fechaBaseVencimiento = ($complejo->suscripcion_proximo_vencimiento 
+                && $complejo->suscripcion_proximo_vencimiento->isFuture()
+                && $complejo->suscripcion_proximo_vencimiento->diffInDays(now()) <= 35)
                 ? $complejo->suscripcion_proximo_vencimiento
                 : now();
 

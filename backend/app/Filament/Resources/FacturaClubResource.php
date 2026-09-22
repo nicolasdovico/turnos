@@ -53,12 +53,15 @@ class FacturaClubResource extends Resource
                             ->maxLength(7),
                         Forms\Components\DatePicker::make('fecha_emision')
                             ->label('Fecha Emisión')
+                            ->displayFormat('d-m-Y')
                             ->required(),
                         Forms\Components\DatePicker::make('fecha_vencimiento')
                             ->label('Fecha Vencimiento')
+                            ->displayFormat('d-m-Y')
                             ->required(),
                         Forms\Components\DatePicker::make('fecha_gracia_vencimiento')
                             ->label('Fin Período de Gracia')
+                            ->displayFormat('d-m-Y')
                             ->helperText('Fecha límite antes de suspender funciones operativas del club.'),
                     ])->columns(2),
 
@@ -136,8 +139,15 @@ class FacturaClubResource extends Resource
                                 );
 
                                 $record->refresh();
-                                if (method_exists($livewire, 'fillForm')) {
-                                    $livewire->fillForm();
+                                if ($livewire instanceof \Filament\Resources\Pages\EditRecord) {
+                                    $livewire->refreshFormData([
+                                        'estado',
+                                        'metodo_pago',
+                                        'pagado_at',
+                                        'fecha_pago',
+                                        'notas',
+                                        'comprobante_transferencia_notas',
+                                    ]);
                                 }
 
                                 Notification::make()
@@ -169,7 +179,8 @@ class FacturaClubResource extends Resource
                                 'transferencia_bancaria' => 'Transferencia Bancaria',
                             ]),
                         Forms\Components\DateTimePicker::make('fecha_pago')
-                            ->label('Fecha de Pago'),
+                            ->label('Fecha de Pago')
+                            ->displayFormat('d-m-Y H:i'),
                         Forms\Components\TextInput::make('comprobante_transferencia_url')
                             ->label('URL / Comprobante de Transferencia')
                             ->url()
@@ -249,11 +260,11 @@ class FacturaClubResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('fecha_vencimiento')
                     ->label('Vencimiento')
-                    ->date()
+                    ->date('d-m-Y')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('fecha_pago')
                     ->label('Pagada el')
-                    ->dateTime()
+                    ->dateTime('d-m-Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])

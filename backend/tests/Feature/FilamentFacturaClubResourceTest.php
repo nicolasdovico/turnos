@@ -138,4 +138,57 @@ class FilamentFacturaClubResourceTest extends TestCase
         $this->assertEquals('transferencia_bancaria', $factura->metodo_pago);
         $this->assertNotNull($factura->pagado_at);
     }
+
+    public function test_admin_can_approve_payment_from_section_header_action_in_edit_page(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin_section@turnos.test',
+        ]);
+
+        $this->actingAs($admin);
+
+        $plan = Plan::where('slug', 'bronce')->firstOrFail();
+
+        $complejo = Complejo::create([
+            'user_id' => $admin->id,
+            'nombre' => 'Club Section Test',
+            'subdominio' => 'club-section-test',
+            'plan_id' => $plan->id,
+            'estado' => 'activo',
+            'suscripcion_estado' => 'gracia',
+            'suscripcion_vence_at' => Carbon::today()->subDays(2),
+            'gracia_vence_at' => Carbon::today()->addDays(5),
+        ]);
+
+        $factura = FacturaClub::create([
+            'complejo_id' => $complejo->id,
+            'plan_id' => $plan->id,
+            'periodo' => Carbon::today()->format('Y-m'),
+            'monto_base_plan' => 29.00,
+            'total_usd' => 29.00,
+            'estado' => 'revision_transferencia',
+            'metodo_pago' => 'transferencia',
+            'fecha_emision' => Carbon::today(),
+            'fecha_vencimiento' => Carbon::today()->addDays(5),
+            'comprobante_transferencia_url' => 'https://ejemplo.com/comp_section.png',
+        ]);
+
+        $component = Livewire::test(FacturaClubResource\Pages\EditFacturaClub::class, [
+            'record' => $factura->getRouteKey(),
+        ]);
+
+        $page = $component->instance();
+        $page->mountFormComponentAction('data.estado-y-cobro', 'aprobarTransferenciaForm');
+        $page->callMountedFormComponentAction();
+
+        $factura->refresh();
+        $this->assertEquals('pagada', $factura->estado);
+        $this->assertEquals('transferencia_bancaria', $factura->metodo_pago);
+        $this->assertNotNull($factura->pagado_at);
+
+        $complejo->refresh();
+        $this->assertEquals('activa', $complejo->suscripcion_estado);
+        $this->assertNull($complejo->suscripcion_gracia_vence_at);
+        $this->assertTrue(Carbon::parse($complejo->suscripcion_proximo_vencimiento)->isFuture());
+    }
 }
