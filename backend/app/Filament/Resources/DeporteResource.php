@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DeporteResource\Pages;
+use App\Filament\Resources\DeporteResource\RelationManagers;
 use App\Models\Deporte;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -143,7 +144,7 @@ class DeporteResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RelationManagers\SuperficiesRelationManager::class,
         ];
     }
 
