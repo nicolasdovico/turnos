@@ -265,7 +265,7 @@ const DEPORTES_CONFIG: Record<string, SportConfig> = {
   },
 };
 
-export const getSportEmoji = (icono?: string | null, slug?: string): string => {
+const getSportEmoji = (icono?: string | null, slug?: string): string => {
   if (icono && /[\u{1F300}-\u{1F9FF}]/u.test(icono)) {
     return icono;
   }
@@ -288,7 +288,7 @@ export const getSportEmoji = (icono?: string | null, slug?: string): string => {
   return map[clean] || "🏅";
 };
 
-export const getEquipamientoEmoji = (icono?: string | null, slug?: string): string => {
+const getEquipamientoEmoji = (icono?: string | null, slug?: string): string => {
   if (!icono && !slug) return "✨";
   if (icono && /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(icono)) {
     return icono;

@@ -422,7 +422,7 @@ export default function FacturacionClubPanel({
         <h3 className="text-base font-bold text-white">Error de Facturación</h3>
         <p className="text-xs text-rose-300">{error}</p>
         <button
-          onClick={fetchData}
+          onClick={() => { fetchData(); }}
           className="mt-2 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition"
         >
           Reintentar
@@ -728,7 +728,7 @@ export default function FacturacionClubPanel({
             <p className="text-xs text-slate-400">Comprobantes de facturación mensual del servicio multitenant.</p>
           </div>
           <button
-            onClick={fetchData}
+            onClick={() => { fetchData(); }}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition text-xs flex items-center gap-1"
             title="Refrescar facturación"
           >
