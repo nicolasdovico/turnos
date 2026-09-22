@@ -224,6 +224,68 @@ const DEPORTES_CONFIG: Record<string, SportConfig> = {
       { id: "cuatro_cristales", label: "Cancha Totalmente de Cristal" },
     ],
   },
+  pickleball: {
+    nombre: "Pickleball",
+    superficies: [
+      { id: "resina_acrilica", label: "Resina Acrílica / Hard Court" },
+      { id: "cemento", label: "Cemento Pulido" },
+      { id: "madera", label: "Madera / Parquet" },
+    ],
+    formatos: [
+      { id: "dobles", label: "Dobles (Estándar)" },
+      { id: "single", label: "Individual / Single" },
+    ],
+    tieneParedes: false,
+  },
+  voley: {
+    nombre: "Vóley",
+    superficies: [
+      { id: "arena", label: "Arena de Playa (Beach)" },
+      { id: "parquet", label: "Parquet / Madera Flotante" },
+      { id: "cemento", label: "Cemento / Baldosa" },
+    ],
+    formatos: [
+      { id: "6v6", label: "6 vs 6 (Indoor / Salón)" },
+      { id: "2v2_beach", label: "2 vs 2 (Beach Vóley)" },
+    ],
+    tieneParedes: false,
+  },
+  hockey: {
+    nombre: "Hockey",
+    superficies: [
+      { id: "sintetico_agua", label: "Césped Sintético de Agua" },
+      { id: "sintetico_arena", label: "Césped Sintético de Arena" },
+      { id: "cesped_natural", label: "Césped Natural" },
+    ],
+    formatos: [
+      { id: "11v11", label: "11 vs 11 (Reglamentaria)" },
+      { id: "7v7", label: "7 vs 7 (Seven)" },
+    ],
+    tieneParedes: false,
+  },
+};
+
+export const getSportEmoji = (icono?: string | null, slug?: string): string => {
+  if (icono && /[\u{1F300}-\u{1F9FF}]/u.test(icono)) {
+    return icono;
+  }
+  const clean = (icono || slug || "").toLowerCase().trim();
+  const map: Record<string, string> = {
+    padel: "🎾",
+    tenis: "🎾",
+    tennis: "🎾",
+    futbol: "⚽",
+    soccer: "⚽",
+    basquet: "🏀",
+    basketball: "🏀",
+    squash: "🏸",
+    pickleball: "🏓",
+    voley: "🏐",
+    volleyball: "🏐",
+    hockey: "🏑",
+    rugby: "🏉",
+  };
+  return map[clean] || "🏅";
 };
 
 interface HorarioItem {
@@ -546,15 +608,17 @@ export default function ClubAdminPanel() {
       return deportesCatalogo.map((d) => ({
         id: d.slug,
         nombre: d.nombre,
-        icono: d.icono || "🎾",
+        icono: getSportEmoji(d.icono, d.slug),
         modelId: d.id,
         tieneParedes: Boolean(d.tiene_paredes),
         duracionDefault: d.duracion_default_minutos || 60,
-        superficies: (d.superficies || []).map((s) => ({
-          id: s.slug || s.id,
-          modelId: s.superficie_id,
-          label: s.label || s.nombre,
-        })),
+        superficies: (d.superficies && d.superficies.length > 0)
+          ? d.superficies.map((s) => ({
+              id: s.slug || s.id,
+              modelId: s.superficie_id,
+              label: s.label || s.nombre,
+            }))
+          : [{ id: "estandar", modelId: undefined, label: "Estándar / Reglamentaria" }],
         formatos: d.formatos && d.formatos.length > 0
           ? d.formatos
           : (DEPORTES_CONFIG[d.slug]?.formatos || [{ id: "estandar", label: "Estándar" }]),
@@ -566,7 +630,7 @@ export default function ClubAdminPanel() {
     return Object.entries(DEPORTES_CONFIG).map(([slug, cfg]) => ({
       id: slug,
       nombre: cfg.nombre,
-      icono: slug === "padel" || slug === "tenis" ? "🎾" : slug === "futbol" ? "⚽" : slug === "basquet" ? "🏀" : "🏸",
+      icono: getSportEmoji(null, slug),
       modelId: undefined,
       tieneParedes: cfg.tieneParedes,
       duracionDefault: slug === "padel" ? 90 : 60,
@@ -746,13 +810,15 @@ export default function ClubAdminPanel() {
     setEditingCancha(null);
     setExtraCourtConfirmation(null);
     setCanchaErrorMsg(null);
-    const dep = complejo?.deporte_principal || "padel";
+    const dep = (complejo?.deporte_principal && complejo.deporte_principal !== "multideporte")
+      ? complejo.deporte_principal
+      : (availableSports.find((s) => s.id === "padel")?.id || availableSports[0]?.id || "padel");
     const sp = availableSports.find((s) => s.id === dep) || availableSports[0];
     const depConfig = DEPORTES_CONFIG[dep] || DEPORTES_CONFIG.padel;
 
     setCanchaNombre(`Cancha ${(canchas.length + 1)}`);
     setCanchaDeporte(sp?.id || dep);
-    setCanchaSuperficie(sp?.superficies[0]?.id || depConfig.superficies[0]?.id || "sintetico");
+    setCanchaSuperficie(sp?.superficies[0]?.id || depConfig?.superficies[0]?.id || "sintetico");
     setCanchaFormato(sp?.formatos[0]?.id || depConfig.formatos[0]?.id || "dobles");
     setCanchaTipoPared(sp?.paredes && sp.paredes.length > 0 ? sp.paredes[0].id : (depConfig.paredes ? depConfig.paredes[0]?.id : ""));
     setCanchaPrecioBase("8000");
@@ -2683,7 +2749,7 @@ export default function ClubAdminPanel() {
                           >
                             {availableSports.map((s) => (
                               <option key={s.id} value={s.id}>
-                                {s.icono ? `${s.icono} ` : ""}{s.nombre}
+                                {s.icono} {s.nombre}
                               </option>
                             ))}
                           </select>
@@ -2710,7 +2776,10 @@ export default function ClubAdminPanel() {
                             onChange={(e) => setCanchaSuperficie(e.target.value)}
                             className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
                           >
-                            {(currentSportConfig?.superficies || []).map((s) => (
+                            {((currentSportConfig?.superficies || []).length > 0
+                              ? currentSportConfig.superficies
+                              : [{ id: "estandar", label: "Estándar / Reglamentaria" }]
+                            ).map((s) => (
                               <option key={s.id} value={s.id}>
                                 {s.label}
                               </option>
@@ -2725,7 +2794,10 @@ export default function ClubAdminPanel() {
                             onChange={(e) => setCanchaFormato(e.target.value)}
                             className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
                           >
-                            {(currentSportConfig?.formatos || []).map((f) => (
+                            {((currentSportConfig?.formatos || []).length > 0
+                              ? currentSportConfig.formatos
+                              : [{ id: "estandar", label: "Estándar" }]
+                            ).map((f) => (
                               <option key={f.id} value={f.id}>
                                 {f.label}
                               </option>
@@ -5770,13 +5842,11 @@ export default function ClubAdminPanel() {
                     onChange={(e) => updateClubDeportePrincipal(e.target.value)}
                     className="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 text-sm font-medium text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                   >
-                    <option value="padel">🎾 Pádel</option>
-                    <option value="tenis">🎾 Tenis</option>
-                    <option value="futbol">⚽ Fútbol 11</option>
-                    <option value="futbol_5">⚽ Fútbol 5</option>
-                    <option value="futbol_7">⚽ Fútbol 7</option>
-                    <option value="basquet">🏀 Básquetbol</option>
-                    <option value="crossfit">🏋️ Gimnasio / Entrenamiento</option>
+                    {availableSports.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.icono} {s.nombre}
+                      </option>
+                    ))}
                     <option value="multideporte">🏅 Multideporte</option>
                   </select>
                 </div>

@@ -75,7 +75,7 @@ class EquipamientoResource extends Resource
                         Forms\Components\TextInput::make('orden')
                             ->label('Orden de Visualización')
                             ->numeric()
-                            ->default(0),
+                            ->default(fn () => (\App\Models\Equipamiento::max('orden') ?? 0) + 1),
                         Forms\Components\Toggle::make('esta_activo')
                             ->label('Equipamiento Activo')
                             ->default(true)

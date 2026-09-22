@@ -55,7 +55,7 @@ class DeporteResource extends Resource
                         Forms\Components\TextInput::make('orden')
                             ->label('Orden de Visualización')
                             ->numeric()
-                            ->default(0),
+                            ->default(fn () => (\App\Models\Deporte::max('orden') ?? 0) + 1),
                         Forms\Components\Toggle::make('esta_activo')
                             ->label('Deporte Activo')
                             ->default(true)

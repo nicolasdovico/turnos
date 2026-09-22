@@ -53,7 +53,7 @@ class SuperficieResource extends Resource
                         Forms\Components\TextInput::make('orden')
                             ->label('Orden de Visualización')
                             ->numeric()
-                            ->default(0),
+                            ->default(fn () => (\App\Models\Superficie::max('orden') ?? 0) + 1),
                         Forms\Components\Textarea::make('descripcion')
                             ->label('Descripción / Características')
                             ->columnSpanFull(),

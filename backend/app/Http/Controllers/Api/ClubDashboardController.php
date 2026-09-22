@@ -164,7 +164,8 @@ class ClubDashboardController extends Controller
                     ->get(['id', 'nombre', 'slug']),
                 'deportes_catalogo' => \App\Models\Deporte::with('superficiesActivas')
                     ->where('esta_activo', true)
-                    ->orderBy('orden')
+                    ->orderBy('orden', 'asc')
+                    ->orderBy('nombre', 'asc')
                     ->get()
                     ->map(function ($d) {
                         return [
