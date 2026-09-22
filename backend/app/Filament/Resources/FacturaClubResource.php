@@ -119,6 +119,34 @@ class FacturaClubResource extends Resource
                     ])->columns(3),
 
                 Forms\Components\Section::make('Estado y Cobro')
+                    ->headerActions([
+                        Forms\Components\Actions\Action::make('aprobarTransferenciaForm')
+                            ->label('Aprobar Pago')
+                            ->icon('heroicon-o-check-circle')
+                            ->color('success')
+                            ->requiresConfirmation()
+                            ->modalHeading('Confirmar y Aprobar Pago de Factura')
+                            ->modalDescription('¿Confirmas que el importe correspondiente ha impactado en la cuenta bancaria de la plataforma? La suscripción del club se extenderá automáticamente por 30 días.')
+                            ->visible(fn (?FacturaClub $record): bool => $record && in_array($record->estado, ['en_revision', 'pendiente', 'vencida']))
+                            ->action(function (FacturaClub $record, ClubPaymentGatewayService $gatewayService, $livewire) {
+                                $gatewayService->marcarFacturaPagada(
+                                    $record,
+                                    'transferencia_bancaria',
+                                    'Pago por transferencia bancaria aprobado manualmente por el Superadministrador desde el formulario de factura.'
+                                );
+
+                                $record->refresh();
+                                if (method_exists($livewire, 'fillForm')) {
+                                    $livewire->fillForm();
+                                }
+
+                                Notification::make()
+                                    ->title('Factura Aprobada')
+                                    ->body("La factura {$record->numero_factura} ha sido marcada como pagada y el período del club {$record->complejo?->nombre} fue extendido exitosamente.")
+                                    ->success()
+                                    ->send();
+                            }),
+                    ])
                     ->schema([
                         Forms\Components\Select::make('estado')
                             ->label('Estado de Factura')
@@ -143,6 +171,13 @@ class FacturaClubResource extends Resource
                         Forms\Components\TextInput::make('comprobante_transferencia_url')
                             ->label('URL / Comprobante de Transferencia')
                             ->url()
+                            ->suffixAction(
+                                Forms\Components\Actions\Action::make('abrirComprobante')
+                                    ->icon('heroicon-m-arrow-top-right-on-square')
+                                    ->tooltip('Abrir comprobante en nueva pestaña')
+                                    ->url(fn ($state) => $state, shouldOpenInNewTab: true)
+                                    ->visible(fn ($state) => !empty($state))
+                            )
                             ->maxLength(2048),
                         Forms\Components\Textarea::make('comprobante_transferencia_notas')
                             ->label('Notas del Club sobre el Comprobante')

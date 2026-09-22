@@ -14,6 +14,10 @@ class FacturaClub extends Model
 
     protected $table = 'facturas_club';
 
+    protected $appends = [
+        'numero_factura',
+    ];
+
     protected $fillable = [
         'uuid',
         'complejo_id',
@@ -42,6 +46,56 @@ class FacturaClub extends Model
         'comprobante_transferencia_url',
         'notas',
     ];
+
+    public function getNumeroFacturaAttribute(): string
+    {
+        return 'FC-' . str_pad((string) ($this->id ?? 1), 6, '0', STR_PAD_LEFT);
+    }
+
+    public function getFechaPagoAttribute()
+    {
+        return $this->pagado_at;
+    }
+
+    public function getFechaGraciaVencimientoAttribute()
+    {
+        return $this->fecha_limite_gracia;
+    }
+
+    public function getMontoPlanBaseUsdAttribute()
+    {
+        return $this->monto_base_plan;
+    }
+
+    public function getCanchasTotalesAttribute()
+    {
+        return $this->canchas_utilizadas;
+    }
+
+    public function getCanchasIncluidasPlanAttribute()
+    {
+        return $this->canchas_incluidas;
+    }
+
+    public function getPrecioUnitarioCanchaExtraUsdAttribute()
+    {
+        return $this->precio_cancha_adicional;
+    }
+
+    public function getMontoCanchasExtrasUsdAttribute()
+    {
+        return $this->monto_canchas_adicionales;
+    }
+
+    public function getCantidadTurnosMarketplaceAttribute()
+    {
+        return $this->total_turnos_marketplace;
+    }
+
+    public function getMontoComisionesMarketplaceUsdAttribute()
+    {
+        return $this->monto_comisiones_marketplace;
+    }
 
     protected function casts(): array
     {

@@ -178,7 +178,9 @@
 4. **Aprobación de Transferencias en Filament Super Admin:**
    - Ingresar a `http://localhost:8080/admin` como Superadmin.
    - En la sección **Facturación & Finanzas > Facturas de Clubes**, localizar la factura en revisión.
-   - Hacer clic en la acción **Aprobar Pago**: la factura pasa a `pagada` y la suscripción del club se renueva automáticamente por 30 días.
+   - **Desde el Listado:** Hacer clic en la acción **Aprobar Pago** en la fila de la tabla.
+   - **Desde la Edición / Detalle:** Hacer clic en la fila o en **Editar** para inspeccionar el comprobante bancario (con botón de enlace directo al comprobante). En la cabecera superior y sobre la sección de "Estado y Cobro" se visualiza el botón verde **"Aprobar Pago"**.
+   - Al confirmar el modal, la factura pasa a `pagada` (`pagado_at` registrado) y la suscripción del club se renueva automáticamente por 30 días (`suscripcion_estado = 'activa'`), purgando el período de gracia. El formulario se refresca inmediatamente mostrando los datos actualizados.
 5. **Período de Gracia de 7 Días y Banner Persistente:**
    - Cuando un abono vence su fecha límite, el club entra en período de gracia de 7 días (`suscripcion_estado = 'gracia'`).
    - En la parte superior de todas las vistas del panel de administración (`/panel`), aparece de forma persistente el banner de advertencia ámbar:

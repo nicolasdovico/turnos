@@ -231,4 +231,18 @@ class ClubPaymentGatewayService
             ];
         });
     }
+
+    /**
+     * Marca manualmente una factura como pagada (e.g. desde Filament Superadmin por transferencia bancaria).
+     */
+    public function marcarFacturaPagada(FacturaClub $factura, string $gateway = 'transferencia_bancaria', ?string $notas = null): array
+    {
+        if ($notas) {
+            $factura->update([
+                'notas' => trim(($factura->notas ? $factura->notas . "\n" : '') . $notas),
+            ]);
+        }
+
+        return $this->procesarPagoAprobado($factura, $gateway, null);
+    }
 }

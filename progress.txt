@@ -2777,7 +2777,34 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * 4. Ajuste de Test Nocturno (`backend/tests/Feature/CancelacionLluviaTest.php`):
     - Se fijó la hora de ejecución del test con `Carbon::setTestNow()` para evitar que ejecuciones automáticas pasadas las 22:00 hs fallen por horario de cierre del club.
 - Verificación:
-  * 286/286 tests de backend pasando en verde en PHPUnit.
+==============================================================================================================================================================
+[2026-09-21] - CORRECCIÓN: ACCIÓN "APROBAR PAGO" EN EDICIÓN DE FACTURAS DE CLUBES (FILAMENT SUPERADMIN)
+==============================================================================================================================================================
+- Diagnóstico del Requerimiento:
+  * Al ingresar a Filament Superadmin (`/admin`) en la sección **Facturación & Finanzas > Facturas de Clubes** y entrar a editar una factura (`/admin/factura-clubs/{id}/edit`), no aparecía disponible la acción de botón **"Aprobar Pago"**.
+  * Causa Raíz:
+    1. La acción `aprobarTransferencia` con etiqueta `'Aprobar Pago'` solo estaba definida a nivel de fila de la tabla en `FacturaClubResource::table()`.
+    2. La página de edición (`EditFacturaClub.php`) únicamente tenía declarado `DeleteAction::make()` dentro de `getHeaderActions()`. Por tanto, al entrar a la ficha detallada de la factura para cotejar el comprobante, el administrador no disponía del botón de aprobación en la cabecera.
+    3. Asimismo, la acción invocaba un método `marcarFacturaPagada()` que no estaba definido explícitamente en `ClubPaymentGatewayService.php` (el servicio contaba con `procesarPagoAprobado()`).
+    4. El modelo `FacturaClub` carecía del accesor `numero_factura` (`FC-000001`), lo que provocaba inconsistencias de visualización en la notificación y en los títulos.
+- Solución Implementada:
+  * 1. Cabecera de Edición (`backend/app/Filament/Resources/FacturaClubResource/Pages/EditFacturaClub.php`):
+    - Se incorporó la acción `aprobarTransferencia` en `getHeaderActions()` con ícono `heroicon-o-check-circle`, color `success`, modal de confirmación explicando la extensión de 30 días, condición de visibilidad para facturas `en_revision`, `pendiente` o `vencida`, refresco reactivo del formulario (`$this->fillForm()`) y notificación toast de éxito.
+  * 2. Formulario Detallado (`backend/app/Filament/Resources/FacturaClubResource.php`):
+    - Se agregó la acción `aprobarTransferenciaForm` directamente en el encabezado de la sección **"Estado y Cobro"** (`Section::headerActions`), permitiendo aprobar el pago tanto desde la cabecera general de la página como desde el bloque específico de cobro.
+    - Se añadió `suffixAction` con ícono de enlace externo (`heroicon-m-arrow-top-right-on-square`) en el campo `comprobante_transferencia_url` para abrir el comprobante en una nueva pestaña con un solo clic.
+  * 3. Servicio de Cobro B2B (`backend/app/Services/ClubPaymentGatewayService.php`):
+    - Se implementó el método `marcarFacturaPagada(FacturaClub $factura, string $gateway = 'transferencia_bancaria', ?string $notas = null): array`, que anota las observaciones del administrador, marca la factura como `pagada` con timestamp `pagado_at` y renueva la suscripción del club por 30 días, cancelando el período de gracia.
+  * 4. Accesor y Mapeos en Modelo (`backend/app/Models/FacturaClub.php`):
+    - Se añadieron los accesores `$appends = ['numero_factura']`, `getNumeroFacturaAttribute()`, `getFechaPagoAttribute()` y aliases de compatibilidad.
+  * 5. Test de Integración Automatizado (`backend/tests/Feature/FilamentFacturaClubResourceTest.php`):
+    - Se crearon pruebas unitarias con Livewire que verifican:
+      a) Presencia, visibilidad y ejecución de la acción "Aprobar Pago" en la página de edición (`EditFacturaClub`).
+      b) Actualización en BD de `estado = 'pagada'`, `pagado_at` y renovación de suscripción del club (`suscripcion_estado = 'activa'`).
+      c) Ocultamiento automático de la acción una vez que la factura ya se encuentra pagada.
+      d) Ejecución exitosa de la acción desde la tabla principal del listado (`ListFacturasClub`).
+- Verificación:
+  * 288/288 tests de backend pasando en verde en PHPUnit.
   * 126/126 tests de frontend pasando en verde en Vitest.
-  * Total Ecosistema: 432/432 tests automatizados pasando exitosamente.
+  * Total Ecosistema: 414 tests automatizados pasando exitosamente.
 ==============================================================================================================================================================
