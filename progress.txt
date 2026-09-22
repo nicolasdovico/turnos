@@ -2897,4 +2897,31 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: tests/DeportesYEquipamientosClub.test.tsx con 3 pruebas completas (renderizado de badges, guardado con IDs de deporte/superficie/equipamientos, y alta inline de atributo propio) pasando al 100%. Suite completa: 132 tests de frontend pasando en 14 suites de Vitest.
   * Total Ecosistema: 446 tests automatizados exitosos (0 fallas, 0 regresiones).
 ==============================================================================================================================
+[2026-09-22] - RESOLUCIÓN: DESPLEGABLE DINÁMICO DE DEPORTES Y SUPERFICIES EN PANEL DE CLUB (CLUB PÁDEL BRONCE)
+==============================================================================================================================
+- Diagnóstico:
+  * El usuario consultó por qué al editar o crear una cancha en "Club Pádel Bronce" no aparecían en el combo todos los deportes definidos en el backend (por ejemplo, 'Rugby' creado en Filament o los deportes de catálogo como Pickleball, Vóley, Hockey).
+  * Factores identificados:
+    1. Caché del bundle de cliente en navegador: el navegador conservaba en memoria la versión previa al hot-reload, donde el combo del modal de canchas tenía 5 opciones estáticas hardcodeadas (Pádel, Tenis, Fútbol, Básquet, Squash).
+    2. Fallback estático `DEPORTES_CONFIG`: sólo contenía 5 deportes, por lo que ante demora de red o carga inicial solo exponía 5 deportes.
+    3. Renderizado de iconos en el select: mostraba `{s.icono} {s.nombre}` como cadenas de texto (ej. "padel Pádel" o "tennis Tenis"), ya que en base de datos `icono` almacena un slug de clave visual y no emojis.
+    4. Deportes sin superficies asociadas: si en Filament se creaba un deporte nuevo sin superficies (ej. Rugby), el combo de superficies quedaba completamente vacío.
+    5. Orden en backend y Filament: en `DeporteResource`, el orden por defecto era `0`, lo que provocaba que un nuevo deporte se posicione antes que los deportes canónicos.
+    6. Selector institucional de "Deporte Principal": en la pestaña de Configuración del Club (`page.tsx`), el selector de Deporte Principal aún mantenía una lista estática en lugar del catálogo dinámico.
+- Solución Realizada:
+  * En frontend (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+    1. Helper `getSportEmoji(icono, slug)`: Mapea iconos a emojis limpios y amigables (🎾 Pádel, 🎾 Tenis, ⚽ Fútbol, 🏀 Básquet, 🏸 Squash, 🏓 Pickleball, 🏐 Vóley, 🏑 Hockey, 🏉 Rugby, 🏅 Otros).
+    2. Fallback robusto en `DEPORTES_CONFIG`: Incorporación de Pickleball, Vóley y Hockey.
+    3. Fallback en superficies y formatos: Si un deporte dinámico no tiene superficies o formatos cargados aún, el selector muestra `Estándar / Reglamentaria` para evitar combos vacíos.
+    4. Sincronización del selector "Deporte Principal" en la pestaña de configuración del club usando `availableSports`.
+    5. Manejo inteligente de complejos con `deporte_principal = "multideporte"` al crear cancha para defaultear a Pádel o primer deporte activo.
+  * En backend (`backend/app/Filament/Resources/` & `ClubDashboardController.php`):
+    1. Ordenamiento secundario: `orderBy('orden', 'asc')->orderBy('nombre', 'asc')`.
+    2. En `DeporteResource`, `SuperficieResource` y `EquipamientoResource`: el campo `orden` ahora autoincrementa por defecto con `max('orden') + 1`.
+    3. Actualizado el orden de Rugby a 9 en base de datos.
+- Tests & Verificación:
+  * Backend: 294 tests pasados al 100% (1.711 aserciones).
+  * Frontend: 132 tests pasados al 100% en Vitest (14 suites).
+  * Total Ecosistema: 426 tests automatizados exitosos (0 fallas).
+==============================================================================================================================
 
