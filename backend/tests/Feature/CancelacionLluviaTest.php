@@ -451,28 +451,33 @@ class CancelacionLluviaTest extends TestCase
 
     public function test_ejecutar_creates_preventive_grid_blocks_when_requested(): void
     {
-        $fecha = Carbon::today()->format('Y-m-d');
+        Carbon::setTestNow(Carbon::parse('2026-09-21 12:00:00'));
+        try {
+            $fecha = Carbon::today()->format('Y-m-d');
 
-        $response = $this->actingAs($this->adminUser, 'sanctum')
-            ->postJson("/api/clubs/nico-padel/cancelacion-lluvia/ejecutar", [
-                'fecha' => $fecha,
-                'hora_desde' => '20:00',
-                'canchas_ids' => [$this->canchaDescubierta1->id],
-                'bloquear_grilla' => true,
-            ]);
+            $response = $this->actingAs($this->adminUser, 'sanctum')
+                ->postJson("/api/clubs/nico-padel/cancelacion-lluvia/ejecutar", [
+                    'fecha' => $fecha,
+                    'hora_desde' => '20:00',
+                    'canchas_ids' => [$this->canchaDescubierta1->id],
+                    'bloquear_grilla' => true,
+                ]);
 
-        $response->assertStatus(200);
+            $response->assertStatus(200);
 
-        // Deberían haberse generado turnos con estado 'bloqueado' y motivo 'lluvia' para las horas >= 20:00
-        $bloqueos = Turno::where('cancha_id', $this->canchaDescubierta1->id)
-            ->where('fecha', $fecha)
-            ->where('estado', 'bloqueado')
-            ->where('motivo_cancelacion', 'lluvia')
-            ->get();
+            // Deberían haberse generado turnos con estado 'bloqueado' y motivo 'lluvia' para las horas >= 20:00
+            $bloqueos = Turno::where('cancha_id', $this->canchaDescubierta1->id)
+                ->where('fecha', $fecha)
+                ->where('estado', 'bloqueado')
+                ->where('motivo_cancelacion', 'lluvia')
+                ->get();
 
-        $this->assertGreaterThan(0, $bloqueos->count());
-        foreach ($bloqueos as $b) {
-            $this->assertGreaterThanOrEqual('20:00', substr($b->hora_inicio, 0, 5));
+            $this->assertGreaterThan(0, $bloqueos->count());
+            foreach ($bloqueos as $b) {
+                $this->assertGreaterThanOrEqual('20:00', substr($b->hora_inicio, 0, 5));
+            }
+        } finally {
+            Carbon::setTestNow();
         }
     }
 

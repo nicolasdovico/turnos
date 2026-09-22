@@ -225,3 +225,13 @@
    - Seleccionar `100 km` o `200 km`: comprobar que el backend `/api/complejos/cercanos` es consultado con `radio_km=100` o `radio_km=200`, permitiendo descubrir clubes de un rango geográfico regional mucho más amplio.
 6. **Persistencia en LocalStorage:**
    - Recargar la página en el navegador (F5): comprobar que la ciudad configurada previamente (ej. Luján) y sus coordenadas persisten automáticamente sin volver a CABA.
+
+### Caso de Prueba: Carga de Facturación & Abono desde Subdominio del Club (Resolución Same-Origin)
+1. **Acceso al Panel del Club desde Subdominio:**
+   - Ingresar a `http://club-padel-bronce.localhost:8080/panel`.
+2. **Navegación a la Pestaña Facturación:**
+   - Si existe un período de gracia o deuda, hacer clic en el banner superior **Regularizar Pago Ahora →** o en la pestaña **💳 Facturación & Abono**.
+3. **Verificación de Conectividad & Ausencia de 'Failed to Fetch':**
+   - Comprobar que la pantalla carga fluidamente el resumen de facturación sin arrojar `Error de Facturación - Failed to fetch`.
+   - Verificar en la consola de red (Network) del navegador que las solicitudes se dirigen a `/api/clubs/club-padel-bronce/facturacion/resumen` y `/api/clubs/club-padel-bronce/facturacion/facturas` sobre el mismo origen `club-padel-bronce.localhost:8080`, sin advertencias de CORS ni Private Network Access.
+   - Comprobar que los botones de pago (Mercado Pago, Stripe, Transferencia Bancaria) interactúan correctamente enviando las solicitudes a `/api/...`.

@@ -47,7 +47,7 @@ interface CanchaItem {
   estado: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+const API_BASE = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
 
 export default function TenantPage({ params }: { params?: { subdomain: string } }) {
   const urlParams = useParams();

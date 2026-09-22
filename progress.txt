@@ -2751,3 +2751,33 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * 126/126 tests de frontend en verde en Vitest.
   * Total Ecosistema: 432/432 tests automatizados pasando exitosamente.
 ==============================================================================================================================================================
+[2026-09-21] - CORRECCIÓN: RESOLUCIÓN DE RUTA DE API Y CORS EN FACTURACIÓN DEL CLUB ("FAILED TO FETCH" EN SUBDOMINIOS)
+==============================================================================================================================================================
+- Diagnóstico del Error:
+  * Al ingresar al panel de administración del club en un subdominio local (ej. `http://club-padel-bronce.localhost:8080/panel`), la sección de facturación arrojaba:
+    `Error de Facturación`
+    `Failed to fetch`
+    `Reintentar`
+  * Causa Raíz (Cross-Origin Mismatch & URL Absoluta Hardcodeada):
+    1. En `frontend/app/tenants/[subdomain]/panel/page.tsx`, `API_BASE` estaba definido como:
+       `process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"`
+       y se transfería como prop `apiUrl={API_BASE}` al componente `<FacturacionClubPanel>`.
+    2. El navegador, posicionado en el origen `http://club-padel-bronce.localhost:8080`, intentaba realizar peticiones HTTP a `http://localhost:8080/api/...`.
+    3. Al diferir el hostname (`club-padel-bronce.localhost` vs `localhost`), los navegadores modernos (especialmente Chromium con sus políticas de Private Network Access y CORS en localhost) bloquean o rechazan peticiones cross-origin con cabeceras personalizadas (`X-Tenant-ID`, `Authorization`), generando la excepción JavaScript `TypeError: Failed to fetch`.
+    4. Asimismo, en arquitecturas multitenant detrás de Caddy, cada subdominio resuelve internamente el prefijo `/api*` hacia FastCGI PHP backend en el mismo host y puerto, por lo que el uso de URLs relativas `/api` es estrictamente same-origin y elimina cualquier fricción de CORS o resolución de nombres de host.
+- Solución Implementada:
+  * 1. Definición Relativa de `API_BASE` en Frontend (`frontend/app/tenants/[subdomain]/panel/page.tsx`, `frontend/components/FacturacionClubPanel.tsx`, `frontend/app/tenants/[subdomain]/page.tsx`, etc.):
+    - Se actualizó `API_BASE` a:
+      `typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");`
+    - En `FacturacionClubPanel.tsx`, la variable `effectiveApiUrl` prioriza `/api` relativo cuando se ejecuta en el navegador (`typeof window !== "undefined"`), evitando que llamadas desde subdominios apunten a localhost absoluto.
+  * 2. Robustez en Resolución de Tokens de Sesión:
+    - Se definió `effectiveToken` en `panel/page.tsx` y se robusteció `getAuthHeaders` en `FacturacionClubPanel.tsx` para inspeccionar `saas_token`, `token` y `auth_token` tanto de props como de `localStorage`, garantizando que la autenticación Bearer viaje siempre poblada.
+  * 3. Manejo Resiliente de Respuestas No-JSON:
+    - En `FacturacionClubPanel.tsx`, la lectura de errores del servidor (`resumenRes.json()`) se protegió con bloque try/catch para exhibir mensajes claros de código de estado HTTP en lugar de errores de sintaxis JSON.
+  * 4. Ajuste de Test Nocturno (`backend/tests/Feature/CancelacionLluviaTest.php`):
+    - Se fijó la hora de ejecución del test con `Carbon::setTestNow()` para evitar que ejecuciones automáticas pasadas las 22:00 hs fallen por horario de cierre del club.
+- Verificación:
+  * 286/286 tests de backend pasando en verde en PHPUnit.
+  * 126/126 tests de frontend pasando en verde en Vitest.
+  * Total Ecosistema: 432/432 tests automatizados pasando exitosamente.
+==============================================================================================================================================================

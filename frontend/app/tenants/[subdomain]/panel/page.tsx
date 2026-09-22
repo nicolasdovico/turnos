@@ -256,7 +256,7 @@ const DIAS_CONFIG = [
 ];
 
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+const API_BASE = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
 
 const ALL_MODULOS = [
   {
@@ -337,6 +337,15 @@ export default function ClubAdminPanel() {
   const params = useParams();
   const subdomain = (params?.subdomain as string) || "demo";
   const { user, token } = useAuth();
+  const effectiveToken =
+    token ||
+    (typeof window !== "undefined"
+      ? (new URLSearchParams(window.location.search).get("auth_token") ||
+         new URLSearchParams(window.location.search).get("token") ||
+         localStorage.getItem("saas_token") ||
+         localStorage.getItem("token") ||
+         localStorage.getItem("auth_token"))
+      : null);
 
   const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion">("canchas");
   const [suscripcionAlerta, setSuscripcionAlerta] = useState<{
@@ -608,11 +617,7 @@ export default function ClubAdminPanel() {
       }
 
       // Get active token from token prop, URL params (SSO transfer) or localStorage
-      let activeToken = token;
-      if (!activeToken && typeof window !== "undefined") {
-        const params = new URLSearchParams(window.location.search);
-        activeToken = params.get("auth_token") || params.get("token") || localStorage.getItem("saas_token");
-      }
+      let activeToken = effectiveToken;
 
       // Check admin status for current user
       const adminRes = await fetch(`${API_BASE}/clubs/${subdomain}/is-admin`, {
@@ -5747,7 +5752,7 @@ export default function ClubAdminPanel() {
           <div className="mt-8">
             <GestionBilleteras
               subdomain={subdomain}
-              token={token}
+              token={effectiveToken}
               apiUrl={API_BASE}
               complejoNombre={complejo?.nombre}
             />
@@ -5761,7 +5766,7 @@ export default function ClubAdminPanel() {
           <div className="mt-8">
             <GestionClientes
               subdomain={subdomain}
-              token={token}
+              token={effectiveToken}
               apiUrl={API_BASE}
             />
           </div>
@@ -5774,7 +5779,7 @@ export default function ClubAdminPanel() {
           <div className="mt-8">
             <FacturacionClubPanel
               subdomain={subdomain}
-              token={token}
+              token={effectiveToken}
               apiUrl={API_BASE}
               onRefreshSummary={() => fetchDashboardData(true)}
             />

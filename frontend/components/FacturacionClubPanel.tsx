@@ -118,7 +118,7 @@ export interface FacturaItem {
   plan?: { id: number; nombre: string; slug: string };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+const API_BASE = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
 
 export default function FacturacionClubPanel({
   subdomain,
@@ -126,7 +126,10 @@ export default function FacturacionClubPanel({
   apiUrl,
   onRefreshSummary,
 }: FacturacionClubPanelProps) {
-  const effectiveApiUrl = apiUrl || (typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"));
+  const effectiveApiUrl =
+    (typeof window !== "undefined" && (!apiUrl || apiUrl.startsWith("http://localhost") || apiUrl.startsWith("http://127.0.0.1")))
+      ? "/api"
+      : (apiUrl || (typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api")));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resumen, setResumen] = useState<ResumenFacturacion | null>(null);
@@ -147,7 +150,10 @@ export default function FacturacionClubPanel({
   const getAuthHeaders = useCallback(() => {
     let activeToken = token;
     if (!activeToken && typeof window !== "undefined") {
-      activeToken = localStorage.getItem("saas_token");
+      activeToken =
+        localStorage.getItem("saas_token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("auth_token");
     }
     return {
       "Content-Type": "application/json",
@@ -169,8 +175,14 @@ export default function FacturacionClubPanel({
       ]);
 
       if (!resumenRes.ok) {
-        const errData = await resumenRes.json();
-        throw new Error(errData.message || "Error al obtener resumen de facturación.");
+        let errorMsg = "Error al obtener resumen de facturación.";
+        try {
+          const errData = await resumenRes.json();
+          if (errData?.message) errorMsg = errData.message;
+        } catch {
+          errorMsg = `Error del servidor (${resumenRes.status}): ${resumenRes.statusText || "Respuesta inválida"}`;
+        }
+        throw new Error(errorMsg);
       }
 
       const resumenJson = await resumenRes.json();
