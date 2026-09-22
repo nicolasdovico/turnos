@@ -9,6 +9,7 @@ import {
   Car,
   MapPin,
   ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
 import { TemplateProps } from "./BookingDirectTemplate";
 
@@ -88,7 +89,12 @@ export default function InstitucionalTemplate({
             <button
               onClick={scrollToReservas}
               data-testid="btn-hero-reservar"
-              className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm transition shadow-xl shadow-emerald-950/60 cursor-pointer flex items-center gap-2"
+              className="px-6 py-3 rounded-2xl text-white font-black text-xs sm:text-sm transition shadow-xl cursor-pointer flex items-center gap-2"
+              style={{
+                backgroundColor: "var(--club-primary, #059669)",
+                boxShadow:
+                  "0 10px 25px -5px color-mix(in srgb, var(--club-primary, #059669) 50%, transparent)",
+              }}
             >
               <span>Reservar mi Cancha</span>
               <ChevronDown className="w-4 h-4 animate-bounce" />
@@ -101,7 +107,13 @@ export default function InstitucionalTemplate({
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-emerald-400">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--club-primary, #10b981) 15%, transparent)",
+                color: "var(--club-primary, #10b981)",
+              }}
+            >
               <Trophy className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-black text-white">Instalaciones Pro</h3>
@@ -111,7 +123,13 @@ export default function InstitucionalTemplate({
           </div>
 
           <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-cyan-400">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--club-accent, #06b6d4) 15%, transparent)",
+                color: "var(--club-accent, #06b6d4)",
+              }}
+            >
               <Sparkles className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-black text-white">Vestuarios & Confort</h3>
@@ -131,22 +149,28 @@ export default function InstitucionalTemplate({
           </div>
 
           <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-emerald-400">
-              <Car className="w-5 h-5" />
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{
+                backgroundColor: "color-mix(in srgb, var(--club-primary, #10b981) 15%, transparent)",
+                color: "var(--club-primary, #10b981)",
+              }}
+            >
+              <ShieldCheck className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-black text-white">Predio Seguro</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Estacionamiento propio y seguridad en todo el predio durante tu estadía.
+              Estacionamiento vigilado, cobertura médica y protocolo de emergencias deportivas.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Reservation Section */}
-      <section id="seccion-reservas-club" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pt-4">
+      {/* Booking Section Anchor */}
+      <section id="seccion-reservas" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pt-6">
         <div className="text-center space-y-1">
           <h2 className="text-xl sm:text-2xl font-black text-white">
-            Reservá tu Cancha en {complejo.nombre}
+            Agenda y Disponibilidad
           </h2>
           <p className="text-xs text-slate-400">
             Elegí la cancha de tu preferencia y consultá los turnos disponibles en tiempo real.
@@ -171,9 +195,18 @@ export default function InstitucionalTemplate({
                     data-testid={`btn-select-cancha-${c.id}`}
                     className={`px-4 py-2.5 rounded-2xl font-bold text-xs transition cursor-pointer flex items-center gap-2 ${
                       isSelected
-                        ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/50"
+                        ? "bg-slate-900 text-white shadow-lg"
                         : "bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-800"
                     }`}
+                    style={
+                      isSelected
+                        ? {
+                            backgroundColor: "var(--club-primary, #059669)",
+                            boxShadow:
+                              "0 10px 20px -3px color-mix(in srgb, var(--club-primary, #059669) 50%, transparent)",
+                          }
+                        : undefined
+                    }
                   >
                     <span>{c.nombre}</span>
                     <span className="text-[10px] opacity-80 font-mono">

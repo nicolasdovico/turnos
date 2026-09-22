@@ -49,7 +49,13 @@ export default function ClubFooter({
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="w-full bg-slate-950 border-t border-slate-800/80 text-slate-400 mt-20">
+    <footer
+      className="w-full border-t text-slate-400 mt-20 transition-colors duration-200"
+      style={{
+        backgroundColor: "color-mix(in srgb, var(--club-bg, #020617) 92%, #000)",
+        borderColor: "color-mix(in srgb, var(--club-primary, #10b981) 18%, #1e293b)",
+      }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 lg:gap-12">
           {/* Col 1: Club Info & Brand */}
@@ -155,7 +161,7 @@ export default function ClubFooter({
             <div className="space-y-2 text-xs text-slate-300">
               {(direccion || ciudad) && (
                 <div className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "var(--club-primary, #10b981)" }} />
                   <div className="space-y-0.5">
                     {direccion && <div>{direccion}</div>}
                     {ciudad && <div className="text-slate-400">{ciudad}</div>}
@@ -165,7 +171,7 @@ export default function ClubFooter({
 
               {telefono && (
                 <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <Phone className="w-4 h-4 flex-shrink-0" style={{ color: "var(--club-primary, #10b981)" }} />
                   <span className="font-mono">{telefono}</span>
                 </div>
               )}
@@ -177,7 +183,8 @@ export default function ClubFooter({
                     target="_blank"
                     rel="noopener noreferrer"
                     data-testid="footer-como-llegar"
-                    className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 text-xs font-semibold border border-slate-800 transition"
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-semibold border border-slate-800 transition"
+                    style={{ color: "var(--club-primary, #10b981)" }}
                   >
                     <Navigation className="w-3 h-3" />
                     <span>Cómo llegar en Google Maps</span>

@@ -41,23 +41,35 @@ export interface ClubBrandingResponse {
 }
 
 export async function fetchClubData(subdomain: string): Promise<ClubBrandingResponse | null> {
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.BACKEND_INTERNAL_URL ||
-    "http://backend:80/api";
+  const isServer = typeof window === "undefined";
+  const urlsToTry = isServer
+    ? [
+        process.env.BACKEND_INTERNAL_URL,
+        "http://saas_webserver/api",
+        "http://backend:80/api",
+        process.env.NEXT_PUBLIC_API_URL,
+      ].filter(Boolean) as string[]
+    : [process.env.NEXT_PUBLIC_API_URL || "/api"];
 
-  try {
-    const res = await fetch(`${apiUrl}/clubs/${subdomain}/branding`, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 3600, tags: [`tenant-${subdomain}`] },
-    });
+  for (const apiUrl of urlsToTry) {
+    try {
+      const res = await fetch(`${apiUrl}/clubs/${subdomain}/branding`, {
+        headers: { Accept: "application/json" },
+        next: { revalidate: 3600, tags: [`tenant-${subdomain}`] },
+      });
 
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.data || null;
-  } catch {
-    return null;
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data) {
+          return json.data;
+        }
+      }
+    } catch {
+      // Probar siguiente URL
+    }
   }
+
+  return null;
 }
 
 export function buildTenantMetadata(subdomain: string, clubData: ClubBrandingResponse | null): Metadata {

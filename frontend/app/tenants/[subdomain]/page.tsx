@@ -294,17 +294,23 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
     onOpenQrModal: () => setShowPublicQrModal(true),
   };
 
+  const primaryColor = branding.color_primario || "#10b981";
+  const secondaryColor = branding.color_secundario || "#047857";
+  const accentColor = branding.color_acento || "#06b6d4";
+  const bgColor = branding.color_fondo || "#020617";
+
   const customStyle: React.CSSProperties = {
     // @ts-ignore
-    "--club-primary": branding.color_primario || "#10b981",
-    "--club-secondary": branding.color_secundario || "#047857",
-    "--club-accent": branding.color_acento || "#06b6d4",
-    "--club-bg": branding.color_fondo || "#020617",
+    "--club-primary": primaryColor,
+    "--club-secondary": secondaryColor,
+    "--club-accent": accentColor,
+    "--club-bg": bgColor,
+    backgroundColor: bgColor,
   };
 
   return (
     <main
-      className="min-h-screen bg-slate-950 text-white flex flex-col justify-between"
+      className="min-h-screen text-white flex flex-col justify-between transition-colors duration-200"
       style={customStyle}
       data-testid="tenant-public-portal"
     >

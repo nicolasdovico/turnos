@@ -37,3 +37,66 @@ body {
   animation: featureFadeIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Multitenant Dynamic Branding & Custom Palette (Módulo F) */
+.tenant-root,
+main[data-testid="tenant-public-portal"],
+div[data-testid="pagina-institucional-cms"] {
+  background-color: var(--club-bg, #020617);
+}
+
+.tenant-root .bg-emerald-600,
+main[data-testid="tenant-public-portal"] .bg-emerald-600,
+div[data-testid="pagina-institucional-cms"] .bg-emerald-600 {
+  background-color: var(--club-primary, #059669) !important;
+}
+
+.tenant-root .hover\:bg-emerald-500:hover,
+main[data-testid="tenant-public-portal"] .hover\:bg-emerald-500:hover,
+div[data-testid="pagina-institucional-cms"] .hover\:bg-emerald-500:hover {
+  background-color: var(--club-secondary, #047857) !important;
+}
+
+.tenant-root .text-emerald-400,
+.tenant-root .text-emerald-300,
+main[data-testid="tenant-public-portal"] .text-emerald-400,
+main[data-testid="tenant-public-portal"] .text-emerald-300,
+div[data-testid="pagina-institucional-cms"] .text-emerald-400,
+div[data-testid="pagina-institucional-cms"] .text-emerald-300 {
+  color: var(--club-accent, #10b981) !important;
+}
+
+.tenant-root .border-emerald-500,
+main[data-testid="tenant-public-portal"] .border-emerald-500,
+div[data-testid="pagina-institucional-cms"] .border-emerald-500 {
+  border-color: var(--club-primary, #10b981) !important;
+}
+
+.tenant-root .ring-emerald-500,
+main[data-testid="tenant-public-portal"] .ring-emerald-500,
+div[data-testid="pagina-institucional-cms"] .ring-emerald-500 {
+  --tw-ring-color: var(--club-primary, #10b981) !important;
+}
+
+.tenant-root .bg-emerald-500\/10,
+.tenant-root .bg-emerald-950\/40,
+.tenant-root .bg-emerald-950\/60,
+main[data-testid="tenant-public-portal"] .bg-emerald-500\/10,
+main[data-testid="tenant-public-portal"] .bg-emerald-950\/40,
+main[data-testid="tenant-public-portal"] .bg-emerald-950\/60 {
+  background-color: color-mix(in srgb, var(--club-primary, #10b981) 14%, transparent) !important;
+}
+
+.tenant-root .border-emerald-500\/20,
+.tenant-root .border-emerald-500\/30,
+main[data-testid="tenant-public-portal"] .border-emerald-500\/20,
+main[data-testid="tenant-public-portal"] .border-emerald-500\/30 {
+  border-color: color-mix(in srgb, var(--club-primary, #10b981) 28%, transparent) !important;
+}
+
+.tenant-root .shadow-emerald-600\/30,
+.tenant-root .shadow-emerald-500\/10,
+.tenant-root .shadow-emerald-950\/40,
+main[data-testid="tenant-public-portal"] .shadow-emerald-600\/30,
+main[data-testid="tenant-public-portal"] .shadow-emerald-500\/10 {
+  --tw-shadow-color: color-mix(in srgb, var(--club-primary, #10b981) 30%, transparent) !important;
+}

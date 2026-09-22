@@ -63,13 +63,8 @@ describe("GestionPaginasCMS - Gestor y Editor de Páginas Institucionales (Panel
       />
     );
 
-    // Esperar carga
-    await waitFor(() => {
-      expect(screen.getByTestId("gestion-paginas-cms")).toBeDefined();
-    });
-
-    // Validar mensaje de estado vacío
-    expect(screen.getByText("Tu club aún no tiene páginas institucionales")).toBeDefined();
+    // Esperar que termine la carga y aparezca el estado vacío
+    await screen.findByText("Tu club aún no tiene páginas institucionales");
 
     // Validar que se ofrecen las 3 plantillas rápidas
     expect(screen.getByText("Reglamento Interno y Normas de Convivencia")).toBeDefined();

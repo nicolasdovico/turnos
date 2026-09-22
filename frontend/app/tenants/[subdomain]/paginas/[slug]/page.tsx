@@ -15,10 +15,9 @@ interface PageProps {
 }
 
 async function getPagina(subdomain: string, slug: string) {
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.BACKEND_INTERNAL_URL ||
-    "http://backend:80/api";
+  const isServer = typeof window === "undefined";
+  const internalApiUrl = process.env.BACKEND_INTERNAL_URL || "http://saas_webserver/api";
+  const apiUrl = isServer ? internalApiUrl : (process.env.NEXT_PUBLIC_API_URL || "/api");
 
   try {
     const res = await fetch(`${apiUrl}/cms/paginas/${slug}`, {
@@ -48,10 +47,9 @@ async function getPagina(subdomain: string, slug: string) {
 }
 
 async function getClubBranding(subdomain: string) {
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.BACKEND_INTERNAL_URL ||
-    "http://backend:80/api";
+  const isServer = typeof window === "undefined";
+  const internalApiUrl = process.env.BACKEND_INTERNAL_URL || "http://saas_webserver/api";
+  const apiUrl = isServer ? internalApiUrl : (process.env.NEXT_PUBLIC_API_URL || "/api");
 
   try {
     const res = await fetch(`${apiUrl}/clubs/${subdomain}/branding`, {
@@ -117,13 +115,14 @@ export default async function TenantPaginaCMS({ params }: PageProps) {
     "--club-secondary": branding.color_secundario || "#047857",
     "--club-accent": branding.color_acento || "#06b6d4",
     "--club-bg": branding.color_fondo || "#020617",
+    backgroundColor: branding.color_fondo || "#020617",
   };
 
   const breadcrumbSchema = buildBreadcrumbSchema(subdomain, pagina, clubNombre);
 
   return (
     <div
-      className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between"
+      className="min-h-screen text-slate-100 flex flex-col justify-between transition-colors duration-200"
       style={customStyle}
       data-testid="pagina-institucional-cms"
     >

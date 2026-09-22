@@ -102,9 +102,20 @@ export default function ModernShowcaseTemplate({
                   data-testid={`btn-select-cancha-${c.id}`}
                   className={`rounded-3xl p-6 transition-all duration-200 cursor-pointer flex flex-col justify-between space-y-5 border ${
                     isSelected
-                      ? "bg-slate-900 border-emerald-500 shadow-xl shadow-emerald-950/40 ring-2 ring-emerald-500/40"
+                      ? "bg-slate-900 border-emerald-500 shadow-xl ring-2 ring-emerald-500/40"
                       : "bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900/90"
                   }`}
+                  style={
+                    isSelected
+                      ? {
+                          borderColor: "var(--club-primary, #10b981)",
+                          boxShadow:
+                            "0 0 24px -2px color-mix(in srgb, var(--club-primary, #10b981) 40%, transparent)",
+                          backgroundColor:
+                            "color-mix(in srgb, var(--club-primary, #10b981) 8%, #0f172a)",
+                        }
+                      : undefined
+                  }
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -112,7 +123,10 @@ export default function ModernShowcaseTemplate({
                         {c.deporte}
                       </span>
                       {isSelected ? (
-                        <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                        <span
+                          className="flex items-center gap-1 text-[11px] font-bold"
+                          style={{ color: "var(--club-primary, #10b981)" }}
+                        >
                           <CheckCircle className="w-3.5 h-3.5" />
                           <span>Seleccionada</span>
                         </span>
@@ -173,7 +187,10 @@ export default function ModernShowcaseTemplate({
                   <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
                     <div>
                       <div className="text-[10px] text-slate-500 font-semibold uppercase">Tarifa Base</div>
-                      <div className="text-base font-black text-emerald-400 font-mono">
+                      <div
+                        className="text-base font-black font-mono"
+                        style={{ color: "var(--club-accent, #10b981)" }}
+                      >
                         ${Number(c.precio_base).toLocaleString()}
                       </div>
                     </div>
@@ -182,9 +199,14 @@ export default function ModernShowcaseTemplate({
                       type="button"
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                         isSelected
-                          ? "bg-emerald-600 text-white"
+                          ? "text-white"
                           : "bg-slate-800 text-slate-300 group-hover:bg-slate-700"
                       }`}
+                      style={
+                        isSelected
+                          ? { backgroundColor: "var(--club-primary, #059669)" }
+                          : undefined
+                      }
                     >
                       {isSelected ? "Viendo Turnos ↓" : "Elegir Pista"}
                     </button>
