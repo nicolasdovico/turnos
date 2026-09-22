@@ -59,7 +59,7 @@ class FilamentFacturaClubResourceTest extends TestCase
             'total_usd' => 29.00,
             'tipo_cambio_ars' => 1500.00,
             'total_ars' => 43500.00,
-            'estado' => 'en_revision',
+            'estado' => 'revision_transferencia',
             'metodo_pago' => 'transferencia_bancaria',
             'fecha_emision' => Carbon::today(),
             'fecha_vencimiento' => Carbon::today()->addDays(5),

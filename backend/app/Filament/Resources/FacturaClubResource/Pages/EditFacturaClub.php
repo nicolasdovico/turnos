@@ -23,7 +23,7 @@ class EditFacturaClub extends EditRecord
                 ->requiresConfirmation()
                 ->modalHeading('Confirmar y Aprobar Pago de Factura')
                 ->modalDescription('¿Confirmas que el importe correspondiente ha impactado en la cuenta bancaria de la plataforma? La suscripción del club se extenderá automáticamente por 30 días.')
-                ->visible(fn (): bool => in_array($this->record->estado, ['en_revision', 'pendiente', 'vencida']))
+                ->visible(fn (): bool => !in_array($this->record->estado, ['pagada', 'anulada']))
                 ->action(function (ClubPaymentGatewayService $gatewayService) {
                     $gatewayService->marcarFacturaPagada(
                         $this->record,

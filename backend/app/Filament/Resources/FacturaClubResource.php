@@ -127,7 +127,7 @@ class FacturaClubResource extends Resource
                             ->requiresConfirmation()
                             ->modalHeading('Confirmar y Aprobar Pago de Factura')
                             ->modalDescription('¿Confirmas que el importe correspondiente ha impactado en la cuenta bancaria de la plataforma? La suscripción del club se extenderá automáticamente por 30 días.')
-                            ->visible(fn (?FacturaClub $record): bool => $record && in_array($record->estado, ['en_revision', 'pendiente', 'vencida']))
+                            ->visible(fn (?FacturaClub $record): bool => $record && !in_array($record->estado, ['pagada', 'anulada']))
                             ->action(function (FacturaClub $record, ClubPaymentGatewayService $gatewayService, $livewire) {
                                 $gatewayService->marcarFacturaPagada(
                                     $record,
@@ -151,9 +151,10 @@ class FacturaClubResource extends Resource
                         Forms\Components\Select::make('estado')
                             ->label('Estado de Factura')
                             ->options([
+                                'revision_transferencia' => 'En Revisión (Comprobante cargado)',
+                                'en_revision' => 'En Revisión',
                                 'pendiente' => 'Pendiente',
                                 'pagada' => 'Pagada',
-                                'en_revision' => 'En Revisión (Comprobante cargado)',
                                 'vencida' => 'Vencida',
                                 'anulada' => 'Anulada',
                             ])
@@ -164,6 +165,7 @@ class FacturaClubResource extends Resource
                             ->options([
                                 'mercadopago' => 'Mercado Pago',
                                 'stripe' => 'Stripe',
+                                'transferencia' => 'Transferencia Bancaria',
                                 'transferencia_bancaria' => 'Transferencia Bancaria',
                             ]),
                         Forms\Components\DateTimePicker::make('fecha_pago')
@@ -221,9 +223,17 @@ class FacturaClubResource extends Resource
                     ->color(fn (string $state): string => match ($state) {
                         'pagada' => 'success',
                         'pendiente' => 'warning',
-                        'en_revision' => 'info',
+                        'revision_transferencia', 'en_revision' => 'info',
                         'vencida' => 'danger',
                         default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'revision_transferencia', 'en_revision' => 'En Revisión',
+                        'pendiente' => 'Pendiente',
+                        'pagada' => 'Pagada',
+                        'vencida' => 'Vencida',
+                        'anulada' => 'Anulada',
+                        default => ucfirst($state),
                     })
                     ->searchable()
                     ->sortable(),
@@ -233,7 +243,7 @@ class FacturaClubResource extends Resource
                     ->formatStateUsing(fn ($state) => match ($state) {
                         'mercadopago' => 'Mercado Pago',
                         'stripe' => 'Stripe',
-                        'transferencia_bancaria' => 'Transferencia',
+                        'transferencia', 'transferencia_bancaria' => 'Transferencia',
                         default => $state ?: '-',
                     })
                     ->sortable(),
@@ -250,9 +260,9 @@ class FacturaClubResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('estado')
                     ->options([
+                        'revision_transferencia' => 'En Revisión',
                         'pendiente' => 'Pendiente',
                         'pagada' => 'Pagada',
-                        'en_revision' => 'En Revisión',
                         'vencida' => 'Vencida',
                         'anulada' => 'Anulada',
                     ]),
@@ -260,7 +270,8 @@ class FacturaClubResource extends Resource
                     ->options([
                         'mercadopago' => 'Mercado Pago',
                         'stripe' => 'Stripe',
-                        'transferencia_bancaria' => 'Transferencia',
+                        'transferencia' => 'Transferencia',
+                        'transferencia_bancaria' => 'Transferencia Bancaria',
                     ]),
             ])
             ->actions([
@@ -271,7 +282,7 @@ class FacturaClubResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Confirmar y Aprobar Pago de Factura')
                     ->modalDescription('¿Confirmas que el importe correspondiente ha impactado en la cuenta bancaria de la plataforma? La suscripción del club se extenderá automáticamente por 30 días.')
-                    ->visible(fn (FacturaClub $record): bool => in_array($record->estado, ['en_revision', 'pendiente', 'vencida']))
+                    ->visible(fn (FacturaClub $record): bool => !in_array($record->estado, ['pagada', 'anulada']))
                     ->action(function (FacturaClub $record, ClubPaymentGatewayService $gatewayService) {
                         $gatewayService->marcarFacturaPagada(
                             $record,
