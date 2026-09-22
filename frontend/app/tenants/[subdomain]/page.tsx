@@ -3,8 +3,13 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import GrillaHoraria, { formatWhatsAppNumber } from "@/components/GrillaHoraria";
 import { useAuth } from "@/context/AuthContext";
+import { formatWhatsAppNumber } from "@/components/GrillaHoraria";
+import ClubHeader, { NavigationLink } from "@/components/templates/ClubHeader";
+import ClubFooter from "@/components/templates/ClubFooter";
+import BookingDirectTemplate, { CanchaItem } from "@/components/templates/BookingDirectTemplate";
+import InstitucionalTemplate from "@/components/templates/InstitucionalTemplate";
+import ModernShowcaseTemplate from "@/components/templates/ModernShowcaseTemplate";
 
 interface ComplejoData {
   id: number;
@@ -23,31 +28,10 @@ interface ComplejoData {
   porcentaje_sena?: number;
 }
 
-interface CanchaItem {
-  id: number;
-  nombre: string;
-  deporte: string;
-  superficie: string;
-  precio_base: string | number;
-  precio_con_luz?: string | number | null;
-  techada: boolean;
-  iluminacion?: boolean;
-  tipo_iluminacion?: string | null;
-  camara_grabacion?: boolean;
-  marcador_digital?: boolean;
-  climatizada?: boolean;
-  tipo_cubierta?: string | null;
-  tipo_pared?: string | null;
-  formato?: string | null;
-  duracion_minutos?: number;
-  permite_duracion_flexible?: boolean;
-  duraciones_permitidas?: number[];
-  precio_90_min?: string | number | null;
-  precio_120_min?: string | number | null;
-  estado: string;
-}
-
-const API_BASE = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
+const API_BASE =
+  typeof window !== "undefined"
+    ? "/api"
+    : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 export default function TenantPage({ params }: { params?: { subdomain: string } }) {
   const urlParams = useParams();
@@ -63,10 +47,58 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
   const [showPublicQrModal, setShowPublicQrModal] = useState<boolean>(false);
   const [distanciaUsuario, setDistanciaUsuario] = useState<string | null>(null);
 
-  const cleanWaNumber = useMemo(() => formatWhatsAppNumber(complejo?.telefono), [complejo?.telefono]);
+  // Dynamic Branding & CMS Navigation
+  const [branding, setBranding] = useState<{
+    plantilla_slug: string;
+    logo_url: string | null;
+    portada_url: string | null;
+    color_primario: string;
+    color_secundario: string;
+    color_acento: string;
+    color_fondo: string;
+    eslogan: string | null;
+    descripcion_corta: string | null;
+    redes_sociales: {
+      instagram?: string | null;
+      facebook?: string | null;
+      tiktok?: string | null;
+      youtube?: string | null;
+      sitio_web?: string | null;
+    };
+  }>({
+    plantilla_slug: "booking_direct",
+    logo_url: null,
+    portada_url: null,
+    color_primario: "#10b981",
+    color_secundario: "#047857",
+    color_acento: "#06b6d4",
+    color_fondo: "#020617",
+    eslogan: null,
+    descripcion_corta: null,
+    redes_sociales: {},
+  });
 
+  const [navegacion, setNavegacion] = useState<{
+    header: NavigationLink[];
+    footer: NavigationLink[];
+  }>({
+    header: [],
+    footer: [],
+  });
+
+  const cleanWaNumber = useMemo(
+    () => formatWhatsAppNumber(complejo?.telefono),
+    [complejo?.telefono]
+  );
+
+  // Geolocation Distance Calculation
   useEffect(() => {
-    if (typeof window !== "undefined" && navigator.geolocation && complejo?.latitud && complejo?.longitud) {
+    if (
+      typeof window !== "undefined" &&
+      navigator.geolocation &&
+      complejo?.latitud &&
+      complejo?.longitud
+    ) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const lat1 = pos.coords.latitude;
@@ -78,7 +110,10 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
           const dLon = ((lon2 - lon1) * Math.PI) / 180;
           const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            Math.cos((lat1 * Math.PI) / 180) *
+              Math.cos((lat2 * Math.PI) / 180) *
+              Math.sin(dLon / 2) *
+              Math.sin(dLon / 2);
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
           const d = R * c;
           if (d < 1) {
@@ -93,6 +128,7 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
     }
   }, [complejo?.latitud, complejo?.longitud]);
 
+  // Marketplace Referral Tracking
   useEffect(() => {
     if (typeof window !== "undefined") {
       const searchParams = new URLSearchParams(window.location.search);
@@ -106,6 +142,7 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
     }
   }, []);
 
+  // Fetch Public Data, Courts & Branding
   useEffect(() => {
     const fetchClubData = async () => {
       try {
@@ -138,8 +175,12 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
           // Non-blocking
         }
 
-        // 3. Fetch public club data & courts
-        const res = await fetch(`${API_BASE}/clubs/${subdomain}/dashboard`);
+        // 3. Fetch public club data, courts & branding concurrently
+        const [res, brandRes] = await Promise.all([
+          fetch(`${API_BASE}/clubs/${subdomain}/dashboard`),
+          fetch(`${API_BASE}/clubs/${subdomain}/branding`).catch(() => null),
+        ]);
+
         const data = await res.json();
 
         if (!res.ok || !data.data?.complejo) {
@@ -149,6 +190,27 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
 
         const compData = data.data.complejo;
         setComplejo(compData);
+
+        // Parse branding if available
+        if (brandRes && brandRes.ok) {
+          try {
+            const brandJson = await brandRes.json();
+            if (brandJson?.data?.branding) {
+              setBranding((prev) => ({
+                ...prev,
+                ...brandJson.data.branding,
+              }));
+            }
+            if (brandJson?.data?.navegacion) {
+              setNavegacion({
+                header: brandJson.data.navegacion.header || [],
+                footer: brandJson.data.navegacion.footer || [],
+              });
+            }
+          } catch {
+            // Ignore branding parsing error
+          }
+        }
 
         // Filter only active courts and sort them naturally by name
         const rawCanchas: CanchaItem[] = data.data.canchas || [];
@@ -202,7 +264,7 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
           <div className="pt-2">
             <a
               href="http://localhost:8080/portal"
-              className="inline-block rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white transition"
+              className="inline-block rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white transition cursor-pointer"
             >
               ← Ir al Portal de Complejos
             </a>
@@ -215,262 +277,75 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
   const selectedCancha = canchas.find((c) => c.id === selectedCanchaId) || canchas[0];
   const tipoNegocioLabel = complejo.tipo_negocio?.nombre || "Club";
 
+  const templateProps = {
+    subdomain,
+    complejo,
+    branding,
+    canchas,
+    selectedCanchaId,
+    onSelectCanchaId: (id: number) => setSelectedCanchaId(id),
+    selectedCancha,
+    tipoNegocioLabel,
+    distanciaUsuario,
+    cleanWaNumber,
+    isAdmin,
+    user,
+    token,
+    onOpenQrModal: () => setShowPublicQrModal(true),
+  };
+
+  const customStyle: React.CSSProperties = {
+    // @ts-ignore
+    "--club-primary": branding.color_primario || "#10b981",
+    "--club-secondary": branding.color_secundario || "#047857",
+    "--club-accent": branding.color_acento || "#06b6d4",
+    "--club-bg": branding.color_fondo || "#020617",
+  };
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white pb-20">
-      {/* Admin Quick Access Bar */}
-      {isAdmin && (
-        <div className="bg-emerald-950/80 border-b border-emerald-500/30 px-4 py-2.5 text-xs font-semibold text-emerald-300">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>
-                Estás visualizando la vista pública como dueño / administrador de <strong>{complejo.nombre}</strong>.
-              </span>
-            </div>
-            <Link
-              href="/panel"
-              className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1 text-xs font-bold text-white shadow transition"
-            >
-              ⚙️ Abrir Panel de Control →
-            </Link>
-          </div>
-        </div>
-      )}
+    <main
+      className="min-h-screen bg-slate-950 text-white flex flex-col justify-between"
+      style={customStyle}
+      data-testid="tenant-public-portal"
+    >
+      <div>
+        {/* Dynamic Header */}
+        <ClubHeader
+          subdomain={subdomain}
+          clubNombre={complejo.nombre}
+          deportePrincipal={complejo.deporte_principal}
+          tipoNegocioLabel={tipoNegocioLabel}
+          logoUrl={branding.logo_url}
+          headerLinks={navegacion.header}
+          telefono={complejo.telefono}
+          isAdmin={isAdmin}
+          distanciaUsuario={distanciaUsuario}
+          onOpenQrModal={() => setShowPublicQrModal(true)}
+        />
 
-      {/* Hero Header Section */}
-      <div className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="text-center max-w-3xl mx-auto space-y-4">
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3.5 py-1 text-xs font-bold uppercase tracking-wider">
-                {tipoNegocioLabel} Oficial
-              </span>
-              <span className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1 text-xs font-semibold capitalize">
-                🏆 {complejo.deporte_principal}
-              </span>
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white capitalize">
-              {complejo.nombre}
-            </h1>
-
-            {(complejo.direccion || complejo.ciudad || (complejo.latitud && complejo.longitud)) && (
-              <div className="flex items-center justify-center gap-2.5 text-xs sm:text-sm text-slate-400 flex-wrap">
-                {(complejo.direccion || complejo.ciudad) && (
-                  <span className="flex items-center gap-1">
-                    <span>📍</span>
-                    <span>
-                      {[complejo.direccion, complejo.ciudad].filter(Boolean).join(", ")}
-                    </span>
-                  </span>
-                )}
-
-                {complejo.latitud && complejo.longitud && (
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${complejo.latitud},${complejo.longitud}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid="btn-como-llegar"
-                    className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 text-xs font-semibold transition"
-                    title="Abrir cómo llegar en Google Maps"
-                  >
-                    <span>🗺️</span>
-                    <span>Cómo llegar</span>
-                    <span className="text-[10px]">↗</span>
-                  </a>
-                )}
-
-                {distanciaUsuario && (
-                  <span
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-800/80 text-emerald-400 border border-slate-700 text-xs font-medium"
-                    data-testid="user-distance-badge"
-                  >
-                    <span>🧭</span>
-                    <span>{distanciaUsuario}</span>
-                  </span>
-                )}
-              </div>
-            )}
-
-            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Portal oficial de reservas de turnos en vivo. Selecciona tu cancha, fecha y horario para asegurar tu lugar al instante con confirmación inmediata.
-            </p>
-
-            {complejo.telefono && (
-              <div className="pt-1 flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => setShowPublicQrModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 hover:border-emerald-500/60 transition shadow-sm cursor-pointer group text-xs font-semibold"
-                  title="Escanear código QR para chatear por WhatsApp desde tu celular"
-                  data-testid="header-qr-button"
-                >
-                  <span className="text-sm">📱</span>
-                  <span>¿Estás en la PC? <strong>Escaneá el Código QR de WhatsApp</strong></span>
-                  <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform">→</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Reservation Section */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 space-y-8">
-        {canchas.length === 0 ? (
-          <div className="text-center rounded-3xl bg-slate-900 border border-slate-800 p-12 space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 text-3xl border border-amber-500/20">
-              ⏸️
-            </div>
-            <h3 className="text-lg font-bold text-white">No hay canchas disponibles para reservar</h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Actualmente todas las canchas se encuentran en mantenimiento o no hay canchas activas registradas. Vuelve a consultar más tarde.
-            </p>
-          </div>
+        {/* Dynamic Template Switcher */}
+        {branding.plantilla_slug === "institucional" ? (
+          <InstitucionalTemplate {...templateProps} />
+        ) : branding.plantilla_slug === "modern_showcase" ? (
+          <ModernShowcaseTemplate {...templateProps} />
         ) : (
-          <>
-            {/* Court Selection Tabs / Cards */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-white">1. Selecciona la Cancha</h2>
-                  <p className="text-xs text-slate-400">
-                    Elige entre las {canchas.length} canchas activas de {complejo.nombre}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {canchas.map((c) => {
-                  const isSelected = selectedCancha?.id === c.id;
-
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => setSelectedCanchaId(c.id)}
-                      className={`text-left rounded-2xl p-4 transition border ${
-                        isSelected
-                          ? "bg-slate-900 border-emerald-500 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/10"
-                          : "bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="font-bold text-sm text-white">{c.nombre}</div>
-                          <div className="text-xs text-slate-400 capitalize mt-0.5 font-medium">
-                            {c.deporte} • {c.superficie}
-                          </div>
-                        </div>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                            isSelected
-                              ? "bg-emerald-500 text-slate-950"
-                              : "bg-slate-800 text-slate-400"
-                          }`}
-                        >
-                          {isSelected ? "✓ Seleccionada" : "Elegir"}
-                        </span>
-                      </div>
-
-                      {/* Attribute Chips */}
-                      <div className="flex flex-wrap gap-1 mt-3">
-                        <span className="rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold">
-                          {c.permite_duracion_flexible
-                            ? "⏱️ Flexible (60/90/120m)"
-                            : `⏱️ ${c.duracion_minutos || 60}m ${(c.duracion_minutos || 60) === 90 ? "(1h 30m)" : (c.duracion_minutos || 60) === 120 ? "(2h)" : "(1h)"}`}
-                        </span>
-                        <span className="rounded-md bg-slate-950 border border-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
-                          {c.techada ? "🏠 Techada" : "☀️ Descubierta"}
-                        </span>
-                        {c.iluminacion !== false && (
-                          <span className="rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 text-[10px]">
-                            💡 Luz {c.tipo_iluminacion || "LED"}
-                          </span>
-                        )}
-                        {c.camara_grabacion && (
-                          <span className="rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-1.5 py-0.5 text-[10px]">
-                            📹 Grabación
-                          </span>
-                        )}
-                        {c.marcador_digital && (
-                          <span className="rounded-md bg-sky-500/10 text-sky-300 border border-sky-500/20 px-1.5 py-0.5 text-[10px]">
-                            🔢 Marcador
-                          </span>
-                        )}
-                        {c.climatizada && (
-                          <span className="rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-1.5 py-0.5 text-[10px]">
-                            ❄️ Clima
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                        <span className="text-slate-400">
-                          Tarifa {c.permite_duracion_flexible ? "desde (60m):" : `(${c.duracion_minutos || 60}m):`}
-                        </span>
-                        <span className="font-extrabold text-emerald-400">${c.precio_base}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Turnos Grid (Grilla Horaria) */}
-            {selectedCancha && (
-              <div className="pt-4 border-t border-slate-800">
-                <div className="mb-4">
-                  <h2 className="text-lg font-bold text-white">
-                    2. Elige tu Turno en <span className="text-emerald-400">{selectedCancha.nombre}</span>
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Bloqueo temporal exclusivo de 10 minutos para completar tu reserva sin solapamientos
-                  </p>
-                </div>
-
-                <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 sm:p-6 shadow-xl">
-                  <GrillaHoraria
-                    key={`${selectedCancha.id}-${selectedCancha.duracion_minutos}-${selectedCancha.permite_duracion_flexible}-${user ? user.id : "anon"}`}
-                    canchaId={selectedCancha.id}
-                    canchaNombre={selectedCancha.nombre}
-                    deporte={selectedCancha.deporte}
-                    subdomain={subdomain}
-                    duracionInicial={selectedCancha.duracion_minutos}
-                    permiteDuracionFlexible={selectedCancha.permite_duracion_flexible}
-                    duracionesPermitidas={selectedCancha.duraciones_permitidas}
-                    precioBase={Number(selectedCancha.precio_base)}
-                    precio90Min={selectedCancha.precio_90_min ? Number(selectedCancha.precio_90_min) : undefined}
-                    precio120Min={selectedCancha.precio_120_min ? Number(selectedCancha.precio_120_min) : undefined}
-                    isAdmin={isAdmin}
-                    token={token}
-                    porcentajeSena={complejo?.porcentaje_sena}
-                    tipoCobroReserva={complejo?.tipo_cobro_reserva}
-                  />
-                </div>
-              </div>
-            )}
-          </>
+          <BookingDirectTemplate {...templateProps} />
         )}
       </div>
 
-      {/* Subtle White-Label Footer */}
-      <footer className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 pt-8 border-t border-slate-900 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div>
-          <span>© {new Date().getFullYear()} {complejo.nombre}. Todos los derechos reservados.</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-          <span>Sistema de gestión con</span>
-          <a
-            href="http://localhost:8080"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-emerald-400 hover:text-emerald-300 font-semibold transition inline-flex items-center gap-0.5"
-          >
-            <span>⚡ Turnos SaaS</span>
-            <span>↗</span>
-          </a>
-        </div>
-      </footer>
+      {/* Dynamic Footer */}
+      <ClubFooter
+        subdomain={subdomain}
+        clubNombre={complejo.nombre}
+        deportePrincipal={complejo.deporte_principal}
+        footerLinks={navegacion.footer}
+        redesSociales={branding.redes_sociales}
+        telefono={complejo.telefono}
+        direccion={complejo.direccion}
+        ciudad={complejo.ciudad}
+        latitud={complejo.latitud}
+        longitud={complejo.longitud}
+      />
 
       {/* Floating WhatsApp Contact Button */}
       {complejo.telefono && (
