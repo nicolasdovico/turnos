@@ -2941,5 +2941,15 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Vitest frontend: suites pasando al 100%.
   * Backend: 294 tests pasando al 100%.
 ==============================================================================================================================
-
-
+[2026-09-22] - MEJORA UX: LECTURA COMPLETA DE DESCRIPCIONES EN ATRIBUTOS ADICIONALES DE CANCHAS
+==============================================================================================================================
+- Diagnóstico:
+  * En el modal de creación y edición de canchas, las descripciones técnicas de los atributos adicionales (ej. "Espacio perimetral reglamentario (mínimo 2 metros) para recuperar pelotas fuera de pista") quedaban cortadas con puntos suspensivos debido a la clase Tailwind `line-clamp-1`.
+- Solución Realizada:
+  * En `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+    - Se removió `line-clamp-1` y se aplicó formato con salto de línea natural y tipografía cómoda (`text-[11px] leading-relaxed break-words text-left`).
+    - Se añadió `shrink-0` a los checkboxes para evitar deformaciones cuando la descripción ocupa varias líneas.
+    - Se amplió el alto máximo del contenedor scrolleable de atributos a `max-h-72` para una lectura fluida.
+- Verificación:
+  * Vitest frontend: 100% pasando sin regresiones.
+==============================================================================================================================
