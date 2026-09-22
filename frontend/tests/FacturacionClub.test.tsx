@@ -208,4 +208,88 @@ describe("Facturación Club B2B & Pasarelas de Pago", () => {
       );
     });
   });
+
+  it("automatically opens payment modal when autoOpenPaymentModal prop is true", async () => {
+    const handleClose = vi.fn();
+    render(
+      <FacturacionClubPanel
+        subdomain="testclub"
+        token="mock-token"
+        autoOpenPaymentModal={true}
+        onClosePaymentModal={handleClose}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-metodo-mp")).toBeDefined();
+    });
+
+    expect(screen.getByTestId("btn-metodo-stripe")).toBeDefined();
+    expect(screen.getByTestId("btn-metodo-transferencia")).toBeDefined();
+
+    const closeBtn = screen.getByText("✕");
+    fireEvent.click(closeBtn);
+    expect(handleClose).toHaveBeenCalled();
+  });
+
+  it("re-fetches and updates subscription to Operativo on refreshTrigger update without full page reload", async () => {
+    let mockEstado = "gracia";
+    let mockEnGracia = true;
+
+    (global.fetch as any).mockImplementation(async (url: string) => {
+      if (url.includes("/facturacion/resumen")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              ...mockResumen,
+              suscripcion: {
+                ...mockResumen.suscripcion,
+                estado: mockEstado,
+                en_gracia: mockEnGracia,
+                es_valida: true,
+              },
+            },
+          }),
+        } as any;
+      }
+      if (url.includes("/facturacion/facturas")) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: mockFacturas }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    const { rerender } = render(
+      <FacturacionClubPanel
+        subdomain="testclub"
+        token="mock-token"
+        refreshTrigger={{ estado: "gracia", en_gracia: true }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Gracia 7 Días")).toBeDefined();
+    });
+
+    // Simular que el superadmin aprobó el pago en Filament y el dashboard detectó el cambio
+    mockEstado = "activa";
+    mockEnGracia = false;
+
+    rerender(
+      <FacturacionClubPanel
+        subdomain="testclub"
+        token="mock-token"
+        refreshTrigger={{ estado: "activa", en_gracia: false }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Operativo")).toBeDefined();
+    });
+    expect(screen.queryByText("Gracia 7 Días")).toBeNull();
+  });
 });

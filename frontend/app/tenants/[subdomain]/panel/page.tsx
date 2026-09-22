@@ -348,6 +348,7 @@ export default function ClubAdminPanel() {
       : null);
 
   const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion">("canchas");
+  const [openBillingPaymentModal, setOpenBillingPaymentModal] = useState(false);
   const [suscripcionAlerta, setSuscripcionAlerta] = useState<{
     estado: string;
     en_gracia: boolean;
@@ -2108,7 +2109,10 @@ export default function ClubAdminPanel() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("facturacion")}
+            onClick={() => {
+              setActiveTab("facturacion");
+              setOpenBillingPaymentModal(true);
+            }}
             className={`px-4 py-2 rounded-xl font-black uppercase text-[11px] tracking-wider transition shrink-0 ${
               suscripcionAlerta.estado === "vencida"
                 ? "bg-white text-rose-700 hover:bg-slate-100"
@@ -5782,6 +5786,9 @@ export default function ClubAdminPanel() {
               token={effectiveToken}
               apiUrl={API_BASE}
               onRefreshSummary={() => fetchDashboardData(true)}
+              autoOpenPaymentModal={openBillingPaymentModal}
+              onClosePaymentModal={() => setOpenBillingPaymentModal(false)}
+              refreshTrigger={suscripcionAlerta}
             />
           </div>
         )}

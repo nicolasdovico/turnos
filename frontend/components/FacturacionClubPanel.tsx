@@ -23,7 +23,8 @@ import {
 
 export const formatFechaDDMMAAAA = (fechaStr?: string | null): string => {
   if (!fechaStr) return "";
-  const parts = fechaStr.split("-");
+  const cleanStr = fechaStr.split("T")[0].split(" ")[0];
+  const parts = cleanStr.split("-");
   if (parts.length === 3 && parts[0].length === 4) {
     return `${parts[2].padStart(2, "0")}-${parts[1].padStart(2, "0")}-${parts[0]}`;
   }
@@ -35,6 +36,9 @@ interface FacturacionClubPanelProps {
   token?: string | null;
   apiUrl?: string;
   onRefreshSummary?: () => void;
+  autoOpenPaymentModal?: boolean;
+  onClosePaymentModal?: () => void;
+  refreshTrigger?: any;
 }
 
 interface ResumenFacturacion {
@@ -125,6 +129,9 @@ export default function FacturacionClubPanel({
   token,
   apiUrl,
   onRefreshSummary,
+  autoOpenPaymentModal,
+  onClosePaymentModal,
+  refreshTrigger,
 }: FacturacionClubPanelProps) {
   const effectiveApiUrl =
     (typeof window !== "undefined" && (!apiUrl || apiUrl.startsWith("http://localhost") || apiUrl.startsWith("http://127.0.0.1")))
@@ -163,9 +170,9 @@ export default function FacturacionClubPanel({
     };
   }, [token, subdomain]);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       setError(null);
       const headers = getAuthHeaders();
 
@@ -193,21 +200,74 @@ export default function FacturacionClubPanel({
         setFacturas(facturasJson.data || []);
       }
     } catch (err: any) {
-      setError(err.message || "No se pudo cargar la información de facturación.");
+      if (!isBackground) {
+        setError(err.message || "No se pudo cargar la información de facturación.");
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
-  }, [subdomain, getAuthHeaders]);
+  }, [subdomain, getAuthHeaders, effectiveApiUrl]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  const handleOpenPayment = (factura?: FacturaItem) => {
-    setFacturaSeleccionada(factura || resumen?.factura_actual || null);
+  // Revalidación inteligente por foco de ventana y sondeo periódico en segundo plano
+  useEffect(() => {
+    const POLL_INTERVAL = 15000; // 15 segundos
+    const intervalId = setInterval(() => {
+      fetchData(true);
+    }, POLL_INTERVAL);
+
+    const onWindowFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchData(true);
+      }
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("visibilitychange", onWindowFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("visibilitychange", onWindowFocus);
+    };
+  }, [fetchData]);
+
+  // Revalidar cuando el panel principal notifica cambios de suscripción
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      fetchData(true);
+    }
+  }, [refreshTrigger, fetchData]);
+
+  const handleClosePaymentModal = useCallback(() => {
+    setPaymentModalOpen(false);
+    onClosePaymentModal?.();
+  }, [onClosePaymentModal]);
+
+  const handleOpenPayment = useCallback((factura?: FacturaItem) => {
+    const targetFactura = factura || resumen?.factura_actual || facturas.find((f) => f.estado !== "pagada") || null;
+    setFacturaSeleccionada(targetFactura);
     setActionAlert(null);
     setPaymentModalOpen(true);
-  };
+  }, [resumen, facturas]);
+
+  useEffect(() => {
+    if (autoOpenPaymentModal) {
+      handleOpenPayment();
+    }
+  }, [autoOpenPaymentModal, handleOpenPayment]);
+
+  useEffect(() => {
+    if (paymentModalOpen && !facturaSeleccionada) {
+      const targetFactura = resumen?.factura_actual || facturas.find((f) => f.estado !== "pagada") || null;
+      if (targetFactura) {
+        setFacturaSeleccionada(targetFactura);
+      }
+    }
+  }, [paymentModalOpen, facturaSeleccionada, resumen, facturas]);
 
   const handlePayMercadoPago = async () => {
     try {
@@ -397,7 +457,7 @@ export default function FacturacionClubPanel({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-black text-white capitalize">
-                Suscripción SaaS: {sub?.estado === "trial" ? "Prueba Gratuita" : sub?.estado === "gracia" ? "En Período de Gracia" : sub?.estado}
+                Suscripción SaaS: {sub?.estado === "trial" ? "Prueba Gratuita" : sub?.estado === "gracia" ? "En Período de Gracia" : sub?.estado === "activa" ? "Activa" : sub?.estado}
               </h2>
               <span
                 className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
@@ -417,8 +477,8 @@ export default function FacturacionClubPanel({
                 : sub?.estado === "vencida"
                 ? "El período de gracia ha finalizado. Las funciones operativas están temporalmente suspendidas hasta regularizar el pago."
                 : sub?.estado === "trial"
-                ? `Disfruta del acceso completo. Tu prueba gratuita vence el ${sub?.trial_vence_at?.substring(0, 10) || "próximamente"}.`
-                : `Próximo vencimiento programado: ${sub?.proximo_vencimiento || "Fin de mes"}.`}
+                ? `Disfruta del acceso completo. Tu prueba gratuita vence el ${formatFechaDDMMAAAA(sub?.trial_vence_at) || "próximamente"}.`
+                : `Próximo vencimiento programado: ${sub?.proximo_vencimiento ? formatFechaDDMMAAAA(sub.proximo_vencimiento) : "Fin de mes"}.`}
             </p>
           </div>
         </div>
@@ -708,7 +768,7 @@ export default function FacturacionClubPanel({
                 </p>
               </div>
               <button
-                onClick={() => setPaymentModalOpen(false)}
+                onClick={handleClosePaymentModal}
                 className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-sm transition"
               >
                 ✕
