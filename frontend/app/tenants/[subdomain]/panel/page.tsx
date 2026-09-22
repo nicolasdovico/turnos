@@ -8,6 +8,7 @@ import ResumenDiarioTurnos from "@/components/ResumenDiarioTurnos";
 import GestionBilleteras from "@/components/GestionBilleteras";
 import GestionClientes from "@/components/GestionClientes";
 import FacturacionClubPanel from "@/components/FacturacionClubPanel";
+import BrandingClubPanel from "@/components/BrandingClubPanel";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 
 interface ComplejoData {
@@ -500,7 +501,7 @@ export default function ClubAdminPanel() {
          localStorage.getItem("auth_token"))
       : null);
 
-  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion">("canchas");
+  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion" | "sitio-web">("canchas");
   const [openBillingPaymentModal, setOpenBillingPaymentModal] = useState(false);
   const [suscripcionAlerta, setSuscripcionAlerta] = useState<{
     estado: string;
@@ -2668,6 +2669,18 @@ export default function ClubAdminPanel() {
             }`}
           >
             📋 Datos del Club
+          </button>
+          <button
+            onClick={() => setActiveTab("sitio-web")}
+            className={`pb-4 transition border-b-2 flex items-center gap-1.5 ${
+              activeTab === "sitio-web"
+                ? "border-emerald-500 text-emerald-400 font-bold"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+            data-testid="tab-sitio-web"
+          >
+            <span>🎨</span>
+            <span>Sitio Web & Marca</span>
           </button>
           <button
             onClick={() => setActiveTab("facturacion")}
@@ -6389,6 +6402,19 @@ export default function ClubAdminPanel() {
               autoOpenPaymentModal={openBillingPaymentModal}
               onClosePaymentModal={() => setOpenBillingPaymentModal(false)}
               refreshTrigger={suscripcionAlerta}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 11: SITIO WEB & MARCA (MÓDULO F) */}
+        {/* ========================================================================= */}
+        {activeTab === "sitio-web" && (
+          <div className="mt-8">
+            <BrandingClubPanel
+              subdomain={subdomain}
+              token={effectiveToken}
+              clubNombre={clubNombre || complejo?.nombre}
             />
           </div>
         )}
