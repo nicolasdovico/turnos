@@ -322,4 +322,87 @@ class ClubBrandingTest extends TestCase
         $this->assertNotNull($this->complejoA->logo_url);
         $this->assertStringContainsString('logo_', $this->complejoA->logo_url);
     }
+
+    public function test_club_admin_puede_crear_listar_editar_y_eliminar_paginas(): void
+    {
+        $tokenClubA = $this->ownerClubA->createToken('test-token')->plainTextToken;
+
+        // 1. Crear página
+        $storeRes = $this->withHeader('Authorization', "Bearer {$tokenClubA}")
+            ->postJson('/api/clubs/padel-norte/paginas', [
+                'titulo' => 'Reglamento General',
+                'contenido_html' => '<p>Normativa oficial del club.</p>',
+                'esta_publicada' => true,
+                'mostrar_en_header' => true,
+                'mostrar_en_footer' => true,
+                'orden' => 1,
+                'meta_descripcion' => 'Conoce las reglas de conducta y vestimenta de nuestro complejo.',
+            ]);
+
+        $storeRes->assertStatus(201)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'titulo' => 'Reglamento General',
+                    'slug' => 'reglamento-general',
+                    'mostrar_en_header' => true,
+                    'orden' => 1,
+                ],
+            ]);
+
+        $pageId = $storeRes->json('data.id');
+
+        // 2. Listar páginas del club
+        $listRes = $this->withHeader('Authorization', "Bearer {$tokenClubA}")
+            ->getJson('/api/clubs/padel-norte/paginas');
+
+        $listRes->assertStatus(200)
+            ->assertJsonCount(1, 'data');
+
+        // 3. Editar página
+        $updateRes = $this->withHeader('Authorization', "Bearer {$tokenClubA}")
+            ->putJson("/api/clubs/padel-norte/paginas/{$pageId}", [
+                'titulo' => 'Reglamento Actualizado 2026',
+                'orden' => 5,
+            ]);
+
+        $updateRes->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'titulo' => 'Reglamento Actualizado 2026',
+                    'orden' => 5,
+                ],
+            ]);
+
+        // 4. Eliminar página
+        $deleteRes = $this->withHeader('Authorization', "Bearer {$tokenClubA}")
+            ->deleteJson("/api/clubs/padel-norte/paginas/{$pageId}");
+
+        $deleteRes->assertStatus(200);
+        $this->assertDatabaseMissing('paginas', ['id' => $pageId]);
+    }
+
+    public function test_usuario_de_otro_club_no_puede_modificar_paginas_ajenas_403(): void
+    {
+        $pagina = Pagina::create([
+            'complejo_id' => $this->complejoA->id,
+            'titulo' => 'Página Secreta',
+            'slug' => 'pagina-secreta',
+            'contenido_html' => '<p>Original</p>',
+            'esta_publicada' => true,
+        ]);
+
+        $tokenClubB = $this->ownerClubB->createToken('test-token-b')->plainTextToken;
+
+        $unauthorizedRes = $this->withHeader('Authorization', "Bearer {$tokenClubB}")
+            ->putJson("/api/clubs/padel-norte/paginas/{$pagina->id}", [
+                'titulo' => 'Hackeado',
+            ]);
+        $unauthorizedRes->assertStatus(403);
+
+        $unauthorizedDelete = $this->withHeader('Authorization', "Bearer {$tokenClubB}")
+            ->deleteJson("/api/clubs/padel-norte/paginas/{$pagina->id}");
+        $unauthorizedDelete->assertStatus(403);
+    }
 }

@@ -9,6 +9,7 @@ import GestionBilleteras from "@/components/GestionBilleteras";
 import GestionClientes from "@/components/GestionClientes";
 import FacturacionClubPanel from "@/components/FacturacionClubPanel";
 import BrandingClubPanel from "@/components/BrandingClubPanel";
+import GestionPaginasCMS from "@/components/GestionPaginasCMS";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 
 interface ComplejoData {
@@ -502,6 +503,7 @@ export default function ClubAdminPanel() {
       : null);
 
   const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion" | "sitio-web">("canchas");
+  const [subTabSitioWeb, setSubTabSitioWeb] = useState<"branding" | "paginas">("branding");
   const [openBillingPaymentModal, setOpenBillingPaymentModal] = useState(false);
   const [suscripcionAlerta, setSuscripcionAlerta] = useState<{
     estado: string;
@@ -6410,12 +6412,48 @@ export default function ClubAdminPanel() {
         {/* TAB 11: SITIO WEB & MARCA (MÓDULO F) */}
         {/* ========================================================================= */}
         {activeTab === "sitio-web" && (
-          <div className="mt-8">
-            <BrandingClubPanel
-              subdomain={subdomain}
-              token={effectiveToken}
-              clubNombre={clubNombre || complejo?.nombre}
-            />
+          <div className="mt-8 space-y-6">
+            {/* Sub-navegación entre Branding/Plantillas y Páginas Institucionales */}
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <button
+                type="button"
+                onClick={() => setSubTabSitioWeb("branding")}
+                data-testid="subtab-sitio-web-branding"
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  subTabSitioWeb === "branding"
+                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/40"
+                    : "bg-slate-800/80 hover:bg-slate-700 text-slate-300"
+                }`}
+              >
+                <span>🎨 Identidad & Plantilla</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSubTabSitioWeb("paginas")}
+                data-testid="subtab-sitio-web-paginas"
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  subTabSitioWeb === "paginas"
+                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/40"
+                    : "bg-slate-800/80 hover:bg-slate-700 text-slate-300"
+                }`}
+              >
+                <span>📄 Páginas Institucionales (CMS)</span>
+              </button>
+            </div>
+
+            {subTabSitioWeb === "branding" ? (
+              <BrandingClubPanel
+                subdomain={subdomain}
+                token={effectiveToken}
+                clubNombre={clubNombre || complejo?.nombre}
+              />
+            ) : (
+              <GestionPaginasCMS
+                subdomain={subdomain}
+                token={effectiveToken}
+                clubNombre={clubNombre || complejo?.nombre}
+              />
+            )}
           </div>
         )}
       </div>

@@ -169,6 +169,12 @@ Route::prefix('clubs')->group(function () {
     Route::get('/{subdomain}/branding/templates', [\App\Http\Controllers\Api\ClubBrandingController::class, 'templates']);
     Route::put('/{subdomain}/branding', [\App\Http\Controllers\Api\ClubBrandingController::class, 'update']);
     Route::post('/{subdomain}/branding/upload', [\App\Http\Controllers\Api\ClubBrandingController::class, 'upload']);
+
+    // Páginas Institucionales CMS del Club (Módulo F)
+    Route::get('/{subdomain}/paginas', [\App\Http\Controllers\Api\PaginaController::class, 'indexByClub']);
+    Route::post('/{subdomain}/paginas', [\App\Http\Controllers\Api\PaginaController::class, 'storeByClub']);
+    Route::put('/{subdomain}/paginas/{id}', [\App\Http\Controllers\Api\PaginaController::class, 'updateByClub']);
+    Route::delete('/{subdomain}/paginas/{id}', [\App\Http\Controllers\Api\PaginaController::class, 'destroyByClub']);
 });
 
 // Vales Digitales de Lluvia (Acceso público y autogestión de jugadores)

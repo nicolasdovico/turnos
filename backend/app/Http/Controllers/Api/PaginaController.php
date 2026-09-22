@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Complejo;
 use App\Models\Pagina;
 use App\Services\RevalidationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Validation\Rule;
 
 class PaginaController extends Controller
@@ -14,6 +16,228 @@ class PaginaController extends Controller
     public function __construct(
         protected RevalidationService $revalidationService
     ) {}
+
+    /**
+     * Helper para verificar si el usuario autenticado tiene permisos de administración sobre el club.
+     */
+    protected function getComplejoForAdmin(Request $request, string $subdomain): ?Complejo
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return null;
+        }
+
+        $user = $request->user('sanctum');
+        if (!$user) {
+            return null;
+        }
+
+        $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
+        $isAdmin = ($user->role ?? '') === 'admin';
+
+        if (!$isOwner && !$isAdmin) {
+            return null;
+        }
+
+        return $complejo;
+    }
+
+    /**
+     * GET /api/clubs/{subdomain}/paginas
+     * Lista todas las páginas institucionales del club para el panel administrativo.
+     */
+    public function indexByClub(Request $request, string $subdomain): JsonResponse
+    {
+        $complejo = $this->getComplejoForAdmin($request, $subdomain);
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado.',
+            ], 403);
+        }
+
+        $paginas = Pagina::withoutGlobalScopes()
+            ->where('complejo_id', $complejo->id)
+            ->orderBy('orden', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $paginas,
+        ]);
+    }
+
+    /**
+     * POST /api/clubs/{subdomain}/paginas
+     * Crear una nueva página institucional para el club.
+     */
+    public function storeByClub(Request $request, string $subdomain): JsonResponse
+    {
+        $complejo = $this->getComplejoForAdmin($request, $subdomain);
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos para crear páginas en este club.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'titulo' => ['required', 'string', 'max:255'],
+            'slug' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('paginas', 'slug')->where(fn ($query) => $query->where('complejo_id', $complejo->id)),
+            ],
+            'contenido_html' => ['required', 'string'],
+            'esta_publicada' => ['nullable', 'boolean'],
+            'orden' => ['nullable', 'integer', 'min:0'],
+            'mostrar_en_header' => ['nullable', 'boolean'],
+            'mostrar_en_footer' => ['nullable', 'boolean'],
+            'meta_descripcion' => ['nullable', 'string', 'max:160'],
+        ]);
+
+        $pagina = Pagina::create([
+            'complejo_id' => $complejo->id,
+            'titulo' => $validated['titulo'],
+            'slug' => $validated['slug'] ?? null,
+            'contenido_html' => $validated['contenido_html'],
+            'esta_publicada' => $validated['esta_publicada'] ?? true,
+            'orden' => $validated['orden'] ?? 0,
+            'mostrar_en_header' => $validated['mostrar_en_header'] ?? false,
+            'mostrar_en_footer' => $validated['mostrar_en_footer'] ?? false,
+            'meta_descripcion' => $validated['meta_descripcion'] ?? null,
+        ]);
+
+        $cleanSubdomain = strtolower(trim($subdomain));
+        try {
+            Redis::del("tenant:branding:{$cleanSubdomain}");
+        } catch (\Throwable $e) {}
+
+        $this->revalidationService->revalidateTenantPath($cleanSubdomain, "/tenants/{$cleanSubdomain}/paginas/{$pagina->slug}");
+        $this->revalidationService->revalidateTenantPath($cleanSubdomain, '/');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Página creada exitosamente.',
+            'data' => $pagina,
+        ], 201);
+    }
+
+    /**
+     * PUT /api/clubs/{subdomain}/paginas/{id}
+     * Actualizar una página institucional existente del club.
+     */
+    public function updateByClub(Request $request, string $subdomain, int $id): JsonResponse
+    {
+        $complejo = $this->getComplejoForAdmin($request, $subdomain);
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos para modificar páginas en este club.',
+            ], 403);
+        }
+
+        $pagina = Pagina::withoutGlobalScopes()
+            ->where('id', $id)
+            ->where('complejo_id', $complejo->id)
+            ->first();
+
+        if (!$pagina) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Página no encontrada en este club.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'titulo' => ['sometimes', 'required', 'string', 'max:255'],
+            'slug' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('paginas', 'slug')
+                    ->where(fn ($query) => $query->where('complejo_id', $complejo->id))
+                    ->ignore($pagina->id),
+            ],
+            'contenido_html' => ['sometimes', 'required', 'string'],
+            'esta_publicada' => ['sometimes', 'boolean'],
+            'orden' => ['sometimes', 'integer', 'min:0'],
+            'mostrar_en_header' => ['sometimes', 'boolean'],
+            'mostrar_en_footer' => ['sometimes', 'boolean'],
+            'meta_descripcion' => ['sometimes', 'nullable', 'string', 'max:160'],
+        ]);
+
+        $pagina->update($validated);
+
+        $cleanSubdomain = strtolower(trim($subdomain));
+        try {
+            Redis::del("tenant:branding:{$cleanSubdomain}");
+        } catch (\Throwable $e) {}
+
+        $this->revalidationService->revalidateTenantPath($cleanSubdomain, "/tenants/{$cleanSubdomain}/paginas/{$pagina->slug}");
+        $this->revalidationService->revalidateTenantPath($cleanSubdomain, '/');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Página actualizada exitosamente.',
+            'data' => $pagina,
+        ]);
+    }
+
+    /**
+     * DELETE /api/clubs/{subdomain}/paginas/{id}
+     * Eliminar una página institucional del club.
+     */
+    public function destroyByClub(Request $request, string $subdomain, int $id): JsonResponse
+    {
+        $complejo = $this->getComplejoForAdmin($request, $subdomain);
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes permisos para eliminar páginas en este club.',
+            ], 403);
+        }
+
+        $pagina = Pagina::withoutGlobalScopes()
+            ->where('id', $id)
+            ->where('complejo_id', $complejo->id)
+            ->first();
+
+        if (!$pagina) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Página no encontrada en este club.',
+            ], 404);
+        }
+
+        $slug = $pagina->slug;
+        $pagina->delete();
+
+        $cleanSubdomain = strtolower(trim($subdomain));
+        try {
+            Redis::del("tenant:branding:{$cleanSubdomain}");
+        } catch (\Throwable $e) {}
+
+        $this->revalidationService->revalidateTenantPath($cleanSubdomain, "/tenants/{$cleanSubdomain}/paginas/{$slug}");
+        $this->revalidationService->revalidateTenantPath($cleanSubdomain, '/');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Página eliminada exitosamente.',
+        ]);
+    }
 
     /**
      * List all CMS pages for current tenant.
