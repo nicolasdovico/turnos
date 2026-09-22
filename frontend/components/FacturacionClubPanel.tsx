@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   CreditCard,
   DollarSign,
@@ -149,6 +149,16 @@ export default function FacturacionClubPanel({
   const [activePaymentMethod, setActivePaymentMethod] = useState<"mercadopago" | "stripe" | "transferencia">("mercadopago");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [actionAlert, setActionAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [panelNotification, setPanelNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   // Formulario Transferencia
   const [comprobanteUrl, setComprobanteUrl] = useState("");
@@ -243,6 +253,10 @@ export default function FacturacionClubPanel({
   }, [refreshTrigger, fetchData]);
 
   const handleClosePaymentModal = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
     setPaymentModalOpen(false);
     onClosePaymentModal?.();
   }, [onClosePaymentModal]);
@@ -364,14 +378,27 @@ export default function FacturacionClubPanel({
         throw new Error(data.message || "Error al informar comprobante.");
       }
 
+      const successMsg =
+        data.message ||
+        "¡Comprobante verificado y pago acreditado exitosamente! Tu abono ha sido renovado y las restricciones han sido levantadas.";
+
       setActionAlert({
         type: "success",
-        message: "¡Comprobante enviado con éxito! El equipo de administración revisará la acreditación bancaria.",
+        message: successMsg,
+      });
+      setPanelNotification({
+        type: "success",
+        message: successMsg,
       });
       setComprobanteUrl("");
       setComprobanteNotas("");
-      fetchData();
+      fetchData(true);
       if (onRefreshSummary) onRefreshSummary();
+
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = setTimeout(() => {
+        handleClosePaymentModal();
+      }, 1000);
     } catch (err: any) {
       setActionAlert({ type: "error", message: err.message || "Error al enviar comprobante." });
     } finally {
@@ -428,6 +455,34 @@ export default function FacturacionClubPanel({
 
   return (
     <div className="space-y-8" data-testid="seccion-facturacion-abono">
+      {/* Alerta de notificación del panel */}
+      {panelNotification && (
+        <div
+          className={`rounded-2xl p-4 text-xs font-semibold flex items-center justify-between gap-3 shadow-lg ${
+            panelNotification.type === "success"
+              ? "bg-emerald-950/80 border border-emerald-500/50 text-emerald-200"
+              : "bg-rose-950/80 border border-rose-500/50 text-rose-200"
+          }`}
+          data-testid="panel-notification-alert"
+        >
+          <div className="flex items-center gap-2.5">
+            {panelNotification.type === "success" ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+            )}
+            <span>{panelNotification.message}</span>
+          </div>
+          <button
+            onClick={() => setPanelNotification(null)}
+            className="text-slate-400 hover:text-white p-1 transition"
+            title="Cerrar notificación"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Barra de Estado de Suscripción */}
       <div
         className={`rounded-3xl border p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${

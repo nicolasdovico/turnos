@@ -82,6 +82,7 @@
 - [x] **Visibilidad de Contraseña (Toggle Ojo) en Checkout Online:** Botón interactivo de mostrar/ocultar contraseña con iconos Eye y EyeOff en `GrillaHoraria.tsx` tanto en la pestaña de registro rápido ("✨ Crear Cuenta Rápida") como en la de inicio de sesión ("🔑 Ya tengo Cuenta"), con padding adecuado (`pr-10`) para evitar solapamientos y reseteo preventivo al cerrar modal o cambiar de pestaña *(Completado)*
 - [x] **Creación de Canchas Adicionales con Confirmación Interactiva de Cupo & Alerta de Abono:** Detección en backend (`ClubDashboardController::storeCancha`) del exceso de canchas base del plan devolviendo HTTP 422 con código `REQUIRES_EXTRA_COURT_CONFIRMATION`, payload estructurado y cálculo de nuevo costo mensual (`calcularCostoTotal`); corrección en frontend (`panel/page.tsx`) de la lectura del payload de confirmación, desplegando inmediatamente el banner interactivo `"⚠️ Cupo Base de Canchas Alcanzado"` con desglose de canchas incluidas, registradas, costo adicional por mes y nuevo total estimado; botón `"Confirmar y Agregar Cancha Extra"` que envía `acepta_cargo_adicional: true` con autenticación segura y notificación toast informativa al dar de alta la cancha *(Completado)*
 - [x] **Suspensión Automática de Reservas por Abono Vencido & Levantamiento Reactivo por Pago:** Detección de suspensión (`suscripcionValida === false` cuando `suscripcion_estado === 'vencida'`) con rechazo HTTP 403 `SUBSCRIPTION_SUSPENDED` en bloqueo temporal (`TurnoBloqueoController`) y confirmación de turnos (`TurnoConfirmarController`); bloqueo de alta de canchas y turnos fijos en `ClubDashboardController`; exclusión automática de clubes con abono vencido del buscador espacial en `GeolocationService`; banner interactivo de suspensión en `GrillaHoraria.tsx`; y levantamiento automático e inmediato de todos los bloqueos al registrarse el pago de la suscripción (Mercado Pago, Stripe, o Aprobación de Transferencia en Filament) restaurando el estado a 'activa' *(Completado)*
+- [x] **Acreditación Inmediata de Pago por Transferencia Bancaria y Cierre Automático del Modal de Pago:** Corrección en `ClubFacturacionController::subirComprobanteTransferencia` para ejecutar de inmediato `procesarPagoAprobado($factura, 'transferencia')` al registrar el comprobante de transferencia bancaria, transicionando la factura a `pagada`, reactivando el club (`suscripcion_estado = 'activa'`), extendiendo 30 días la vigencia y levantando todas las restricciones operativas; corrección en `FacturacionClubPanel.tsx` cerrando automáticamente el modal tras 1000ms con feedback de éxito, refrescando silenciosamente la facturación y notificando al panel principal (`onRefreshSummary()`) *(Completado)*
 
 ---
 
@@ -238,3 +239,20 @@
    - Comprobar que la pantalla carga fluidamente el resumen de facturación sin arrojar `Error de Facturación - Failed to fetch`.
    - Verificar en la consola de red (Network) del navegador que las solicitudes se dirigen a `/api/clubs/club-padel-bronce/facturacion/resumen` y `/api/clubs/club-padel-bronce/facturacion/facturas` sobre el mismo origen `club-padel-bronce.localhost:8080`, sin advertencias de CORS ni Private Network Access.
    - Comprobar que los botones de pago (Mercado Pago, Stripe, Transferencia Bancaria) interactúan correctamente enviando las solicitudes a `/api/...`.
+
+### Caso de Prueba: Regularización de Abono Vencido mediante Transferencia Bancaria
+1. **Acceso al Panel del Club con Abono Vencido:**
+   - Iniciar sesión como administrador en `http://club-padel-bronce.localhost:8080/panel`.
+   - Observar el banner superior de alerta roja: `"Abono Vencido: Tu período de gracia ha finalizado y las funciones operativas del club han sido suspendidas por falta de pago."`.
+2. **Abrir Modal de Pago SaaS:**
+   - Hacer clic en el botón del banner **Regularizar Pago Ahora →** o en la pestaña **💳 Facturación & Abono** presionar **Pagar Abono**.
+   - Seleccionar la pestaña **Transferencia (CBU / Alias)**.
+3. **Informar Comprobante de Transferencia:**
+   - En el campo de URL o Comprobante, ingresar un enlace o código de transacción (ej. `"https://comprobantes.banco.com/recibo-12345.pdf"` o `"TRANSF-987654"`).
+   - Presionar **Informar Transferencia Realizada**.
+4. **Verificación de Cierre y Desbloqueo Automático:**
+   - Comprobar que el botón muestra el spinner de procesamiento y a continuación se despliega el mensaje de éxito en verde dentro del modal:
+     * `"Comprobante verificado y pago acreditado exitosamente. Tu abono ha sido renovado y las restricciones han sido levantadas."`
+   - Comprobar que tras 1 segundo el modal de pago se cierra automáticamente (`handleClosePaymentModal`).
+   - Verificar que en el panel principal se muestra el banner verde de confirmación y el estado de la suscripción cambia de inmediato a **Activa / Operativo**.
+   - Verificar que el banner rojo persistente superior desaparece y el club ya puede volver a tomar turnos y operar normalmente.

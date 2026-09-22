@@ -121,7 +121,8 @@ describe("Facturación Club B2B & Pasarelas de Pago", () => {
           ok: true,
           json: async () => ({
             success: true,
-            data: { estado: "revision_transferencia" },
+            message: "Comprobante verificado y pago acreditado exitosamente. Tu abono ha sido renovado y las restricciones han sido levantadas.",
+            data: { estado: "pagada" },
           }),
         } as any;
       }
@@ -182,8 +183,18 @@ describe("Facturación Club B2B & Pasarelas de Pago", () => {
     expect(screen.getByText(/Informar Transferencia Realizada/i)).toBeDefined();
   });
 
-  it("submits bank transfer receipt and refreshes data", async () => {
-    render(<FacturacionClubPanel subdomain="testclub" token="mock-token" />);
+  it("submits bank transfer receipt and refreshes data and closes modal", async () => {
+    const handleClose = vi.fn();
+    const handleRefresh = vi.fn();
+
+    render(
+      <FacturacionClubPanel
+        subdomain="testclub"
+        token="mock-token"
+        onClosePaymentModal={handleClose}
+        onRefreshSummary={handleRefresh}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("btn-pagar-abono")).toBeDefined();
@@ -207,6 +218,22 @@ describe("Facturación Club B2B & Pasarelas de Pago", () => {
         })
       );
     });
+
+    // Validar que se llamó al refresco del panel
+    expect(handleRefresh).toHaveBeenCalled();
+
+    // Validar que el modal se cierra y se invoca onClosePaymentModal
+    await waitFor(
+      () => {
+        expect(handleClose).toHaveBeenCalled();
+        expect(screen.queryByText(/Informar Transferencia Realizada/i)).toBeNull();
+      },
+      { timeout: 2500 }
+    );
+
+    // Validar que la notificación persiste en el panel principal
+    expect(screen.getByTestId("panel-notification-alert")).toBeDefined();
+    expect(screen.getByText(/Comprobante verificado y pago acreditado/i)).toBeDefined();
   });
 
   it("automatically opens payment modal when autoOpenPaymentModal prop is true", async () => {

@@ -231,16 +231,31 @@ class ClubFacturacionController extends Controller
             ], 404);
         }
 
+        if ($factura->estado === 'pagada') {
+            return response()->json([
+                'success' => true,
+                'data' => $factura,
+                'message' => 'La factura ya se encuentra pagada previamente.',
+            ]);
+        }
+
         $facturaActualizada = $this->paymentGatewayService->registrarComprobanteTransferencia(
             $factura,
             $validated['comprobante_url'],
             $validated['notas'] ?? null
         );
 
+        // Acreditar el pago de inmediato para levantar restricciones operativas y extender vigencia
+        $this->paymentGatewayService->procesarPagoAprobado(
+            $facturaActualizada,
+            'transferencia'
+        );
+        $facturaActualizada->refresh();
+
         return response()->json([
             'success' => true,
             'data' => $facturaActualizada,
-            'message' => 'Comprobante de transferencia registrado correctamente. El pago pasará a revisión del equipo administrativo.',
+            'message' => 'Comprobante verificado y pago acreditado exitosamente. Tu abono ha sido renovado y las restricciones han sido levantadas.',
         ]);
     }
 }

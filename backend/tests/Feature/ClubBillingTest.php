@@ -281,9 +281,15 @@ class ClubBillingTest extends TestCase
         $this->assertTrue($complejoActualizado->suscripcion_proximo_vencimiento->isFuture());
     }
 
-    public function test_bank_transfer_receipt_submission_sets_status_en_revision(): void
+    public function test_bank_transfer_receipt_submission_consumates_payment_and_activates_subscription(): void
     {
         [$admin, $complejo, $plan, $canchas] = $this->crearComplejoConPlan('bronce', 5.0);
+
+        // Simular que el abono estaba vencido
+        $complejo->update([
+            'suscripcion_estado' => 'vencida',
+            'suscripcion_proximo_vencimiento' => Carbon::yesterday(),
+        ]);
 
         $response = $this->actingAs($admin)->postJson("/api/clubs/{$complejo->subdominio}/facturacion/comprobante-transferencia", [
             'comprobante_url' => 'https://storage.googleapis.com/receipts/transf_12345.pdf',
@@ -294,11 +300,15 @@ class ClubBillingTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'estado' => 'revision_transferencia',
+                    'estado' => 'pagada',
                     'metodo_pago' => 'transferencia',
                     'comprobante_transferencia_url' => 'https://storage.googleapis.com/receipts/transf_12345.pdf',
                 ],
             ]);
+
+        $complejoActualizado = $complejo->fresh();
+        $this->assertEquals('activa', $complejoActualizado->suscripcion_estado);
+        $this->assertTrue($complejoActualizado->suscripcion_proximo_vencimiento->isFuture());
     }
 
     public function test_grace_period_evaluation_transitions_to_gracia_and_vencida(): void

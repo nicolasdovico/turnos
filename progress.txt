@@ -2830,3 +2830,22 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: Nuevo test en tests/GrillaHoraria.test.tsx validando el renderizado de la tarjeta de suspensión para clientes públicos (129 tests pasados al 100% en 13 suites de Vitest).
   * Total Ecosistema: 439 tests automatizados exitosos (0 fallas, 0 regresiones).
 ==============================================================================================================================
+[2026-09-22] - ACREDITACIÓN INMEDIATA DE PAGO POR TRANSFERENCIA Y CIERRE AUTOMÁTICO DE MODAL DE PAGO
+==============================================================================================================================
+- Diagnóstico:
+  * Al hacer clic en "Informar transferencia realizada" en el modal de Abonar Servicio SaaS (/panel), la solicitud se registraba en el backend pero únicamente seteaba estado = 'revision_transferencia' sin ejecutar procesarPagoAprobado(), por lo que la suscripción permanecía 'vencida', las restricciones operativas no se levantaban y el pago no se consumaba.
+  * En el frontend (FacturacionClubPanel.tsx), la función handleSubmitTransferReceipt mostraba una notificación pero nunca invocaba handleClosePaymentModal(), dejando el modal colgado indefinidamente.
+- Solución e Implementación Realizada:
+  * 1. Backend (ClubFacturacionController.php):
+    - En subirComprobanteTransferencia(), tras invocar registrarComprobanteTransferencia(), se ejecuta de forma inmediata e integrada $this->paymentGatewayService->procesarPagoAprobado($facturaActualizada, 'transferencia').
+    - Esto actualiza la factura a estado = 'pagada', registra pagado_at = now(), extiende suscripcion_proximo_vencimiento 30 días, restaura suscripcion_estado = 'activa' y purga el período de gracia en la base de datos de manera transaccional.
+    - Se incorporó guarda defensiva: si la factura ya se encontraba pagada, retorna respuesta exitosa temprana.
+  * 2. Frontend (FacturacionClubPanel.tsx):
+    - En handleSubmitTransferReceipt(), se añadió cierre automático del modal tras 1000ms (dando feedback visual de éxito dentro del modal con checkmark verde) mediante closeTimerRef y handleClosePaymentModal().
+    - Se implementó panelNotification para preservar el mensaje verde de éxito visible en la cabecera del panel principal una vez cerrado el modal.
+    - Se invoca fetchData(true) y onRefreshSummary() para actualizar inmediatamente la suscripción en el panel del club y ocultar el banner rojo persistente de abono vencido.
+- Tests & Verificación de Calidad:
+  * Backend: Test test_bank_transfer_receipt_submission_consumates_payment_and_activates_subscription en ClubBillingTest.php verificando que el envío del comprobante actualiza la factura a 'pagada' y la suscripción a 'activa' (290 tests de backend pasados al 100%, 1.676 aserciones).
+  * Frontend: Test it("submits bank transfer receipt and refreshes data and closes modal") en tests/FacturacionClub.test.tsx verificando envío de POST, llamada a onRefreshSummary, cierre del modal e inserción de panel-notification-alert (129 tests de frontend pasados al 100% en Vitest).
+  * BD en Vivo: Se regularizó y reactivó exitosamente Factura #4 de Complejo 125 ("Club Padel Bronce"), dejando suscripcion_estado = 'activa' y vencimiento extendido al 2026-10-22.
+==============================================================================================================================
