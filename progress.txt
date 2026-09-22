@@ -2953,3 +2953,17 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación:
   * Vitest frontend: 100% pasando sin regresiones.
 ==============================================================================================================================
+[2026-09-22] - CORRECCIÓN: WORKFLOW CI DE GITHUB ACTIONS - FRONTEND TESTS & BUILD (NEXT.JS & VITEST)
+==============================================================================================================================
+- Diagnóstico:
+  * En GitHub Actions, el job `Frontend Tests (Next.js & Vitest)` fallaba durante el paso `Build Next.js Application` (`npm run build` / `next build`).
+  * Causas identificadas:
+    1. En `frontend/app/tenants/[subdomain]/panel/page.tsx`: se exportaban `getSportEmoji` y `getEquipamientoEmoji` (`export const`). Next.js App Router tipa estrictamente los archivos `page.tsx` y prohíbe exports con nombres personalizados que no pertenezcan al estándar de Next.js (como `default`, `metadata`, etc.), lanzando error TS2344 (`OmitWithTag ... does not satisfy constraint '{ [x: string]: never; }'`).
+    2. En `frontend/components/FacturacionClubPanel.tsx`: `fetchData` fue tipado como `(isBackground: boolean = false) => Promise<void>`. Al asignarse directamente en botones `onClick={fetchData}` en líneas 425 y 731, React pasaba el evento del mouse (`MouseEvent`), produciendo el error TS2322 (`MouseEvent is not assignable to boolean | undefined`).
+- Solución Realizada:
+  * En `page.tsx`: se removió el modificador `export` de las funciones helper `getSportEmoji` y `getEquipamientoEmoji`, manteniéndolas como constantes internas al archivo.
+  * En `FacturacionClubPanel.tsx`: se envolvieron los callbacks de `onClick` en funciones anónimas `() => { fetchData(); }` en ambos botones.
+- Verificación:
+  * TypeScript compiler: `npx tsc --noEmit` ejecuta con código 0 (cero errores de tipos en todo el frontend).
+  * Vitest frontend: 132 tests pasando al 100% en 14 suites.
+==============================================================================================================================
