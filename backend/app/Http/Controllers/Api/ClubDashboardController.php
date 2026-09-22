@@ -184,6 +184,14 @@ class ClubDashboardController extends Controller
             ], 404);
         }
 
+        if (!$complejo->suscripcionValida()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'SUBSCRIPTION_SUSPENDED',
+                'message' => 'No es posible agregar nuevas canchas porque el abono del club se encuentra vencido. Por favor regulariza tu suscripción en la solapa de Facturación.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'deporte' => 'nullable|string|max:50',
@@ -1239,6 +1247,14 @@ class ClubDashboardController extends Controller
         $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
         if (!$complejo) {
             return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        if (!$complejo->suscripcionValida()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'SUBSCRIPTION_SUSPENDED',
+                'message' => 'No es posible registrar turnos fijos porque el abono del club se encuentra vencido. Por favor regulariza tu suscripción en la solapa de Facturación.',
+            ], 403);
         }
 
         $user = $request->user('sanctum');

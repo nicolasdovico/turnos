@@ -28,12 +28,19 @@ class TurnoBloqueoController extends Controller
             'duracion_minutos' => ['nullable', 'integer'],
         ]);
 
-        $cancha = Cancha::find($validated['cancha_id']);
+        $cancha = Cancha::with('complejo')->find($validated['cancha_id']);
         if (!$cancha) {
             return response()->json([
                 'error' => 'CANCHA_NOT_FOUND',
                 'message' => 'La cancha especificada no fue encontrada en este complejo.',
             ], 404);
+        }
+
+        if ($cancha->complejo && !$cancha->complejo->suscripcionValida()) {
+            return response()->json([
+                'error' => 'SUBSCRIPTION_SUSPENDED',
+                'message' => 'Las reservas online de este club se encuentran temporalmente suspendidas por falta de pago.',
+            ], 403);
         }
 
         $timezone = $cancha->complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');

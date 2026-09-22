@@ -98,6 +98,15 @@ class TurnoConfirmarController extends Controller
         if ($user) {
             $esAdminClub = (($user->role ?? '') === 'admin') || (!empty($user->is_admin)) || ($complejo && $complejo->user_id === $user->id) || ($user->email ?? '') === 'admin@admin.com';
         }
+
+        if ($complejo && !$complejo->suscripcionValida()) {
+            return response()->json([
+                'error' => 'SUBSCRIPTION_SUSPENDED',
+                'message' => $esAdminClub
+                    ? 'Las operaciones del club se encuentran suspendidas por abono vencido. Regulariza tu suscripción en la pestaña Facturación para reactivarlas.'
+                    : 'Las reservas online para este club se encuentran temporalmente suspendidas por la administración.',
+            ], 403);
+        }
         $cleanEmail = !empty($validated['cliente_email']) ? Str::lower(trim($validated['cliente_email'])) : null;
         $clienteEmail = $cleanEmail ?: (!$esAdminClub && $user ? $user->email : null);
 

@@ -241,6 +241,7 @@ export default function GrillaHoraria({
   const [antiBachesInfo, setAntiBachesInfo] = useState<AntiBachesInfo | null>(null);
   const [slots, setSlots] = useState<Slot[]>(initialSlots || []);
   const [isComplejoCerrado, setIsComplejoCerrado] = useState<boolean>(false);
+  const [isSuscripcionSuspendida, setIsSuscripcionSuspendida] = useState<boolean>(false);
   const [turnosOcupados, setTurnosOcupados] = useState<TurnoOcupado[]>([]);
   const [turnosRetenidos, setTurnosRetenidos] = useState<RetainedLock[]>([]);
   const [turnoToCancel, setTurnoToCancel] = useState<TurnoOcupado | null>(null);
@@ -940,6 +941,7 @@ export default function GrillaHoraria({
 
       const data = await res.json();
       setIsComplejoCerrado(Boolean(data.complejo_cerrado || data.data?.complejo_cerrado));
+      setIsSuscripcionSuspendida(Boolean(data.suscripcion_suspendida || data.data?.suscripcion_suspendida));
       if (data.permite_duracion_flexible !== undefined) {
         setIsFlexible(Boolean(data.permite_duracion_flexible));
       }
@@ -1990,6 +1992,10 @@ export default function GrillaHoraria({
 
   // Request atomic slot lock in Redis
   const handleSelectSlot = async (slot: Slot) => {
+    if (isSuscripcionSuspendida) {
+      addToast("error", "Las reservas online para este club se encuentran temporalmente suspendidas.");
+      return;
+    }
     if (!slot.disponible) return;
     if (isSlotInPast(slot.hora_inicio, fecha)) {
       addToast("warning", "Este horario ya ha pasado y no puede asignarse.");
@@ -2024,7 +2030,9 @@ export default function GrillaHoraria({
       if (res.status === 409 || !res.ok) {
         const errorMsg =
           data.message ||
-          (data.error === "TURNO_ALREADY_LOCKED"
+          (data.error === "SUBSCRIPTION_SUSPENDED"
+            ? "Las reservas online para este club se encuentran temporalmente suspendidas."
+            : data.error === "TURNO_ALREADY_LOCKED"
             ? "El turno ya se encuentra bloqueado por otro usuario."
             : "El turno ya no está disponible.");
         addToast("error", errorMsg);
@@ -2909,6 +2917,14 @@ export default function GrillaHoraria({
                   <Clock className="w-10 h-10 text-amber-400 mx-auto mb-2" />
                   <p className="text-amber-300 font-bold">Complejo cerrado este día</p>
                   <p className="text-slate-400 text-sm mt-1">El club no cuenta con horarios de atención habilitados para la fecha seleccionada.</p>
+                </div>
+              ) : isSuscripcionSuspendida && !isAdmin ? (
+                <div data-testid="suspension-notice" className="text-center py-12 bg-rose-500/10 rounded-2xl border border-rose-500/20 px-6">
+                  <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto mb-2" />
+                  <p className="text-rose-300 font-bold text-base">Reservas Online Temporalmente Suspendidas</p>
+                  <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto">
+                    Este club tiene las reservas online temporalmente suspendidas por la administración. Comunícate directamente con el club para consultas o turnos presenciales.
+                  </p>
                 </div>
               ) : displaySlots.length === 0 ? (
                 <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-800">

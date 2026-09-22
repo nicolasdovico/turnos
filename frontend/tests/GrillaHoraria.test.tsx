@@ -72,7 +72,35 @@ describe("Componente Reactivo GrillaHoraria", () => {
     expect(screen.getByText(/El club no cuenta con horarios de atención habilitados/i)).toBeDefined();
   });
 
+  it("renderiza mensaje de suspensión cuando el abono del club está vencido para clientes públicos", async () => {
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            complejo_cerrado: false,
+            suscripcion_suspendida: true,
+            slots_disponibles: mockSlots,
+            turnos_ocupados: [],
+          }),
+      })
+    );
 
+    render(
+      <GrillaHoraria
+        canchaId={1}
+        canchaNombre="Cancha Principal"
+        deporte="padel"
+        fechaInicial="2026-09-02"
+        isAdmin={false}
+      />
+    );
+
+    expect(await screen.findByTestId("suspension-notice")).toBeDefined();
+    expect(screen.getByText("Reservas Online Temporalmente Suspendidas")).toBeDefined();
+    expect(screen.getByText(/Este club tiene las reservas online temporalmente suspendidas/i)).toBeDefined();
+  });
 
   it("simula selección y bloqueo exitoso de turno con inicio del contador de 10 minutos", async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {

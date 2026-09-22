@@ -47,9 +47,13 @@ class GeolocationService
         float $radioKm = 20.0,
         ?string $deporte = null
     ): Collection {
-        // Query base sobre complejos activos con coordenadas válidas
+        // Query base sobre complejos activos con coordenadas válidas y suscripción vigente
         $query = Complejo::query()
             ->where('estado', 'activo')
+            ->where(function ($q) {
+                $q->whereNull('suscripcion_estado')
+                  ->orWhereNotIn('suscripcion_estado', ['vencida', 'suspendida']);
+            })
             ->whereNotNull('latitud')
             ->whereNotNull('longitud')
             ->with(['canchas' => function ($q) {

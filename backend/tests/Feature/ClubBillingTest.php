@@ -333,4 +333,120 @@ class ClubBillingTest extends TestCase
         $this->assertFalse($complejoVencido->suscripcionValida());
         $this->assertFalse($complejoVencido->estaEnPeriodoDeGracia());
     }
+
+    public function test_expired_subscription_blocks_online_booking_and_lifting_on_payment(): void
+    {
+        [$admin, $complejo, $plan, $canchas] = $this->crearComplejoConPlan('bronce', 5.0);
+        $cancha = $canchas[0];
+
+        $complejo->update([
+            'latitud' => -34.6037,
+            'longitud' => -58.3816,
+        ]);
+
+        \App\Models\HorarioAtencion::create([
+            'complejo_id' => $complejo->id,
+            'dia_semana' => Carbon::tomorrow()->dayOfWeek,
+            'hora_apertura' => '08:00',
+            'hora_cierre' => '23:00',
+            'duracion_turno_minutos' => 60,
+        ]);
+
+        $cliente = User::factory()->create();
+        $fecha = Carbon::tomorrow()->format('Y-m-d');
+
+        // 1. Simular abono vencido
+        $complejo->update([
+            'suscripcion_estado' => 'vencida',
+            'suscripcion_gracia_vence_at' => Carbon::yesterday(),
+        ]);
+
+        $this->assertFalse($complejo->fresh()->suscripcionValida());
+
+        // A) Disponibilidad retorna suscripcion_suspendida = true
+        $dispResponse = $this->getJson("/api/canchas/{$cancha->id}/disponibilidad?fecha={$fecha}", [
+            'X-Tenant-ID' => $complejo->subdominio,
+        ]);
+        $dispResponse->assertStatus(200)
+            ->assertJson([
+                'suscripcion_suspendida' => true,
+            ]);
+
+        // B) Intentar bloquear slot online falla con 403 SUBSCRIPTION_SUSPENDED
+        $lockResponse = $this->actingAs($cliente)->withHeaders([
+            'X-Tenant-ID' => $complejo->subdominio,
+        ])->postJson('/api/turnos/bloquear-temporal', [
+            'cancha_id' => $cancha->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '10:00',
+            'duracion_minutos' => 60,
+        ]);
+        $lockResponse->assertStatus(403)
+            ->assertJson([
+                'error' => 'SUBSCRIPTION_SUSPENDED',
+            ]);
+
+        // C) Intentar confirmar turno online falla con 403 SUBSCRIPTION_SUSPENDED
+        $confirmResponse = $this->actingAs($cliente)->withHeaders([
+            'X-Tenant-ID' => $complejo->subdominio,
+        ])->postJson('/api/turnos/confirmar', [
+            'cancha_id' => $cancha->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '10:00',
+            'hora_fin' => '11:00',
+            'precio' => 10000,
+            'metodo_pago' => 'online',
+        ]);
+        $confirmResponse->assertStatus(403)
+            ->assertJson([
+                'error' => 'SUBSCRIPTION_SUSPENDED',
+            ]);
+
+        // D) GeolocationService excluye el complejo del buscador espacial
+        $geoService = app(\App\Services\GeolocationService::class);
+        $cercanos = $geoService->buscarComplejosCercanos(-34.6037, -58.3816, 10.0);
+        $this->assertFalse($cercanos->contains('id', $complejo->id));
+
+        // 2. Club regulariza su pago (aprobación de factura por pasarela)
+        $factura = FacturaClub::create([
+            'complejo_id' => $complejo->id,
+            'plan_id' => $plan->id,
+            'periodo' => Carbon::today()->format('Y-m'),
+            'total_usd' => 29.00,
+            'estado' => 'pendiente',
+            'fecha_emision' => Carbon::today(),
+            'fecha_vencimiento' => Carbon::today(),
+        ]);
+
+        $gatewayService = app(\App\Services\ClubPaymentGatewayService::class);
+        $gatewayService->marcarFacturaPagada($factura, 'mercadopago');
+
+        $complejoReactivado = $complejo->fresh();
+        $this->assertEquals('activa', $complejoReactivado->suscripcion_estado);
+        $this->assertTrue($complejoReactivado->suscripcionValida());
+
+        // A) Disponibilidad retorna suscripcion_suspendida = false
+        $dispResponse2 = $this->getJson("/api/canchas/{$cancha->id}/disponibilidad?fecha={$fecha}", [
+            'X-Tenant-ID' => $complejo->subdominio,
+        ]);
+        $dispResponse2->assertStatus(200)
+            ->assertJson([
+                'suscripcion_suspendida' => false,
+            ]);
+
+        // B) Bloquear turno ahora se permite exitosamente
+        $lockResponse2 = $this->actingAs($cliente)->withHeaders([
+            'X-Tenant-ID' => $complejo->subdominio,
+        ])->postJson('/api/turnos/bloquear-temporal', [
+            'cancha_id' => $cancha->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '10:00',
+            'duracion_minutos' => 60,
+        ]);
+        $lockResponse2->assertStatus(200);
+
+        // C) El complejo vuelve a aparecer en el buscador espacial
+        $cercanosReactivados = $geoService->buscarComplejosCercanos(-34.6037, -58.3816, 10.0);
+        $this->assertTrue($cercanosReactivados->contains('id', $complejo->id));
+    }
 }

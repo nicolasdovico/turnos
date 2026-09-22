@@ -217,19 +217,23 @@ class Complejo extends Model
      */
     public function suscripcionValida(): bool
     {
+        if ($this->suscripcion_estado === 'vencida' || $this->suscripcion_estado === 'suspendida') {
+            return false;
+        }
+
         if ($this->suscripcion_estado === 'activa') {
             return true;
         }
 
         if ($this->suscripcion_estado === 'trial') {
-            return $this->suscripcion_trial_vence_at && now()->lte($this->suscripcion_trial_vence_at);
+            return !$this->suscripcion_trial_vence_at || now()->lte($this->suscripcion_trial_vence_at);
         }
 
         if ($this->suscripcion_estado === 'gracia') {
-            return $this->suscripcion_gracia_vence_at && now()->lte($this->suscripcion_gracia_vence_at);
+            return !$this->suscripcion_gracia_vence_at || now()->lte($this->suscripcion_gracia_vence_at);
         }
 
-        return false;
+        return true;
     }
 
     /**

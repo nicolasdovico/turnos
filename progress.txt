@@ -2808,3 +2808,25 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * 126/126 tests de frontend pasando en verde en Vitest.
   * Total Ecosistema: 414 tests automatizados pasando exitosamente.
 ==============================================================================================================================================================
+[2026-09-22] - SUSPENSIÓN TÉCNICA DE RESERVAS Y OPERACIONES POR ABONO VENCIDO CON REACTIVACIÓN AUTOMÁTICA POR PAGO
+==============================================================================================================================
+- Diagnóstico:
+  * Cuando un club superaba su fecha de vencimiento y consumía los 7 días de gracia (suscripcion_estado = 'vencida'), el panel de administración (/panel) mostraba el banner rojo de advertencia, pero los clientes y visitantes aún podían bloquear y reservar turnos en la web del club y encontrarlo en el marketplace, debido a que el chequeo de suscripcionValida() no estaba conectado al motor de reservas del backend ni a la búsqueda espacial.
+- Solución e Implementación Realizada:
+  * 1. Backend (Modelos, Servicios y Controladores):
+    - Complejo (backend/app/Models/Complejo.php): Refinamiento del método suscripcionValida() para retornar false de forma estricta ante suscripcion_estado in ('vencida', 'suspendida'), o períodos de gracia/trial expirados, y true cuando se encuentra activa o en gracia vigente.
+    - TurnoBloqueoController (backend/app/Http/Controllers/Api/TurnoBloqueoController.php): Eager loading de complejo y validación de suscripcionValida() devolviendo HTTP 403 con código SUBSCRIPTION_SUSPENDED y mensaje amigable ante abono vencido.
+    - TurnoConfirmarController (backend/app/Http/Controllers/Api/TurnoConfirmarController.php): Validación previa al SELECT FOR UPDATE retornando HTTP 403 SUBSCRIPTION_SUSPENDED ante suscripciones suspendidas.
+    - DisponibilidadService & DisponibilidadController (backend/app/Services/DisponibilidadService.php, backend/app/Http/Controllers/Api/DisponibilidadController.php): Exposición de la bandera booleana suscripcion_suspendida en el payload de disponibilidad.
+    - GeolocationService (backend/app/Services/GeolocationService.php): Exclusión automática de complejos con suscripcion_estado = 'vencida' o 'suspendida' del buscador espacial de jugar.turnos.com.
+    - ClubDashboardController (backend/app/Http/Controllers/Api/ClubDashboardController.php): Bloqueo en storeCancha y storeTurnoFijo retornando HTTP 403 SUBSCRIPTION_SUSPENDED cuando el abono del club está vencido.
+  * 2. Frontend Web (Next.js 14):
+    - GrillaHoraria (frontend/components/GrillaHoraria.tsx): Captura de suscripcion_suspendida; despliegue del banner informativo con AlertTriangle "Reservas Online Temporalmente Suspendidas" para clientes/visitantes; bloqueo interactivo en handleSelectSlot; y manejo transparente del error 403 con toast explicativa.
+  * 3. Levantamiento Reactivo Automático por Acreditación de Pago:
+    - Cuando el club realiza el pago por cualquier canal (Mercado Pago, Stripe o Aprobación Manual en Filament Superadmin), ClubPaymentGatewayService::procesarPagoAprobado() transiciona automáticamente suscripcion_estado a 'activa', purga la fecha de gracia y extiende la vigencia por 30 días.
+    - Al pasar a 'activa', suscripcionValida() retorna true inmediatamente, levantando de forma 100% automática y en tiempo real todos los bloqueos en el motor de reservas, la grilla horaria pública y el buscador del marketplace.
+- Tests & Verificación de Calidad:
+  * Backend: Nuevo test test_expired_subscription_blocks_online_booking_and_lifting_on_payment en ClubBillingTest.php verificando bloqueo de slots, rechazo de confirmación, exclusión del marketplace, y reactivación inmediata tras el pago (290 tests pasados al 100%, 1.674 aserciones).
+  * Frontend: Nuevo test en tests/GrillaHoraria.test.tsx validando el renderizado de la tarjeta de suspensión para clientes públicos (129 tests pasados al 100% en 13 suites de Vitest).
+  * Total Ecosistema: 439 tests automatizados exitosos (0 fallas, 0 regresiones).
+==============================================================================================================================

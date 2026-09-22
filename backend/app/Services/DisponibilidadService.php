@@ -43,7 +43,7 @@ class DisponibilidadService
      */
     public function obtenerDisponibilidadCompleta(int $canchaId, string $fecha, ?int $duracionSolicitada = null, bool $esAdmin = false, ?int $currentUserId = null): array
     {
-        $cancha = Cancha::find($canchaId);
+        $cancha = Cancha::with('complejo')->find($canchaId);
         if (!$cancha || $cancha->estado !== 'activo') {
             return [
                 'slots' => [],
@@ -429,12 +429,15 @@ class DisponibilidadService
             return $data;
         })->values()->all();
 
+        $suscripcionSuspendida = (bool) ($cancha->complejo && !$cancha->complejo->suscripcionValida());
+
         return [
             'slots' => $slotsDisponibles,
             'turnos_ocupados' => $turnosOcupadosData,
             'turnos_retenidos' => $turnosRetenidos,
             'hora_inicio_luz' => $horaInicioLuz,
             'complejo_cerrado' => false,
+            'suscripcion_suspendida' => $suscripcionSuspendida,
             'optimizacion_anti_baches' => [
                 'activa' => $antiBachesActivo,
                 'total_horarios_protegidos' => count($horariosProtegidos),
