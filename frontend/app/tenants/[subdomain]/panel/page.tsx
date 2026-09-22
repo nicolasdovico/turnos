@@ -3287,13 +3287,13 @@ export default function ClubAdminPanel() {
                         </div>
 
                         {additionalEquipamientos.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
                             {additionalEquipamientos.map((eq) => {
                               const isChecked = canchaEquipamientosIds.includes(eq.id);
                               return (
                                 <div
                                   key={eq.id}
-                                  className={`p-3 rounded-2xl border transition flex items-start justify-between gap-2 ${
+                                  className={`p-3 rounded-2xl border transition flex items-start justify-between gap-2.5 ${
                                     isChecked
                                       ? "bg-slate-900 border-emerald-500/50 text-white shadow-sm"
                                       : "bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700"
@@ -3304,10 +3304,10 @@ export default function ClubAdminPanel() {
                                       type="checkbox"
                                       checked={isChecked}
                                       onChange={() => toggleEquipamiento(eq.id, eq.slug)}
-                                      className="mt-0.5 h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
+                                      className="mt-0.5 h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0 shrink-0"
                                     />
-                                    <div className="text-xs">
-                                      <div className="font-bold text-slate-200 flex items-center gap-1.5">
+                                    <div className="text-xs flex-1 min-w-0">
+                                      <div className="font-bold text-slate-200 flex items-center gap-1.5 flex-wrap">
                                         <span>{getEquipamientoEmoji(eq.icono, eq.slug)}</span> {eq.nombre}
                                         {eq.es_propio && (
                                           <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30">
@@ -3316,9 +3316,9 @@ export default function ClubAdminPanel() {
                                         )}
                                       </div>
                                       {eq.descripcion && (
-                                        <div className="text-slate-400 text-[11px] mt-0.5 line-clamp-1">
+                                        <p className="text-slate-400 text-[11px] mt-1 leading-relaxed text-left break-words">
                                           {eq.descripcion}
-                                        </div>
+                                        </p>
                                       )}
                                     </div>
                                   </label>
