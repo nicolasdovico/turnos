@@ -288,6 +288,63 @@ export const getSportEmoji = (icono?: string | null, slug?: string): string => {
   return map[clean] || "🏅";
 };
 
+export const getEquipamientoEmoji = (icono?: string | null, slug?: string): string => {
+  if (!icono && !slug) return "✨";
+  if (icono && /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(icono)) {
+    return icono;
+  }
+  const clean = (icono || slug || "").toLowerCase().trim().replace(/[-_]/g, "");
+  const map: Record<string, string> = {
+    zap: "💡",
+    iluminacion: "💡",
+    iluminacionled: "💡",
+    home: "🎪",
+    techada: "🎪",
+    techadaindoor: "🎪",
+    video: "📹",
+    camara: "📹",
+    camaragrabacion: "📹",
+    hash: "🔢",
+    marcador: "🔢",
+    marcadordigital: "🔢",
+    thermometer: "❄️",
+    climatizada: "❄️",
+    climatizacion: "❄️",
+    tv: "📺",
+    streaming: "📺",
+    transmisionstreaming: "📺",
+    users: "🏟️",
+    gradas: "🏟️",
+    gradastribuna: "🏟️",
+    tribuna: "🏟️",
+    door: "🚪",
+    dooropen: "🚪",
+    vestuario: "🚪",
+    vestuariocancha: "🚪",
+    volume: "🔊",
+    volume2: "🔊",
+    sonido: "🔊",
+    sistemasonido: "🔊",
+    maximize: "↔️",
+    maximize2: "↔️",
+    salidapista: "↔️",
+    package: "🎒",
+    alquilermaterial: "🎒",
+    paletas: "🎒",
+    pelotas: "🎾",
+    star: "⭐",
+    trophy: "🏆",
+    wifi: "📶",
+    coffee: "☕",
+    car: "🚗",
+    parking: "🅿️",
+    shield: "🛡️",
+    check: "✨",
+    sparkles: "✨",
+  };
+  return map[clean] || "✨";
+};
+
 interface HorarioItem {
   id: number;
   dia_semana: number;
@@ -3251,7 +3308,7 @@ export default function ClubAdminPanel() {
                                     />
                                     <div className="text-xs">
                                       <div className="font-bold text-slate-200 flex items-center gap-1.5">
-                                        <span>{eq.icono || "✨"}</span> {eq.nombre}
+                                        <span>{getEquipamientoEmoji(eq.icono, eq.slug)}</span> {eq.nombre}
                                         {eq.es_propio && (
                                           <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30">
                                             Propio
@@ -3697,7 +3754,7 @@ export default function ClubAdminPanel() {
                                 key={eq.id}
                                 className="rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20 px-2 py-0.5 text-[11px] font-medium flex items-center gap-1"
                               >
-                                <span>{eq.icono || "✨"}</span> {eq.nombre}
+                                <span>{getEquipamientoEmoji(eq.icono, eq.slug)}</span> {eq.nombre}
                               </span>
                             ))
                         )}

@@ -201,7 +201,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'iluminacion_led',
                 'nombre' => 'Iluminación LED Profesional',
-                'icono' => 'zap',
+                'icono' => '💡',
                 'categoria' => 'iluminacion',
                 'descripcion' => 'Focos LED de alta potencia para juego nocturno sin sombras.',
                 'orden' => 1,
@@ -209,7 +209,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'techada_indoor',
                 'nombre' => 'Cancha Techada / Cubierta (Indoor)',
-                'icono' => 'home',
+                'icono' => '🎪',
                 'categoria' => 'estructura',
                 'descripcion' => 'Pista completamente cubierta o protegida contra lluvia y sol directo.',
                 'orden' => 2,
@@ -217,7 +217,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'camara_grabacion',
                 'nombre' => 'Cámara de Grabación HD / Replay',
-                'icono' => 'video',
+                'icono' => '📹',
                 'categoria' => 'tecnologia',
                 'descripcion' => 'Grabación automática de partidos con generación de clips y repeticiones.',
                 'orden' => 3,
@@ -225,7 +225,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'marcador_digital',
                 'nombre' => 'Marcador Digital / Tanteador LED',
-                'icono' => 'hash',
+                'icono' => '🔢',
                 'categoria' => 'tecnologia',
                 'descripcion' => 'Marcador electrónico de puntos visible en cancha con control remoto o app.',
                 'orden' => 4,
@@ -233,7 +233,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'climatizada',
                 'nombre' => 'Climatización / Calefacción',
-                'icono' => 'thermometer',
+                'icono' => '❄️',
                 'categoria' => 'confort',
                 'descripcion' => 'Ambiente cerrado con aire acondicionado frío o calefacción en invierno.',
                 'orden' => 5,
@@ -241,7 +241,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'transmision_streaming',
                 'nombre' => 'Transmisión Streaming en Vivo',
-                'icono' => 'tv',
+                'icono' => '📺',
                 'categoria' => 'tecnologia',
                 'descripcion' => 'Cámaras preparadas para emitir partidos en directo vía YouTube o Twitch.',
                 'orden' => 6,
@@ -249,7 +249,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'gradas_tribuna',
                 'nombre' => 'Gradas / Tribuna para Espectadores',
-                'icono' => 'users',
+                'icono' => '🏟️',
                 'categoria' => 'estructura',
                 'descripcion' => 'Asientos o gradas perimetrales para público y espectadores de torneos.',
                 'orden' => 7,
@@ -257,7 +257,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'vestuario_cancha',
                 'nombre' => 'Acceso Directo a Vestuarios',
-                'icono' => 'door-open',
+                'icono' => '🚪',
                 'categoria' => 'confort',
                 'descripcion' => 'Cercanía inmediata a vestuarios, duchas e instalaciones sanitarias.',
                 'orden' => 8,
@@ -265,7 +265,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'sistema_sonido',
                 'nombre' => 'Sistema de Sonido / Música Bluetooth',
-                'icono' => 'volume-2',
+                'icono' => '🔊',
                 'categoria' => 'confort',
                 'descripcion' => 'Altavoces inalámbricos integrados para música durante el turno.',
                 'orden' => 9,
@@ -273,7 +273,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'salida_pista',
                 'nombre' => 'Salida de Pista Reglamentaria',
-                'icono' => 'maximize-2',
+                'icono' => '↔️',
                 'categoria' => 'estructura',
                 'descripcion' => 'Espacio perimetral reglamentario (mínimo 2 metros) para recuperar pelotas fuera de pista.',
                 'aplica_a_deportes' => ['padel'],
@@ -282,7 +282,7 @@ class DeportesYEquipamientosSeeder extends Seeder
             [
                 'slug' => 'alquiler_material',
                 'nombre' => 'Paletas / Pelotas de Cortesía',
-                'icono' => 'package',
+                'icono' => '🎒',
                 'categoria' => 'confort',
                 'descripcion' => 'Incluye pelotas en tubo o paletas de test para los jugadores del turno.',
                 'orden' => 11,
