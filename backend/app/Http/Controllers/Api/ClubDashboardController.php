@@ -77,7 +77,7 @@ class ClubDashboardController extends Controller
             ->with([
                 'plan.modulos',
                 'canchas' => function ($query) {
-                    $query->orderBy('nombre', 'asc');
+                    $query->with('equipamientos')->orderBy('nombre', 'asc');
                 },
                 'horariosAtencion',
                 'owner',
@@ -162,6 +162,47 @@ class ClubDashboardController extends Controller
                 'tipos_negocio' => \App\Models\TipoNegocio::where('esta_activo', true)
                     ->orderBy('id', 'asc')
                     ->get(['id', 'nombre', 'slug']),
+                'deportes_catalogo' => \App\Models\Deporte::with('superficiesActivas')
+                    ->where('esta_activo', true)
+                    ->orderBy('orden')
+                    ->get()
+                    ->map(function ($d) {
+                        return [
+                            'id' => $d->id,
+                            'nombre' => $d->nombre,
+                            'slug' => $d->slug,
+                            'icono' => $d->icono,
+                            'tiene_paredes' => (bool) $d->tiene_paredes,
+                            'duracion_default_minutos' => (int) $d->duracion_default_minutos,
+                            'formatos' => $d->formatos ?? [],
+                            'paredes' => $d->paredes ?? [],
+                            'superficies' => $d->superficiesActivas->map(function ($s) {
+                                return [
+                                    'id' => $s->slug,
+                                    'superficie_id' => $s->id,
+                                    'nombre' => $s->nombre,
+                                    'label' => $s->nombre,
+                                    'slug' => $s->slug,
+                                    'descripcion' => $s->descripcion,
+                                ];
+                            })->values(),
+                        ];
+                    }),
+                'equipamientos_disponibles' => \App\Models\Equipamiento::paraComplejo($complejo->id)
+                    ->get()
+                    ->map(function ($e) use ($complejo) {
+                        return [
+                            'id' => $e->id,
+                            'nombre' => $e->nombre,
+                            'slug' => $e->slug,
+                            'categoria' => $e->categoria,
+                            'icono' => $e->icono,
+                            'descripcion' => $e->descripcion,
+                            'aplica_a_deportes' => $e->aplica_a_deportes,
+                            'es_propio' => $e->complejo_id === $complejo->id,
+                            'esta_activo' => (bool) $e->esta_activo,
+                        ];
+                    }),
             ],
         ]);
     }
@@ -196,6 +237,10 @@ class ClubDashboardController extends Controller
             'nombre' => 'required|string|max:255',
             'deporte' => 'nullable|string|max:50',
             'superficie' => 'nullable|string|max:50',
+            'deporte_id' => 'nullable|integer|exists:deportes,id',
+            'superficie_id' => 'nullable|integer|exists:superficies,id',
+            'equipamientos_ids' => 'nullable|array',
+            'equipamientos_ids.*' => 'integer|exists:equipamientos,id',
             'precio_base' => 'required|numeric|min:0',
             'precio_con_luz' => 'nullable|numeric|min:0',
             'precio_valle' => 'nullable|numeric|min:0',
@@ -249,8 +294,25 @@ class ClubDashboardController extends Controller
             }
         }
 
-        $deporte = strtolower($validated['deporte'] ?? ($complejo->deporte_principal ?? 'padel'));
-        $requiereParedes = in_array($deporte, ['padel', 'squash', 'racquetball'], true);
+        $deporteModel = null;
+        if (!empty($validated['deporte_id'])) {
+            $deporteModel = \App\Models\Deporte::find($validated['deporte_id']);
+        } elseif (!empty($validated['deporte'])) {
+            $deporteModel = \App\Models\Deporte::where('slug', strtolower($validated['deporte']))->first();
+        }
+
+        $superficieModel = null;
+        if (!empty($validated['superficie_id'])) {
+            $superficieModel = \App\Models\Superficie::find($validated['superficie_id']);
+        } elseif (!empty($validated['superficie']) && $deporteModel) {
+            $superficieModel = \App\Models\Superficie::where('deporte_id', $deporteModel->id)
+                ->where('slug', strtolower($validated['superficie']))
+                ->first();
+        }
+
+        $deporte = $deporteModel ? $deporteModel->slug : strtolower($validated['deporte'] ?? ($complejo->deporte_principal ?? 'padel'));
+        $superficie = $superficieModel ? $superficieModel->slug : ($validated['superficie'] ?? 'cristal');
+        $requiereParedes = $deporteModel ? (bool) $deporteModel->tiene_paredes : in_array($deporte, ['padel', 'squash', 'racquetball'], true);
         $tipoPared = $requiereParedes ? ($validated['tipo_pared'] ?? null) : null;
 
         $precioBase = (float) $validated['precio_base'];
@@ -263,7 +325,9 @@ class ClubDashboardController extends Controller
             'complejo_id' => $complejo->id,
             'nombre' => $validated['nombre'],
             'deporte' => $deporte,
-            'superficie' => $validated['superficie'] ?? 'cristal',
+            'deporte_id' => $deporteModel?->id,
+            'superficie' => $superficie,
+            'superficie_id' => $superficieModel?->id,
             'precio_base' => $validated['precio_base'],
             'precio_con_luz' => $precioConLuz,
             'precio_valle' => $validated['precio_valle'] ?? null,
@@ -287,6 +351,12 @@ class ClubDashboardController extends Controller
             'precio_120_min' => $validated['precio_120_min'] ?? null,
             'estado' => $validated['estado'] ?? 'activo',
         ]);
+
+        if (!empty($validated['equipamientos_ids'])) {
+            $cancha->equipamientos()->sync($validated['equipamientos_ids']);
+        }
+
+        $cancha->load(['equipamientos', 'deporteRel', 'superficieRel']);
 
         return response()->json([
             'success' => true,
@@ -329,6 +399,10 @@ class ClubDashboardController extends Controller
             'nombre' => 'required|string|max:255',
             'deporte' => 'nullable|string|max:50',
             'superficie' => 'nullable|string|max:50',
+            'deporte_id' => 'nullable|integer|exists:deportes,id',
+            'superficie_id' => 'nullable|integer|exists:superficies,id',
+            'equipamientos_ids' => 'nullable|array',
+            'equipamientos_ids.*' => 'integer|exists:equipamientos,id',
             'precio_base' => 'required|numeric|min:0',
             'precio_con_luz' => 'nullable|numeric|min:0',
             'precio_valle' => 'nullable|numeric|min:0',
@@ -353,8 +427,26 @@ class ClubDashboardController extends Controller
             'estado' => 'nullable|string|in:activo,mantenimiento,inactivo',
         ]);
 
-        $deporte = strtolower($validated['deporte'] ?? $cancha->deporte);
-        $requiereParedes = in_array($deporte, ['padel', 'squash', 'racquetball'], true);
+        $deporteModel = null;
+        if (!empty($validated['deporte_id'])) {
+            $deporteModel = \App\Models\Deporte::find($validated['deporte_id']);
+        } elseif (!empty($validated['deporte'])) {
+            $deporteModel = \App\Models\Deporte::where('slug', strtolower($validated['deporte']))->first();
+        }
+
+        $superficieModel = null;
+        if (!empty($validated['superficie_id'])) {
+            $superficieModel = \App\Models\Superficie::find($validated['superficie_id']);
+        } elseif (!empty($validated['superficie']) && ($deporteModel || $cancha->deporte_id)) {
+            $targetDepId = $deporteModel ? $deporteModel->id : $cancha->deporte_id;
+            $superficieModel = \App\Models\Superficie::where('deporte_id', $targetDepId)
+                ->where('slug', strtolower($validated['superficie']))
+                ->first();
+        }
+
+        $deporte = $deporteModel ? $deporteModel->slug : strtolower($validated['deporte'] ?? $cancha->deporte);
+        $superficie = $superficieModel ? $superficieModel->slug : ($validated['superficie'] ?? $cancha->superficie);
+        $requiereParedes = $deporteModel ? (bool) $deporteModel->tiene_paredes : in_array($deporte, ['padel', 'squash', 'racquetball'], true);
         $tipoPared = $requiereParedes ? ($validated['tipo_pared'] ?? $cancha->tipo_pared) : null;
 
         $precioBase = (float) $validated['precio_base'];
@@ -369,7 +461,9 @@ class ClubDashboardController extends Controller
         $cancha->update([
             'nombre' => $validated['nombre'],
             'deporte' => $deporte,
-            'superficie' => $validated['superficie'] ?? $cancha->superficie,
+            'deporte_id' => $deporteModel ? $deporteModel->id : $cancha->deporte_id,
+            'superficie' => $superficie,
+            'superficie_id' => $superficieModel ? $superficieModel->id : $cancha->superficie_id,
             'precio_base' => $validated['precio_base'],
             'precio_con_luz' => $precioConLuz,
             'precio_valle' => array_key_exists('precio_valle', $validated) ? $validated['precio_valle'] : $cancha->precio_valle,
@@ -393,6 +487,12 @@ class ClubDashboardController extends Controller
             'precio_120_min' => array_key_exists('precio_120_min', $validated) ? $validated['precio_120_min'] : $cancha->precio_120_min,
             'estado' => $validated['estado'] ?? $cancha->estado,
         ]);
+
+        if (array_key_exists('equipamientos_ids', $validated)) {
+            $cancha->equipamientos()->sync($validated['equipamientos_ids'] ?? []);
+        }
+
+        $cancha->load(['equipamientos', 'deporteRel', 'superficieRel']);
 
         return response()->json([
             'success' => true,
@@ -2323,6 +2423,128 @@ class ClubDashboardController extends Controller
             'success' => false,
             'message' => 'No se pudo enviar el WhatsApp vía Evolution API. Verifica el estado del servicio.',
         ], 500);
+    }
+
+    /**
+     * Obtener equipamientos disponibles para el club (globales + propios).
+     */
+    public function getEquipamientos(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->firstOrFail();
+
+        $equipamientos = \App\Models\Equipamiento::paraComplejo($complejo->id)
+            ->get()
+            ->map(function ($e) use ($complejo) {
+                return [
+                    'id' => $e->id,
+                    'nombre' => $e->nombre,
+                    'slug' => $e->slug,
+                    'categoria' => $e->categoria,
+                    'icono' => $e->icono,
+                    'descripcion' => $e->descripcion,
+                    'aplica_a_deportes' => $e->aplica_a_deportes,
+                    'es_propio' => $e->complejo_id === $complejo->id,
+                    'esta_activo' => (bool) $e->esta_activo,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $equipamientos,
+        ]);
+    }
+
+    /**
+     * Crear un equipamiento / atributo personalizado exclusivo del club.
+     */
+    public function storeEquipamiento(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->firstOrFail();
+
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:100',
+            'categoria' => 'nullable|string|in:iluminacion,estructura,tecnologia,confort,general',
+            'icono' => 'nullable|string|max:50',
+            'descripcion' => 'nullable|string|max:500',
+            'aplica_a_deportes' => 'nullable|array',
+        ]);
+
+        $slug = \Illuminate\Support\Str::slug($validated['nombre']) . '-' . $complejo->id;
+
+        $equipamiento = \App\Models\Equipamiento::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => $validated['nombre'],
+            'slug' => $slug,
+            'categoria' => $validated['categoria'] ?? 'general',
+            'icono' => $validated['icono'] ?? 'check',
+            'descripcion' => $validated['descripcion'] ?? null,
+            'aplica_a_deportes' => $validated['aplica_a_deportes'] ?? null,
+            'orden' => 99,
+            'esta_activo' => true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Equipamiento personalizado creado exitosamente.',
+            'data' => [
+                'id' => $equipamiento->id,
+                'nombre' => $equipamiento->nombre,
+                'slug' => $equipamiento->slug,
+                'categoria' => $equipamiento->categoria,
+                'icono' => $equipamiento->icono,
+                'descripcion' => $equipamiento->descripcion,
+                'aplica_a_deportes' => $equipamiento->aplica_a_deportes,
+                'es_propio' => true,
+                'esta_activo' => true,
+            ],
+        ], 201);
+    }
+
+    /**
+     * Actualizar un equipamiento propio del club.
+     */
+    public function updateEquipamiento(Request $request, string $subdomain, int $id): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->firstOrFail();
+
+        $equipamiento = \App\Models\Equipamiento::where('complejo_id', $complejo->id)->where('id', $id)->firstOrFail();
+
+        $validated = $request->validate([
+            'nombre' => 'required|string|max:100',
+            'categoria' => 'nullable|string|in:iluminacion,estructura,tecnologia,confort,general',
+            'icono' => 'nullable|string|max:50',
+            'descripcion' => 'nullable|string|max:500',
+            'aplica_a_deportes' => 'nullable|array',
+            'esta_activo' => 'nullable|boolean',
+        ]);
+
+        $equipamiento->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Equipamiento actualizado exitosamente.',
+            'data' => $equipamiento,
+        ]);
+    }
+
+    /**
+     * Eliminar un equipamiento propio del club.
+     */
+    public function destroyEquipamiento(Request $request, string $subdomain, int $id): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->firstOrFail();
+
+        $equipamiento = \App\Models\Equipamiento::where('complejo_id', $complejo->id)->where('id', $id)->firstOrFail();
+        $equipamiento->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Equipamiento eliminado exitosamente.',
+        ]);
     }
 }
 

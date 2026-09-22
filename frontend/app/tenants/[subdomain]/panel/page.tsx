@@ -101,6 +101,40 @@ interface CanchaItem {
   precio_90_min?: string | number | null;
   precio_120_min?: string | number | null;
   estado: string;
+  deporte_id?: number | null;
+  superficie_id?: number | null;
+  equipamientos?: EquipamientoItem[];
+}
+
+export interface EquipamientoItem {
+  id: number;
+  nombre: string;
+  slug: string;
+  categoria?: string;
+  icono?: string;
+  descripcion?: string;
+  aplica_a_deportes?: string[] | null;
+  es_propio?: boolean;
+  esta_activo: boolean;
+}
+
+export interface DeporteCatalogoItem {
+  id: number;
+  nombre: string;
+  slug: string;
+  icono?: string;
+  tiene_paredes: boolean;
+  duracion_default_minutos: number;
+  formatos?: { id: string; label: string }[];
+  paredes?: { id: string; label: string }[];
+  superficies: {
+    id: string;
+    superficie_id?: number;
+    nombre: string;
+    label: string;
+    slug: string;
+    descripcion?: string;
+  }[];
 }
 
 interface SportConfig {
@@ -492,6 +526,194 @@ export default function ClubAdminPanel() {
   const [canchaPrecio120Min, setCanchaPrecio120Min] = useState("");
   const [canchaEstado, setCanchaEstado] = useState("activo");
 
+  // Catálogo dinámico de deportes y equipamientos
+  const [deportesCatalogo, setDeportesCatalogo] = useState<DeporteCatalogoItem[]>([]);
+  const [equipamientosDisponibles, setEquipamientosDisponibles] = useState<EquipamientoItem[]>([]);
+  const [canchaEquipamientosIds, setCanchaEquipamientosIds] = useState<number[]>([]);
+
+  // Sub-formulario para agregar atributo/equipamiento propio del club
+  const [showAddCustomEquipModal, setShowAddCustomEquipModal] = useState(false);
+  const [newEquipNombre, setNewEquipNombre] = useState("");
+  const [newEquipCategoria, setNewEquipCategoria] = useState("general");
+  const [newEquipIcono, setNewEquipIcono] = useState("✨");
+  const [newEquipDescripcion, setNewEquipDescripcion] = useState("");
+  const [isSavingCustomEquip, setIsSavingCustomEquip] = useState(false);
+  const [customEquipErrorMsg, setCustomEquipErrorMsg] = useState<string | null>(null);
+
+  // Lista de deportes unificada (catálogo dinámico del backend + fallback estático DEPORTES_CONFIG)
+  const availableSports = useMemo(() => {
+    if (deportesCatalogo && deportesCatalogo.length > 0) {
+      return deportesCatalogo.map((d) => ({
+        id: d.slug,
+        nombre: d.nombre,
+        icono: d.icono || "🎾",
+        modelId: d.id,
+        tieneParedes: Boolean(d.tiene_paredes),
+        duracionDefault: d.duracion_default_minutos || 60,
+        superficies: (d.superficies || []).map((s) => ({
+          id: s.slug || s.id,
+          modelId: s.superficie_id,
+          label: s.label || s.nombre,
+        })),
+        formatos: d.formatos && d.formatos.length > 0
+          ? d.formatos
+          : (DEPORTES_CONFIG[d.slug]?.formatos || [{ id: "estandar", label: "Estándar" }]),
+        paredes: d.paredes && d.paredes.length > 0
+          ? d.paredes
+          : (DEPORTES_CONFIG[d.slug]?.paredes || []),
+      }));
+    }
+    return Object.entries(DEPORTES_CONFIG).map(([slug, cfg]) => ({
+      id: slug,
+      nombre: cfg.nombre,
+      icono: slug === "padel" || slug === "tenis" ? "🎾" : slug === "futbol" ? "⚽" : slug === "basquet" ? "🏀" : "🏸",
+      modelId: undefined,
+      tieneParedes: cfg.tieneParedes,
+      duracionDefault: slug === "padel" ? 90 : 60,
+      superficies: cfg.superficies.map((s) => ({ id: s.id, modelId: undefined, label: s.label })),
+      formatos: cfg.formatos,
+      paredes: cfg.paredes || [],
+    }));
+  }, [deportesCatalogo]);
+
+  const currentSportConfig = useMemo(() => {
+    const found = availableSports.find((s) => s.id === canchaDeporte);
+    if (found) return found;
+    return availableSports[0] || {
+      id: "padel",
+      nombre: "Pádel",
+      icono: "🎾",
+      modelId: undefined,
+      tieneParedes: true,
+      duracionDefault: 90,
+      superficies: DEPORTES_CONFIG.padel.superficies.map((s) => ({ id: s.id, modelId: undefined, label: s.label })),
+      formatos: DEPORTES_CONFIG.padel.formatos,
+      paredes: DEPORTES_CONFIG.padel.paredes || [],
+    };
+  }, [availableSports, canchaDeporte]);
+
+  const coreEquipSlugs = useMemo(() => [
+    "iluminacion_led", "iluminacion", "techada", "techada_indoor", "camara_grabacion", "marcador_digital", "climatizada"
+  ], []);
+
+  const additionalEquipamientos = useMemo(() => {
+    return equipamientosDisponibles.filter((eq) => !coreEquipSlugs.includes(eq.slug));
+  }, [equipamientosDisponibles, coreEquipSlugs]);
+
+  const toggleCoreEquipamiento = (coreKey: "iluminacion" | "techada" | "camara_grabacion" | "marcador_digital" | "climatizada", newVal: boolean) => {
+    if (coreKey === "iluminacion") {
+      setCanchaIluminacion(newVal);
+    } else if (coreKey === "techada") {
+      setCanchaTechada(newVal);
+      setCanchaTipoCubierta(newVal ? "indoor" : "outdoor");
+    } else if (coreKey === "camara_grabacion") {
+      setCanchaCamaraGrabacion(newVal);
+    } else if (coreKey === "marcador_digital") {
+      setCanchaMarcadorDigital(newVal);
+    } else if (coreKey === "climatizada") {
+      setCanchaClimatizada(newVal);
+    }
+
+    const matchSlug = coreKey === "iluminacion"
+      ? ["iluminacion_led", "iluminacion"]
+      : coreKey === "techada"
+      ? ["techada", "techada_indoor"]
+      : [coreKey];
+
+    const targetEq = equipamientosDisponibles.find((eq) => matchSlug.includes(eq.slug));
+    if (targetEq) {
+      setCanchaEquipamientosIds((prev) => {
+        if (newVal && !prev.includes(targetEq.id)) {
+          return [...prev, targetEq.id];
+        } else if (!newVal && prev.includes(targetEq.id)) {
+          return prev.filter((id) => id !== targetEq.id);
+        }
+        return prev;
+      });
+    }
+  };
+
+  const toggleEquipamiento = (equipId: number, equipSlug?: string) => {
+    setCanchaEquipamientosIds((prev) => {
+      const exists = prev.includes(equipId);
+      const updated = exists ? prev.filter((id) => id !== equipId) : [...prev, equipId];
+
+      if (equipSlug === "iluminacion_led" || equipSlug === "iluminacion") {
+        setCanchaIluminacion(!exists);
+      } else if (equipSlug === "techada" || equipSlug === "techada_indoor") {
+        setCanchaTechada(!exists);
+        setCanchaTipoCubierta(!exists ? "indoor" : "outdoor");
+      } else if (equipSlug === "camara_grabacion") {
+        setCanchaCamaraGrabacion(!exists);
+      } else if (equipSlug === "marcador_digital") {
+        setCanchaMarcadorDigital(!exists);
+      } else if (equipSlug === "climatizada") {
+        setCanchaClimatizada(!exists);
+      }
+
+      return updated;
+    });
+  };
+
+  const handleCreateCustomEquipamiento = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEquipNombre.trim()) return;
+    setIsSavingCustomEquip(true);
+    setCustomEquipErrorMsg(null);
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("saas_token") || localStorage.getItem("token") || localStorage.getItem("auth_token")) : null);
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/equipamientos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+        body: JSON.stringify({
+          nombre: newEquipNombre.trim(),
+          categoria: newEquipCategoria,
+          icono: newEquipIcono,
+          descripcion: newEquipDescripcion.trim() || null,
+        }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        setCustomEquipErrorMsg(resData.message || "Error al crear el atributo.");
+        return;
+      }
+      const created: EquipamientoItem = resData.data;
+      setEquipamientosDisponibles((prev) => [...prev, created]);
+      setCanchaEquipamientosIds((prev) => [...prev, created.id]);
+      setNewEquipNombre("");
+      setNewEquipDescripcion("");
+      setShowAddCustomEquipModal(false);
+    } catch (err: any) {
+      setCustomEquipErrorMsg(err.message || "Error de conexión al guardar el atributo.");
+    } finally {
+      setIsSavingCustomEquip(false);
+    }
+  };
+
+  const handleDeleteCustomEquipamiento = async (equipId: number) => {
+    if (!confirm("¿Deseas eliminar este atributo personalizado de tu club?")) return;
+    try {
+      const activeToken = token || (typeof window !== "undefined" ? (localStorage.getItem("saas_token") || localStorage.getItem("token") || localStorage.getItem("auth_token")) : null);
+      const res = await fetch(`${API_BASE}/clubs/${subdomain}/equipamientos/${equipId}`, {
+        method: "DELETE",
+        headers: {
+          "Accept": "application/json",
+          ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+        },
+      });
+      if (res.ok) {
+        setEquipamientosDisponibles((prev) => prev.filter((eq) => eq.id !== equipId));
+        setCanchaEquipamientosIds((prev) => prev.filter((id) => id !== equipId));
+      }
+    } catch {
+      // Ignorar silenciosamente
+    }
+  };
+
   const [isSavingCancha, setIsSavingCancha] = useState(false);
   const [canchaSuccessMsg, setCanchaSuccessMsg] = useState<string | null>(null);
   const [canchaErrorMsg, setCanchaErrorMsg] = useState<string | null>(null);
@@ -525,20 +747,21 @@ export default function ClubAdminPanel() {
     setExtraCourtConfirmation(null);
     setCanchaErrorMsg(null);
     const dep = complejo?.deporte_principal || "padel";
+    const sp = availableSports.find((s) => s.id === dep) || availableSports[0];
     const depConfig = DEPORTES_CONFIG[dep] || DEPORTES_CONFIG.padel;
 
     setCanchaNombre(`Cancha ${(canchas.length + 1)}`);
-    setCanchaDeporte(dep);
-    setCanchaSuperficie(depConfig.superficies[0]?.id || "sintetico");
-    setCanchaFormato(depConfig.formatos[0]?.id || "dobles");
-    setCanchaTipoPared(depConfig.paredes ? depConfig.paredes[0]?.id : "");
+    setCanchaDeporte(sp?.id || dep);
+    setCanchaSuperficie(sp?.superficies[0]?.id || depConfig.superficies[0]?.id || "sintetico");
+    setCanchaFormato(sp?.formatos[0]?.id || depConfig.formatos[0]?.id || "dobles");
+    setCanchaTipoPared(sp?.paredes && sp.paredes.length > 0 ? sp.paredes[0].id : (depConfig.paredes ? depConfig.paredes[0]?.id : ""));
     setCanchaPrecioBase("8000");
     setCanchaPrecioConLuz("");
     setCanchaPrecioValle("");
     setCanchaPrecioPico("");
     setCanchaPrecioFinSemana("");
     setCanchaPrecioLuzAdicional("");
-    setCanchaDuracionMinutos(dep === "padel" ? 90 : 60);
+    setCanchaDuracionMinutos(sp?.duracionDefault || (dep === "padel" ? 90 : 60));
     setCanchaPermiteDuracionFlexible(false);
     setCanchaAntiBachesActivo(true);
     setCanchaPrecio90Min("");
@@ -552,6 +775,14 @@ export default function ClubAdminPanel() {
     setCanchaClimatizada(false);
     setCanchaEstado("activo");
 
+    const initialEqIds: number[] = [];
+    equipamientosDisponibles.forEach((eq) => {
+      if (eq.slug === "iluminacion_led" || eq.slug === "iluminacion") {
+        initialEqIds.push(eq.id);
+      }
+    });
+    setCanchaEquipamientosIds(initialEqIds);
+
     setShowCanchaModal(true);
   };
 
@@ -560,13 +791,14 @@ export default function ClubAdminPanel() {
     setExtraCourtConfirmation(null);
     setCanchaErrorMsg(null);
     const dep = c.deporte || complejo?.deporte_principal || "padel";
+    const sp = availableSports.find((s) => s.id === dep) || availableSports[0];
     const depConfig = DEPORTES_CONFIG[dep] || DEPORTES_CONFIG.padel;
 
     setCanchaNombre(c.nombre);
     setCanchaDeporte(dep);
-    setCanchaSuperficie(c.superficie || depConfig.superficies[0]?.id);
-    setCanchaFormato(c.formato || depConfig.formatos[0]?.id);
-    setCanchaTipoPared(c.tipo_pared || (depConfig.paredes ? depConfig.paredes[0]?.id : ""));
+    setCanchaSuperficie(c.superficie || sp?.superficies[0]?.id || depConfig.superficies[0]?.id);
+    setCanchaFormato(c.formato || sp?.formatos[0]?.id || depConfig.formatos[0]?.id);
+    setCanchaTipoPared(c.tipo_pared || (sp?.paredes && sp.paredes.length > 0 ? sp.paredes[0].id : (depConfig.paredes ? depConfig.paredes[0]?.id : "")));
     setCanchaPrecioBase(String(c.precio_base || "8000"));
     setCanchaPrecioConLuz(c.precio_con_luz ? String(c.precio_con_luz) : "");
     setCanchaPrecioValle(c.precio_valle ? String(c.precio_valle) : "");
@@ -578,7 +810,7 @@ export default function ClubAdminPanel() {
       ? String(Number(c.precio_con_luz) - Number(c.precio_base))
       : "";
     setCanchaPrecioLuzAdicional(extraLuz);
-    setCanchaDuracionMinutos(c.duracion_minutos || (dep === "padel" ? 90 : 60));
+    setCanchaDuracionMinutos(c.duracion_minutos || sp?.duracionDefault || (dep === "padel" ? 90 : 60));
     setCanchaPermiteDuracionFlexible(Boolean(c.permite_duracion_flexible));
     setCanchaAntiBachesActivo(c.anti_baches_activo !== undefined ? Boolean(c.anti_baches_activo) : true);
     setCanchaPrecio90Min(c.precio_90_min ? String(c.precio_90_min) : "");
@@ -592,18 +824,33 @@ export default function ClubAdminPanel() {
     setCanchaClimatizada(Boolean(c.climatizada));
     setCanchaEstado(c.estado || "activo");
 
+    const eqIds: number[] = [];
+    if (c.equipamientos && c.equipamientos.length > 0) {
+      c.equipamientos.forEach((eq) => eqIds.push(eq.id));
+    } else {
+      equipamientosDisponibles.forEach((eq) => {
+        if ((eq.slug === "iluminacion_led" || eq.slug === "iluminacion") && c.iluminacion) eqIds.push(eq.id);
+        if ((eq.slug === "techada" || eq.slug === "techada_indoor") && c.techada) eqIds.push(eq.id);
+        if (eq.slug === "camara_grabacion" && c.camara_grabacion) eqIds.push(eq.id);
+        if (eq.slug === "marcador_digital" && c.marcador_digital) eqIds.push(eq.id);
+        if (eq.slug === "climatizada" && c.climatizada) eqIds.push(eq.id);
+      });
+    }
+    setCanchaEquipamientosIds(eqIds);
+
     setShowCanchaModal(true);
   };
 
   const handleDeporteChange = (newDeporte: string) => {
     setCanchaDeporte(newDeporte);
+    const sp = availableSports.find((s) => s.id === newDeporte);
     const depConfig = DEPORTES_CONFIG[newDeporte] || DEPORTES_CONFIG.padel;
-    setCanchaSuperficie(depConfig.superficies[0]?.id || "sintetico");
-    setCanchaFormato(depConfig.formatos[0]?.id || "");
-    if (newDeporte === "padel") {
-      setCanchaDuracionMinutos(90);
-    }
-    if (depConfig.tieneParedes && depConfig.paredes) {
+    setCanchaSuperficie(sp?.superficies[0]?.id || depConfig.superficies[0]?.id || "sintetico");
+    setCanchaFormato(sp?.formatos[0]?.id || depConfig.formatos[0]?.id || "");
+    setCanchaDuracionMinutos(sp?.duracionDefault || (newDeporte === "padel" ? 90 : 60));
+    if (sp?.tieneParedes && sp.paredes && sp.paredes.length > 0) {
+      setCanchaTipoPared(sp.paredes[0]?.id || "cristal_estandar");
+    } else if (depConfig.tieneParedes && depConfig.paredes) {
       setCanchaTipoPared(depConfig.paredes[0]?.id || "cristal_estandar");
     } else {
       setCanchaTipoPared("");
@@ -716,6 +963,12 @@ export default function ClubAdminPanel() {
 
       if (data.data?.tipos_negocio) {
         setTiposNegocio(data.data.tipos_negocio);
+      }
+      if (data.data?.deportes_catalogo) {
+        setDeportesCatalogo(data.data.deportes_catalogo);
+      }
+      if (data.data?.equipamientos_disponibles) {
+        setEquipamientosDisponibles(data.data.equipamientos_disponibles);
       }
 
       setPlan(data.data.plan);
@@ -1794,14 +2047,18 @@ export default function ClubAdminPanel() {
     setIsSavingCancha(true);
     setCanchaSuccessMsg(null);
 
-    const depConfig = DEPORTES_CONFIG[canchaDeporte] || DEPORTES_CONFIG.padel;
+    const selectedSport = availableSports.find((s) => s.id === canchaDeporte);
+    const selectedSuperficie = selectedSport?.superficies.find((s) => s.id === canchaSuperficie);
 
     const payload = {
       nombre: canchaNombre,
       deporte: canchaDeporte,
+      deporte_id: selectedSport?.modelId || null,
       superficie: canchaSuperficie,
+      superficie_id: selectedSuperficie?.modelId || null,
+      equipamientos_ids: canchaEquipamientosIds,
       formato: canchaFormato,
-      tipo_pared: depConfig.tieneParedes ? canchaTipoPared : null,
+      tipo_pared: currentSportConfig.tieneParedes ? canchaTipoPared : null,
       precio_base: parseFloat(canchaPrecioBase) || 8000,
       precio_con_luz: canchaPrecioLuzAdicional
         ? ((parseFloat(canchaPrecioBase) || 8000) + parseFloat(canchaPrecioLuzAdicional))
@@ -1893,14 +2150,18 @@ export default function ClubAdminPanel() {
     setIsSavingCancha(true);
     setCanchaErrorMsg(null);
 
-    const depConfig = DEPORTES_CONFIG[canchaDeporte] || DEPORTES_CONFIG.padel;
+    const selectedSport = availableSports.find((s) => s.id === canchaDeporte);
+    const selectedSuperficie = selectedSport?.superficies.find((s) => s.id === canchaSuperficie);
 
     const payload = {
       nombre: canchaNombre,
       deporte: canchaDeporte,
+      deporte_id: selectedSport?.modelId || null,
       superficie: canchaSuperficie,
+      superficie_id: selectedSuperficie?.modelId || null,
+      equipamientos_ids: canchaEquipamientosIds,
       formato: canchaFormato,
-      tipo_pared: depConfig.tieneParedes ? canchaTipoPared : null,
+      tipo_pared: currentSportConfig.tieneParedes ? canchaTipoPared : null,
       precio_base: parseFloat(canchaPrecioBase) || 8000,
       precio_con_luz: canchaPrecioLuzAdicional
         ? ((parseFloat(canchaPrecioBase) || 8000) + parseFloat(canchaPrecioLuzAdicional))
@@ -2420,11 +2681,11 @@ export default function ClubAdminPanel() {
                             onChange={(e) => handleDeporteChange(e.target.value)}
                             className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
                           >
-                            <option value="padel">🎾 Pádel</option>
-                            <option value="tenis">🎾 Tenis</option>
-                            <option value="futbol">⚽ Fútbol</option>
-                            <option value="basquet">🏀 Básquet</option>
-                            <option value="squash">🏸 Squash</option>
+                            {availableSports.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.icono ? `${s.icono} ` : ""}{s.nombre}
+                              </option>
+                            ))}
                           </select>
                         </div>
 
@@ -2449,7 +2710,7 @@ export default function ClubAdminPanel() {
                             onChange={(e) => setCanchaSuperficie(e.target.value)}
                             className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
                           >
-                            {(DEPORTES_CONFIG[canchaDeporte]?.superficies || []).map((s) => (
+                            {(currentSportConfig?.superficies || []).map((s) => (
                               <option key={s.id} value={s.id}>
                                 {s.label}
                               </option>
@@ -2464,7 +2725,7 @@ export default function ClubAdminPanel() {
                             onChange={(e) => setCanchaFormato(e.target.value)}
                             className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
                           >
-                            {(DEPORTES_CONFIG[canchaDeporte]?.formatos || []).map((f) => (
+                            {(currentSportConfig?.formatos || []).map((f) => (
                               <option key={f.id} value={f.id}>
                                 {f.label}
                               </option>
@@ -2474,17 +2735,17 @@ export default function ClubAdminPanel() {
                       </div>
 
                       {/* Selector de Paredes / Cerramiento: SÓLO para deportes con paredes (Pádel, Squash) */}
-                      {DEPORTES_CONFIG[canchaDeporte]?.tieneParedes && (
+                      {currentSportConfig?.tieneParedes && (
                         <div>
                           <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
-                            Tipo de Pared / Cerramiento (Exclusivo {DEPORTES_CONFIG[canchaDeporte].nombre})
+                            Tipo de Pared / Cerramiento (Exclusivo {currentSportConfig.nombre})
                           </label>
                           <select
                             value={canchaTipoPared}
                             onChange={(e) => setCanchaTipoPared(e.target.value)}
                             className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-sm text-white focus:border-emerald-500 focus:outline-none"
                           >
-                            {(DEPORTES_CONFIG[canchaDeporte]?.paredes || []).map((p) => (
+                            {(currentSportConfig?.paredes || []).map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.label}
                               </option>
@@ -2763,9 +3024,14 @@ export default function ClubAdminPanel() {
 
                     {/* SECCIÓN 4: EQUIPAMIENTO & SERVICIOS */}
                     <div className="space-y-4 pt-4 border-t border-slate-800">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                        4. Equipamiento
-                      </h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                          4. Equipamiento
+                        </h4>
+                        <span className="text-[11px] text-slate-400">
+                          Características e infraestructura
+                        </span>
+                      </div>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Iluminación */}
@@ -2773,7 +3039,7 @@ export default function ClubAdminPanel() {
                           <input
                             type="checkbox"
                             checked={canchaIluminacion}
-                            onChange={(e) => setCanchaIluminacion(e.target.checked)}
+                            onChange={(e) => toggleCoreEquipamiento("iluminacion", e.target.checked)}
                             className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
                           />
                           <div className="text-xs">
@@ -2789,10 +3055,7 @@ export default function ClubAdminPanel() {
                           <input
                             type="checkbox"
                             checked={canchaTechada}
-                            onChange={(e) => {
-                              setCanchaTechada(e.target.checked);
-                              setCanchaTipoCubierta(e.target.checked ? "indoor" : "outdoor");
-                            }}
+                            onChange={(e) => toggleCoreEquipamiento("techada", e.target.checked)}
                             className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
                           />
                           <div className="text-xs">
@@ -2808,7 +3071,7 @@ export default function ClubAdminPanel() {
                           <input
                             type="checkbox"
                             checked={canchaCamaraGrabacion}
-                            onChange={(e) => setCanchaCamaraGrabacion(e.target.checked)}
+                            onChange={(e) => toggleCoreEquipamiento("camara_grabacion", e.target.checked)}
                             className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
                           />
                           <div className="text-xs">
@@ -2824,7 +3087,7 @@ export default function ClubAdminPanel() {
                           <input
                             type="checkbox"
                             checked={canchaMarcadorDigital}
-                            onChange={(e) => setCanchaMarcadorDigital(e.target.checked)}
+                            onChange={(e) => toggleCoreEquipamiento("marcador_digital", e.target.checked)}
                             className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
                           />
                           <div className="text-xs">
@@ -2840,7 +3103,7 @@ export default function ClubAdminPanel() {
                           <input
                             type="checkbox"
                             checked={canchaClimatizada}
-                            onChange={(e) => setCanchaClimatizada(e.target.checked)}
+                            onChange={(e) => toggleCoreEquipamiento("climatizada", e.target.checked)}
                             className="h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
                           />
                           <div className="text-xs">
@@ -2867,6 +3130,94 @@ export default function ClubAdminPanel() {
                             <option value="inactivo">⚪ Inactiva</option>
                           </select>
                         </div>
+                      </div>
+
+                      {/* Atributos y Equipamientos Adicionales del Catálogo y del Club */}
+                      <div className="pt-3 border-t border-slate-800/60 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                              <span>✨</span> Atributos y Equipamientos Adicionales
+                            </span>
+                            <p className="text-[11px] text-slate-500">
+                              Selecciona equipamientos del catálogo o crea atributos exclusivos de tu club.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewEquipNombre("");
+                              setNewEquipDescripcion("");
+                              setCustomEquipErrorMsg(null);
+                              setShowAddCustomEquipModal(true);
+                            }}
+                            className="self-start sm:self-auto text-xs font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 border border-emerald-500/30 hover:border-emerald-500/60 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm"
+                          >
+                            <span>➕</span> Agregar Atributo Propio del Club
+                          </button>
+                        </div>
+
+                        {additionalEquipamientos.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                            {additionalEquipamientos.map((eq) => {
+                              const isChecked = canchaEquipamientosIds.includes(eq.id);
+                              return (
+                                <div
+                                  key={eq.id}
+                                  className={`p-3 rounded-2xl border transition flex items-start justify-between gap-2 ${
+                                    isChecked
+                                      ? "bg-slate-900 border-emerald-500/50 text-white shadow-sm"
+                                      : "bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700"
+                                  }`}
+                                >
+                                  <label className="flex items-start gap-2.5 cursor-pointer flex-1 select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => toggleEquipamiento(eq.id, eq.slug)}
+                                      className="mt-0.5 h-4 w-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0"
+                                    />
+                                    <div className="text-xs">
+                                      <div className="font-bold text-slate-200 flex items-center gap-1.5">
+                                        <span>{eq.icono || "✨"}</span> {eq.nombre}
+                                        {eq.es_propio && (
+                                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30">
+                                            Propio
+                                          </span>
+                                        )}
+                                      </div>
+                                      {eq.descripcion && (
+                                        <div className="text-slate-400 text-[11px] mt-0.5 line-clamp-1">
+                                          {eq.descripcion}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </label>
+
+                                  {eq.es_propio && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteCustomEquipamiento(eq.id);
+                                      }}
+                                      className="text-slate-500 hover:text-rose-400 p-1 rounded-lg transition"
+                                      title="Eliminar atributo personalizado del club"
+                                    >
+                                      🗑️
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-2xl bg-slate-950/40 border border-slate-800/60 text-center">
+                            <p className="text-xs text-slate-400">
+                              No hay atributos adicionales creados. Puedes agregar atributos personalizados usando el botón <strong>&quot;Agregar Atributo Propio del Club&quot;</strong>.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -2926,6 +3277,115 @@ export default function ClubAdminPanel() {
                         className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
                       >
                         {isSavingCancha ? "Guardando..." : editingCancha ? "Actualizar Cancha" : "Crear Cancha"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Submodal para Crear Atributo / Equipamiento Personalizado del Club */}
+            {showAddCustomEquipModal && (
+              <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in">
+                <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <span>✨</span> Nuevo Atributo para mi Club
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCustomEquipModal(false)}
+                      className="text-slate-400 hover:text-white p-1 rounded-lg"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Crea un atributo o equipamiento exclusivo para las canchas de tu club (ej. Césped WPT Oficial, Calefactores Radiantes, Pelotas Nuevas Incluidas).
+                  </p>
+
+                  {customEquipErrorMsg && (
+                    <div className="rounded-xl bg-rose-950/60 border border-rose-500/40 p-3 text-xs font-bold text-rose-300">
+                      {customEquipErrorMsg}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleCreateCustomEquipamiento} className="space-y-3.5">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
+                        Nombre del Atributo *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej. Césped Azul WPT Oficial"
+                        value={newEquipNombre}
+                        onChange={(e) => setNewEquipNombre(e.target.value)}
+                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
+                          Categoría
+                        </label>
+                        <select
+                          value={newEquipCategoria}
+                          onChange={(e) => setNewEquipCategoria(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none"
+                        >
+                          <option value="general">General</option>
+                          <option value="estructura">Estructura</option>
+                          <option value="iluminacion">Iluminación</option>
+                          <option value="tecnologia">Tecnología</option>
+                          <option value="confort">Confort</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
+                          Icono (Emoji)
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={4}
+                          placeholder="✨"
+                          value={newEquipIcono}
+                          onChange={(e) => setNewEquipIcono(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-white text-center focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
+                        Descripción breve (opcional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Césped texturado oficial de alta absorción"
+                        value={newEquipDescripcion}
+                        onChange={(e) => setNewEquipDescripcion(e.target.value)}
+                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddCustomEquipModal(false)}
+                        className="rounded-xl px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingCustomEquip || !newEquipNombre.trim()}
+                        className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
+                      >
+                        {isSavingCustomEquip ? "Guardando..." : "Crear Atributo"}
                       </button>
                     </div>
                   </form>
@@ -3072,7 +3532,7 @@ export default function ClubAdminPanel() {
             {/* Listado Enriquecido de Canchas (Orden Alfabético) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {sortedCanchas.map((c) => {
-                const sportCfg = DEPORTES_CONFIG[c.deporte?.toLowerCase()] || DEPORTES_CONFIG.padel;
+                const sportCfg = availableSports.find((s) => s.id === c.deporte?.toLowerCase()) || DEPORTES_CONFIG[c.deporte?.toLowerCase()] || DEPORTES_CONFIG.padel;
                 const tieneParedes = sportCfg?.tieneParedes;
 
                 return (
@@ -3155,6 +3615,19 @@ export default function ClubAdminPanel() {
                           <span className="rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 text-[11px] font-medium">
                             ❄️ Climatizada
                           </span>
+                        )}
+
+                        {c.equipamientos && c.equipamientos.length > 0 && (
+                          c.equipamientos
+                            .filter((eq) => !coreEquipSlugs.includes(eq.slug))
+                            .map((eq) => (
+                              <span
+                                key={eq.id}
+                                className="rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20 px-2 py-0.5 text-[11px] font-medium flex items-center gap-1"
+                              >
+                                <span>{eq.icono || "✨"}</span> {eq.nombre}
+                              </span>
+                            ))
                         )}
                       </div>
 

@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cancha extends Model
@@ -19,7 +20,9 @@ class Cancha extends Model
         'complejo_id',
         'nombre',
         'deporte',
+        'deporte_id',
         'superficie',
+        'superficie_id',
         'techada',
         'precio_base',
         'precio_con_luz',
@@ -95,6 +98,23 @@ class Cancha extends Model
     public function complejo(): BelongsTo
     {
         return $this->belongsTo(Complejo::class, 'complejo_id');
+    }
+
+    public function deporteRel(): BelongsTo
+    {
+        return $this->belongsTo(Deporte::class, 'deporte_id');
+    }
+
+    public function superficieRel(): BelongsTo
+    {
+        return $this->belongsTo(Superficie::class, 'superficie_id');
+    }
+
+    public function equipamientos(): BelongsToMany
+    {
+        return $this->belongsToMany(Equipamiento::class, 'cancha_equipamiento')
+            ->withPivot('valor_adicional')
+            ->withTimestamps();
     }
 
     public function turnos(): HasMany

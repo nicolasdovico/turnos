@@ -46,6 +46,7 @@ class FullTestingSeeder extends Seeder
             TipoNegocioSeeder::class,
             ModuloSeeder::class,
             PlanSeeder::class,
+            DeportesYEquipamientosSeeder::class,
         ]);
 
         $tipoClub = TipoNegocio::where('slug', 'club')->first();

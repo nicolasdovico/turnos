@@ -108,11 +108,17 @@ Route::get('/tipos-negocio', function () {
     ]);
 });
 
+Route::get('/deportes', [\App\Http\Controllers\Api\DeporteController::class, 'index']);
+
 Route::prefix('clubs')->group(function () {
     Route::get('/check-subdomain', [\App\Http\Controllers\Api\ClubOnboardingController::class, 'checkSubdomain']);
     Route::post('/registro', [\App\Http\Controllers\Api\ClubOnboardingController::class, 'registrarClub']);
     Route::get('/{subdomain}/is-admin', [\App\Http\Controllers\Api\ClubDashboardController::class, 'checkAdmin']);
     Route::get('/{subdomain}/dashboard', [\App\Http\Controllers\Api\ClubDashboardController::class, 'show']);
+    Route::get('/{subdomain}/equipamientos', [\App\Http\Controllers\Api\ClubDashboardController::class, 'getEquipamientos']);
+    Route::post('/{subdomain}/equipamientos', [\App\Http\Controllers\Api\ClubDashboardController::class, 'storeEquipamiento']);
+    Route::put('/{subdomain}/equipamientos/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateEquipamiento']);
+    Route::delete('/{subdomain}/equipamientos/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyEquipamiento']);
     Route::post('/{subdomain}/canchas', [\App\Http\Controllers\Api\ClubDashboardController::class, 'storeCancha']);
     Route::put('/{subdomain}/canchas/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'updateCancha']);
     Route::delete('/{subdomain}/canchas/{id}', [\App\Http\Controllers\Api\ClubDashboardController::class, 'destroyCancha']);

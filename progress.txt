@@ -2849,3 +2849,52 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: Test it("submits bank transfer receipt and refreshes data and closes modal") en tests/FacturacionClub.test.tsx verificando envío de POST, llamada a onRefreshSummary, cierre del modal e inserción de panel-notification-alert (129 tests de frontend pasados al 100% en Vitest).
   * BD en Vivo: Se regularizó y reactivó exitosamente Factura #4 de Complejo 125 ("Club Padel Bronce"), dejando suscripcion_estado = 'activa' y vencimiento extendido al 2026-10-22.
 ==============================================================================================================================
+[2026-09-22] - GESTIÓN DINÁMICA DE DEPORTES, SUPERFICIES Y ATRIBUTOS DE CANCHAS (MODELO HÍBRIDO SUPERADMIN / CLUB)
+==============================================================================================================================
+- Diagnóstico:
+  * El sistema contaba con configuraciones estáticas en frontend (DEPORTES_CONFIG) y columnas booleanas fijas en la tabla canchas (techada, iluminacion, camara_grabacion, marcador_digital, climatizada).
+  * No existía mecanismo en el backend ni en Filament Superadmin (/admin) para dar de alta nuevos deportes, nuevas superficies o nuevos atributos/equipamientos de canchas, ni para editar los existentes.
+  * Tampoco los administradores de club podían configurar comodidades o atributos específicos y distintivos de su propio complejo deportivo.
+- Solución e Implementación Realizada (Opción 3 Aprobada - Modelo Híbrido):
+  * 1. Base de Datos y Modelos Eloquent:
+    - Migración 2026_09_22_110000_create_deportes_superficies_and_equipamientos_tables.php:
+      * Tabla 'deportes': id, nombre, slug (unique), icono, tiene_paredes (boolean), duracion_default_minutos, formatos (json), paredes (json), orden, esta_activo.
+      * Tabla 'superficies': id, deporte_id (fk), nombre, slug, descripcion, orden, esta_activo, unique(deporte_id, slug).
+      * Tabla 'equipamientos': id, complejo_id (nullable fk para multi-tenancy), nombre, slug, categoria, icono, descripcion, aplica_a_deportes (json), orden, esta_activo.
+      * Tabla 'cancha_equipamiento': pivot [cancha_id, equipamiento_id].
+      * Tabla 'canchas': agregado de claves foráneas nullable deporte_id y superficie_id.
+    - Modelos creados:
+      * App\Models\Deporte: casts para formatos/paredes en array, relaciones superficies(), superficiesActivas(), canchas(), scopeActivo().
+      * App\Models\Superficie: relación deporte(), canchas(), scopeActivo().
+      * App\Models\Equipamiento: relación complejo(), canchas(), scopeGlobales(), scopeParaComplejo($complejoId).
+      * Actualización de App\Models\Cancha: campos deporte_id y superficie_id en fillable, relaciones deporteRel(), superficieRel(), equipamientos().
+  * 2. Seeders Centrales:
+    - DeportesYEquipamientosSeeder: Registro de 8 deportes canónicos (Pádel, Tenis, Fútbol, Básquet, Squash, Pickleball, Vóley, Hockey) con 26 superficies especializadas y 11 equipamientos/amenities globales (Iluminación LED, Cancha Techada Indoor, Cámara HD, Marcador Digital, Climatización, Tribuna, Cristales Panorámicos Blindex, Césped Monofilamento WPT, Vestuarios Directos, Sonido Ambiente, Redes Perimetrales).
+    - Backfill inteligente de canchas existentes en la base de datos vinculando deporte_id y superficie_id.
+    - Integración en DatabaseSeeder y FullTestingSeeder.
+  * 3. Filament Superadmin (/admin):
+    - Grupo de navegación "Configuración Deportiva" con 3 recursos completos:
+      * DeporteResource: ABM de deportes oficiales con slugs automáticos, toggle de paredes, duración por defecto, Repeater para formatos y paredes.
+      * SuperficieResource: ABM de superficies vinculadas a deportes, slug, descripción y orden.
+      * EquipamientoResource: ABM de atributos/amenities globales del catálogo maestro con categorías, iconos y deportes aplicables.
+  * 4. API Backend y Multitenancy:
+    - DeporteController (GET /api/deportes): Catálogo público de deportes activos y superficies.
+    - ClubDashboardController:
+      * show(): Retorna canchas con equipamientos eager-loaded, deportes_catalogo ordenados y equipamientos_disponibles (globales + propios del club).
+      * storeCancha() y updateCancha(): Aceptan deporte_id, superficie_id y equipamientos_ids, sincronizando la tabla pivot cancha_equipamiento a la vez que mantienen coherencia bidireccional con las columnas booleanas legacy.
+      * Endpoints CRUD de atributos propios del club: GET/POST/PUT/DELETE /api/clubs/{subdomain}/equipamientos con aislamiento estricto por complejo_id.
+    - Rutas registradas en backend/routes/api.php.
+  * 5. Frontend Panel del Club (Next.js 14):
+    - En frontend/app/tenants/[subdomain]/panel/page.tsx:
+      * Estados deportesCatalogo, equipamientosDisponibles, canchaEquipamientosIds.
+      * availableSports computado que combina catálogo dinámico del backend con fallback seguro DEPORTES_CONFIG.
+      * Modal de Cancha (Sección 1): Desplegables reactivos de deportes, superficies, formatos y paredes según el deporte seleccionado.
+      * Modal de Cancha (Sección 4): Checkboxes de los 5 equipamientos core con sincronización bidireccional automática + lista interactiva de atributos adicionales del catálogo y propios del club + botón "+ Agregar Atributo Propio del Club".
+      * Sub-modal interactivo para crear atributos personalizados del club con validación y guardado inmediato sin salir del flujo de la cancha.
+      * Tarjetas de canchas en el panel: Muestra de badges elegantes para atributos propios y adicionales de cada cancha.
+- Tests & Verificación de Calidad:
+  * Backend: tests/Feature/DeportesYEquipamientosTest.php con 4 pruebas completas (catálogo público, aislamiento multi-tenant de atributos, creación de atributos propios, sincronización de cancha y tabla pivot) pasando al 100% con 35 aserciones. Suite completa: 294 tests de backend pasando (1.711 aserciones).
+  * Frontend: tests/DeportesYEquipamientosClub.test.tsx con 3 pruebas completas (renderizado de badges, guardado con IDs de deporte/superficie/equipamientos, y alta inline de atributo propio) pasando al 100%. Suite completa: 132 tests de frontend pasando en 14 suites de Vitest.
+  * Total Ecosistema: 446 tests automatizados exitosos (0 fallas, 0 regresiones).
+==============================================================================================================================
+
