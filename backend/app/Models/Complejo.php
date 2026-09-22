@@ -48,6 +48,16 @@ class Complejo extends Model
         'suscripcion_trial_vence_at',
         'suscripcion_proximo_vencimiento',
         'suscripcion_gracia_vence_at',
+        'plantilla_slug',
+        'logo_url',
+        'portada_url',
+        'color_primario',
+        'color_secundario',
+        'color_acento',
+        'color_fondo',
+        'eslogan',
+        'descripcion_corta',
+        'redes_sociales',
     ];
 
     protected function casts(): array
@@ -66,6 +76,7 @@ class Complejo extends Model
             'suscripcion_trial_vence_at' => 'datetime',
             'suscripcion_proximo_vencimiento' => 'datetime',
             'suscripcion_gracia_vence_at' => 'datetime',
+            'redes_sociales' => 'array',
         ];
     }
 
@@ -294,6 +305,31 @@ class Complejo extends Model
         $picoFin = $this->hora_fin_pico_semana ?: '23:30';
 
         return ($hInicio >= $picoInicio && $hInicio < $picoFin);
+    }
+
+    /**
+     * Retorna la configuración de identidad visual, colores y plantilla con defaults seguros.
+     */
+    public function getBrandingData(): array
+    {
+        return [
+            'plantilla_slug' => $this->plantilla_slug ?: 'booking_direct',
+            'logo_url' => $this->logo_url,
+            'portada_url' => $this->portada_url,
+            'color_primario' => $this->color_primario ?: '#10b981',
+            'color_secundario' => $this->color_secundario ?: '#047857',
+            'color_acento' => $this->color_acento ?: '#06b6d4',
+            'color_fondo' => $this->color_fondo ?: '#020617',
+            'eslogan' => $this->eslogan,
+            'descripcion_corta' => $this->descripcion_corta,
+            'redes_sociales' => is_array($this->redes_sociales) ? $this->redes_sociales : [
+                'instagram' => null,
+                'facebook' => null,
+                'tiktok' => null,
+                'youtube' => null,
+                'sitio_web' => null,
+            ],
+        ];
     }
 }
 

@@ -21,12 +21,19 @@ class Pagina extends Model
         'slug',
         'contenido_html',
         'esta_publicada',
+        'orden',
+        'mostrar_en_header',
+        'mostrar_en_footer',
+        'meta_descripcion',
     ];
 
     protected function casts(): array
     {
         return [
             'esta_publicada' => 'boolean',
+            'mostrar_en_header' => 'boolean',
+            'mostrar_en_footer' => 'boolean',
+            'orden' => 'integer',
         ];
     }
 

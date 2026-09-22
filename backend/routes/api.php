@@ -163,6 +163,12 @@ Route::prefix('clubs')->group(function () {
     Route::post('/{subdomain}/facturacion/pagar-mercadopago', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'pagarMercadoPago']);
     Route::post('/{subdomain}/facturacion/pagar-stripe', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'pagarStripe']);
     Route::post('/{subdomain}/facturacion/comprobante-transferencia', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'subirComprobanteTransferencia']);
+
+    // Branding, Plantillas y Sitio Web Whitelabel (Módulo F)
+    Route::get('/{subdomain}/branding', [\App\Http\Controllers\Api\ClubBrandingController::class, 'show']);
+    Route::get('/{subdomain}/branding/templates', [\App\Http\Controllers\Api\ClubBrandingController::class, 'templates']);
+    Route::put('/{subdomain}/branding', [\App\Http\Controllers\Api\ClubBrandingController::class, 'update']);
+    Route::post('/{subdomain}/branding/upload', [\App\Http\Controllers\Api\ClubBrandingController::class, 'upload']);
 });
 
 // Vales Digitales de Lluvia (Acceso público y autogestión de jugadores)

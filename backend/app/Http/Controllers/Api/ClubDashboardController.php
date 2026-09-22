@@ -131,6 +131,8 @@ class ClubDashboardController extends Controller
                     'dias_fin_semana' => $complejo->dias_fin_semana ?? [0, 6],
                     'recordatorio_whatsapp_activo' => (bool) ($complejo->recordatorio_whatsapp_activo ?? true),
                     'recordatorio_anticipacion_minutos' => (int) ($complejo->recordatorio_anticipacion_minutos ?? 120),
+                    'branding' => $complejo->getBrandingData(),
+                    'plantilla_slug' => $complejo->plantilla_slug ?: 'booking_direct',
                     'created_at' => $complejo->created_at,
                     'owner' => $complejo->owner ? [
                         'id' => $complejo->owner->id,

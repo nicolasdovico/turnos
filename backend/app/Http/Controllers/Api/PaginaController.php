@@ -65,6 +65,10 @@ class PaginaController extends Controller
             ],
             'contenido_html' => ['required', 'string'],
             'esta_publicada' => ['nullable', 'boolean'],
+            'orden' => ['nullable', 'integer', 'min:0'],
+            'mostrar_en_header' => ['nullable', 'boolean'],
+            'mostrar_en_footer' => ['nullable', 'boolean'],
+            'meta_descripcion' => ['nullable', 'string', 'max:160'],
         ]);
 
         $pagina = Pagina::create([
@@ -72,11 +76,20 @@ class PaginaController extends Controller
             'slug' => $validated['slug'] ?? null,
             'contenido_html' => $validated['contenido_html'],
             'esta_publicada' => $validated['esta_publicada'] ?? true,
+            'orden' => $validated['orden'] ?? 0,
+            'mostrar_en_header' => $validated['mostrar_en_header'] ?? false,
+            'mostrar_en_footer' => $validated['mostrar_en_footer'] ?? false,
+            'meta_descripcion' => $validated['meta_descripcion'] ?? null,
         ]);
 
         if ($tenant) {
+            try {
+                \Illuminate\Support\Facades\Redis::del("tenant:branding:{$tenant->subdominio}");
+            } catch (\Throwable $e) {}
+
             $path = "/tenants/{$tenant->subdominio}/paginas/{$pagina->slug}";
             $this->revalidationService->revalidateTenantPath($tenant->subdominio, $path);
+            $this->revalidationService->revalidateTenantPath($tenant->subdominio, '/');
         }
 
         return response()->json([
@@ -114,13 +127,22 @@ class PaginaController extends Controller
             ],
             'contenido_html' => ['sometimes', 'required', 'string'],
             'esta_publicada' => ['sometimes', 'boolean'],
+            'orden' => ['sometimes', 'integer', 'min:0'],
+            'mostrar_en_header' => ['sometimes', 'boolean'],
+            'mostrar_en_footer' => ['sometimes', 'boolean'],
+            'meta_descripcion' => ['sometimes', 'nullable', 'string', 'max:160'],
         ]);
 
         $pagina->update($validated);
 
         if ($tenant) {
+            try {
+                \Illuminate\Support\Facades\Redis::del("tenant:branding:{$tenant->subdominio}");
+            } catch (\Throwable $e) {}
+
             $path = "/tenants/{$tenant->subdominio}/paginas/{$pagina->slug}";
             $this->revalidationService->revalidateTenantPath($tenant->subdominio, $path);
+            $this->revalidationService->revalidateTenantPath($tenant->subdominio, '/');
         }
 
         return response()->json([
@@ -149,8 +171,13 @@ class PaginaController extends Controller
         $pagina->delete();
 
         if ($tenant) {
+            try {
+                \Illuminate\Support\Facades\Redis::del("tenant:branding:{$tenant->subdominio}");
+            } catch (\Throwable $e) {}
+
             $path = "/tenants/{$tenant->subdominio}/paginas/{$slug}";
             $this->revalidationService->revalidateTenantPath($tenant->subdominio, $path);
+            $this->revalidationService->revalidateTenantPath($tenant->subdominio, '/');
         }
 
         return response()->json([
