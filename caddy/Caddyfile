@@ -9,9 +9,9 @@
         respond "OK" 200
     }
 
-    # Laravel Backend (API, Filament Admin Panel & Livewire)
+    # Laravel Backend (API, Filament Admin Panel & Livewire) and public Storage assets
     @backend {
-        path /api* /admin* /livewire* /filament* /css/filament* /js/filament*
+        path /api* /admin* /livewire* /filament* /css/filament* /js/filament* /storage*
     }
     handle @backend {
         root * /var/www/html/public

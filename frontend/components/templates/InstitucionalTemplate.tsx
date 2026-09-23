@@ -42,6 +42,7 @@ export default function InstitucionalTemplate({
           <div
             className="absolute inset-0 bg-cover bg-center opacity-30 transform scale-105 filter blur-[1px]"
             style={{ backgroundImage: `url(${branding.portada_url})` }}
+            data-testid="institucional-portada"
           />
         ) : (
           <div
@@ -55,6 +56,16 @@ export default function InstitucionalTemplate({
 
         {/* Hero Content */}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 text-center space-y-6">
+          {branding.logo_url && (
+            <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white/5 border border-white/10 p-2.5 shadow-2xl flex items-center justify-center">
+              <img
+                src={branding.logo_url}
+                alt={`Logo ${complejo.nombre}`}
+                className="w-full h-full object-contain"
+                data-testid="institucional-logo"
+              />
+            </div>
+          )}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 backdrop-blur-sm text-xs font-bold text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="capitalize">{tipoNegocioLabel} Oficial</span>

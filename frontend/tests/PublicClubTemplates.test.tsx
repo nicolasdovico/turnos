@@ -204,6 +204,8 @@ describe("Módulo F - Portal Público Whitelabel y Renderizador de las 3 Plantil
     );
 
     expect(screen.getByTestId("template-booking-direct")).toBeDefined();
+    expect(screen.getByTestId("booking-direct-portada")).toBeDefined();
+    expect(screen.getByTestId("booking-direct-logo")).toBeDefined();
     expect(screen.getByText("Reserva Directa Inmediata")).toBeDefined();
     expect(screen.getByTestId("btn-select-cancha-101")).toBeDefined();
     expect(screen.getByTestId("btn-select-cancha-102")).toBeDefined();
@@ -241,6 +243,8 @@ describe("Módulo F - Portal Público Whitelabel y Renderizador de las 3 Plantil
     );
 
     expect(screen.getByTestId("template-institucional")).toBeDefined();
+    expect(screen.getByTestId("institucional-portada")).toBeDefined();
+    expect(screen.getByTestId("institucional-logo")).toBeDefined();
     expect(screen.getByText(`"${mockBrandingBooking.eslogan}"`)).toBeDefined();
 
     // Pilares institucionales
@@ -278,6 +282,8 @@ describe("Módulo F - Portal Público Whitelabel y Renderizador de las 3 Plantil
     );
 
     expect(screen.getByTestId("template-modern-showcase")).toBeDefined();
+    expect(screen.getByTestId("modern-showcase-portada")).toBeDefined();
+    expect(screen.getByTestId("modern-showcase-logo")).toBeDefined();
     expect(screen.getByText("Showcase Deportivo Premium")).toBeDefined();
     expect(screen.getByText("Pistas & Ficha Técnica")).toBeDefined();
 

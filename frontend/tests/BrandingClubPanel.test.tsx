@@ -300,4 +300,161 @@ describe("BrandingClubPanel - Selector de Plantillas e Identidad Visual (Fronten
     expect(inputEslogan.value).toBe("El mejor pádel de la zona");
     expect(screen.queryByTestId("dirty-alert-banner")).toBeNull();
   });
+
+  it("sube logotipo exitosamente y actualiza la previsualización del logo", async () => {
+    let uploadFormData: FormData | null = null;
+
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+      if (url.includes("/branding/templates")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockTemplatesResponse),
+        });
+      }
+      if (url.includes("/branding/upload") && opts?.method === "POST") {
+        uploadFormData = opts.body;
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "Imagen subida exitosamente.",
+              url: "/storage/tenants/nico-padel/branding/logo_nuevo.png",
+              tipo: "logo",
+            }),
+        });
+      }
+      if (url.includes("/branding")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockBrandingResponse),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+
+    render(
+      <BrandingClubPanel
+        subdomain="nico-padel"
+        token="test-token-123"
+        clubNombre="Nico Padel Club"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("branding-club-panel")).toBeDefined();
+    });
+
+    const file = new File(["dummy logo content"], "mi_logo.png", { type: "image/png" });
+    const inputLogo = screen.getByTestId("logo-uploader-card").querySelector("input[type='file']") as HTMLInputElement;
+
+    fireEvent.change(inputLogo, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(uploadFormData).not.toBeNull();
+      expect(screen.getByText(/¡Logotipo subido y actualizado exitosamente!/i)).toBeDefined();
+      const mockupLogo = screen.getByTestId("mockup-logo-preview") as HTMLImageElement;
+      expect(mockupLogo.src).toContain("logo_nuevo.png");
+    });
+  });
+
+  it("sube banner de portada exitosamente y actualiza la previsualización del hero mockup", async () => {
+    let uploadFormData: FormData | null = null;
+
+    global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+      if (url.includes("/branding/templates")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockTemplatesResponse),
+        });
+      }
+      if (url.includes("/branding/upload") && opts?.method === "POST") {
+        uploadFormData = opts.body;
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "Imagen subida exitosamente.",
+              url: "/storage/tenants/nico-padel/branding/portada_nueva.jpg",
+              tipo: "portada",
+            }),
+        });
+      }
+      if (url.includes("/branding")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockBrandingResponse),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+
+    render(
+      <BrandingClubPanel
+        subdomain="nico-padel"
+        token="test-token-123"
+        clubNombre="Nico Padel Club"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("branding-club-panel")).toBeDefined();
+    });
+
+    const file = new File(["dummy portada content"], "mi_portada.jpg", { type: "image/jpeg" });
+    const inputPortada = screen.getByTestId("portada-uploader-card").querySelector("input[type='file']") as HTMLInputElement;
+
+    fireEvent.change(inputPortada, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(uploadFormData).not.toBeNull();
+      expect(screen.getByText(/¡Banner de portada subido y actualizado exitosamente!/i)).toBeDefined();
+      const mockupPortada = screen.getByTestId("mockup-portada-preview");
+      expect(mockupPortada).toBeDefined();
+      expect(mockupPortada.style.backgroundImage).toContain("portada_nueva.jpg");
+    });
+  });
+
+  it("permite quitar logotipo y portada con los botones correspondientes", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/branding/templates")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockTemplatesResponse),
+        });
+      }
+      if (url.includes("/branding")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockBrandingResponse),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+
+    render(
+      <BrandingClubPanel
+        subdomain="nico-padel"
+        token="test-token-123"
+        clubNombre="Nico Padel Club"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("branding-club-panel")).toBeDefined();
+    });
+
+    // Quitar logo
+    const btnQuitarLogo = screen.getByTestId("btn-quitar-logo");
+    fireEvent.click(btnQuitarLogo);
+    expect(screen.getByText(/Logotipo removido/i)).toBeDefined();
+    expect(screen.queryByTestId("btn-quitar-logo")).toBeNull();
+
+    // Quitar portada
+    const btnQuitarPortada = screen.getByTestId("btn-quitar-portada");
+    fireEvent.click(btnQuitarPortada);
+    expect(screen.getByText(/Banner de portada removido/i)).toBeDefined();
+    expect(screen.queryByTestId("btn-quitar-portada")).toBeNull();
+  });
 });

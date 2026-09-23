@@ -92,13 +92,23 @@ export default function BookingDirectTemplate({
     <div className="space-y-6" data-testid="template-booking-direct">
       {/* Quick Operational Sub-Header */}
       <div
-        className="border-b py-5 transition-colors duration-200"
+        className="relative overflow-hidden border-b py-6 sm:py-8 transition-colors duration-200"
         style={{
           backgroundColor: "color-mix(in srgb, var(--club-bg, #020617) 70%, #000)",
           borderColor: "color-mix(in srgb, var(--club-primary, #10b981) 15%, #1e293b)",
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {branding.portada_url && (
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30 transform scale-105 filter blur-[0.5px]"
+            style={{ backgroundImage: `url(${branding.portada_url})` }}
+            data-testid="booking-direct-portada"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-slate-950/70" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+          </div>
+        )}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span
@@ -124,8 +134,16 @@ export default function BookingDirectTemplate({
                 </span>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white">
-              Turnos Disponibles
+            <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-3">
+              {branding.logo_url && (
+                <img
+                  src={branding.logo_url}
+                  alt={`Logo ${complejo.nombre}`}
+                  className="h-8 w-8 sm:h-10 sm:w-10 object-contain rounded-xl bg-white/10 p-1 border border-white/10 flex-shrink-0"
+                  data-testid="booking-direct-logo"
+                />
+              )}
+              <span>Turnos Disponibles</span>
             </h1>
             {(complejo.direccion || complejo.ciudad || (complejo.latitud && complejo.longitud)) && (
               <div className="flex items-center gap-2.5 text-xs text-slate-400 flex-wrap pt-0.5">

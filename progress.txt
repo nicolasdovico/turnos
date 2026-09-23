@@ -2967,3 +2967,55 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * TypeScript compiler: `npx tsc --noEmit` ejecuta con código 0 (cero errores de tipos en todo el frontend).
   * Vitest frontend: 132 tests pasando al 100% en 14 suites.
 ==============================================================================================================================
+[2026-09-23] - SUBIDA, PREVISUALIZACIÓN EN VIVO Y DESPLIEGUE PÚBLICO DE LOGOTIPO Y PORTADA DE CLUBES
+==============================================================================================================================
+- Diagnóstico:
+  * Los botones "Subir Logotipo" y "Subir Portada" en la pestaña de Identidad & Diseño Web (/panel) no funcionaban: las imágenes no se previsualizaban y tampoco se mostraban en la web final del club.
+  * Causa Raíz 1 (Backend Validation 422):
+    - Al enviar el archivo mediante FormData en `BrandingClubPanel.tsx`, se enviaba `formData.append("actualizar_directo", "true")`.
+    - En `ClubBrandingController::upload`, la regla de validación `'actualizar_directo' => ['nullable', 'boolean']` fallaba estrictamente porque la regla `boolean` en Laravel no admite la cadena de texto `"true"`, lanzando error HTTP 422: "The actualizar directo field must be true or false.".
+    - Al fallar la petición HTTP, el bloque `catch` en frontend revertía inmediatamente `logoUrl` y `portadaUrl` al valor anterior (`null`), y en el bloque `finally` se revocaba el blob URL optimista, haciendo que la previsualización desapareciera instantáneamente.
+  * Causa Raíz 2 (Re-selección de archivo en input):
+    - Los `<input type="file" />` ocultos no reseteaban `e.target.value = ""`. Si el usuario intentaba subir el mismo archivo o reintentar tras un error, el evento `onChange` del navegador no se disparaba.
+  * Causa Raíz 3 (Falta de Renderizado de Portada en Plantillas Públicas):
+    - La plantilla por defecto del 95% de los clubes (`BookingDirectTemplate.tsx`) y la plantilla `ModernShowcaseTemplate.tsx` ignoraban por completo la variable `branding.portada_url` en su JSX (solo la recibían en la interfaz de TypeScript pero no la renderizaban). Por tanto, aunque el banner estuviera guardado en la base de datos, la web final nunca lo mostraba.
+    - Asimismo, el logotipo tampoco figuraba en el cuerpo del sub-header en `BookingDirectTemplate`, ni en el hero central de `InstitucionalTemplate` y `ModernShowcaseTemplate`.
+  * Causa Raíz 4 (Ausencia de Portada en el Live Preview Mockup):
+    - El recuadro interactivo "Previsualización en Vivo" (`live-preview-mockup`) solo simulaba el logo en la barra y las canchas, pero no tenía implementado el banner de portada, por lo que el usuario no podía ver cómo quedaba su portada en tiempo real.
+- Solución Implementada:
+  * 1. Backend (`ClubBrandingController.php` & `Complejo.php`):
+    - En `ClubBrandingController::upload`: se flexibilizó la regla de validación de `actualizar_directo` a `'nullable'` y se procesa mediante `filter_var(..., FILTER_VALIDATE_BOOLEAN)`, aceptando `"1"`, `"true"`, `1`, `true`, etc. sin error 422.
+    - En `getComplejoForAdmin`: se homologó la verificación de permisos con `ClubDashboardController` aceptando administrador por rol (`role === 'admin'`), flag booleano (`is_admin`), coincidencia de propietario (`complejo->user_id === user->id`) y superadmin (`admin@admin.com`).
+    - En `Complejo::getBrandingData()`: se normalizan URLs absolutas locales hacia rutas relativas same-origin `/storage/...`.
+  * 2. Frontend (`BrandingClubPanel.tsx` & `panel/page.tsx`):
+    - En `BrandingClubPanel.tsx`:
+      * Se añadió `apiUrl?: string` a las props y se computa `effectiveApiUrl` apuntando a `/api` same-origin.
+      * Se envía `formData.append("actualizar_directo", "1")` garantizando compatibilidad universal con FormData.
+      * Previsualización instantánea: los blob URLs optimistas se conservan de forma segura durante la subida y se liberan tras confirmarse la URL del servidor.
+      * Reseteo automático de `e.target.value = ""` en los inputs file tras cada selección.
+      * Live Preview Mockup mejorado: se incorporó el banner panorámico `mockup-portada-preview` y el logotipo `mockup-logo-preview` dentro de la pantalla del dispositivo simulado, permitiendo ver ambos activos gráficos en tiempo real.
+      * Botones "Quitar" mejorados con data-testid (`btn-quitar-logo`, `btn-quitar-portada`) y feedback toast.
+    - En `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+      * Se pasó `apiUrl={API_BASE}` al componente `<BrandingClubPanel>`.
+  * 3. Plantillas Públicas del Club (`BookingDirectTemplate.tsx`, `ModernShowcaseTemplate.tsx`, `InstitucionalTemplate.tsx`):
+    - `BookingDirectTemplate.tsx`: En el sub-header operativo se incorporó el fondo con la foto panorámica de `branding.portada_url` (`booking-direct-portada`) con overlays de gradiente oscuro que garantizan 100% de legibilidad de textos y botones, junto al logotipo oficial (`booking-direct-logo`) junto al título.
+    - `ModernShowcaseTemplate.tsx`: Se incorporó `branding.portada_url` (`modern-showcase-portada`) con gradiente panorámico y el logotipo (`modern-showcase-logo`) en el hero principal.
+    - `InstitucionalTemplate.tsx`: Se incorporó el logotipo oficial `branding.logo_url` (`institucional-logo`) en un marco elegante con sombra sobre el hero de bienvenida y se identificó `institucional-portada`.
+  * 4. Webserver (`caddy/Caddyfile`):
+    - Verificado ruteo directo de `@backend` para `/storage*` hacia `/var/www/html/public` con `200 OK`.
+- Verificación y Tests:
+  * Backend:
+    - 2 nuevos tests en `ClubBrandingTest.php`:
+      * `test_subida_de_portada_multipart_con_string_booleano_actualiza_club` (validando '1', 'portada', retorno 201 y prefijo /storage/).
+      * `test_subida_de_archivo_con_formato_no_permitido_retorna_422`.
+    - Suite `ClubBrandingTest`: 15/15 tests pasados en verde (58 aserciones).
+    - Suite completa Backend: 309/309 tests pasados en verde (1.769 aserciones).
+  * Frontend:
+    - 3 nuevos tests en `BrandingClubPanel.test.tsx` (subida de logo, subida de portada con mockup y quitar imágenes).
+    - Tests actualizados en `PublicClubTemplates.test.tsx` validando que las 3 plantillas renderizan portada y logo.
+    - Suite `BrandingClubPanel` y `PublicClubTemplates`: 14/14 tests pasados en verde.
+    - Suite completa Frontend: 162/162 tests pasados en verde en 18 suites de Vitest.
+  * Mobile:
+    - Suite completa Mobile: 20/20 tests pasados en verde en Jest.
+  * Total Ecosistema: 491 tests automatizados en verde (0 fallas, 0 regresiones).
+==============================================================================================================================

@@ -6445,6 +6445,7 @@ export default function ClubAdminPanel() {
               <BrandingClubPanel
                 subdomain={subdomain}
                 token={effectiveToken}
+                apiUrl={API_BASE}
                 clubNombre={clubNombre || complejo?.nombre}
               />
             ) : (

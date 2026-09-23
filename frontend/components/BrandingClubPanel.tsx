@@ -58,6 +58,7 @@ export interface BrandingClubPanelProps {
   subdomain: string;
   token?: string | null;
   clubNombre?: string;
+  apiUrl?: string;
   onSaved?: (newBranding: BrandingData) => void;
 }
 
@@ -157,8 +158,14 @@ export default function BrandingClubPanel({
   subdomain,
   token,
   clubNombre = "Mi Club",
+  apiUrl,
   onSaved,
 }: BrandingClubPanelProps) {
+  const effectiveApiUrl =
+    apiUrl ||
+    (typeof window !== "undefined"
+      ? "/api"
+      : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -194,6 +201,17 @@ export default function BrandingClubPanel({
   const resolveToken = () => {
     if (token) return token;
     if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlToken = searchParams.get("auth_token") || searchParams.get("token");
+      if (urlToken) return urlToken;
+
+      const cookieMatch = document.cookie.match(/(?:^|;\s*)saas_token=([^;]*)/);
+      if (cookieMatch) {
+        try {
+          return decodeURIComponent(cookieMatch[1]);
+        } catch {}
+      }
+
       return (
         localStorage.getItem("saas_token") ||
         localStorage.getItem("token") ||
@@ -212,7 +230,7 @@ export default function BrandingClubPanel({
 
       // Fetch templates catalog
       try {
-        const resTpl = await fetch(`${API_BASE}/clubs/${subdomain}/branding/templates`);
+        const resTpl = await fetch(`${effectiveApiUrl}/clubs/${subdomain}/branding/templates`);
         if (resTpl.ok) {
           const jsonTpl = await resTpl.json();
           if (jsonTpl.data?.plantillas && Array.isArray(jsonTpl.data.plantillas)) {
@@ -224,7 +242,7 @@ export default function BrandingClubPanel({
       }
 
       // Fetch club branding
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/branding`);
+      const res = await fetch(`${effectiveApiUrl}/clubs/${subdomain}/branding`);
       const json = await res.json();
 
       if (res.ok && json.data) {
@@ -354,8 +372,8 @@ export default function BrandingClubPanel({
       const activeToken = resolveToken();
       const payload = {
         plantilla_slug: plantillaSlug,
-        logo_url: logoUrl,
-        portada_url: portadaUrl,
+        logo_url: logoUrl?.startsWith("blob:") ? (initialData?.logo_url || null) : logoUrl,
+        portada_url: portadaUrl?.startsWith("blob:") ? (initialData?.portada_url || null) : portadaUrl,
         color_primario: colorPrimario,
         color_secundario: colorSecundario,
         color_acento: colorAcento,
@@ -371,7 +389,7 @@ export default function BrandingClubPanel({
         },
       };
 
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/branding`, {
+      const res = await fetch(`${effectiveApiUrl}/clubs/${subdomain}/branding`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -402,18 +420,36 @@ export default function BrandingClubPanel({
 
   // Upload Logo or Portada
   const handleFileUpload = async (file: File, tipo: "logo" | "portada") => {
+    const previousUrl = tipo === "logo" ? logoUrl : portadaUrl;
+    let localPreview: string | null = null;
+
     try {
       if (tipo === "logo") setUploadingLogo(true);
       if (tipo === "portada") setUploadingPortada(true);
       setErrorMsg(null);
+      setSuccessMsg(null);
+
+      // 1. Optimistic Instant Preview en 0ms
+      if (typeof window !== "undefined" && window.URL?.createObjectURL) {
+        try {
+          localPreview = URL.createObjectURL(file);
+          if (tipo === "logo") {
+            setLogoUrl(localPreview);
+          } else {
+            setPortadaUrl(localPreview);
+          }
+        } catch {
+          // Ignorar si el navegador no soporta createObjectURL
+        }
+      }
 
       const activeToken = resolveToken();
       const formData = new FormData();
       formData.append("file", file);
       formData.append("tipo", tipo);
-      formData.append("actualizar_directo", "true");
+      formData.append("actualizar_directo", "1");
 
-      const res = await fetch(`${API_BASE}/clubs/${subdomain}/branding/upload`, {
+      const res = await fetch(`${effectiveApiUrl}/clubs/${subdomain}/branding/upload`, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -424,18 +460,70 @@ export default function BrandingClubPanel({
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || !data.success) {
         throw new Error(data.message || `Error al subir ${tipo}.`);
       }
 
+      const serverUrl = data.url;
       if (tipo === "logo") {
-        setLogoUrl(data.url);
+        setLogoUrl(serverUrl);
       } else {
-        setPortadaUrl(data.url);
+        setPortadaUrl(serverUrl);
       }
 
-      setSuccessMsg(`¡${tipo === "logo" ? "Logotipo" : "Banner de portada"} actualizado exitosamente!`);
+      setSuccessMsg(`¡${tipo === "logo" ? "Logotipo" : "Banner de portada"} subido y actualizado exitosamente!`);
+
+      // Safely revoke optimistic blob preview after server URL takes effect
+      if (localPreview && typeof window !== "undefined" && window.URL?.revokeObjectURL) {
+        setTimeout(() => {
+          try {
+            URL.revokeObjectURL(localPreview!);
+          } catch {}
+        }, 1000);
+      }
+
+      // Mantener initialData sincronizado con el asset guardado en backend
+      setInitialData((prev) =>
+        prev
+          ? {
+              ...prev,
+              [tipo === "logo" ? "logo_url" : "portada_url"]: serverUrl,
+            }
+          : null
+      );
+
+      if (onSaved) {
+        onSaved({
+          plantilla_slug: plantillaSlug,
+          logo_url: tipo === "logo" ? serverUrl : logoUrl,
+          portada_url: tipo === "portada" ? serverUrl : portadaUrl,
+          color_primario: colorPrimario,
+          color_secundario: colorSecundario,
+          color_acento: colorAcento,
+          color_fondo: colorFondo,
+          eslogan: eslogan.trim() || null,
+          descripcion_corta: descripcionCorta.trim() || null,
+          redes_sociales: {
+            instagram: instagram.trim() || null,
+            facebook: facebook.trim() || null,
+            tiktok: tiktok.trim() || null,
+            youtube: youtube.trim() || null,
+            sitio_web: sitioWeb.trim() || null,
+          },
+        });
+      }
     } catch (err: any) {
+      // Revertir a la URL previa si falló la subida
+      if (tipo === "logo") {
+        setLogoUrl(previousUrl);
+      } else {
+        setPortadaUrl(previousUrl);
+      }
+      if (localPreview && typeof window !== "undefined" && window.URL?.revokeObjectURL) {
+        try {
+          URL.revokeObjectURL(localPreview);
+        } catch {}
+      }
       setErrorMsg(err.message || `Error al subir archivo de ${tipo}.`);
     } finally {
       if (tipo === "logo") setUploadingLogo(false);
@@ -839,7 +927,7 @@ export default function BrandingClubPanel({
 
               {/* Simulated Device Screen */}
               <div
-                className="rounded-2xl p-5 border shadow-2xl transition-all duration-300 space-y-4"
+                className="rounded-2xl p-5 border shadow-2xl transition-all duration-300 space-y-4 overflow-hidden"
                 style={{
                   backgroundColor: colorFondo,
                   borderColor: colorSecundario,
@@ -849,7 +937,12 @@ export default function BrandingClubPanel({
                 <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
                   <div className="flex items-center gap-2">
                     {logoUrl ? (
-                      <img src={logoUrl} alt="Logo" className="w-7 h-7 rounded-lg object-contain bg-white/5" />
+                      <img
+                        src={logoUrl}
+                        alt="Logo"
+                        className="w-7 h-7 rounded-lg object-contain bg-white/5 border border-white/10"
+                        data-testid="mockup-logo-preview"
+                      />
                     ) : (
                       <div
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white"
@@ -873,6 +966,24 @@ export default function BrandingClubPanel({
                     Oficial
                   </span>
                 </div>
+
+                {/* Portada Hero Banner Mockup */}
+                {portadaUrl ? (
+                  <div
+                    className="w-full h-24 rounded-xl overflow-hidden bg-cover bg-center border relative shadow-md"
+                    style={{
+                      backgroundImage: `url(${portadaUrl})`,
+                      borderColor: `${colorSecundario}80`,
+                    }}
+                    data-testid="mockup-portada-preview"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-transparent flex items-end p-2.5">
+                      <span className="text-[10px] font-bold text-white tracking-wide truncate">
+                        {eslogan || clubNombre}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
 
                 {/* Slogan Mockup */}
                 <div>
@@ -954,9 +1065,13 @@ export default function BrandingClubPanel({
                 {logoUrl && (
                   <button
                     type="button"
-                    onClick={() => setLogoUrl(null)}
+                    onClick={() => {
+                      setLogoUrl(null);
+                      setSuccessMsg("Logotipo removido. Haz clic en Guardar Cambios para aplicar.");
+                    }}
                     className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
                     title="Remover logotipo"
+                    data-testid="btn-quitar-logo"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Quitar</span>
@@ -981,6 +1096,7 @@ export default function BrandingClubPanel({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) handleFileUpload(file, "logo");
+                      e.target.value = "";
                     }}
                     className="hidden"
                   />
@@ -1018,9 +1134,13 @@ export default function BrandingClubPanel({
                 {portadaUrl && (
                   <button
                     type="button"
-                    onClick={() => setPortadaUrl(null)}
+                    onClick={() => {
+                      setPortadaUrl(null);
+                      setSuccessMsg("Banner de portada removido. Haz clic en Guardar Cambios para aplicar.");
+                    }}
                     className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
                     title="Remover portada"
+                    data-testid="btn-quitar-portada"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Quitar</span>
@@ -1044,6 +1164,7 @@ export default function BrandingClubPanel({
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleFileUpload(file, "portada");
+                    e.target.value = "";
                   }}
                   className="hidden"
                 />

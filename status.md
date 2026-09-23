@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 23 / 23 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Gestión Dinámica de Deportes, Superficies y Atributos de Cancha, Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, Conversión Precisa ARS/USD en Comisiones de Marketplace, y Suspensión Automática de Reservas por Abono Vencido con Levantamiento Reactivo por Pago)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Gestión dinámica de deportes, superficies y atributos/equipamientos de canchas tanto del Superadmin central en Filament como del administrador del club con atributos propios y multi-tenant; suspensión de reservas online y marketplace por abono vencido con reactivación inmediata por acreditación de pago; buscador manual con geocodificación OSM Nominatim; alta de canchas excedentes con alerta interactiva; facturación B2B y comisiones de marketplace; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
-- **Última Actualización:** 2026-09-22 (Gestión dinámica de deportes, superficies y equipamientos de canchas [Opción 3 Híbrida] y resolución de tipos de compilación para CI GitHub Actions. 446 tests automatizados en verde: 294 backend, 132 frontend, 20 mobile; 100% sin fallas ni regresiones).
+- **Tareas Completadas:** 23 / 23 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Subida y Previsualización de Logotipo y Portada Web, Gestión Dinámica de Deportes, Superficies y Atributos de Cancha, Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, Conversión Precisa ARS/USD en Comisiones de Marketplace, y Suspensión Automática de Reservas por Abono Vencido con Levantamiento Reactivo por Pago)
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Subida directa y previsualización en tiempo real de Logotipo y Portada del club con renderizado en todas las plantillas públicas; gestión dinámica de deportes, superficies y atributos/equipamientos de canchas; suspensión de reservas online y marketplace por abono vencido con reactivación inmediata por acreditación de pago; buscador manual con geocodificación OSM Nominatim; alta de canchas excedentes con alerta interactiva; facturación B2B y comisiones de marketplace; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
+- **Última Actualización:** 2026-09-23 (Subida, previsualización en vivo y despliegue público de Logotipo y Banner de Portada en plantillas de club. 491 tests automatizados en verde: 309 backend, 162 frontend, 20 mobile; 100% sin fallas ni regresiones).
 
 ---
 
@@ -84,10 +84,33 @@
 - [x] **Suspensión Automática de Reservas por Abono Vencido & Levantamiento Reactivo por Pago:** Detección de suspensión (`suscripcionValida === false` cuando `suscripcion_estado === 'vencida'`) con rechazo HTTP 403 `SUBSCRIPTION_SUSPENDED` en bloqueo temporal (`TurnoBloqueoController`) y confirmación de turnos (`TurnoConfirmarController`); bloqueo de alta de canchas y turnos fijos en `ClubDashboardController`; exclusión automática de clubes con abono vencido del buscador espacial en `GeolocationService`; banner interactivo de suspensión en `GrillaHoraria.tsx`; y levantamiento automático e inmediato de todos los bloqueos al registrarse el pago de la suscripción (Mercado Pago, Stripe, o Aprobación de Transferencia en Filament) restaurando el estado a 'activa' *(Completado)*
 - [x] **Acreditación Inmediata de Pago por Transferencia Bancaria y Cierre Automático del Modal de Pago:** Corrección en `ClubFacturacionController::subirComprobanteTransferencia` para ejecutar de inmediato `procesarPagoAprobado($factura, 'transferencia')` al registrar el comprobante de transferencia bancaria, transicionando la factura a `pagada`, reactivando el club (`suscripcion_estado = 'activa'`), extendiendo 30 días la vigencia y levantando todas las restricciones operativas; corrección en `FacturacionClubPanel.tsx` cerrando automáticamente el modal tras 1000ms con feedback de éxito, refrescando silenciosamente la facturación y notificando al panel principal (`onRefreshSummary()`) *(Completado)*
 - [x] **Gestión Dinámica de Deportes, Superficies y Atributos de Canchas (Modelo Híbrido Superadmin / Club):** Catálogo central administrable desde Filament Superadmin (`/admin`) con recursos `DeporteResource`, `SuperficieResource` y `EquipamientoResource`; consumo dinámico en el panel del club (`/panel`) en la creación y edición de canchas; capacidad de los clubes para agregar y eliminar atributos propios/exclusivos de su club (`POST/DELETE /api/clubs/{subdomain}/equipamientos`) aislados con multi-tenancy (`complejo_id`); sincronización bidireccional con campos legacy (`techada`, `iluminacion`, `precio_con_luz`, `camara_grabacion`, `marcador_digital`, `climatizada`); persistencia de relaciones `deporte_id`, `superficie_id` y `equipamientos_ids`; y renderizado de badges con atributos personalizados en las tarjetas de canchas *(Completado)*
+- [x] **Subida y Previsualización en Vivo de Logotipo y Portada Web:** Corrección de la validación en backend (`ClubBrandingController::upload`) para admitir representaciones booleanas de FormData (`'1'`, `'true'`); previsualización optimista instantánea en tarjetas y en el Mockup de previsualización en vivo (`mockup-portada-preview` y `mockup-logo-preview`); renderizado del banner panorámico de portada y del logotipo en las tres plantillas públicas (`BookingDirectTemplate`, `ModernShowcaseTemplate` e `InstitucionalTemplate`); ruteo Caddy de `/storage*`; y botones interactivos de Quitar imagen con actualización de estado *(Completado)*
 
 ---
 
 ## 🧪 Guía de Pruebas Paso a Paso para Testers
+
+### Caso de Prueba: Subida de Logotipo y Portada, Previsualización en Vivo y Despliegue en la Web Pública
+1. **Acceso a la Configuración de Marca:**
+   - Iniciar sesión como administrador de club (ej. `nico-padel`) e ingresar a `http://[subdominio].localhost:8080/panel`.
+   - Dirigirse a la pestaña **🌐 Sitio Web** y verificar que la sub-pestaña activa sea **🎨 Identidad & Diseño Web**.
+2. **Subida de Logotipo:**
+   - En la tarjeta **Logotipo Oficial**, hacer clic en el botón **Subir Logotipo** (o "Cambiar Logotipo").
+   - Seleccionar un archivo de imagen (PNG, JPEG, WEBP o SVG).
+   - Comprobar que de inmediato se muestra la previsualización en la tarjeta y en el recuadro **👁️ Previsualización en Vivo** (cabecera del dispositivo simulado).
+   - Aparece la notificación toast verde: `"¡Logotipo subido y actualizado exitosamente!"`.
+3. **Subida de Banner de Portada (Hero):**
+   - En la tarjeta **Banner de Portada (Hero)**, hacer clic en el botón **Subir Portada** (o "Cambiar Portada").
+   - Seleccionar una foto panorámica de canchas o predio.
+   - Comprobar que la imagen se previsualiza en la tarjeta y en el recuadro **👁️ Previsualización en Vivo** como banner superior del dispositivo simulado.
+   - Aparece la notificación toast verde: `"¡Banner de portada subido y actualizado exitosamente!"`.
+4. **Verificación en el Sitio Web Público:**
+   - En la parte superior de la pantalla presionar el botón **Ver mi Sitio Web en Vivo** (o abrir `http://[subdominio].localhost:8080/`).
+   - **En Plantilla 1 (Booking Direct - Más Rápida):** Comprobar que en la cabecera superior y en el sub-header se visualiza el logotipo del club, y en el fondo del bloque de turnos se aprecia el banner panorámico de portada con gradiente oscuro de alto contraste.
+   - **En Plantilla 2 (Institucional) y Plantilla 3 (Modern Showcase):** Comprobar que tanto el hero panorámico como el logotipo destacan en el centro de la escena con los colores corporativos del club.
+5. **Remoción de Imágenes:**
+   - En el panel de control presionar el botón rojo **Quitar** en Logotipo o Portada.
+   - Comprobar que la imagen desaparece de la vista previa y al hacer clic en **Guardar Cambios** se aplica la remoción en la web pública.
 
 ### Caso de Prueba: Distinción de Turnos Pasados vs. Próximos en Agenda en Clientes con Turnos Fijos (ej. Fernando Belasteguin `bela@gmail.com`)
 1. **Acceso al Panel de Administración:**

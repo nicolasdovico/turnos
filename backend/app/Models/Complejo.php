@@ -312,10 +312,18 @@ class Complejo extends Model
      */
     public function getBrandingData(): array
     {
+        $normalizeUrl = function (?string $url): ?string {
+            if (!$url) {
+                return null;
+            }
+            // Normalizar URLs absolutas locales (ej: http://localhost:8080/storage/...) a relativas (/storage/...)
+            return preg_replace('#^https?://[^/]+/storage/#', '/storage/', $url);
+        };
+
         return [
             'plantilla_slug' => $this->plantilla_slug ?: 'booking_direct',
-            'logo_url' => $this->logo_url,
-            'portada_url' => $this->portada_url,
+            'logo_url' => $normalizeUrl($this->logo_url),
+            'portada_url' => $normalizeUrl($this->portada_url),
             'color_primario' => $this->color_primario ?: '#10b981',
             'color_secundario' => $this->color_secundario ?: '#047857',
             'color_acento' => $this->color_acento ?: '#06b6d4',

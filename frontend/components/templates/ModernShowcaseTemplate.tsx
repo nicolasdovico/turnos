@@ -38,17 +38,37 @@ export default function ModernShowcaseTemplate({
   return (
     <div className="space-y-12" data-testid="template-modern-showcase">
       {/* Premium Hero Header */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-slate-900/90 via-slate-950 to-slate-950 border-b border-slate-800/80 py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden bg-slate-950 border-b border-slate-800/80 py-12 sm:py-16">
+        {branding.portada_url && (
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30 transform scale-105 filter blur-[0.5px]"
+            style={{ backgroundImage: `url(${branding.portada_url})` }}
+            data-testid="modern-showcase-portada"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-slate-950/70" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div className="space-y-3 max-w-3xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black tracking-widest uppercase">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Showcase Deportivo Premium</span>
               </div>
-              <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-                {complejo.nombre}
-              </h1>
+              <div className="flex items-center gap-4">
+                {branding.logo_url && (
+                  <img
+                    src={branding.logo_url}
+                    alt={`Logo ${complejo.nombre}`}
+                    className="h-12 w-12 sm:h-16 sm:w-16 object-contain rounded-2xl bg-white/5 border border-white/10 p-1.5 shadow-xl flex-shrink-0"
+                    data-testid="modern-showcase-logo"
+                  />
+                )}
+                <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
+                  {complejo.nombre}
+                </h1>
+              </div>
               {branding.eslogan ? (
                 <p className="text-sm sm:text-base text-slate-300 font-medium">
                   {branding.eslogan}

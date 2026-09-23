@@ -323,6 +323,52 @@ class ClubBrandingTest extends TestCase
         $this->assertStringContainsString('logo_', $this->complejoA->logo_url);
     }
 
+    public function test_subida_de_portada_multipart_con_string_booleano_actualiza_club(): void
+    {
+        Storage::fake('public');
+
+        $tokenClubA = $this->ownerClubA->createToken('test-token')->plainTextToken;
+
+        $file = UploadedFile::fake()->image('portada_padel.jpg', 1200, 600);
+
+        // Envío como string '1' y 'true' típico de FormData
+        $response = $this->withHeader('Authorization', "Bearer {$tokenClubA}")
+            ->post('/api/clubs/padel-norte/branding/upload', [
+                'file' => $file,
+                'tipo' => 'portada',
+                'actualizar_directo' => '1',
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'success' => true,
+                'tipo' => 'portada',
+            ]);
+
+        $this->complejoA->refresh();
+        $this->assertNotNull($this->complejoA->portada_url);
+        $this->assertStringContainsString('portada_', $this->complejoA->portada_url);
+        $this->assertStringStartsWith('/storage/', $this->complejoA->portada_url);
+    }
+
+    public function test_subida_de_archivo_con_formato_no_permitido_retorna_422(): void
+    {
+        Storage::fake('public');
+
+        $tokenClubA = $this->ownerClubA->createToken('test-token')->plainTextToken;
+
+        $file = UploadedFile::fake()->create('malicious.exe', 500, 'application/octet-stream');
+
+        $response = $this->withHeader('Authorization', "Bearer {$tokenClubA}")
+            ->postJson('/api/clubs/padel-norte/branding/upload', [
+                'file' => $file,
+                'tipo' => 'logo',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['file']);
+    }
+
     public function test_club_admin_puede_crear_listar_editar_y_eliminar_paginas(): void
     {
         $tokenClubA = $this->ownerClubA->createToken('test-token')->plainTextToken;
