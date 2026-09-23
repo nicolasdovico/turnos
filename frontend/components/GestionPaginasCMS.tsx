@@ -924,7 +924,7 @@ export default function GestionPaginasCMS({
                   >
                     {formContenido ? (
                       <div
-                        className="space-y-3 prose-invert"
+                        className="prose prose-invert max-w-none text-slate-300 text-xs"
                         dangerouslySetInnerHTML={{ __html: formContenido }}
                       />
                     ) : (

@@ -3129,4 +3129,43 @@ Tarea: Corrección de "The slug has already been taken" en Plantillas Rápidas C
   * Backend: 19/19 tests pasados en `ClubBrandingTest` y `CMSSanitizationAndRevalidationTest` (78 assertions).
   * Verificación en vivo: `http://club-padel-bronce.localhost:8080/paginas/quienes-somos` renderiza de forma íntegra y nítida todo el contenido de la plantilla rápida (canchas panorámicas, iluminación LED, vestuarios, Resto Bar & Terraza panorámica, footer con canal de YouTube y metadatos Open Graph completos).
 ==============================================================================================================================
+Fecha: 2026-09-23
+Tarea: Corrección del Renderizado de Tags HTML (H1-H6, UL, OL, LI, Blockquote, etc.) en Páginas Institucionales CMS
+- Problema Reportado:
+  * El usuario reportó que el renderizado de la página no tomaba algunos tags HTML como `h2`, `h3`, `li`, etc., y que únicamente el tag `strong` se mostraba formateado (en negrita).
+- Causa Raíz Identificada:
+  1. Tailwind CSS incluye por defecto un reseteo CSS integral llamado **Preflight** (basado en modern-normalize):
+     * Encabezados (`h1`, `h2`, `h3`, `h4`, `h5`, `h6`): se resetean con `font-size: inherit; font-weight: inherit; margin: 0;`. Por ende, sin clases de tipografía explícitas, un `<h2>` o `<h3>` se visualizaba con el tamaño y grosor idénticos al texto plano de un `<p>`.
+     * Listas (`ul`, `ol`): se resetean con `list-style: none; margin: 0; padding: 0;`. En consecuencia, los elementos `<li>` no mostraban viñetas (bullets), sangría ni márgenes, pareciendo oraciones continuas sin formato de lista.
+     * En contraste, `<strong>` y `<b>` sí son estilizados en Preflight con `font-weight: bolder;`, motivo por el cual solo `<strong>` se percibía con formato.
+  2. En el código fuente se asumía la presencia del plugin `@tailwindcss/typography` aplicando `className="prose ..."`, pero dicho plugin no estaba instalado en `package.json` ni registrado en `tailwind.config.ts`.
+  3. En `GestionPaginasCMS.tsx`, el contenedor de la pestaña "Vista Previa" tenía `className="space-y-3 prose-invert"` omitiendo la clase base `.prose`.
+- Solución Implementada:
+  1. En `frontend/app/globals.css`:
+     * Se crearon reglas de tipografía completas y semánticas para `.prose` y `[data-testid="vista-previa-contenido"]`:
+       - `h1`: tamaño 2rem (32px), negrita 800, color blanco, márgenes superior e inferior semánticos.
+       - `h2`: tamaño 1.5rem (24px), negrita 700, color blanco (#f8fafc), borde inferior sutil divisorio y espaciado proporcional.
+       - `h3`: tamaño 1.25rem (20px), peso 600, color gris claro (#f1f5f9).
+       - `h4`: tamaño 1.1rem, peso 600.
+       - `p`: color slate-300, line-height 1.7, márgenes superior e inferior equilibrados.
+       - `ul`: `list-style-type: disc !important; padding-left: 1.6rem !important;` para viñetas claras.
+       - `ol`: `list-style-type: decimal !important; padding-left: 1.6rem !important;` para listas numeradas.
+       - `li`: `display: list-item !important; margin: 0.35rem 0;` con color de viñeta adaptativo a `--club-accent`.
+       - `blockquote`: barra lateral de acento (`border-left: 3px solid var(--club-primary)`), fondo slate traslúcido y texto itálico.
+       - `strong` / `b`: `font-weight: 700; color: #ffffff;`.
+       - `em` / `i`: `font-style: italic; color: #e2e8f0;`.
+       - `a`: subrayado y color acento del club.
+       - `hr` y `table`: bordes, encabezados destacados y estructura tabular legible.
+  2. En `frontend/components/GestionPaginasCMS.tsx`:
+     * Se actualizó la vista previa en vivo a `className="prose prose-invert max-w-none text-slate-300 text-xs"` para reflejar fielmente los estilos tipográficos mientras el usuario redacta.
+  3. En `frontend/app/tenants/[subdomain]/paginas/[slug]/page.tsx`:
+     * Se retiró `space-y-4` del `<article>` para permitir que el ritmo vertical natural de cada etiqueta tipográfica (títulos, listas, citas y párrafos) actúe limpiamente.
+  4. Tests y Validación:
+     * Se actualizó el test de vista previa en `frontend/tests/GestionPaginasCMS.test.tsx` para verificar la existencia del contenedor `.prose` y el renderizado simultáneo de `h2`, `h3`, `ul`, `li`, `strong` y `p`.
+- Verificación:
+  * 165/165 tests de Vitest pasados.
+  * 19/19 tests de PHPUnit pasados.
+  * Verificado en `http://club-padel-bronce.localhost:8080/paginas/quienes-somos` y en `layout.css`: los estilos tipográficos están compilados y activos, renderizando títulos destacados, listas con viñetas y texto enriquecido de forma impecable.
+==============================================================================================================================
+
 

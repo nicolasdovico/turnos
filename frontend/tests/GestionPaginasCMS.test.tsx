@@ -183,7 +183,11 @@ describe("GestionPaginasCMS - Gestor y Editor de Páginas Institucionales (Panel
     fireEvent.click(screen.getByTestId("btn-nueva-pagina"));
 
     const textarea = screen.getByTestId("textarea-contenido-pagina") as HTMLTextAreaElement;
-    fireEvent.change(textarea, { target: { value: "<h2>Reglas Especiales</h2><p>Punto de oro en 40 iguales.</p>" } });
+    fireEvent.change(textarea, {
+      target: {
+        value: "<h2>Reglas Especiales</h2><h3>Instalaciones</h3><ul><li>Punto de <strong>oro</strong></li></ul><p>Punto de oro en 40 iguales.</p>",
+      },
+    });
 
     // Alternar a Vista Previa
     const tabPreview = screen.getByTestId("tab-preview");
@@ -191,6 +195,9 @@ describe("GestionPaginasCMS - Gestor y Editor de Páginas Institucionales (Panel
 
     const previewContainer = screen.getByTestId("vista-previa-contenido");
     expect(previewContainer.innerHTML).toContain("<h2>Reglas Especiales</h2>");
+    expect(previewContainer.innerHTML).toContain("<h3>Instalaciones</h3>");
+    expect(previewContainer.innerHTML).toContain("<ul><li>Punto de <strong>oro</strong></li></ul>");
+    expect(previewContainer.querySelector(".prose")).not.toBeNull();
     expect(previewContainer.innerHTML).toContain("Punto de oro en 40 iguales.");
 
     // Volver a Editor

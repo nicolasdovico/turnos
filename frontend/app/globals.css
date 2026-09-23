@@ -100,3 +100,175 @@ main[data-testid="tenant-public-portal"] .shadow-emerald-600\/30,
 main[data-testid="tenant-public-portal"] .shadow-emerald-500\/10 {
   --tw-shadow-color: color-mix(in srgb, var(--club-primary, #10b981) 30%, transparent) !important;
 }
+
+/* ==========================================================================
+   CMS Content & WYSIWYG Article Typography Styles (.prose)
+   Renders semantic HTML tags (h1-h6, ul, ol, li, blockquote, strong, em, etc.)
+   ========================================================================== */
+.prose,
+[data-testid="vista-previa-contenido"] {
+  color: #cbd5e1; /* slate-300 */
+  line-height: 1.75;
+}
+
+.prose h1,
+[data-testid="vista-previa-contenido"] h1 {
+  display: block;
+  font-size: 2rem; /* 32px */
+  font-weight: 800;
+  color: #ffffff;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.prose h2,
+[data-testid="vista-previa-contenido"] h2 {
+  display: block;
+  font-size: 1.5rem; /* 24px */
+  font-weight: 700;
+  color: #f8fafc; /* slate-50 */
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.4); /* slate-700/40 */
+}
+
+.prose h3,
+[data-testid="vista-previa-contenido"] h3 {
+  display: block;
+  font-size: 1.25rem; /* 20px */
+  font-weight: 600;
+  color: #f1f5f9; /* slate-100 */
+  margin-top: 1.35rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.prose h4,
+[data-testid="vista-previa-contenido"] h4 {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-top: 1.15rem;
+  margin-bottom: 0.4rem;
+}
+
+.prose p,
+[data-testid="vista-previa-contenido"] p {
+  display: block;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  color: #cbd5e1; /* slate-300 */
+  line-height: 1.7;
+}
+
+.prose strong,
+.prose b,
+[data-testid="vista-previa-contenido"] strong,
+[data-testid="vista-previa-contenido"] b {
+  font-weight: 700 !important;
+  color: #ffffff !important;
+}
+
+.prose em,
+.prose i,
+[data-testid="vista-previa-contenido"] em,
+[data-testid="vista-previa-contenido"] i {
+  font-style: italic !important;
+  color: #e2e8f0 !important;
+}
+
+.prose ul,
+[data-testid="vista-previa-contenido"] ul {
+  display: block;
+  list-style-type: disc !important;
+  margin-top: 0.85rem;
+  margin-bottom: 0.85rem;
+  padding-left: 1.6rem !important;
+}
+
+.prose ol,
+[data-testid="vista-previa-contenido"] ol {
+  display: block;
+  list-style-type: decimal !important;
+  margin-top: 0.85rem;
+  margin-bottom: 0.85rem;
+  padding-left: 1.6rem !important;
+}
+
+.prose li,
+[data-testid="vista-previa-contenido"] li {
+  display: list-item !important;
+  list-style: inherit !important;
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+  padding-left: 0.35rem;
+  line-height: 1.6;
+}
+
+.prose li::marker,
+[data-testid="vista-previa-contenido"] li::marker {
+  color: var(--club-accent, #10b981);
+}
+
+.prose blockquote,
+[data-testid="vista-previa-contenido"] blockquote {
+  display: block;
+  border-left: 3px solid var(--club-primary, #10b981);
+  background-color: rgba(30, 41, 59, 0.4);
+  padding: 0.85rem 1.15rem;
+  margin: 1.25rem 0;
+  border-radius: 0 0.75rem 0.75rem 0;
+  color: #94a3b8; /* slate-400 */
+  font-style: italic;
+}
+
+.prose a,
+[data-testid="vista-previa-contenido"] a {
+  color: var(--club-accent, #10b981);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.prose a:hover,
+[data-testid="vista-previa-contenido"] a:hover {
+  opacity: 0.8;
+}
+
+.prose hr,
+[data-testid="vista-previa-contenido"] hr {
+  border: none;
+  border-top: 1px solid rgba(51, 65, 85, 0.6);
+  margin: 2rem 0;
+}
+
+.prose table,
+[data-testid="vista-previa-contenido"] table {
+  width: 100%;
+  margin: 1.25rem 0;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.prose th,
+.prose td,
+[data-testid="vista-previa-contenido"] th,
+[data-testid="vista-previa-contenido"] td {
+  padding: 0.75rem;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+.prose th,
+[data-testid="vista-previa-contenido"] th {
+  background-color: rgba(30, 41, 59, 0.8);
+  font-weight: 700;
+  color: #ffffff;
+}
+

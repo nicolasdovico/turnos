@@ -187,7 +187,7 @@ export default async function TenantPaginaCMS({ params }: PageProps) {
 
           {/* Article Body (Sanitized HTML) */}
           <article
-            className="prose prose-invert prose-emerald max-w-none text-slate-300 leading-relaxed space-y-4 pt-4 border-t border-slate-800/60"
+            className="prose prose-invert max-w-none text-slate-300 leading-relaxed pt-4 border-t border-slate-800/60"
             dangerouslySetInnerHTML={{ __html: pagina.contenido_html }}
           />
 
