@@ -79,6 +79,14 @@ export default function ModernShowcaseTemplate({
                   Instalaciones de vanguardia para deportistas de alto nivel competitivo.
                 </p>
               )}
+              {branding.descripcion_corta && (
+                <p
+                  className="text-xs sm:text-sm text-slate-200/95 leading-relaxed max-w-2xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] bg-slate-950/60 backdrop-blur-md p-3.5 rounded-2xl border border-white/10"
+                  data-testid="modern-showcase-descripcion-corta"
+                >
+                  {branding.descripcion_corta}
+                </p>
+              )}
             </div>
 
             <button

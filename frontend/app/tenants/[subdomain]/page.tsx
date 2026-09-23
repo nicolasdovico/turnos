@@ -346,6 +346,7 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
         deportePrincipal={complejo.deporte_principal}
         footerLinks={navegacion.footer}
         redesSociales={branding.redes_sociales}
+        descripcionCorta={branding.descripcion_corta}
         telefono={complejo.telefono}
         direccion={complejo.direccion}
         ciudad={complejo.ciudad}

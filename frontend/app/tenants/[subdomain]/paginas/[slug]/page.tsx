@@ -219,6 +219,7 @@ export default async function TenantPaginaCMS({ params }: PageProps) {
         deportePrincipal={clubData?.deporte_principal || "pádel"}
         footerLinks={navegacion.footer}
         redesSociales={branding.redes_sociales}
+        descripcionCorta={branding.descripcion_corta}
         telefono={clubData?.telefono}
         direccion={clubData?.direccion}
         ciudad={clubData?.ciudad}

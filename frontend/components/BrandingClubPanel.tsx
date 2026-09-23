@@ -986,13 +986,13 @@ export default function BrandingClubPanel({
                   </div>
                 ) : null}
 
-                {/* Slogan Mockup */}
+                {/* Slogan & Reseña Corta Mockup */}
                 <div>
                   <h5 className="text-xs font-black text-white">
                     {eslogan || "Tu club deportivo oficial"}
                   </h5>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Reserva tu turno online en menos de 1 minuto
+                  <p className="text-[10px] text-slate-400 mt-1 line-clamp-3" data-testid="mockup-descripcion-corta">
+                    {descripcionCorta || "Reserva tu turno online en menos de 1 minuto"}
                   </p>
                 </div>
 

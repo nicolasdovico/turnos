@@ -175,6 +175,14 @@ export default function BookingDirectTemplate({
                 )}
               </div>
             )}
+            {branding.descripcion_corta && (
+              <p
+                className="text-xs text-slate-300/90 max-w-2xl leading-relaxed pt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                data-testid="booking-direct-descripcion-corta"
+              >
+                {branding.descripcion_corta}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs text-slate-400">

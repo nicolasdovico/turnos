@@ -66,6 +66,7 @@ export interface ClubFooterProps {
   ciudad?: string | null;
   latitud?: number | null;
   longitud?: number | null;
+  descripcionCorta?: string | null;
 }
 
 export default function ClubFooter({
@@ -79,6 +80,7 @@ export default function ClubFooter({
   ciudad,
   latitud,
   longitud,
+  descripcionCorta,
 }: ClubFooterProps) {
   const currentYear = new Date().getFullYear();
 
@@ -95,8 +97,8 @@ export default function ClubFooter({
           {/* Col 1: Club Info & Brand */}
           <div className="space-y-4 md:col-span-1">
             <h3 className="text-lg font-black text-white">Complejo {clubNombre}</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Tu complejo deportivo de confianza para turnos de {deportePrincipal}, torneos y vida social.
+            <p className="text-xs text-slate-400 leading-relaxed" data-testid="footer-club-description">
+              {descripcionCorta || `Tu complejo deportivo de confianza para turnos de ${deportePrincipal}, torneos y vida social.`}
             </p>
 
             {/* Social Icons */}

@@ -249,6 +249,11 @@ describe("Módulo F - Portal Público Whitelabel y Renderizador de las 3 Plantil
     // Grilla en primer plano
     expect(screen.getByTestId("mock-grilla-horaria")).toBeDefined();
 
+    // Reseña Corta / Sobre Nosotros
+    expect(screen.getByTestId("booking-direct-descripcion-corta").textContent).toContain(
+      mockBrandingBooking.descripcion_corta
+    );
+
     // Cambiar de cancha
     fireEvent.click(screen.getByTestId("btn-select-cancha-102"));
     expect(handleSelect).toHaveBeenCalledWith(102);
@@ -282,6 +287,7 @@ describe("Módulo F - Portal Público Whitelabel y Renderizador de las 3 Plantil
     expect(screen.getByTestId("institucional-portada")).toBeDefined();
     expect(screen.getByTestId("institucional-logo")).toBeDefined();
     expect(screen.getByText(`"${mockBrandingBooking.eslogan}"`)).toBeDefined();
+    expect(screen.getByText(mockBrandingBooking.descripcion_corta)).toBeDefined();
 
     // Pilares institucionales
     expect(screen.getByText("Instalaciones Pro")).toBeDefined();
@@ -322,6 +328,11 @@ describe("Módulo F - Portal Público Whitelabel y Renderizador de las 3 Plantil
     expect(screen.getByTestId("modern-showcase-logo")).toBeDefined();
     expect(screen.getByText("Showcase Deportivo Premium")).toBeDefined();
     expect(screen.getByText("Pistas & Ficha Técnica")).toBeDefined();
+
+    // Reseña Corta / Sobre Nosotros
+    expect(screen.getByTestId("modern-showcase-descripcion-corta").textContent).toContain(
+      mockBrandingBooking.descripcion_corta
+    );
 
     // Badges técnicos
     expect(screen.getAllByText("Iluminación LED").length).toBeGreaterThanOrEqual(1);

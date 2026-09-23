@@ -3169,3 +3169,33 @@ Tarea: Corrección del Renderizado de Tags HTML (H1-H6, UL, OL, LI, Blockquote, 
 ==============================================================================================================================
 
 
+Fecha: 2026-09-23
+Tarea: Visualización Integral de "Reseña Corta / Sobre Nosotros" en Plantillas Web Públicas, Footer y Mockup de Administración
+- Problema Reportado:
+  * El usuario reportó que el contenido configurado en "Reseña Corta / Sobre Nosotros" (campo `descripcion_corta` de la identidad de marca del club) no se estaba mostrando en la página web pública del club.
+- Causa Raíz Identificada:
+  1. En las plantillas web públicas:
+     * `ModernShowcaseTemplate.tsx` y `BookingDirectTemplate.tsx` recibían la propiedad `branding` en sus props (incluyendo `branding.descripcion_corta`), pero en su JSX nunca la renderizaban. Únicamente la plantilla `InstitucionalTemplate.tsx` incluía su renderizado. Dado que el club de prueba `club-padel-bronce` utiliza la plantilla `modern_showcase`, la reseña corta no se mostraba a los visitantes.
+  2. En el pie de página (`ClubFooter.tsx`):
+     * La columna 1 mostraba un texto estático/hardcodeado: `"Tu complejo deportivo de confianza para turnos de {deportePrincipal}, torneos y vida social."` en lugar de mostrar la reseña personalizada configurada por el club.
+  3. En la previsualización del panel de administración (`BrandingClubPanel.tsx`):
+     * El dispositivo mockup de previsualización en vivo solo renderizaba el eslogan y un texto de muestra genérico, sin reflejar el valor dinámico del campo `descripcionCorta`.
+- Solución Implementada:
+  1. `frontend/components/templates/ModernShowcaseTemplate.tsx`:
+     * Se incorporó el renderizado de `branding.descripcion_corta` en la sección Hero, destacado en un contenedor con efecto glassmorphism (`bg-slate-950/60 backdrop-blur-md border border-white/10 rounded-2xl p-3.5`) y `data-testid="modern-showcase-descripcion-corta"`.
+  2. `frontend/components/templates/BookingDirectTemplate.tsx`:
+     * Se agregó el renderizado de `branding.descripcion_corta` en el subheader de bienvenida y contexto del club con `data-testid="booking-direct-descripcion-corta"`.
+  3. `frontend/components/templates/ClubFooter.tsx`:
+     * Se añadió la propiedad opcional `descripcionCorta?: string | null` a `ClubFooterProps`.
+     * Se renderiza `{descripcionCorta || "Tu complejo deportivo de confianza..."}` con `data-testid="footer-club-description"`.
+  4. Páginas de Tenants (`app/tenants/[subdomain]/page.tsx` y `app/tenants/[subdomain]/paginas/[slug]/page.tsx`):
+     * Se pasó `descripcionCorta={branding.descripcion_corta}` al componente `<ClubFooter />` en la home pública y en todas las páginas institucionales CMS.
+  5. `frontend/components/BrandingClubPanel.tsx`:
+     * Se actualizó la tarjeta de previsualización del teléfono simulado con `data-testid="mockup-descripcion-corta"`, mostrando el texto en vivo de `descripcionCorta` a medida que el administrador lo tipea.
+  6. Tests Automatizados:
+     * En `frontend/tests/PublicClubTemplates.test.tsx`, se agregaron aserciones que verifican el renderizado de `descripcion_corta` en `BookingDirectTemplate`, `InstitucionalTemplate` y `ModernShowcaseTemplate`.
+- Verificación:
+  * Frontend: 165/165 tests pasados en Vitest (18 archivos de test 100% exitosos).
+  * Backend: 19/19 tests pasados en `ClubBrandingTest` y `CMSSanitizationAndRevalidationTest` (78 aserciones).
+  * Verificación en vivo: La reseña corta del club se visualiza de forma elegante en el Hero de la web pública, en el pie de página de todas las vistas, en los metadatos SEO y en el mockup interactivo del panel de administración.
+==============================================================================================================================
