@@ -6452,6 +6452,7 @@ export default function ClubAdminPanel() {
               <GestionPaginasCMS
                 subdomain={subdomain}
                 token={effectiveToken}
+                apiUrl={API_BASE}
                 clubNombre={clubNombre || complejo?.nombre}
               />
             )}

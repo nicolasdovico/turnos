@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 23 / 23 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Icono y Enlace a Canal de YouTube en Pie de Página, Calibración Visual y Luminosidad de Portada en Plantillas Web Públicas, Subida y Previsualización de Logotipo y Portada Web, Gestión Dinámica de Deportes, Superficies y Atributos de Cancha, Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, Conversión Precisa ARS/USD en Comisiones de Marketplace, y Suspensión Automática de Reservas por Abono Vencido con Levantamiento Reactivo por Pago)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Icono y enlace a YouTube en el footer del club con normalización de enlaces; banner de portada luminoso y nítido con colores vivos en todas las plantillas web públicas; subida directa y previsualización en tiempo real de Logotipo y Portada del club; gestión dinámica de deportes, superficies y atributos/equipamientos de canchas; suspensión de reservas online y marketplace por abono vencido con reactivación inmediata por acreditación de pago; buscador manual con geocodificación OSM Nominatim; alta de canchas excedentes con alerta interactiva; facturación B2B y comisiones de marketplace; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
-- **Última Actualización:** 2026-09-23 (Icono y enlace de YouTube en ClubFooter y normalización inteligente de URLs sociales. 492 tests automatizados en verde: 309 backend, 163 frontend, 20 mobile; 100% sin fallas ni regresiones).
+- **Tareas Completadas:** 23 / 23 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Gestor de Páginas Institucionales CMS con Same-Origin y Normalización de Rutas `/api/`, Icono y Enlace a Canal de YouTube en Pie de Página, Calibración Visual y Luminosidad de Portada en Plantillas Web Públicas, Subida y Previsualización de Logotipo y Portada Web, Gestión Dinámica de Deportes, Superficies y Atributos de Cancha, Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, Conversión Precisa ARS/USD en Comisiones de Marketplace, y Suspensión Automática de Reservas por Abono Vencido con Levantamiento Reactivo por Pago)
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Gestión, creación y publicación de páginas institucionales CMS con plantillas rápidas y normalización same-origin; icono y enlace a YouTube en el footer del club; banner de portada luminoso y nítido con colores vivos en todas las plantillas web públicas; subida directa y previsualización en tiempo real de Logotipo y Portada del club; gestión dinámica de deportes, superficies y atributos/equipamientos de canchas; suspensión de reservas online y marketplace por abono vencido con reactivación inmediata por acreditación de pago; buscador manual con geocodificación OSM Nominatim; alta de canchas excedentes con alerta interactiva; facturación B2B y comisiones de marketplace; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
+- **Última Actualización:** 2026-09-23 (Normalización de rutas y endpoints en GestionPaginasCMS eliminando duplicación `/api/api/`, autenticación extendida y verificación end-to-end de creación de páginas institucionales. 492 tests automatizados en verde: 309 backend, 163 frontend, 20 mobile; 100% sin fallas ni regresiones).
 
 ---
 
@@ -303,3 +303,18 @@
    - Pasar el cursor sobre el icono y verificar el tooltip `"YouTube"` y el cambio de color característico a rojo (`hover:text-red-500`).
 4. **Comprobación del Enlace y Apertura:**
    - Hacer clic en el icono de YouTube y comprobar que se abre en una nueva pestaña redirigiendo a la URL configurada para el club (ej: `https://youtube.com/club_padel_bronce`).
+
+### Caso de Prueba: Creación y Publicación de Páginas Institucionales CMS desde el Panel
+1. **Acceso al Gestor de Páginas CMS:**
+   - Ingresar a `http://club-padel-bronce.localhost:8080/panel`.
+   - Navegar a la pestaña **Sitio Web** y luego a la subpestaña **Páginas Institucionales**.
+2. **Uso de Plantilla Rápida de Inicio:**
+   - En la sección de plantillas de inicio, hacer clic en **Quiénes Somos e Instalaciones** (o presionar **+ Nueva Página**).
+   - Comprobar que se abre el modal del editor con el título, slug (`quienes-somos`) y contenido pre-cargado.
+3. **Guardado y Creación Exitosa:**
+   - Presionar **Guardar y Publicar Página**.
+   - Verificar que no arroja error de ruta `api/api/...` y la petición se realiza de forma limpia a `/api/clubs/{subdomain}/paginas`.
+   - Comprobar que el modal se cierra y la nueva página aparece en el listado de páginas activas.
+4. **Verificación en la Web Pública:**
+   - Hacer clic en el icono de enlace externo junto a la página o ingresar directamente a `http://club-padel-bronce.localhost:8080/paginas/quienes-somos`.
+   - Constatar que la página institucional carga fluidamente (HTTP 200) con el contenido redactado, encabezado del club, pie de página y metadatos SEO.

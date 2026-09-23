@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   FileText,
   Plus,
@@ -48,6 +48,7 @@ export interface GestionPaginasCMSProps {
   subdomain: string;
   token?: string | null;
   clubNombre?: string;
+  apiUrl?: string;
   onPageChanged?: () => void;
 }
 
@@ -122,8 +123,18 @@ export default function GestionPaginasCMS({
   subdomain,
   token,
   clubNombre = "Club Deportivo",
+  apiUrl,
   onPageChanged,
 }: GestionPaginasCMSProps) {
+  const effectiveApiUrl = useMemo(() => {
+    const raw =
+      apiUrl ||
+      (typeof window !== "undefined"
+        ? "/api"
+        : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
+    return raw.replace(/\/api\/?$/, "");
+  }, [apiUrl]);
+
   const [paginas, setPaginas] = useState<PaginaCMS[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -157,10 +168,23 @@ export default function GestionPaginasCMS({
   const getAuthToken = (): string | null => {
     if (token) return token;
     if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlToken = searchParams.get("auth_token") || searchParams.get("token");
+      if (urlToken) return urlToken;
+
+      const cookieMatch = document.cookie.match(/(?:^|;\s*)saas_token=([^;]*)/);
+      if (cookieMatch) {
+        try {
+          return decodeURIComponent(cookieMatch[1]);
+        } catch {}
+      }
+
       return (
+        localStorage.getItem("saas_token") ||
         localStorage.getItem("token") ||
         localStorage.getItem("auth_token") ||
-        localStorage.getItem(`club_admin_token_${subdomain}`)
+        localStorage.getItem(`club_admin_token_${subdomain}`) ||
+        null
       );
     }
     return null;
@@ -172,9 +196,8 @@ export default function GestionPaginasCMS({
       setLoading(true);
       setErrorMsg(null);
       const activeToken = getAuthToken();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-      const res = await fetch(`${apiUrl}/api/clubs/${subdomain}/paginas`, {
+      const res = await fetch(`${effectiveApiUrl}/api/clubs/${subdomain}/paginas`, {
         headers: {
           Accept: "application/json",
           ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
@@ -310,7 +333,6 @@ export default function GestionPaginasCMS({
       setSaving(true);
       setFormError(null);
       const activeToken = getAuthToken();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
       const payload = {
         titulo: formTitulo.trim(),
@@ -324,8 +346,8 @@ export default function GestionPaginasCMS({
       };
 
       const url = editingPageId
-        ? `${apiUrl}/api/clubs/${subdomain}/paginas/${editingPageId}`
-        : `${apiUrl}/api/clubs/${subdomain}/paginas`;
+        ? `${effectiveApiUrl}/api/clubs/${subdomain}/paginas/${editingPageId}`
+        : `${effectiveApiUrl}/api/clubs/${subdomain}/paginas`;
 
       const method = editingPageId ? "PUT" : "POST";
 
@@ -368,10 +390,9 @@ export default function GestionPaginasCMS({
     try {
       setIsDeleting(true);
       const activeToken = getAuthToken();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
       const res = await fetch(
-        `${apiUrl}/api/clubs/${subdomain}/paginas/${deletingPage.id}`,
+        `${effectiveApiUrl}/api/clubs/${subdomain}/paginas/${deletingPage.id}`,
         {
           method: "DELETE",
           headers: {

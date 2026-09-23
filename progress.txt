@@ -3071,3 +3071,28 @@ Tarea: Incorporación del Icono y Enlace a Canal de YouTube en el Pie de Página
   * Backend: 15/15 tests pasados en `ClubBrandingTest` (58 assertions).
   * En club `club-padel-bronce`: verificado en base de datos que cuenta con `youtube: "https://youtube.com/club_padel_bronce"` y ahora se visualiza correctamente en el pie de página de la web pública.
 ==============================================================================================================================
+Fecha: 2026-09-23
+Tarea: Corrección de Ruta Duplicada `/api/api/` y Autorización en Gestor de Páginas CMS (`GestionPaginasCMS`)
+- Problema Reportado:
+  * Al intentar crear y guardar una página institucional en `club-padel-bronce` usando la plantilla rápida "Quiénes Somos e Instalaciones", el modal de edición arrojó el error `The route api/api/clubs/club-padel-bronce/paginas could not be found.` y la página no se publicó.
+- Causa Raíz Identificada:
+  * En `frontend/components/GestionPaginasCMS.tsx`:
+    1. En `fetchPaginas`, `handleSave` y `handleConfirmDelete`, la URL base se construía como `${apiUrl}/api/clubs/${subdomain}/paginas`.
+    2. Como `NEXT_PUBLIC_API_URL` en el entorno Docker está configurado como `http://localhost:8080/api` (termina en `/api`), al concatenar `/api/...` se duplicaba el prefijo generando la ruta inexistente `/api/api/clubs/club-padel-bronce/paginas`.
+    3. `GestionPaginasCMSProps` no aceptaba la propiedad `apiUrl`, a diferencia de `BrandingClubPanel`, forzando el fallback que causaba la duplicación.
+    4. En `backend/app/Http/Controllers/Api/PaginaController.php`, el método `getComplejoForAdmin` solo consultaba el guard `sanctum` de forma estricta y requería `role === 'admin'`, sin homologar los guards `web`, `is_admin` booleano y superadmin presentes en `ClubBrandingController`.
+- Solución Implementada:
+  * En `GestionPaginasCMS.tsx`:
+    - Se agregó `apiUrl?: string` a `GestionPaginasCMSProps`.
+    - Se implementó `effectiveApiUrl` con `useMemo` que normaliza la URL eliminando cualquier sufijo `/api` redundante (`raw.replace(/\/api\/?$/, "")`), evitando la duplicación independientemente de si la variable de entorno incluye o no `/api`.
+    - Se ampliaron los orígenes de resolución de credenciales en `getAuthToken` (URL query params, cookie `saas_token` y localStorage `saas_token`).
+    - Se actualizaron las 3 llamadas fetch (`fetchPaginas`, `handleSave` y `handleConfirmDelete`) para utilizar `effectiveApiUrl`.
+  * En `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+    - Se pasó `apiUrl={API_BASE}` a `<GestionPaginasCMS />` para que en el navegador utilice la ruta relativa same-origin `/api` evitando problemas de CORS o cross-origin.
+  * En `backend/app/Http/Controllers/Api/PaginaController.php`:
+    - Se homologó `getComplejoForAdmin` con `ClubBrandingController` para soportar tokens Sanctum, sesiones web, usuarios propietarios del complejo y superadministradores.
+- Verificación y Tests:
+  * Backend: 19/19 tests pasados en `ClubBrandingTest` y `CMSSanitizationAndRevalidationTest` (78 assertions).
+  * Frontend: 163/163 tests pasados en Vitest (`tests/GestionPaginasCMS.test.tsx` y suite completa).
+  * En club `club-padel-bronce`: página "Quiénes Somos e Instalaciones" creada exitosamente (`id: 7`, `slug: "quienes-somos"`), publicada y verificada en `http://club-padel-bronce.localhost:8080/paginas/quienes-somos` respondiendo HTTP 200 con su contenido y metadatos SEO.
+==============================================================================================================================
