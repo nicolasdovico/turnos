@@ -13,7 +13,7 @@ class RevalidationService
      */
     public function revalidateTenantPath(string $subdomain, string $path): bool
     {
-        $frontendUrl = rtrim(config('services.frontend.url', env('FRONTEND_URL', 'http://frontend:3000')), '/');
+        $frontendUrl = rtrim(config('services.frontend.internal_url', env('FRONTEND_INTERNAL_URL', 'http://frontend:3000')), '/');
         $secret = config('services.frontend.revalidate_secret', env('REVALIDATE_SECRET_TOKEN', 'turnos-secret-revalidate-token'));
 
         $endpoint = "{$frontendUrl}/api/revalidate";

@@ -3096,3 +3096,37 @@ Tarea: Corrección de Ruta Duplicada `/api/api/` y Autorización en Gestor de P�
   * Frontend: 163/163 tests pasados en Vitest (`tests/GestionPaginasCMS.test.tsx` y suite completa).
   * En club `club-padel-bronce`: página "Quiénes Somos e Instalaciones" creada exitosamente (`id: 7`, `slug: "quienes-somos"`), publicada y verificada en `http://club-padel-bronce.localhost:8080/paginas/quienes-somos` respondiendo HTTP 200 con su contenido y metadatos SEO.
 ==============================================================================================================================
+Fecha: 2026-09-23
+Tarea: Corrección de "The slug has already been taken" en Plantillas Rápidas CMS y Revalidación en Tiempo Real
+- Problema Reportado:
+  * Al intentar aplicar y guardar una página institucional usando la plantilla rápida "Quiénes Somos e Instalaciones", el sistema arrojaba el error `The slug has already been taken.` y la página pública solo mostraba el texto preliminar/de prueba en lugar del contenido detallado de la plantilla por defecto.
+- Causa Raíz Identificada:
+  1. En `frontend/components/GestionPaginasCMS.tsx`:
+     * La función `handleApplyStarterTemplate` seteaba incondicionalmente `setEditingPageId(null)`. Al aplicar una plantilla rápida cuyo slug ya existía previamente para el club (ej. `quienes-somos`), el botón de guardar intentaba ejecutar un `POST /api/clubs/{subdomain}/paginas` (creación de nueva página) en lugar de un `PUT` (actualización de la página existente), provocando el rechazo 422 de Laravel por slug duplicado (`The slug has already been taken.`).
+     * `handleSavePage` no contaba con validación preventiva del lado del cliente para verificar slugs duplicados antes de despachar la petición de red.
+  2. En `frontend/app/tenants/[subdomain]/paginas/[slug]/page.tsx`:
+     * Tenía configurado `export const revalidate = 3600;` e invocaba `fetch` con `next: { revalidate: 3600 }` sin forzar dynamic rendering ni ignorar el cache estático. Esto retenía en caché el contenido corto de prueba previo durante 1 hora.
+  3. En `backend/app/Services/RevalidationService.php`:
+     * Utilizaba `config('services.frontend.url', env('FRONTEND_URL', 'http://frontend:3000'))`. Como en el entorno Docker `FRONTEND_URL` está configurado con la URL pública del navegador `http://localhost:8080`, el backend intentaba contactar `http://localhost:8080/api/revalidate` que no alcanzaba el contenedor frontend `http://frontend:3000`.
+- Solución Implementada:
+  1. En `frontend/components/GestionPaginasCMS.tsx`:
+     * Se actualizó `handleApplyStarterTemplate` para buscar si el slug de la plantilla ya existe en la lista de páginas del club (`paginas.find((p) => p.slug.toLowerCase() === tmpl.slug.toLowerCase())`). Si existe, asigna `setEditingPageId(existing.id)` y mantiene el orden asignado, permitiendo que al guardar se ejecute un `PUT /api/clubs/{subdomain}/paginas/{id}` (actualización limpia sin error de duplicación).
+     * Se agregó validación preventiva en el cliente en `handleSavePage` contra slugs duplicados de otras páginas existentes con mensajes claros en español.
+     * Se mejoró el mapeo de errores del backend para traducir y formatear adecuadamente errores de slug único.
+     * Se incorporó una barra rápida de carga de plantillas (`btn-modal-starter-*`) dentro del propio modal de edición para permitir recargar o cambiar de plantilla en cualquier momento con un solo clic.
+  2. En `frontend/app/tenants/[subdomain]/paginas/[slug]/page.tsx`:
+     * Se definió `export const dynamic = "force-dynamic";` y `export const revalidate = 0;`.
+     * Se configuró `cache: "no-store"` en `getPagina` y `getClubBranding`, garantizando que tanto los visitantes como los administradores vean instantáneamente los cambios publicados en la web pública sin retención de caché obsoleta.
+  3. En `backend/app/Services/RevalidationService.php` y `backend/config/services.php`:
+     * Se configuró `services.frontend.internal_url` y `FRONTEND_INTERNAL_URL` con valor por defecto `http://frontend:3000`, asegurando que las llamadas de revalidación ISR servidor a servidor dentro de la red Docker lleguen directamente a Next.js y retornen HTTP 200 `{"revalidated": true}`.
+     * En `PaginaController.php`, se agregó la revalidación del slug anterior en caso de que el slug haya sido modificado durante la edición.
+  4. Tests automatizados:
+     * En `frontend/tests/GestionPaginasCMS.test.tsx`, se agregaron 2 nuevos casos de prueba:
+       - Validación de vinculación automática con la página existente (`PUT` en lugar de `POST`) al aplicar una plantilla con slug preexistente.
+       - Validación preventiva del cliente ante intentos de duplicar slugs existentes.
+- Verificación y Tests:
+  * Frontend: 165/165 tests pasados en Vitest (`tests/GestionPaginasCMS.test.tsx` 9/9 pasados; suite completa de 18 archivos 165/165 pasados).
+  * Backend: 19/19 tests pasados en `ClubBrandingTest` y `CMSSanitizationAndRevalidationTest` (78 assertions).
+  * Verificación en vivo: `http://club-padel-bronce.localhost:8080/paginas/quienes-somos` renderiza de forma íntegra y nítida todo el contenido de la plantilla rápida (canchas panorámicas, iluminación LED, vestuarios, Resto Bar & Terraza panorámica, footer con canal de YouTube y metadatos Open Graph completos).
+==============================================================================================================================
+

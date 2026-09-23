@@ -180,6 +180,7 @@ class PaginaController extends Controller
             'meta_descripcion' => ['sometimes', 'nullable', 'string', 'max:160'],
         ]);
 
+        $oldSlug = $pagina->slug;
         $pagina->update($validated);
 
         $cleanSubdomain = strtolower(trim($subdomain));
@@ -187,6 +188,9 @@ class PaginaController extends Controller
             Redis::del("tenant:branding:{$cleanSubdomain}");
         } catch (\Throwable $e) {}
 
+        if ($oldSlug !== $pagina->slug) {
+            $this->revalidationService->revalidateTenantPath($cleanSubdomain, "/tenants/{$cleanSubdomain}/paginas/{$oldSlug}");
+        }
         $this->revalidationService->revalidateTenantPath($cleanSubdomain, "/tenants/{$cleanSubdomain}/paginas/{$pagina->slug}");
         $this->revalidationService->revalidateTenantPath($cleanSubdomain, '/');
 

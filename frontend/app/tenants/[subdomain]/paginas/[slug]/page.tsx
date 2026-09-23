@@ -5,7 +5,8 @@ import ClubHeader from "@/components/templates/ClubHeader";
 import ClubFooter from "@/components/templates/ClubFooter";
 import { ArrowLeft, Calendar, FileText } from "lucide-react";
 
-export const revalidate = 3600; // Incremental Static Regeneration (ISR) every 1 hour
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 interface PageProps {
   params: {
@@ -25,7 +26,7 @@ async function getPagina(subdomain: string, slug: string) {
         "X-Tenant-ID": subdomain,
         Accept: "application/json",
       },
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
 
     if (!res.ok) {
@@ -56,7 +57,7 @@ async function getClubBranding(subdomain: string) {
       headers: {
         Accept: "application/json",
       },
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
 
     if (!res.ok) {

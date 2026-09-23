@@ -341,4 +341,131 @@ describe("GestionPaginasCMS - Gestor y Editor de Páginas Institucionales (Panel
       expect(deleteCalled).toBe(true);
     });
   });
+
+  it("vincula automáticamente con la página existente cuando se aplica una plantilla cuyo slug ya existe (realizando PUT)", async () => {
+    let capturedMethod = "";
+    let capturedUrl = "";
+
+    const paginasConQuienesSomos = [
+      ...mockPaginas,
+      {
+        id: 7,
+        complejo_id: 10,
+        titulo: "Antiguo Quiénes Somos",
+        slug: "quienes-somos",
+        contenido_html: "<p>Texto corto viejo</p>",
+        esta_publicada: true,
+        orden: 3,
+        mostrar_en_header: true,
+        mostrar_en_footer: true,
+        meta_descripcion: "Texto viejo",
+        created_at: "2026-09-22T10:00:00Z",
+      },
+    ];
+
+    global.fetch = vi.fn().mockImplementation((url: string, options?: any) => {
+      if (url.includes("/api/clubs/padel-norte/paginas/7") && options?.method === "PUT") {
+        capturedMethod = options.method;
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "Página actualizada exitosamente.",
+              data: { id: 7, ...JSON.parse(options.body) },
+            }),
+        });
+      }
+      if (url.includes("/api/clubs/padel-norte/paginas")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true, data: paginasConQuienesSomos }),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+
+    render(
+      <GestionPaginasCMS
+        subdomain="padel-norte"
+        token="token-admin"
+        clubNombre="Club Padel Norte"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-nueva-pagina")).toBeDefined();
+    });
+
+    // Abrir modal de nueva página
+    fireEvent.click(screen.getByTestId("btn-nueva-pagina"));
+    expect(screen.getByTestId("modal-editor-pagina")).toBeDefined();
+
+    // En el modal, hacer click en la plantilla rápida "Quiénes Somos e Instalaciones" (índice 1)
+    const btnTemplate = screen.getByTestId("btn-modal-starter-1");
+    fireEvent.click(btnTemplate);
+
+    const inputTitulo = screen.getByTestId("input-titulo-pagina") as HTMLInputElement;
+    const inputSlug = screen.getByTestId("input-slug-pagina") as HTMLInputElement;
+
+    expect(inputTitulo.value).toBe(STARTER_TEMPLATES[1].titulo);
+    expect(inputSlug.value).toBe(STARTER_TEMPLATES[1].slug);
+
+    // Guardar
+    fireEvent.click(screen.getByTestId("btn-guardar-pagina"));
+
+    await waitFor(() => {
+      expect(capturedMethod).toBe("PUT");
+    });
+    expect(capturedUrl).toContain("/api/clubs/padel-norte/paginas/7");
+  });
+
+  it("bloquea el guardado en el cliente mostrando un mensaje claro si se ingresa un slug duplicado", async () => {
+    let fetchCalled = false;
+
+    global.fetch = vi.fn().mockImplementation((url: string, options?: any) => {
+      if (options?.method === "POST" || options?.method === "PUT") {
+        fetchCalled = true;
+      }
+      if (url.includes("/api/clubs/padel-norte/paginas")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true, data: mockPaginas }),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+
+    render(
+      <GestionPaginasCMS
+        subdomain="padel-norte"
+        token="token-admin"
+        clubNombre="Club Padel Norte"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-nueva-pagina")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId("btn-nueva-pagina"));
+
+    // Intentar crear una página con el slug "reglamento-general" que ya existe en mockPaginas (id 1)
+    fireEvent.change(screen.getByTestId("input-titulo-pagina"), {
+      target: { value: "Nuevo Reglamento Duplicado" },
+    });
+    fireEvent.change(screen.getByTestId("input-slug-pagina"), {
+      target: { value: "reglamento-general" },
+    });
+    fireEvent.change(screen.getByTestId("textarea-contenido-pagina"), {
+      target: { value: "<p>Contenido de prueba</p>" },
+    });
+
+    fireEvent.click(screen.getByTestId("btn-guardar-pagina"));
+
+    await screen.findByText(/Ya existe una página con el enlace \(slug\) "reglamento-general"/);
+    expect(fetchCalled).toBe(false);
+  });
 });
+

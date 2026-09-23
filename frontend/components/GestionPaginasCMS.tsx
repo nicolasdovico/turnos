@@ -281,7 +281,8 @@ export default function GestionPaginasCMS({
 
   // Abrir modal con plantilla predefinida
   const handleApplyStarterTemplate = (tmpl: typeof STARTER_TEMPLATES[0]) => {
-    setEditingPageId(null);
+    const existing = paginas.find((p) => p.slug.toLowerCase() === tmpl.slug.toLowerCase());
+    setEditingPageId(existing ? existing.id : null);
     setFormTitulo(tmpl.titulo);
     setFormSlug(tmpl.slug);
     setAutoSlug(false);
@@ -289,7 +290,7 @@ export default function GestionPaginasCMS({
     setFormEstaPublicada(true);
     setFormMostrarHeader(tmpl.mostrar_en_header);
     setFormMostrarFooter(tmpl.mostrar_en_footer);
-    setFormOrden(paginas.length + 1);
+    setFormOrden(existing ? existing.orden : paginas.length + 1);
     setFormMetaDescripcion(tmpl.meta_descripcion);
     setFormError(null);
     setActiveTab("editor");
@@ -329,6 +330,17 @@ export default function GestionPaginasCMS({
       return;
     }
 
+    const trimmedSlug = formSlug.trim().toLowerCase();
+    const duplicatePage = paginas.find(
+      (p) => p.slug.toLowerCase() === trimmedSlug && p.id !== editingPageId
+    );
+    if (duplicatePage) {
+      setFormError(
+        `Ya existe una página con el enlace (slug) "${formSlug.trim()}". Por favor elige un slug diferente o edita la página "${duplicatePage.titulo}".`
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       setFormError(null);
@@ -364,7 +376,17 @@ export default function GestionPaginasCMS({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Error al procesar la página.");
+        let msg = data.message || "Error al procesar la página.";
+        if (data.errors) {
+          const firstKey = Object.keys(data.errors)[0];
+          if (firstKey && data.errors[firstKey]?.[0]) {
+            msg = data.errors[firstKey][0];
+          }
+        }
+        if (msg.toLowerCase().includes("slug has already been taken") || msg.toLowerCase().includes("slug ya existe")) {
+          msg = `El enlace (slug) "${formSlug.trim()}" ya está en uso en este club. Elige un slug diferente.`;
+        }
+        throw new Error(msg);
       }
 
       setSuccessMsg(
@@ -687,6 +709,28 @@ export default function GestionPaginasCMS({
                   <span>{formError}</span>
                 </div>
               )}
+
+              {/* Plantillas rápidas selector */}
+              <div className="p-3 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Cargar plantilla predefinida:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {STARTER_TEMPLATES.map((tmpl, idx) => (
+                    <button
+                      key={tmpl.slug}
+                      type="button"
+                      onClick={() => handleApplyStarterTemplate(tmpl)}
+                      data-testid={`btn-modal-starter-${idx}`}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-emerald-500/50 text-[11px] font-medium text-slate-300 hover:text-white transition cursor-pointer"
+                      title={tmpl.meta_descripcion}
+                    >
+                      {tmpl.titulo}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Title & Slug Row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

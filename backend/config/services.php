@@ -62,4 +62,10 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI', 'http://localhost:8080/api/auth/google/callback'),
     ],
 
+    'frontend' => [
+        'url' => env('FRONTEND_URL', 'http://localhost:8080'),
+        'internal_url' => env('FRONTEND_INTERNAL_URL', 'http://frontend:3000'),
+        'revalidate_secret' => env('REVALIDATE_SECRET_TOKEN', 'turnos-secret-revalidate-token'),
+    ],
+
 ];
