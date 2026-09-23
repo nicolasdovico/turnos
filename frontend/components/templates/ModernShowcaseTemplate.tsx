@@ -38,21 +38,22 @@ export default function ModernShowcaseTemplate({
   return (
     <div className="space-y-12" data-testid="template-modern-showcase">
       {/* Premium Hero Header */}
-      <section className="relative overflow-hidden bg-slate-950 border-b border-slate-800/80 py-12 sm:py-16">
+      <section className="relative overflow-hidden bg-slate-950 border-b border-slate-800/80 py-14 sm:py-20">
         {branding.portada_url && (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-30 transform scale-105 filter blur-[0.5px]"
+            className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${branding.portada_url})` }}
             data-testid="modern-showcase-portada"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-slate-950/70" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
+        {/* Soft balanced gradient overlays: protect left-side text contrast while preserving vivid colors of the cover photo */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div className="space-y-3 max-w-3xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black tracking-widest uppercase">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950/70 border border-emerald-500/40 backdrop-blur-md text-emerald-400 text-xs font-black tracking-widest uppercase shadow-md">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Showcase Deportivo Premium</span>
               </div>
@@ -61,20 +62,20 @@ export default function ModernShowcaseTemplate({
                   <img
                     src={branding.logo_url}
                     alt={`Logo ${complejo.nombre}`}
-                    className="h-12 w-12 sm:h-16 sm:w-16 object-contain rounded-2xl bg-white/5 border border-white/10 p-1.5 shadow-xl flex-shrink-0"
+                    className="h-14 w-14 sm:h-20 sm:w-20 object-contain rounded-2xl bg-slate-950/80 border border-white/20 p-2 shadow-2xl backdrop-blur-md flex-shrink-0"
                     data-testid="modern-showcase-logo"
                   />
                 )}
-                <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
+                <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                   {complejo.nombre}
                 </h1>
               </div>
               {branding.eslogan ? (
-                <p className="text-sm sm:text-base text-slate-300 font-medium">
+                <p className="text-sm sm:text-base text-slate-100 font-semibold drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
                   {branding.eslogan}
                 </p>
               ) : (
-                <p className="text-xs sm:text-sm text-slate-400">
+                <p className="text-xs sm:text-sm text-slate-300 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
                   Instalaciones de vanguardia para deportistas de alto nivel competitivo.
                 </p>
               )}
@@ -82,7 +83,7 @@ export default function ModernShowcaseTemplate({
 
             <button
               onClick={scrollToGrid}
-              className="px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition cursor-pointer self-start lg:self-auto flex items-center gap-2 shadow-lg"
+              className="px-5 py-3 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border border-emerald-500/40 font-bold text-xs transition cursor-pointer self-start lg:self-auto flex items-center gap-2 shadow-xl backdrop-blur-md"
             >
               <span>Ver Grilla de Horarios</span>
               <ArrowRight className="w-4 h-4" />

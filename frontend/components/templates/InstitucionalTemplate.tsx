@@ -40,7 +40,7 @@ export default function InstitucionalTemplate({
         {/* Background Cover Image or Default Gradient */}
         {branding.portada_url ? (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-30 transform scale-105 filter blur-[1px]"
+            className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${branding.portada_url})` }}
             data-testid="institucional-portada"
           />
@@ -52,12 +52,13 @@ export default function InstitucionalTemplate({
             }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/80 to-slate-950" />
+        {/* Soft balanced gradient overlay: preserves vivid colors in center while smoothly fading to edges */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/60 via-slate-950/30 to-slate-950" />
 
         {/* Hero Content */}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 text-center space-y-6">
           {branding.logo_url && (
-            <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white/5 border border-white/10 p-2.5 shadow-2xl flex items-center justify-center">
+            <div className="mx-auto w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-slate-950/80 border border-white/20 p-2.5 shadow-2xl backdrop-blur-md flex items-center justify-center">
               <img
                 src={branding.logo_url}
                 alt={`Logo ${complejo.nombre}`}
@@ -66,31 +67,31 @@ export default function InstitucionalTemplate({
               />
             </div>
           )}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 backdrop-blur-sm text-xs font-bold text-slate-300">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/80 backdrop-blur-md text-xs font-bold text-slate-200 shadow-lg">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="capitalize">{tipoNegocioLabel} Oficial</span>
             <span>•</span>
             <span className="text-emerald-400 capitalize">{complejo.deporte_principal}</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight max-w-4xl mx-auto">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight max-w-4xl mx-auto drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
             {complejo.nombre}
           </h1>
 
           {branding.eslogan && (
-            <p className="text-base sm:text-xl text-emerald-300/90 font-medium max-w-2xl mx-auto italic">
+            <p className="text-base sm:text-xl text-emerald-300 font-semibold max-w-2xl mx-auto italic drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
               "{branding.eslogan}"
             </p>
           )}
 
           {branding.descripcion_corta && (
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-200 max-w-xl mx-auto leading-relaxed drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] bg-slate-950/40 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
               {branding.descripcion_corta}
             </p>
           )}
 
           {(complejo.direccion || complejo.ciudad) && (
-            <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
               <MapPin className="w-3.5 h-3.5 text-emerald-400" />
               <span>{[complejo.direccion, complejo.ciudad].filter(Boolean).join(", ")}</span>
             </div>

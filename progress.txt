@@ -3019,3 +3019,32 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Suite completa Mobile: 20/20 tests pasados en verde en Jest.
   * Total Ecosistema: 491 tests automatizados en verde (0 fallas, 0 regresiones).
 ==============================================================================================================================
+Fecha: 2026-09-23
+Tarea: Optimización de Visibilidad, Luminosidad y Contraste de Banner de Portada en Plantillas Web Públicas
+- Problema Reportado:
+  * En la web pública vista por clientes (ej: http://club-padel-bronce.localhost:8080/), el banner de portada apenas se percibía y se veía excesivamente oscuro y apagado, mientras que en la previsualización del panel de administración los colores se apreciaban vivos e intensos.
+- Causa Raíz Identificada:
+  * En las 3 plantillas públicas (`ModernShowcaseTemplate.tsx`, `BookingDirectTemplate.tsx`, `InstitucionalTemplate.tsx`):
+    1. El contenedor del banner tenía `opacity-30`, reduciendo la visibilidad inicial de la imagen al 30% sobre el fondo oscuro de la sección.
+    2. Tenía aplicado filtros de desenfoque (`filter blur-[0.5px]` y `filter blur-[1px]`) que quitaban nitidez a las fotos de las canchas e instalaciones.
+    3. Tenía superpuestas capas de gradientes extremadamente densas (ej: `bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-slate-950/70` y `from-slate-950`), lo que sumado al 30% de opacidad inicial reducía la visibilidad neta del banner a menos del 5%-9%, dejándolo prácticamente negro.
+- Solución Implementada:
+  * En `ModernShowcaseTemplate.tsx`:
+    - Se eliminó `opacity-30` y `filter blur-[0.5px]`, permitiendo que la foto se muestre con su opacidad natural y colores 100% nítidos y vivos.
+    - Se rebalancearon los gradientes: `from-slate-950/90 via-slate-950/40 to-transparent` (lateral) y `from-slate-950/80 via-transparent to-transparent` (inferior). Esto oscurece suavemente el tercio izquierdo para proteger la lectura de títulos e insignias, mientras deja los dos tercios centrales y derechos completamente despejados, vivos y vibrantes.
+    - Se incrementó el padding vertical del hero a `py-14 sm:py-20` para otorgar mayor amplitud visual al banner fotográfico.
+    - Se incorporaron sombras tipográficas de alta definición (`drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]`) y micro-glassmorphism (`bg-slate-950/80 backdrop-blur-md`) al logotipo y botón de acción.
+  * En `BookingDirectTemplate.tsx`:
+    - Se eliminó `opacity-30` y el desenfoque en `booking-direct-portada`.
+    - Se calibraron los gradientes a `from-slate-950/90 via-slate-950/40 to-transparent` y fondo `to-transparent`, garantizando que la foto de las pistas luzca luminosa y colorida.
+    - Se agregaron drop-shadows y efectos backdrop-blur a los badges operativos y logotipo.
+  * En `InstitucionalTemplate.tsx`:
+    - Se retiró `opacity-30` y `blur-[1px]`.
+    - Se suavizó el gradiente cenital a `bg-gradient-to-b from-slate-950/60 via-slate-950/30 to-slate-950`, manteniendo el centro al 70% de luminosidad natural de la fotografía.
+    - Se aplicaron sombras tipográficas y fondos con backdrop-blur al marco del logo y texto descriptivo.
+- Verificación y Tests:
+  * Frontend: 162/162 tests pasados en Vitest (`npx vitest run tests/PublicClubTemplates.test.tsx` y suite completa).
+  * Backend: 15/15 tests pasados en `ClubBrandingTest` (58 assertions).
+  * Resultado visual: La imagen de portada ahora se muestra con colores intensos, nitidez fotográfica y perfecta legibilidad de todos los textos.
+==============================================================================================================================
+

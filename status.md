@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 23 / 23 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Subida y Previsualización de Logotipo y Portada Web, Gestión Dinámica de Deportes, Superficies y Atributos de Cancha, Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, Conversión Precisa ARS/USD en Comisiones de Marketplace, y Suspensión Automática de Reservas por Abono Vencido con Levantamiento Reactivo por Pago)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Subida directa y previsualización en tiempo real de Logotipo y Portada del club con renderizado en todas las plantillas públicas; gestión dinámica de deportes, superficies y atributos/equipamientos de canchas; suspensión de reservas online y marketplace por abono vencido con reactivación inmediata por acreditación de pago; buscador manual con geocodificación OSM Nominatim; alta de canchas excedentes con alerta interactiva; facturación B2B y comisiones de marketplace; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
-- **Última Actualización:** 2026-09-23 (Subida, previsualización en vivo y despliegue público de Logotipo y Banner de Portada en plantillas de club. 491 tests automatizados en verde: 309 backend, 162 frontend, 20 mobile; 100% sin fallas ni regresiones).
+- **Tareas Completadas:** 23 / 23 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Calibración Visual y Luminosidad de Portada en Plantillas Web Públicas, Subida y Previsualización de Logotipo y Portada Web, Gestión Dinámica de Deportes, Superficies y Atributos de Cancha, Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, Conversión Precisa ARS/USD en Comisiones de Marketplace, y Suspensión Automática de Reservas por Abono Vencido con Levantamiento Reactivo por Pago)
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Banner de portada luminoso y nítido con colores vivos en todas las plantillas web públicas; subida directa y previsualización en tiempo real de Logotipo y Portada del club; gestión dinámica de deportes, superficies y atributos/equipamientos de canchas; suspensión de reservas online y marketplace por abono vencido con reactivación inmediata por acreditación de pago; buscador manual con geocodificación OSM Nominatim; alta de canchas excedentes con alerta interactiva; facturación B2B y comisiones de marketplace; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
+- **Última Actualización:** 2026-09-23 (Optimización de visualización de portada: eliminación de opacidad atenuada y desenfoques, gradientes suaves de alto impacto visual y tipografía protegida con drop-shadows. 491 tests automatizados en verde: 309 backend, 162 frontend, 20 mobile; 100% sin fallas ni regresiones).
 
 ---
 
@@ -280,3 +280,15 @@
    - Comprobar que tras 1 segundo el modal de pago se cierra automáticamente (`handleClosePaymentModal`).
    - Verificar que en el panel principal se muestra el banner verde de confirmación y el estado de la suscripción cambia de inmediato a **Activa / Operativo**.
    - Verificar que el banner rojo persistente superior desaparece y el club ya puede volver a tomar turnos y operar normalmente.
+
+### Caso de Prueba: Visibilidad, Luminosidad y Contraste de Portada en Web Pública
+1. **Acceso a la Web Pública del Club:**
+   - Ingresar en el navegador a `http://club-padel-bronce.localhost:8080/`.
+2. **Comprobación de Nitidez y Colores Vivos:**
+   - Observar el banner superior panorámico (`modern-showcase-portada` o plantilla activa).
+   - Constatar que la fotografía del club se visualiza con sus colores naturales, vivos e intensos, idéntica a la previsualización del panel de administración (`live-preview-mockup`), sin velos oscuros artificiales ni desenfoques.
+3. **Comprobación de Legibilidad y Contraste:**
+   - Verificar que el nombre del club, eslogan, insignias y botón "Ver Grilla de Horarios" son 100% legibles gracias al gradiente lateral equilibrado (`from-slate-950/90 via-slate-950/40 to-transparent`) y las sombras de texto (`drop-shadow`).
+4. **Comprobación en Diferentes Plantillas:**
+   - Cambiar la plantilla desde el panel de administración a **Booking Direct** o **Institucional**.
+   - Ingresar a la web pública y comprobar que en todas las variantes el banner se muestra con alta definición y excelente contraste.

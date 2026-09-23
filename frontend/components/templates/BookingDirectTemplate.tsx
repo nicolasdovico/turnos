@@ -100,21 +100,22 @@ export default function BookingDirectTemplate({
       >
         {branding.portada_url && (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-30 transform scale-105 filter blur-[0.5px]"
+            className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${branding.portada_url})` }}
             data-testid="booking-direct-portada"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/80 to-slate-950/70" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+            {/* Soft balanced gradient overlays: protect left-side text contrast while preserving vivid colors of the cover photo */}
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
           </div>
         )}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border backdrop-blur-md"
                 style={{
-                  backgroundColor: "color-mix(in srgb, var(--club-primary, #10b981) 15%, transparent)",
+                  backgroundColor: "color-mix(in srgb, var(--club-primary, #10b981) 15%, rgba(2,6,23,0.8))",
                   color: "var(--club-primary, #10b981)",
                   borderColor: "color-mix(in srgb, var(--club-primary, #10b981) 30%, transparent)",
                 }}
@@ -122,31 +123,31 @@ export default function BookingDirectTemplate({
                 <Zap className="w-3 h-3" />
                 <span>{tipoNegocioLabel} Oficial</span>
               </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-900/80 text-slate-200 border border-slate-700/80 backdrop-blur-md">
                 <span>Reserva Directa Inmediata</span>
               </span>
-              <span className="rounded-full bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-0.5 text-[10px] font-semibold capitalize">
+              <span className="rounded-full bg-slate-900/80 text-slate-200 border border-slate-700/80 px-2.5 py-0.5 text-[10px] font-semibold capitalize backdrop-blur-md">
                 🏆 {complejo.deporte_principal}
               </span>
               {branding.eslogan && (
-                <span className="text-xs text-slate-400 font-medium italic hidden sm:inline">
+                <span className="text-xs text-slate-200 font-medium italic hidden sm:inline drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
                   "{branding.eslogan}"
                 </span>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-3 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
               {branding.logo_url && (
                 <img
                   src={branding.logo_url}
                   alt={`Logo ${complejo.nombre}`}
-                  className="h-8 w-8 sm:h-10 sm:w-10 object-contain rounded-xl bg-white/10 p-1 border border-white/10 flex-shrink-0"
+                  className="h-8 w-8 sm:h-10 sm:w-10 object-contain rounded-xl bg-slate-950/80 p-1 border border-white/20 flex-shrink-0 backdrop-blur-md shadow-lg"
                   data-testid="booking-direct-logo"
                 />
               )}
               <span>Turnos Disponibles</span>
             </h1>
             {(complejo.direccion || complejo.ciudad || (complejo.latitud && complejo.longitud)) && (
-              <div className="flex items-center gap-2.5 text-xs text-slate-400 flex-wrap pt-0.5">
+              <div className="flex items-center gap-2.5 text-xs text-slate-300 flex-wrap pt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                 {(complejo.direccion || complejo.ciudad) && (
                   <span className="flex items-center gap-1">
                     <span>📍</span>
