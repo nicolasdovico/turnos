@@ -3047,4 +3047,27 @@ Tarea: Optimización de Visibilidad, Luminosidad y Contraste de Banner de Portad
   * Backend: 15/15 tests pasados en `ClubBrandingTest` (58 assertions).
   * Resultado visual: La imagen de portada ahora se muestra con colores intensos, nitidez fotográfica y perfecta legibilidad de todos los textos.
 ==============================================================================================================================
-
+Fecha: 2026-09-23
+Tarea: Incorporación del Icono y Enlace a Canal de YouTube en el Pie de Página (ClubFooter)
+- Problema Reportado:
+  * Al pie de página (footer) de la web del club no aparecía el icono de YouTube con el enlace al canal, aunque sí aparecían los demás iconos de redes sociales (Instagram, Facebook, TikTok, etc.).
+- Causa Raíz Identificada:
+  * En `frontend/components/templates/ClubFooter.tsx`:
+    1. Si bien la interfaz de TypeScript `ClubFooterProps` contemplaba `youtube?: string | null;` dentro de `redesSociales`, en el bloque JSX de iconos de redes sociales (`{redesSociales && ...}`) no existía la condición para renderizar `redesSociales.youtube`. Solo estaban codificados Instagram, Facebook, TikTok y Sitio Web.
+    2. No se importaba el icono `Youtube` de `lucide-react`.
+    3. En `BrandingClubPanel.tsx`, la etiqueta del campo YouTube utilizaba el icono genérico `<Video />` en lugar de `<Youtube />`.
+- Solución Implementada:
+  * En `ClubFooter.tsx`:
+    - Se importó `Youtube` desde `lucide-react`.
+    - Se implementó la función helper `formatSocialUrl` para normalizar URLs en caso de que el usuario ingrese un handle (ej. `@clubpadel`), una URL sin esquema (`youtube.com/@clubpadel`) o una URL absoluta (`https://youtube.com/@clubpadel`), evitando links relativos erróneos.
+    - Se incorporó el botón con data-testid `footer-social-youtube` estilizado con hover rojo (`hover:text-red-500`), icono de YouTube, tooltip accesible (`title="YouTube"`) y apertura segura en nueva pestaña (`target="_blank" rel="noopener noreferrer"`).
+  * En `BrandingClubPanel.tsx`:
+    - Se importó `Youtube` de `lucide-react` y se actualizó el icono del campo `input-youtube` para concordancia visual en todo el panel.
+  * En `PublicClubTemplates.test.tsx`:
+    - Se actualizó el caso de prueba para validar que `footer-social-youtube` se renderiza y su atributo `href` coincide con el canal del club.
+    - Se incorporó un nuevo test que valida la normalización de URLs para redes sociales (@canal, sin https://, etc.).
+- Verificación y Tests:
+  * Frontend: 163/163 tests pasados en Vitest (`npx vitest run tests/PublicClubTemplates.test.tsx` y suite completa de 18 archivos).
+  * Backend: 15/15 tests pasados en `ClubBrandingTest` (58 assertions).
+  * En club `club-padel-bronce`: verificado en base de datos que cuenta con `youtube: "https://youtube.com/club_padel_bronce"` y ahora se visualiza correctamente en el pie de página de la web pública.
+==============================================================================================================================

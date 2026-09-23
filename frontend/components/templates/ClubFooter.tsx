@@ -12,8 +12,42 @@ import {
   Globe,
   Share2,
   Navigation,
+  Youtube,
 } from "lucide-react";
 import { NavigationLink } from "./ClubHeader";
+
+function formatSocialUrl(
+  url: string,
+  platform: "instagram" | "facebook" | "tiktok" | "youtube" | "web"
+): string {
+  const trimmed = url.trim();
+  if (!trimmed) return "#";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+  switch (platform) {
+    case "instagram":
+      return trimmed.includes("instagram.com")
+        ? `https://${trimmed}`
+        : `https://instagram.com/${trimmed.replace(/^@/, "")}`;
+    case "facebook":
+      return trimmed.includes("facebook.com")
+        ? `https://${trimmed}`
+        : `https://facebook.com/${trimmed.replace(/^@/, "")}`;
+    case "tiktok":
+      return trimmed.includes("tiktok.com")
+        ? `https://${trimmed}`
+        : `https://tiktok.com/${trimmed.startsWith("@") ? trimmed : `@${trimmed}`}`;
+    case "youtube":
+      if (trimmed.includes("youtube.com") || trimmed.includes("youtu.be")) {
+        return `https://${trimmed}`;
+      }
+      return `https://youtube.com/${trimmed.startsWith("@") ? trimmed : `@${trimmed}`}`;
+    case "web":
+    default:
+      return `https://${trimmed}`;
+  }
+}
 
 export interface ClubFooterProps {
   subdomain: string;
@@ -67,10 +101,10 @@ export default function ClubFooter({
 
             {/* Social Icons */}
             {redesSociales && (
-              <div className="flex items-center gap-2 pt-2">
+              <div className="flex items-center gap-2 pt-2 flex-wrap">
                 {redesSociales.instagram && (
                   <a
-                    href={redesSociales.instagram}
+                    href={formatSocialUrl(redesSociales.instagram, "instagram")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-pink-400 border border-slate-800 transition"
@@ -82,7 +116,7 @@ export default function ClubFooter({
                 )}
                 {redesSociales.facebook && (
                   <a
-                    href={redesSociales.facebook}
+                    href={formatSocialUrl(redesSociales.facebook, "facebook")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-blue-400 border border-slate-800 transition"
@@ -94,7 +128,7 @@ export default function ClubFooter({
                 )}
                 {redesSociales.tiktok && (
                   <a
-                    href={redesSociales.tiktok}
+                    href={formatSocialUrl(redesSociales.tiktok, "tiktok")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-400 border border-slate-800 transition"
@@ -104,9 +138,21 @@ export default function ClubFooter({
                     <Video className="w-4 h-4" />
                   </a>
                 )}
+                {redesSociales.youtube && (
+                  <a
+                    href={formatSocialUrl(redesSociales.youtube, "youtube")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-red-500 border border-slate-800 transition"
+                    title="YouTube"
+                    data-testid="footer-social-youtube"
+                  >
+                    <Youtube className="w-4 h-4" />
+                  </a>
+                )}
                 {redesSociales.sitio_web && (
                   <a
-                    href={redesSociales.sitio_web}
+                    href={formatSocialUrl(redesSociales.sitio_web, "web")}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-emerald-400 border border-slate-800 transition"

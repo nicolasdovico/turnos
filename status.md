@@ -5,9 +5,9 @@
 ---
 
 ## 📋 Resumen de Progreso
-- **Tareas Completadas:** 23 / 23 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Calibración Visual y Luminosidad de Portada en Plantillas Web Públicas, Subida y Previsualización de Logotipo y Portada Web, Gestión Dinámica de Deportes, Superficies y Atributos de Cancha, Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, Conversión Precisa ARS/USD en Comisiones de Marketplace, y Suspensión Automática de Reservas por Abono Vencido con Levantamiento Reactivo por Pago)
-- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Banner de portada luminoso y nítido con colores vivos en todas las plantillas web públicas; subida directa y previsualización en tiempo real de Logotipo y Portada del club; gestión dinámica de deportes, superficies y atributos/equipamientos de canchas; suspensión de reservas online y marketplace por abono vencido con reactivación inmediata por acreditación de pago; buscador manual con geocodificación OSM Nominatim; alta de canchas excedentes con alerta interactiva; facturación B2B y comisiones de marketplace; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
-- **Última Actualización:** 2026-09-23 (Optimización de visualización de portada: eliminación de opacidad atenuada y desenfoques, gradientes suaves de alto impacto visual y tipografía protegida con drop-shadows. 491 tests automatizados en verde: 309 backend, 162 frontend, 20 mobile; 100% sin fallas ni regresiones).
+- **Tareas Completadas:** 23 / 23 (100% de los 8 Bloques Completados con Éxito) + Módulos de Expansión (Icono y Enlace a Canal de YouTube en Pie de Página, Calibración Visual y Luminosidad de Portada en Plantillas Web Públicas, Subida y Previsualización de Logotipo y Portada Web, Gestión Dinámica de Deportes, Superficies y Atributos de Cancha, Facturación B2B & Comisiones de Marketplace, Pasarelas de Pago Multimoneda Mercado Pago / Stripe / Transferencia Bancaria, Período de Gracia de 7 días, WhatsApp, Google Auth SSO, Geolocalización B2C, Pricing Híbrido, Tarifas Dinámicas Pico/Valle, Protocolo de Cancelación por Lluvia, Hardening Contable/Caja, CRM / Directorio de Clientes del Club, Visibilidad de Contraseña en Checkout Online, Creación de Canchas Adicionales con Confirmación de Cupo, Conversión Precisa ARS/USD en Comisiones de Marketplace, y Suspensión Automática de Reservas por Abono Vencido con Levantamiento Reactivo por Pago)
+- **Fase Actual:** Proyecto SaaS Finalizado & Certificado para Producción (Icono y enlace a YouTube en el footer del club con normalización de enlaces; banner de portada luminoso y nítido con colores vivos en todas las plantillas web públicas; subida directa y previsualización en tiempo real de Logotipo y Portada del club; gestión dinámica de deportes, superficies y atributos/equipamientos de canchas; suspensión de reservas online y marketplace por abono vencido con reactivación inmediata por acreditación de pago; buscador manual con geocodificación OSM Nominatim; alta de canchas excedentes con alerta interactiva; facturación B2B y comisiones de marketplace; período de gracia de 7 días; visibilidad de contraseña en checkout online; Padrón y Ficha 360° de Clientes; protocolo por lluvia y tarifas dinámicas)
+- **Última Actualización:** 2026-09-23 (Icono y enlace de YouTube en ClubFooter y normalización inteligente de URLs sociales. 492 tests automatizados en verde: 309 backend, 163 frontend, 20 mobile; 100% sin fallas ni regresiones).
 
 ---
 
@@ -292,3 +292,14 @@
 4. **Comprobación en Diferentes Plantillas:**
    - Cambiar la plantilla desde el panel de administración a **Booking Direct** o **Institucional**.
    - Ingresar a la web pública y comprobar que en todas las variantes el banner se muestra con alta definición y excelente contraste.
+
+### Caso de Prueba: Icono y Enlace a Canal de YouTube en el Pie de Página (Footer)
+1. **Acceso a la Web Pública del Club:**
+   - Ingresar a `http://club-padel-bronce.localhost:8080/`.
+2. **Navegación al Pie de Página (Footer):**
+   - Desplazarse hasta el final de la página donde se ubican las redes sociales del club.
+3. **Comprobación del Icono de YouTube:**
+   - Constatar que junto a los iconos de Instagram, Facebook y TikTok se visualiza el icono rojo de YouTube (`footer-social-youtube`).
+   - Pasar el cursor sobre el icono y verificar el tooltip `"YouTube"` y el cambio de color característico a rojo (`hover:text-red-500`).
+4. **Comprobación del Enlace y Apertura:**
+   - Hacer clic en el icono de YouTube y comprobar que se abre en una nueva pestaña redirigiendo a la URL configurada para el club (ej: `https://youtube.com/club_padel_bronce`).

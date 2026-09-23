@@ -98,7 +98,7 @@ describe("Módulo F - Portal Público Whitelabel y Renderizador de las 3 Plantil
       instagram: "https://instagram.com/padellavilla",
       facebook: "https://facebook.com/padellavilla",
       tiktok: null,
-      youtube: null,
+      youtube: "https://youtube.com/@padellavilla",
       sitio_web: "https://padellavilla.com",
     },
   };
@@ -174,12 +174,48 @@ describe("Módulo F - Portal Público Whitelabel y Renderizador de las 3 Plantil
     // Redes sociales
     expect(screen.getByTestId("footer-social-instagram")).toBeDefined();
     expect(screen.getByTestId("footer-social-facebook")).toBeDefined();
+    expect(screen.getByTestId("footer-social-youtube")).toBeDefined();
+    expect(screen.getByTestId("footer-social-youtube").getAttribute("href")).toBe(
+      "https://youtube.com/@padellavilla"
+    );
     expect(screen.getByTestId("footer-social-web")).toBeDefined();
 
     // Contacto y ubicación
     expect(screen.getByText("Av. Libertador 5500")).toBeDefined();
     expect(screen.getByText("Buenos Aires")).toBeDefined();
     expect(screen.getByTestId("footer-como-llegar")).toBeDefined();
+  });
+
+  it("ClubFooter normaliza URLs de redes sociales sin protocolo (ej: @canal o youtube.com)", () => {
+    render(
+      <ClubFooter
+        subdomain="la-villa"
+        clubNombre="Padel Club La Villa"
+        redesSociales={{
+          instagram: "@padellavilla",
+          facebook: "facebook.com/padellavilla",
+          tiktok: "padeltiktok",
+          youtube: "@padellavilla_tv",
+          sitio_web: "www.padellavilla.com",
+        }}
+      />
+    );
+
+    expect(screen.getByTestId("footer-social-instagram").getAttribute("href")).toBe(
+      "https://instagram.com/padellavilla"
+    );
+    expect(screen.getByTestId("footer-social-facebook").getAttribute("href")).toBe(
+      "https://facebook.com/padellavilla"
+    );
+    expect(screen.getByTestId("footer-social-tiktok").getAttribute("href")).toBe(
+      "https://tiktok.com/@padeltiktok"
+    );
+    expect(screen.getByTestId("footer-social-youtube").getAttribute("href")).toBe(
+      "https://youtube.com/@padellavilla_tv"
+    );
+    expect(screen.getByTestId("footer-social-web").getAttribute("href")).toBe(
+      "https://www.padellavilla.com"
+    );
   });
 
   it("Plantilla 1: BookingDirectTemplate renderiza cabecera operativa y grilla inmediata", () => {

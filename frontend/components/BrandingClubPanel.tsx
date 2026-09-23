@@ -16,6 +16,7 @@ import {
   Instagram,
   Facebook,
   Video,
+  Youtube,
   Share2,
   Trash2,
   AlertTriangle,
@@ -1290,7 +1291,7 @@ export default function BrandingClubPanel({
             {/* YouTube */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Video className="w-3.5 h-3.5 text-rose-500" />
+                <Youtube className="w-3.5 h-3.5 text-red-500" />
                 <span>YouTube (URL)</span>
               </label>
               <input
