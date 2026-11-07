@@ -8,6 +8,8 @@ import {
   SunMoon,
   Users,
   Globe,
+  Coffee,
+  CloudRain,
   CheckCircle2,
   Sparkles,
   ChevronLeft,
@@ -26,6 +28,8 @@ const iconMap: Record<string, React.ReactNode> = {
   SunMoon: <SunMoon className="w-5 h-5 text-emerald-400" />,
   Users: <Users className="w-5 h-5 text-emerald-400" />,
   Globe: <Globe className="w-5 h-5 text-emerald-400" />,
+  Coffee: <Coffee className="w-5 h-5 text-emerald-400" />,
+  CloudRain: <CloudRain className="w-5 h-5 text-emerald-400" />,
 };
 
 export default function FeaturesShowcase() {

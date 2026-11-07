@@ -1858,12 +1858,12 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
       </AuthProvider>
     );
 
-    // Switch to Resumen Diario & Caja tab
-    const resumenTabBtn = await screen.findByRole("button", { name: /Resumen Diario & Caja/i });
+    // Switch to Resumen de Turnos tab
+    const resumenTabBtn = await screen.findByRole("button", { name: /Resumen de Turnos/i });
     fireEvent.click(resumenTabBtn);
 
     // Verify Header & KPIs
-    expect(await screen.findByText(/Resumen Diario & Control de Caja/i)).toBeDefined();
+    expect(await screen.findByText(/Resumen & Flujo de Turnos/i)).toBeDefined();
     expect(screen.getAllByText("$45,000").length).toBeGreaterThanOrEqual(1); // Total Facturado
     expect(screen.getAllByText("$35,000").length).toBeGreaterThanOrEqual(1); // Cobrado
     expect(screen.getAllByText("$10,000").length).toBeGreaterThanOrEqual(1); // Saldo Pendiente
@@ -2127,5 +2127,38 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
         longitud: -58.381592,
       })
     );
+  });
+
+  it("renders player profile section in PortalPage when user has player clubs", () => {
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({
+        id: 6,
+        name: "Fernando Belasteguín",
+        email: "bela@gmail.com",
+        complejos: [],
+        clubes_jugador: [
+          {
+            id: 1,
+            nombre: "Nico Pádel & Sport Club",
+            subdominio: "nico-padel",
+            deporte_principal: "padel",
+            ciudad: "Buenos Aires",
+          },
+        ],
+      })
+    );
+    localStorage.setItem("saas_token", "test-token-player");
+
+    render(
+      <AuthProvider>
+        <PortalPage />
+      </AuthProvider>
+    );
+
+    expect(screen.getByText(/Perfil de Jugador/i)).toBeDefined();
+    expect(screen.getByText(/Tus Clubes para Reservar Turnos/i)).toBeDefined();
+    expect(screen.getByText("Nico Pádel & Sport Club")).toBeDefined();
+    expect(screen.getByText(/Reservar Turno →/i)).toBeDefined();
   });
 });

@@ -155,23 +155,39 @@ export const LANDING_CONFIG = {
         "Independencia y aislamiento total de datos de tu club",
       ],
     },
-    // Roadmap Features
     {
       id: "pos-buffet",
       title: "POS & Buffet / Cantina",
-      category: "innovacion",
-      badge: "En Desarrollo",
-      status: "coming_soon",
+      category: "gestion",
+      badge: "Operativo",
+      status: "available",
       iconName: "Coffee",
-      shortDesc: "Punto de venta para cantina, control de stock y comanda vinculada al turno.",
+      shortDesc: "Punto de venta táctil, comanda a la cancha y control de caja diaria.",
       fullDesc:
-        "Administrá las ventas de bebidas, pelotas, paletas y comidas en el club. Asigná consumiciones directamente a la cancha para cobrar todo junto al finalizar el partido y realizá el arqueo diario.",
+        "Gestioná el buffet del club con catálogo táctil, control de stock mínimo y comandas vinculadas al turno para cobrar todo junto (cancha + consumos) en un solo paso. Incluye apertura y cierre con arqueo ciego para detectar faltantes o sobrantes.",
       highlights: [
-        "Control de inventario y stock mínimo",
-        "Comandas asociadas a turnos o venta directa en barra",
-        "Arqueo ciego de caja diaria y reportes",
+        "Comandas asociadas a turnos y cobro unificado",
+        "Control de inventario, categorías y stock mínimo",
+        "Apertura de turno y arqueo ciego de efectivo",
       ],
     },
+    {
+      id: "protocolo-lluvia",
+      title: "Protocolo de Lluvia & Vales de Crédito",
+      category: "reservas",
+      badge: "Operativo",
+      status: "available",
+      iconName: "CloudRain",
+      shortDesc: "Cancelación masiva de canchas al aire libre con reintegro automático.",
+      fullDesc:
+        "Ante inclemencias climáticas, activá el protocolo con 1 clic para suspender turnos de canchas descubiertas. El sistema reintegra automáticamente a billetera virtual o genera un vale con código alfanumérico para el cliente.",
+      highlights: [
+        "Cancelación selectiva por canchas outdoor",
+        "Acreditación automática en billetera virtual o emisión de vales",
+        "Notificaciones directas por WhatsApp con 1 clic",
+      ],
+    },
+    // Roadmap Features
     {
       id: "torneos-fixtures",
       title: "Gestor de Torneos & Fixtures",

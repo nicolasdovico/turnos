@@ -43,7 +43,6 @@ describe("Landing Page Vendedora (PortalPage)", () => {
 
     // 5. Próximos Módulos en Desarrollo (Roadmap)
     expect(screen.getByText("Próximos Módulos en Desarrollo Activo")).toBeDefined();
-    expect(screen.getByText("POS & Buffet / Cantina")).toBeDefined();
     expect(screen.getByText("Gestor de Torneos & Fixtures")).toBeDefined();
     expect(screen.getByText("Partidos Abiertos & Matchmaking")).toBeDefined();
     expect(screen.getByText("Domótica IoT: Control de Luces")).toBeDefined();
@@ -116,8 +115,8 @@ describe("Landing Page Vendedora (PortalPage)", () => {
       </AuthProvider>
     );
 
-    // Inicialmente muestra la primera feature (1 / 6)
-    expect(screen.getByText("1 / 6")).toBeDefined();
+    // Inicialmente muestra la primera feature (1 / 8)
+    expect(screen.getByText("1 / 8")).toBeDefined();
     expect(
       screen.getByText(/Tus clientes ven la disponibilidad en vivo desde su celular/i)
     ).toBeDefined();
@@ -126,8 +125,8 @@ describe("Landing Page Vendedora (PortalPage)", () => {
     const obleaSenas = screen.getByRole("button", { name: /Cobro de Señas & Billetera Virtual/i });
     fireEvent.click(obleaSenas);
 
-    // Ahora muestra la feature 2 (2 / 6) y su detalle correspondiente
-    expect(screen.getByText("2 / 6")).toBeDefined();
+    // Ahora muestra la feature 2 (2 / 8) y su detalle correspondiente
+    expect(screen.getByText("2 / 8")).toBeDefined();
     expect(
       screen.getByText(/Configurá el porcentaje de seña requerido o cobro total/i)
     ).toBeDefined();
@@ -136,7 +135,7 @@ describe("Landing Page Vendedora (PortalPage)", () => {
     const btnNext = screen.getByRole("button", { name: /Siguiente funcionalidad/i });
     fireEvent.click(btnNext);
 
-    expect(screen.getByText("3 / 6")).toBeDefined();
+    expect(screen.getByText("3 / 8")).toBeDefined();
     expect(
       screen.getByText(/Cargá los turnos semanales fijos con un solo clic/i)
     ).toBeDefined();
@@ -144,7 +143,7 @@ describe("Landing Page Vendedora (PortalPage)", () => {
     // Probamos el botón Anterior
     const btnPrev = screen.getByRole("button", { name: /Funcionalidad anterior/i });
     fireEvent.click(btnPrev);
-    expect(screen.getByText("2 / 6")).toBeDefined();
+    expect(screen.getByText("2 / 8")).toBeDefined();
 
     // Probamos alternar Pausa / Auto-rotación
     const btnAuto = screen.getByRole("button", { name: /Pausar rotación automática/i });
@@ -161,15 +160,15 @@ describe("Landing Page Vendedora (PortalPage)", () => {
       </AuthProvider>
     );
 
-    expect(screen.getByText("1 / 6")).toBeDefined();
+    expect(screen.getByText("1 / 8")).toBeDefined();
 
     // Avanzamos 6 segundos en el temporizador
     act(() => {
       vi.advanceTimersByTime(6000);
     });
 
-    // Debe haber avanzado automáticamente a 2 / 6
-    expect(screen.getByText("2 / 6")).toBeDefined();
+    // Debe haber avanzado automáticamente a 2 / 8
+    expect(screen.getByText("2 / 8")).toBeDefined();
 
     vi.useRealTimers();
   });
