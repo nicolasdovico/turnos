@@ -62,9 +62,7 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('mobile_app')->plainTextToken;
-        $user->load(['complejos' => function ($query) {
-            $query->with('tipoNegocio')->select('id', 'user_id', 'nombre', 'subdominio', 'estado', 'deporte_principal', 'tipo_negocio_id');
-        }]);
+        $user = $this->loadUserRelationships($user);
 
         return response()->json([
             'token' => $token,
@@ -90,12 +88,42 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user()->load(['complejos' => function ($query) {
-            $query->with('tipoNegocio')->select('id', 'user_id', 'nombre', 'subdominio', 'estado', 'deporte_principal', 'tipo_negocio_id');
-        }]);
+        $user = $this->loadUserRelationships($request->user());
 
         return response()->json([
             'user' => $user,
         ]);
+    }
+
+    /**
+     * Carga relaciones de dueño y clubes donde participa como jugador/cliente.
+     */
+    private function loadUserRelationships(User $user): User
+    {
+        $user->load(['complejos' => function ($query) {
+            $query->with('tipoNegocio')->select('id', 'user_id', 'nombre', 'subdominio', 'estado', 'deporte_principal', 'tipo_negocio_id', 'logo_url');
+        }]);
+
+        // Clubes donde figura registrado como cliente por email o teléfono
+        $clienteComplejoIds = \App\Models\Cliente::query()
+            ->where(function ($query) use ($user) {
+                $query->where('email', $user->email);
+                if (!empty($user->telefono)) {
+                    $query->orWhere('telefono', $user->telefono);
+                }
+            })
+            ->pluck('complejo_id')
+            ->unique();
+
+        $clubesJugador = \App\Models\Complejo::query()
+            ->whereIn('id', $clienteComplejoIds)
+            ->where('estado', 'activo')
+            ->with('tipoNegocio')
+            ->select('id', 'nombre', 'subdominio', 'deporte_principal', 'tipo_negocio_id', 'logo_url', 'ciudad', 'direccion')
+            ->get();
+
+        $user->setRelation('clubes_jugador', $clubesJugador);
+
+        return $user;
     }
 }

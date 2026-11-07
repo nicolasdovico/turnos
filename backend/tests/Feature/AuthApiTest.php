@@ -88,6 +88,67 @@ class AuthApiTest extends TestCase
         $this->assertCount(0, $user->fresh()->tokens);
     }
 
+    public function test_auth_me_and_login_return_clubes_como_jugador(): void
+    {
+        $owner = User::factory()->create();
+        $plan = \App\Models\Plan::first() ?? \App\Models\Plan::create([
+            'nombre' => 'Plan Test',
+            'slug' => 'plan-test',
+            'precio_mensual' => 10,
+            'limite_canchas' => 5,
+        ]);
+        $complejo = \App\Models\Complejo::create([
+            'user_id' => $owner->id,
+            'nombre' => 'Club de Prueba',
+            'subdominio' => 'club-prueba',
+            'plan_id' => $plan->id,
+            'estado' => 'activo',
+            'deporte_principal' => 'pádel',
+        ]);
+
+        $jugador = User::factory()->create([
+            'email' => 'jugador.test@turnos.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        // Registrar al jugador como Cliente en el complejo
+        \App\Models\Cliente::create([
+            'complejo_id' => $complejo->id,
+            'nombre' => 'Jugador Test',
+            'email' => $jugador->email,
+            'telefono' => '1122334455',
+            'estado' => 'activo',
+        ]);
+
+        // Probar /api/auth/login
+        $loginRes = $this->postJson('/api/auth/login', [
+            'email' => 'jugador.test@turnos.com',
+            'password' => 'password123',
+        ]);
+
+        $loginRes->assertStatus(200)
+            ->assertJsonStructure([
+                'user' => [
+                    'complejos',
+                    'clubes_jugador' => [
+                        '*' => ['id', 'nombre', 'subdominio', 'deporte_principal'],
+                    ],
+                ],
+            ])
+            ->assertJsonCount(1, 'user.clubes_jugador')
+            ->assertJsonPath('user.clubes_jugador.0.subdominio', 'club-prueba');
+
+        $token = $loginRes->json('token');
+
+        // Probar /api/auth/me
+        $meRes = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->getJson('/api/auth/me');
+
+        $meRes->assertStatus(200)
+            ->assertJsonCount(1, 'user.clubes_jugador')
+            ->assertJsonPath('user.clubes_jugador.0.nombre', 'Club de Prueba');
+    }
+
     public function test_registration_fails_if_telefono_contains_letters(): void
     {
         $response = $this->postJson('/api/auth/register', [

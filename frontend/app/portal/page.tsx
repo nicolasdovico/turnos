@@ -30,6 +30,9 @@ export default function PortalPage() {
   }, []);
 
   const userClubs = user?.complejos || [];
+  const playerClubs = user?.clubes_jugador || [];
+  const isOwner = userClubs.length > 0;
+  const isPlayer = playerClubs.length > 0;
 
   const getClubAdminUrl = (subdomain: string) => {
     const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
@@ -64,6 +67,90 @@ export default function PortalPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 selection:bg-emerald-500 selection:text-white">
+      {/* Mis Clubes como Jugador (Si el usuario autenticado tiene historial de turnos/reservas en clubes) */}
+      {isPlayer && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <div className="rounded-3xl bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-950 text-white p-6 sm:p-8 text-left shadow-xl border border-emerald-800/40">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <span className="inline-block rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-0.5 text-xs font-bold mb-2">
+                  🎾 Perfil de Jugador ({playerClubs.length} {playerClubs.length === 1 ? "Club" : "Clubes"})
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-white">
+                  Tus Clubes para Reservar Turnos
+                </h2>
+                <p className="text-xs text-slate-300 mt-1">
+                  Accedé rápidamente a la web y grilla horaria de tus clubes habituales:
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/jugar"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs font-bold text-white transition shadow-md shadow-emerald-900/30"
+                >
+                  📍 Explorar Más Canchas
+                </Link>
+                {!isOwner && (
+                  <Link
+                    href="/registro-club"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2.5 text-xs font-bold text-slate-200 border border-slate-700 transition"
+                  >
+                    + Registrar mi Club
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {playerClubs.map((club: any) => {
+                const publicUrl = getClubPublicUrl(club.subdominio);
+                return (
+                  <div
+                    key={club.id}
+                    className="rounded-2xl bg-slate-900/90 border border-emerald-900/40 p-5 hover:border-emerald-500/60 transition flex flex-col justify-between"
+                  >
+                    <div className="flex items-start gap-3">
+                      {club.logo_url ? (
+                        <img
+                          src={club.logo_url}
+                          alt={club.nombre}
+                          className="w-12 h-12 rounded-xl object-cover bg-white p-1 border border-slate-700"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-emerald-950 border border-emerald-800 flex items-center justify-center text-xl">
+                          🎾
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="text-base font-bold text-white leading-tight">{club.nombre}</h3>
+                        <p className="text-xs text-emerald-400 font-medium capitalize mt-0.5">
+                          {club.deporte_principal || "Pádel"}
+                        </p>
+                        {club.ciudad && (
+                          <p className="text-[11px] text-slate-400 mt-1">📍 {club.ciudad}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {club.subdominio}.localhost:8080
+                      </span>
+                      <a
+                        href={publicUrl}
+                        className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition"
+                      >
+                        Reservar Turno →
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mis Establecimientos (Si el usuario autenticado es dueño de uno o más negocios) */}
       {userClubs.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">

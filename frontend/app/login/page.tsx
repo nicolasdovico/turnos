@@ -122,6 +122,15 @@ export default function LoginPage() {
     );
   }
 
+  const resolveSmartRedirect = (loggedInUser: any, authToken: string): string | null => {
+    // Si el usuario se loguea en la raíz de la plataforma (localhost:8080/login),
+    // se lo deja en el Portal Hub ("/") donde tiene acceso inmediato a:
+    // 1) "Mis Clubes para Reservar" (sus turnos como jugador)
+    // 2) "+ Registrar mi Club" (para contratar el SaaS para su propio club)
+    // 3) "Mis Paneles de Dueño" (si ya administra un complejo)
+    return "/";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -133,12 +142,28 @@ export default function LoginPage() {
       setError(res.error || "No se pudo iniciar sesión. Verifica tus datos.");
       setIsSubmitting(false);
     } else {
+      const loggedInUser = res.user || user;
+      const activeToken = res.token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : "") || "";
       const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-      const target = params?.get("returnTo") || params?.get("redirect") || returnUrl || "/";
+      let target = params?.get("returnTo") || params?.get("redirect") || returnUrl;
+
+      // Si no hay returnTo explícito, aplicamos redirección inteligente por rol
+      if (!target || target === "/") {
+        const smartTarget = resolveSmartRedirect(loggedInUser, activeToken);
+        if (smartTarget) {
+          if (smartTarget.startsWith("http://") || smartTarget.startsWith("https://")) {
+            window.location.href = smartTarget;
+            return;
+          }
+          target = smartTarget;
+        } else {
+          target = "/";
+        }
+      }
+
       if (target.startsWith("http://") || target.startsWith("https://")) {
-        const token = (res as any)?.token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : "") || "";
         const sep = target.includes("?") ? "&" : "?";
-        window.location.href = `${target}${sep}auth_token=${encodeURIComponent(token)}`;
+        window.location.href = `${target}${sep}auth_token=${encodeURIComponent(activeToken)}`;
       } else {
         router.push(target);
       }

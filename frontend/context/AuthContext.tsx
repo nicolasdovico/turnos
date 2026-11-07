@@ -10,20 +10,32 @@ export interface ComplejoResumen {
   deporte_principal?: string;
 }
 
+export interface ClubJugadorResumen {
+  id: number;
+  nombre: string;
+  subdominio: string;
+  deporte_principal?: string;
+  tipo_negocio_id?: number;
+  logo_url?: string | null;
+  ciudad?: string | null;
+  direccion?: string | null;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
   email_verified_at?: string | null;
   complejos?: ComplejoResumen[];
+  clubes_jugador?: ClubJugadorResumen[];
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, password: string, password_confirmation: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; user?: User; token?: string; error?: string }>;
+  register: (name: string, email: string, password: string, password_confirmation: string) => Promise<{ success: boolean; user?: User; token?: string; error?: string }>;
   logout: () => Promise<void>;
   setAuthSession: (user: User, token: string) => void;
   markEmailAsVerified: () => void;
@@ -238,7 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setAuthSession(data.user, data.token);
-      return { success: true };
+      return { success: true, user: data.user, token: data.token };
     } catch (err: any) {
       return { success: false, error: err.message || "Error de conexión con el servidor" };
     }
@@ -262,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setAuthSession(data.user, data.token);
-      return { success: true };
+      return { success: true, user: data.user, token: data.token };
     } catch (err: any) {
       return { success: false, error: err.message || "Error de conexión con el servidor" };
     }

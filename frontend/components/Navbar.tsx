@@ -101,6 +101,7 @@ export default function Navbar() {
 
   // User's owned club (if any)
   const userClubs = user?.complejos || [];
+  const playerClubs = user?.clubes_jugador || [];
   const ownedClub = userClubs.length > 0 ? userClubs[0] : null;
 
   // Instant ownership check on current subdomain
@@ -173,12 +174,15 @@ export default function Navbar() {
               <Link href="/" className="hover:text-emerald-600 transition font-semibold text-slate-900">
                 Inicio
               </Link>
+              <Link href="/jugar" className="hover:text-emerald-600 transition text-emerald-700 font-semibold flex items-center gap-1">
+                <span>🎾 Buscar Canchas</span>
+              </Link>
               <Link href="/#funcionalidades" className="hover:text-emerald-600 transition">
                 Funcionalidades
               </Link>
               {!ownedClub && (
-                <a href={demoClubUrl} className="hover:text-emerald-600 transition text-emerald-700 font-semibold">
-                  Demo Club (Padel Pro)
+                <a href={demoClubUrl} className="hover:text-emerald-600 transition text-slate-600 font-medium">
+                  Demo Club
                 </a>
               )}
               <Link href="/planes" className="hover:text-emerald-600 transition">
