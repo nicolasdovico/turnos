@@ -218,4 +218,61 @@ class CMSSanitizationAndRevalidationTest extends TestCase
             ]);
     }
 
+    /**
+     * Test subida de imagen para páginas institucionales CMS.
+     */
+    public function test_subida_de_imagen_cms_exitosa_y_validaciones(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        // Dueño del complejo
+        $owner = User::factory()->create();
+        $this->complejoOro->update(['user_id' => $owner->id]);
+        $ownerToken = $owner->createToken('test-token')->plainTextToken;
+
+        // 1. Subida exitosa de imagen válida
+        $validImage = \Illuminate\Http\UploadedFile::fake()->image('cancha_cristal.jpg', 1200, 800)->size(1500); // 1.5MB
+
+        $response = $this->withHeader('Authorization', "Bearer {$ownerToken}")
+            ->post("/api/clubs/{$this->complejoOro->subdominio}/paginas/upload-imagen", [
+                'file' => $validImage,
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Imagen subida exitosamente.',
+            ]);
+
+        $url = $response->json('url');
+        $this->assertStringStartsWith("/storage/tenants/{$this->complejoOro->subdominio}/cms/img_", $url);
+        $this->assertStringEndsWith(".jpg", $url);
+
+        // 2. Rechazo por archivo no imagen (PDF o script)
+        $invalidFile = \Illuminate\Http\UploadedFile::fake()->create('documento.pdf', 500, 'application/pdf');
+        $responseInvalid = $this->withHeader('Authorization', "Bearer {$ownerToken}")
+            ->postJson("/api/clubs/{$this->complejoOro->subdominio}/paginas/upload-imagen", [
+                'file' => $invalidFile,
+            ]);
+        $responseInvalid->assertStatus(422)
+            ->assertJsonValidationErrors(['file']);
+
+        // 3. Rechazo por tamaño excesivo (> 4096 KB)
+        $hugeImage = \Illuminate\Http\UploadedFile::fake()->image('foto_pesada.png')->size(5000); // 5MB
+        $responseHuge = $this->withHeader('Authorization', "Bearer {$ownerToken}")
+            ->postJson("/api/clubs/{$this->complejoOro->subdominio}/paginas/upload-imagen", [
+                'file' => $hugeImage,
+            ]);
+        $responseHuge->assertStatus(422)
+            ->assertJsonValidationErrors(['file']);
+
+        // 4. Rechazo 403 para usuario no autorizado
+        $otherUser = User::factory()->create();
+        $this->flushHeaders();
+        $responseForbidden = $this->actingAs($otherUser, 'sanctum')
+            ->post("/api/clubs/{$this->complejoOro->subdominio}/paginas/upload-imagen", [
+                'file' => \Illuminate\Http\UploadedFile::fake()->image('otra_cancha.jpg'),
+            ]);
+        $responseForbidden->assertStatus(403);
+    }
 }

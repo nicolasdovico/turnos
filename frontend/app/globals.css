@@ -272,3 +272,30 @@ main[data-testid="tenant-public-portal"] .shadow-emerald-500\/10 {
   color: #ffffff;
 }
 
+.prose figure,
+[data-testid="vista-previa-contenido"] figure {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.prose img,
+[data-testid="vista-previa-contenido"] img {
+  border-radius: 1rem;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  display: block;
+}
+
+.prose figcaption,
+[data-testid="vista-previa-contenido"] figcaption {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 0.5rem;
+  text-align: center;
+  font-style: italic;
+}
+
+

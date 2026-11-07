@@ -474,5 +474,105 @@ describe("GestionPaginasCMS - Gestor y Editor de Páginas Institucionales (Panel
     await screen.findByText(/Ya existe una página con el enlace \(slug\) "reglamento-general"/);
     expect(fetchCalled).toBe(false);
   });
+
+  it("permite subir e insertar una imagen de cancha en el editor con etiqueta figure semántica", async () => {
+    let uploadFormData: FormData | null = null;
+
+    global.fetch = vi.fn().mockImplementation((url: string, options?: any) => {
+      if (url.includes("/api/clubs/padel-norte/paginas/upload-imagen")) {
+        uploadFormData = options?.body;
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              message: "Imagen subida exitosamente.",
+              url: "/storage/tenants/padel-norte/cms/img_cancha_central_123.jpg",
+              filename: "img_cancha_central_123.jpg",
+            }),
+        });
+      }
+      if (url.includes("/api/clubs/padel-norte/paginas")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true, data: mockPaginas }),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+
+    render(
+      <GestionPaginasCMS
+        subdomain="padel-norte"
+        token="token-admin"
+        clubNombre="Club Padel Norte"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-nueva-pagina")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId("btn-nueva-pagina"));
+    expect(screen.getByTestId("btn-insert-image")).toBeDefined();
+
+    // Simular selección de archivo de imagen
+    const file = new File(["dummy content"], "cancha_central.jpg", { type: "image/jpeg" });
+    const fileInput = screen.getByTestId("input-cms-image-upload") as HTMLInputElement;
+
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      const textarea = screen.getByTestId("textarea-contenido-pagina") as HTMLTextAreaElement;
+      expect(textarea.value).toContain("/storage/tenants/padel-norte/cms/img_cancha_central_123.jpg");
+      expect(textarea.value).toContain("<figure>");
+      expect(textarea.value).toContain("<figcaption>");
+      expect(textarea.value).toContain("Cancha central");
+    });
+
+    expect(uploadFormData).toBeDefined();
+  });
+
+  it("rechaza archivos no permitidos o mayores a 4MB en el editor de páginas", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/clubs/padel-norte/paginas")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ success: true, data: mockPaginas }),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+
+    render(
+      <GestionPaginasCMS
+        subdomain="padel-norte"
+        token="token-admin"
+        clubNombre="Club Padel Norte"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("btn-nueva-pagina")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId("btn-nueva-pagina"));
+
+    const fileInput = screen.getByTestId("input-cms-image-upload") as HTMLInputElement;
+
+    // 1. Archivo PDF no admitido
+    const pdfFile = new File(["dummy pdf"], "reglas.pdf", { type: "application/pdf" });
+    fireEvent.change(fileInput, { target: { files: [pdfFile] } });
+
+    await screen.findByText("Solo se permiten imágenes en formato JPEG, PNG o WEBP.");
+
+    // 2. Archivo excesivamente grande (> 4MB)
+    const hugeFile = new File([new ArrayBuffer(5 * 1024 * 1024)], "foto_pesada.png", {
+      type: "image/png",
+    });
+    fireEvent.change(fileInput, { target: { files: [hugeFile] } });
+
+    await screen.findByText("La imagen es demasiado pesada. El tamaño máximo permitido es 4 MB.");
+  });
 });
 

@@ -175,6 +175,7 @@ Route::prefix('clubs')->group(function () {
     // Páginas Institucionales CMS del Club (Módulo F)
     Route::get('/{subdomain}/paginas', [\App\Http\Controllers\Api\PaginaController::class, 'indexByClub']);
     Route::post('/{subdomain}/paginas', [\App\Http\Controllers\Api\PaginaController::class, 'storeByClub']);
+    Route::post('/{subdomain}/paginas/upload-imagen', [\App\Http\Controllers\Api\PaginaController::class, 'uploadImagen']);
     Route::put('/{subdomain}/paginas/{id}', [\App\Http\Controllers\Api\PaginaController::class, 'updateByClub']);
     Route::delete('/{subdomain}/paginas/{id}', [\App\Http\Controllers\Api\PaginaController::class, 'destroyByClub']);
 });

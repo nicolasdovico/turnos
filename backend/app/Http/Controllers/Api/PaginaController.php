@@ -9,6 +9,8 @@ use App\Services\RevalidationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class PaginaController extends Controller
@@ -36,6 +38,8 @@ class PaginaController extends Controller
         if (!$user) {
             return null;
         }
+
+        \Illuminate\Support\Facades\Log::info("getComplejoForAdmin: user {$user->id} ({$user->email}), isOwner: " . ($complejo->user_id && ((string) $complejo->user_id === (string) $user->id) ? 'YES' : 'NO') . ", isAdmin: " . ((($user->role ?? '') === 'admin' || !empty($user->is_admin) || ($user->email ?? '') === 'admin@admin.com') ? 'YES' : 'NO'));
 
         $isOwner = $complejo->user_id && ((string) $complejo->user_id === (string) $user->id);
         $isAdmin = ($user->role ?? '') === 'admin' 
@@ -414,6 +418,52 @@ class PaginaController extends Controller
             'success' => true,
             'message' => 'Página eliminada exitosamente.',
         ]);
+    }
+
+    /**
+     * POST /api/clubs/{subdomain}/paginas/upload-imagen
+     * Subida directa de imágenes para incluir en el contenido de páginas institucionales CMS.
+     */
+    public function uploadImagen(Request $request, string $subdomain): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'image', 'mimes:jpeg,png,webp,jpg', 'max:4096'],
+            'titulo' => ['nullable', 'string', 'max:255'],
+        ], [
+            'file.required' => 'Debe seleccionar un archivo de imagen.',
+            'file.file' => 'El archivo proporcionado no es válido.',
+            'file.image' => 'El archivo debe ser una imagen.',
+            'file.mimes' => 'El formato debe ser JPEG, PNG o WEBP.',
+            'file.max' => 'La imagen no puede superar los 4 MB de tamaño.',
+        ]);
+
+        $complejo = $this->getComplejoForAdmin($request, $subdomain);
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado para subir imágenes en este club.',
+            ], 403);
+        }
+
+        $file = $request->file('file');
+        $extension = $file->getClientOriginalExtension() ?: 'webp';
+        $filename = 'img_' . Str::random(14) . '.' . strtolower($extension);
+        $cleanSubdomain = strtolower(trim($subdomain));
+
+        $path = "tenants/{$cleanSubdomain}/cms/{$filename}";
+        Storage::disk('public')->put($path, file_get_contents($file));
+
+        $publicUrl = "/storage/{$path}";
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Imagen subida exitosamente.',
+            'url' => $publicUrl,
+            'filename' => $filename,
+            'original_name' => $file->getClientOriginalName(),
+            'size' => $file->getSize(),
+        ], 201);
     }
 
     /**

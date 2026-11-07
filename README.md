@@ -212,3 +212,16 @@ Para conocer el estado exacto de avance, consulta [`status.md`](status.md) y [`p
 ejemplos de sitios
 https://www.dondejuegoapp.com/
 https://www.turnosport.com/
+
+
+Usuarios de prueba
+nicolas@gmail.com
+password: password123
+
+URL del backend
+http://localhost:8080/admin
+user: admin@turnos.test
+password: password123
+
+URL del frontend
+http://localhost:8080/

@@ -3199,3 +3199,31 @@ Tarea: Visualización Integral de "Reseña Corta / Sobre Nosotros" en Plantillas
   * Backend: 19/19 tests pasados en `ClubBrandingTest` y `CMSSanitizationAndRevalidationTest` (78 aserciones).
   * Verificación en vivo: La reseña corta del club se visualiza de forma elegante en el Hero de la web pública, en el pie de página de todas las vistas, en los metadatos SEO y en el mockup interactivo del panel de administración.
 ==============================================================================================================================
+
+Fecha: 2026-11-07
+Tarea: Subida e Inserción Directa de Imágenes en el Gestor de Páginas CMS (Exhibición de Canchas e Instalaciones)
+- Contexto y Requerimiento:
+  * El usuario solicitó la posibilidad de subir imágenes directamente desde el editor de páginas institucionales para exhibir fotos de las canchas e instalaciones del complejo (por ejemplo, creando una página "Canchas"), con validación de tipo de archivo y restricción de tamaño.
+- Implementación Realizada:
+  1. Backend (Laravel 11):
+     * En `PaginaController.php`, se implementó el método `uploadImagen(Request $request, string $subdomain)`.
+     * Autenticación rigurosa delegada a `getComplejoForAdmin`, garantizando aislamiento multi-tenant estricto.
+     * Validación: `'file' => ['required', 'file', 'image', 'mimes:jpeg,png,webp,jpg', 'max:4096']` (límite 4MB).
+     * Almacenamiento seguro en disco público: `tenants/{subdomain}/cms/img_{random14}.{ext}` retornando `{ success: true, url: "/storage/...", filename: "..." }`.
+     * Registro de ruta protegida en `routes/api.php`: `POST /api/clubs/{subdomain}/paginas/upload-imagen`.
+     * Test automatizado en `CMSSanitizationAndRevalidationTest.php`: validación de subida exitosa, rechazo 422 a no imágenes, rechazo 422 a archivos > 4MB, y rechazo 403 a usuarios no administradores.
+  2. Frontend (Next.js 14):
+     * En `GestionPaginasCMS.tsx`:
+       - Se incorporó el botón "🖼️ Insertar Imagen" en la barra de herramientas del editor WYSIWYG.
+       - Selector de archivos oculto con input `accept="image/jpeg,image/png,image/webp,image/jpg"`.
+       - Validación en cliente de extensión y peso máximo (4MB) con alertas amigables en interfaz.
+       - Spinner de carga reactivo durante la transferencia (`uploadingImage`).
+       - Inserción automática de estructura semántica `<figure><img src="..." alt="..." /><figcaption>...</figcaption></figure>` en la posición del cursor o al final del contenido.
+       - Incorporación de una nueva plantilla predefinida en `STARTER_TEMPLATES`: `"Nuestras Canchas & Pistas"` (slug `nuestras-canchas`, con estructura de pistas, iluminación LED y césped profesional).
+     * En `globals.css`:
+       - Reglas semánticas añadidas para `.prose figure`, `.prose img` (bordes redondeados `rounded-2xl`, sombras suaves, adaptabilidad responsiva) y `.prose figcaption` (pie de foto en gris slate y estilo itálico).
+  3. Tests Automatizados:
+     * Frontend: Se incorporaron 2 nuevos tests en `GestionPaginasCMS.test.tsx` verificando inserción de imagen y rechazo preventivo de archivos no permitidos/pesados. Suite Vitest completa: 167/167 tests pasados en verde (18 archivos).
+     * Backend: 5/5 tests pasados en `CMSSanitizationAndRevalidationTest` y 310/310 tests en la suite completa de PHPUnit.
+==============================================================================================================================
+

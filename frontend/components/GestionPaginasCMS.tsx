@@ -23,6 +23,8 @@ import {
   Quote,
   Minus,
   Link as LinkIcon,
+  Image as ImageIcon,
+  Upload,
   CheckCircle2,
   X,
   ArrowUpDown,
@@ -105,6 +107,34 @@ export const STARTER_TEMPLATES = [
     orden: 3,
     meta_descripcion: "Consulta las tarifas vigentes por turno, abonos semestrales para turnos fijos y promociones especiales.",
   },
+  {
+    titulo: "Nuestras Canchas & Pistas",
+    slug: "nuestras-canchas",
+    contenido_html: `<h2>Pistas Profesionales de Primer Nivel</h2>
+<p>Contamos con canchas de pádel construidas bajo estándares del World Padel Tour, pensadas tanto para jugadores exigentes como para el disfrute con amigos y torneos del club.</p>
+
+<h3>Cancha 1 - Central Panorámica</h3>
+<p>Nuestra pista principal cuenta con cristales templados sin columnas estructurales en los fondos, brindando una visibilidad de 360 grados inigualable.</p>
+<ul>
+  <li><strong>Césped sintético texturado:</strong> Menor abrasión articular y bote homogéneo.</li>
+  <li><strong>Iluminación LED Master Pro:</strong> 8 focos de 200W sin puntos ciegos ni reflejos nocturnos.</li>
+  <li><strong>Cámara de grabación HD:</strong> Para revivir tus mejores jugadas y puntos.</li>
+</ul>
+
+<h3>Cancha 2 - Pista Exterior Techada</h3>
+<p>Ideal para disfrutar durante todo el año protegida de las inclemencias del clima, con ventilación cruzada y cerramientos perimetrales de seguridad.</p>
+<ul>
+  <li>Césped monofilamento azul de alta densidad con arena de sílice micronizada.</li>
+  <li>Marcador electrónico digital en cabecera con control remoto.</li>
+  <li>Salidas oficiales por 3 y por 4 metros habilitadas para juego exterior.</li>
+</ul>
+
+<blockquote>Todas nuestras canchas reciben mantenimiento diario de cepillado y control de tensión de redes para asegurar la máxima calidad de juego.</blockquote>`,
+    mostrar_en_header: true,
+    mostrar_en_footer: true,
+    orden: 4,
+    meta_descripcion: "Conoce en detalle nuestras canchas, tecnología de césped sintético, iluminación LED y especificaciones técnicas.",
+  },
 ];
 
 export function slugify(text: string): string {
@@ -157,6 +187,11 @@ export default function GestionPaginasCMS({
   const [formMetaDescripcion, setFormMetaDescripcion] = useState<string>("");
   const [saving, setSaving] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Image Upload State
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Delete Confirmation Modal
   const [deletingPage, setDeletingPage] = useState<PaginaCMS | null>(null);
@@ -260,6 +295,74 @@ export default function GestionPaginasCMS({
         start + prefix.length + selectedText.length
       );
     }, 50);
+  };
+
+  // Manejar subida de imagen para insertar en el contenido
+  const handleTriggerImageUpload = () => {
+    setImageUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImageFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validación de tipo de archivo en el cliente
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+    if (!allowedTypes.includes(file.type)) {
+      setImageUploadError("Solo se permiten imágenes en formato JPEG, PNG o WEBP.");
+      return;
+    }
+
+    // Validación de tamaño (máximo 4 MB = 4 * 1024 * 1024 bytes)
+    const maxBytes = 4 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setImageUploadError("La imagen es demasiado pesada. El tamaño máximo permitido es 4 MB.");
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      setImageUploadError(null);
+      const activeToken = getAuthToken();
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(
+        `${effectiveApiUrl}/api/clubs/${subdomain}/paginas/upload-imagen`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
+          },
+          body: formData,
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.url) {
+        throw new Error(data.message || "Error al subir la imagen.");
+      }
+
+      // Nombre amigable para alt/caption sugerido
+      const rawName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+      const suggestedCaption = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+
+      // Inserción de etiqueta HTML semántica de imagen con figure y figcaption
+      const imageSnippet = `\n<figure>\n  <img src="${data.url}" alt="${suggestedCaption}" />\n  <figcaption>${suggestedCaption}</figcaption>\n</figure>\n`;
+
+      insertFormatting(imageSnippet, "", "");
+    } catch (err: any) {
+      setImageUploadError(err.message || "No se pudo subir la imagen.");
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   // Abrir modal para nueva página en blanco
@@ -903,7 +1006,54 @@ export default function GestionPaginasCMS({
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
+
+                      <div className="w-px h-4 bg-slate-600 mx-1" />
+
+                      {/* Botón Subir e Insertar Imagen */}
+                      <button
+                        type="button"
+                        onClick={handleTriggerImageUpload}
+                        disabled={uploadingImage}
+                        data-testid="btn-insert-image"
+                        className="px-2.5 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                        title="Subir foto de cancha o instalación del club"
+                      >
+                        {uploadingImage ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ImageIcon className="w-3.5 h-3.5" />
+                        )}
+                        <span>{uploadingImage ? "Subiendo..." : "Insertar Imagen"}</span>
+                      </button>
+
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImageFileSelected}
+                        accept="image/jpeg,image/png,image/webp,image/jpg"
+                        className="hidden"
+                        data-testid="input-cms-image-upload"
+                      />
                     </div>
+
+                    {imageUploadError && (
+                      <div
+                        data-testid="image-upload-error"
+                        className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-rose-400" />
+                          <span>{imageUploadError}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setImageUploadError(null)}
+                          className="text-slate-400 hover:text-white text-xs ml-2 cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
 
                     <textarea
                       ref={textareaRef}
