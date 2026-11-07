@@ -252,7 +252,6 @@ export default function GestionPOSBuffet({ subdomain, token }: GestionPOSBuffetP
       setMontoRecibido("");
       setComandaTurnoId("");
       fetchProductos();
-      fetchCajaResumen();
     } catch (err: any) {
       setErrorMsg(err.message || "Error al registrar la venta.");
     } finally {

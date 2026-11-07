@@ -431,7 +431,7 @@ export default function BrandingClubPanel({
       setSuccessMsg(null);
 
       // 1. Optimistic Instant Preview en 0ms
-      if (typeof window !== "undefined" && window.URL?.createObjectURL) {
+      if (typeof window !== "undefined" && typeof window.URL?.createObjectURL === "function") {
         try {
           localPreview = URL.createObjectURL(file);
           if (tipo === "logo") {
@@ -475,7 +475,7 @@ export default function BrandingClubPanel({
       setSuccessMsg(`¡${tipo === "logo" ? "Logotipo" : "Banner de portada"} subido y actualizado exitosamente!`);
 
       // Safely revoke optimistic blob preview after server URL takes effect
-      if (localPreview && typeof window !== "undefined" && window.URL?.revokeObjectURL) {
+      if (localPreview && typeof window !== "undefined" && typeof window.URL?.revokeObjectURL === "function") {
         setTimeout(() => {
           try {
             URL.revokeObjectURL(localPreview!);
@@ -520,7 +520,7 @@ export default function BrandingClubPanel({
       } else {
         setPortadaUrl(previousUrl);
       }
-      if (localPreview && typeof window !== "undefined" && window.URL?.revokeObjectURL) {
+      if (localPreview && typeof window !== "undefined" && typeof window.URL?.revokeObjectURL === "function") {
         try {
           URL.revokeObjectURL(localPreview);
         } catch {}
