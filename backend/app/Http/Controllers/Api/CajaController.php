@@ -20,6 +20,9 @@ class CajaController extends Controller
      */
     public function apertura(Request $request): JsonResponse
     {
+        $monto = $request->input('monto_apertura') ?? $request->input('monto_inicial');
+        $request->merge(['monto_apertura' => $monto]);
+
         $validated = $request->validate([
             'monto_apertura' => ['required', 'numeric', 'min:0'],
         ]);
@@ -46,6 +49,9 @@ class CajaController extends Controller
      */
     public function cierre(Request $request): JsonResponse
     {
+        $monto = $request->input('monto_cierre_declarado') ?? $request->input('monto_final') ?? $request->input('monto_cierre');
+        $request->merge(['monto_cierre_declarado' => $monto]);
+
         $validated = $request->validate([
             'caja_sesion_id' => ['nullable', 'integer', 'exists:cajas_sesiones,id'],
             'monto_cierre_declarado' => ['required', 'numeric', 'min:0'],

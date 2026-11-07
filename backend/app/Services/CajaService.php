@@ -107,7 +107,10 @@ class CajaService
         $fechaInicio = $fechaCarbon->copy()->startOfDay();
         $fechaFin = $fechaCarbon->copy()->endOfDay();
 
-        $sesiones = CajaSesion::whereBetween('fecha_apertura', [$fechaInicio, $fechaFin])
+        $sesiones = CajaSesion::where(function ($q) use ($fechaInicio, $fechaFin) {
+                $q->whereBetween('fecha_apertura', [$fechaInicio, $fechaFin])
+                  ->orWhereBetween('fecha_cierre', [$fechaInicio, $fechaFin]);
+            })
             ->with('usuario')
             ->orderBy('fecha_apertura', 'desc')
             ->get();

@@ -10,6 +10,8 @@ import GestionClientes from "@/components/GestionClientes";
 import FacturacionClubPanel from "@/components/FacturacionClubPanel";
 import BrandingClubPanel from "@/components/BrandingClubPanel";
 import GestionPaginasCMS from "@/components/GestionPaginasCMS";
+import GestionPOSBuffet from "@/components/GestionPOSBuffet";
+import GestionCajaArqueo from "@/components/GestionCajaArqueo";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 
 interface ComplejoData {
@@ -36,6 +38,13 @@ interface ComplejoData {
   dias_fin_semana?: number[];
   recordatorio_whatsapp_activo?: boolean;
   recordatorio_anticipacion_minutos?: number;
+  logo_url?: string | null;
+  branding?: {
+    logo_url?: string | null;
+    portada_url?: string | null;
+    plantilla_slug?: string;
+    color_primario?: string;
+  } | null;
   owner: { id: number; name: string; email: string } | null;
 }
 
@@ -439,9 +448,9 @@ const ALL_MODULOS = [
     nombre: "Punto de Venta (POS) & Buffet",
     icon: "🍔",
     descripcion: "Control de stock, comandas asignadas a turnos y arqueo de caja diaria.",
-    actionLabel: "Gestionar Productos en POS ↗",
-    actionHref: "http://localhost:8080/admin",
-    isExternal: true,
+    actionLabel: "Abrir Terminal Buffet & POS →",
+    actionHref: "#pos-buffet",
+    isExternal: false,
     planMinimo: "Plata",
   },
   {
@@ -502,7 +511,7 @@ export default function ClubAdminPanel() {
          localStorage.getItem("auth_token"))
       : null);
 
-  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion" | "sitio-web">("canchas");
+  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "caja" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion" | "sitio-web" | "pos-buffet">("canchas");
   const [subTabSitioWeb, setSubTabSitioWeb] = useState<"branding" | "paginas">("branding");
   const [openBillingPaymentModal, setOpenBillingPaymentModal] = useState(false);
   const [suscripcionAlerta, setSuscripcionAlerta] = useState<{
@@ -2517,12 +2526,21 @@ export default function ClubAdminPanel() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 font-black text-white shadow-lg shadow-emerald-600/30">
-                  ⚡
-                </span>
+              <div className="flex items-center gap-3 sm:gap-4 mb-2">
+                {complejo?.branding?.logo_url || complejo?.logo_url ? (
+                  <img
+                    src={complejo.branding?.logo_url || complejo.logo_url || ""}
+                    alt={`Logo ${complejo.nombre}`}
+                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl object-contain bg-white p-1 border border-slate-700 shadow-lg shadow-emerald-950/40 shrink-0"
+                    data-testid="panel-club-logo"
+                  />
+                ) : (
+                  <span className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-emerald-600 font-black text-white text-xl shadow-lg shadow-emerald-600/30 shrink-0">
+                    ⚡
+                  </span>
+                )}
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white capitalize">
                       {complejo?.nombre || subdomain}
                     </h1>
@@ -2600,7 +2618,18 @@ export default function ClubAdminPanel() {
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            📊 Resumen Diario & Caja
+            📊 Resumen de Turnos
+          </button>
+          <button
+            onClick={() => setActiveTab("caja")}
+            className={`pb-4 transition border-b-2 flex items-center gap-1.5 ${
+              activeTab === "caja"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+            data-testid="tab-caja-arqueo"
+          >
+            💵 Caja & Arqueo
           </button>
           <button
             onClick={() => setActiveTab("clientes")}
@@ -2611,6 +2640,17 @@ export default function ClubAdminPanel() {
             }`}
           >
             👥 Clientes
+          </button>
+          <button
+            onClick={() => setActiveTab("pos-buffet")}
+            className={`pb-4 transition border-b-2 flex items-center gap-1.5 ${
+              activeTab === "pos-buffet"
+                ? "border-emerald-500 text-emerald-400"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+            data-testid="tab-pos-buffet"
+          >
+            🍔 Buffet & POS
           </button>
           <button
             onClick={() => setActiveTab("modulos")}
@@ -2698,7 +2738,19 @@ export default function ClubAdminPanel() {
         </div>
 
         {/* ========================================================================= */}
-        {/* TAB 0: RESUMEN DIARIO & CAJA */}
+        {/* TAB: BUFFET & POS */}
+        {/* ========================================================================= */}
+        {activeTab === "pos-buffet" && (
+          <div className="mt-8">
+            <GestionPOSBuffet
+              subdomain={subdomain}
+              token={token}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 0: RESUMEN DE TURNOS */}
         {/* ========================================================================= */}
         {activeTab === "resumen" && (
           <div className="mt-8">
@@ -2706,6 +2758,18 @@ export default function ClubAdminPanel() {
               subdomain={subdomain}
               token={token}
               canchas={canchas}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB: CAJA & ARQUEO (GLOBAL PARA TODOS LOS CLUBES) */}
+        {/* ========================================================================= */}
+        {activeTab === "caja" && (
+          <div className="mt-8">
+            <GestionCajaArqueo
+              subdomain={subdomain}
+              token={token}
             />
           </div>
         )}
@@ -3945,7 +4009,15 @@ export default function ClubAdminPanel() {
 
                     <div className="mt-6 pt-4 border-t border-slate-800/60">
                       {isActivo ? (
-                        mod.isExternal ? (
+                        mod.actionHref === "#pos-buffet" ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("pos-buffet")}
+                            className="block w-full text-center rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition cursor-pointer"
+                          >
+                            {mod.actionLabel}
+                          </button>
+                        ) : mod.isExternal ? (
                           <a
                             href={mod.actionHref}
                             target="_blank"
