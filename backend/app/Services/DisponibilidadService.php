@@ -114,7 +114,7 @@ class DisponibilidadService
         $ahora = Carbon::now($timezone);
 
         // Fetch non-available turnos in database (reservado, bloqueado, confirmado, etc. o cancelado por lluvia)
-        $turnosOcupados = Turno::with('cliente')
+        $turnosOcupados = Turno::with(['cliente', 'ventas.items.producto'])
             ->where('cancha_id', $canchaId)
             ->where('fecha', $fechaCarbon->format('Y-m-d'))
             ->where(function ($q) {
@@ -389,6 +389,25 @@ class DisponibilidadService
 
             $fechaTurno = $t->fecha ? Carbon::parse($t->fecha)->format('Y-m-d') : $fechaCarbon->format('Y-m-d');
 
+            $ventasPendientes = $t->ventas->where('estado', '!=', 'cancelado');
+            $consumosBuffet = [];
+            $totalBuffet = 0.0;
+
+            foreach ($ventasPendientes as $venta) {
+                // Si la venta quedó cargada a cuenta de turno o mostrador
+                $totalBuffet += (float) $venta->total;
+                foreach ($venta->items as $item) {
+                    $consumosBuffet[] = [
+                        'venta_id' => $venta->id,
+                        'producto_id' => $item->producto_id,
+                        'nombre' => $item->producto?->nombre ?? 'Producto Buffet',
+                        'cantidad' => (int) $item->cantidad,
+                        'precio_unitario' => (float) $item->precio_unitario,
+                        'subtotal' => (float) ($item->precio_unitario * $item->cantidad),
+                    ];
+                }
+            }
+
             $data = [
                 'id' => $t->id,
                 'cancha_id' => $cancha->id,
@@ -400,6 +419,9 @@ class DisponibilidadService
                 'precio' => $precio,
                 'monto_pagado' => $montoPagado,
                 'saldo_pendiente' => $saldoPendiente,
+                'total_buffet' => $totalBuffet,
+                'saldo_total_a_cobrar' => max(0.0, round($saldoPendiente + $totalBuffet, 2)),
+                'consumos_buffet' => $consumosBuffet,
                 'estado' => $t->estado,
                 'estado_pago' => $estadoPago,
                 'motivo_cancelacion' => $t->motivo_cancelacion,

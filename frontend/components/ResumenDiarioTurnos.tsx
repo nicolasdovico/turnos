@@ -28,6 +28,15 @@ import {
 } from "lucide-react";
 import ModalProtocoloLluvia from "./ModalProtocoloLluvia";
 
+export interface ConsumoBuffetItem {
+  venta_id: number;
+  producto_id: number;
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
 export interface TurnoDetalle {
   id: number;
   cancha_id: number;
@@ -43,6 +52,9 @@ export interface TurnoDetalle {
   precio_efectivo?: number;
   monto_pagado: number;
   saldo_pendiente: number;
+  total_buffet?: number;
+  saldo_total_a_cobrar?: number;
+  consumos_buffet?: ConsumoBuffetItem[];
   estado_pago: string;
   metodo_pago: string;
   es_fijo: boolean;
@@ -363,7 +375,8 @@ export default function ResumenDiarioTurnos({
     e.preventDefault();
     if (!turnoToPay) return;
     const targetTurno = turnoToPay;
-    const montoCobrado = pagoMonto ? parseFloat(pagoMonto) : targetTurno.saldo_pendiente;
+    const totalAdeudado = Number(targetTurno.saldo_total_a_cobrar ?? targetTurno.saldo_pendiente ?? targetTurno.precio);
+    const montoCobrado = pagoMonto ? parseFloat(pagoMonto) : totalAdeudado;
 
     try {
       setIsProcessingPago(true);
@@ -390,7 +403,7 @@ export default function ResumenDiarioTurnos({
         throw new Error(json.message || "Error al registrar el cobro.");
       }
 
-      showToast("success", `¡Cobro de $${montoCobrado.toLocaleString()} registrado con éxito (${pagoMetodo.toUpperCase()})!`);
+      showToast("success", `¡Cobro unificado (Turno + Buffet) de $${montoCobrado.toLocaleString()} registrado con éxito (${pagoMetodo.toUpperCase()})!`);
       setTurnoToPay(null);
       setPagoMonto("");
       await fetchResumen(true);
@@ -485,11 +498,11 @@ export default function ResumenDiarioTurnos({
                 <Calendar className="w-5 h-5" />
               </div>
               <h2 className="text-xl font-black text-white tracking-tight">
-                Resumen Diario & Control de Caja
+                Resumen & Flujo de Turnos
               </h2>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Control financiero día a día de turnos reservados, cobranzas realizadas y saldos pendientes de mostrador.
+              Control de ocupación día a día de turnos reservados, cobranzas de alquileres y saldos pendientes de canchas.
             </p>
           </div>
 
@@ -1240,16 +1253,46 @@ export default function ResumenDiarioTurnos({
                 </span>
               </div>
               <div className="flex justify-between border-t border-slate-800/60 pt-2 font-mono">
-                <span className="text-slate-400">Precio Total:</span>
+                <span className="text-slate-400">Alquiler Cancha:</span>
                 <span className="text-white">${turnoToPay.precio.toLocaleString()}</span>
               </div>
+              {turnoToPay.monto_pagado > 0 && (
+                <div className="flex justify-between font-mono">
+                  <span className="text-slate-400">Seña Ya Pagada:</span>
+                  <span className="text-emerald-400">-${turnoToPay.monto_pagado.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between font-mono">
-                <span className="text-slate-400">Ya Pagado:</span>
-                <span className="text-emerald-400">${turnoToPay.monto_pagado.toLocaleString()}</span>
+                <span className="text-slate-400">Resta Cancha:</span>
+                <span className="text-slate-200">${(turnoToPay.saldo_pendiente ?? 0).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between font-mono font-bold text-amber-400 text-sm border-t border-slate-800/60 pt-2">
-                <span>Saldo Pendiente:</span>
-                <span>${turnoToPay.saldo_pendiente.toLocaleString()}</span>
+
+              {/* Desglose de Consumos de Buffet / Comanda */}
+              {Array.isArray(turnoToPay.consumos_buffet) && turnoToPay.consumos_buffet.length > 0 && (
+                <div className="border-t border-slate-800/80 pt-2 space-y-1.5" data-testid="resumen-consumos-buffet">
+                  <div className="flex justify-between text-xs font-bold text-amber-400">
+                    <span>🥤 Consumos Buffet / Cantina:</span>
+                    <span className="font-mono">+${(turnoToPay.total_buffet || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/80 space-y-1">
+                    {turnoToPay.consumos_buffet.map((c, idx) => (
+                      <div key={idx} className="flex justify-between text-[11px] text-slate-300">
+                        <span>
+                          {c.cantidad}x {c.nombre}
+                        </span>
+                        <span className="font-mono text-slate-400">
+                          ${c.subtotal.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Total Definitivo Unificado a Cobrar */}
+              <div className="flex justify-between font-mono font-black text-emerald-400 text-sm border-t border-slate-800/60 pt-2">
+                <span>TOTAL A COBRAR:</span>
+                <span>${(turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio).toLocaleString()}</span>
               </div>
             </div>
 
@@ -1277,14 +1320,12 @@ export default function ResumenDiarioTurnos({
                       type="button"
                       onClick={() => {
                         setPagoMetodo(m.id as any);
-                        const saldoPend = turnoToPay.saldo_pendiente !== undefined && turnoToPay.saldo_pendiente > 0
-                          ? turnoToPay.saldo_pendiente
-                          : turnoToPay.precio || 0;
+                        const totalAdeudado = Number((turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio) || 0);
                         if (m.id === "billetera") {
                           const saldoDisp = Number(turnoToPay.cliente_saldo_billetera || 0);
-                          setPagoMonto(String(Math.min(saldoPend, saldoDisp)));
+                          setPagoMonto(String(Math.min(totalAdeudado, saldoDisp)));
                         } else if (pagoMetodo === "billetera") {
-                          setPagoMonto(String(saldoPend));
+                          setPagoMonto(String(totalAdeudado));
                         }
                       }}
                       className={`p-2.5 rounded-xl border text-left font-bold transition text-xs ${
@@ -1308,11 +1349,11 @@ export default function ResumenDiarioTurnos({
                   step="any"
                   value={pagoMonto}
                   onChange={(e) => setPagoMonto(e.target.value)}
-                  placeholder={turnoToPay.saldo_pendiente.toString()}
+                  placeholder={String((turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio) || 0)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Por defecto se cobra el saldo pendiente total (${turnoToPay.saldo_pendiente.toLocaleString()}).
+                  Por defecto se cobra el total adeudado (${(turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio).toLocaleString()}).
                 </p>
               </div>
 

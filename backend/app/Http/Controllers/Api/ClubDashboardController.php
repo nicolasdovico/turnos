@@ -1996,20 +1996,43 @@ class ClubDashboardController extends Controller
         ]);
 
         $precioTurno = (float) $turno->precio;
-        $montoCobrado = isset($validated['monto']) ? (float) $validated['monto'] : $precioTurno;
+        $ventasAsociadas = $turno->ventas()->where('estado', '!=', 'cancelado')->get();
+        $totalBuffet = (float) $ventasAsociadas->sum('total');
+        $saldoPendienteCancha = (float) ($turno->saldo_pendiente !== null ? $turno->saldo_pendiente : max(0.0, $precioTurno - (float)($turno->monto_pagado ?? 0)));
+        $totalAdeudadoUnificado = round($saldoPendienteCancha + $totalBuffet, 2);
+
+        $montoCobrado = isset($validated['monto']) ? (float) $validated['monto'] : $totalAdeudadoUnificado;
         $metodoPago = $validated['metodo_pago'];
 
         $montoPagadoAnterior = (float) ($turno->monto_pagado ?? 0);
 
-        // Si el monto cobrado es igual o mayor al precio total del turno
-        if ($montoCobrado >= $precioTurno) {
-            $montoPagadoTotal = $montoCobrado;
+        // Si se cobra el total o más que el saldo de la cancha, cancelamos la cancha y el buffet
+        if ($montoCobrado >= $totalAdeudadoUnificado) {
+            $montoPagadoTotal = $precioTurno;
+            $saldoPendiente = 0.0;
+            // Marcar ventas como pagadas con el método de pago elegido
+            foreach ($ventasAsociadas as $v) {
+                $v->update([
+                    'tipo_pago' => $metodoPago,
+                    'estado' => 'completado',
+                ]);
+            }
+        } elseif ($montoCobrado >= $saldoPendienteCancha) {
+            $montoPagadoTotal = $precioTurno;
+            $saldoPendiente = 0.0;
+            $restoParaBuffet = $montoCobrado - $saldoPendienteCancha;
+            foreach ($ventasAsociadas as $v) {
+                if ($restoParaBuffet >= (float)$v->total) {
+                    $v->update(['tipo_pago' => $metodoPago, 'estado' => 'completado']);
+                    $restoParaBuffet -= (float)$v->total;
+                }
+            }
         } else {
-            // Si el cobro es parcial o acumulado
+            // Cobro parcial a cuenta de la cancha
             $montoPagadoTotal = min($precioTurno, $montoPagadoAnterior + $montoCobrado);
+            $saldoPendiente = max(0.0, round($precioTurno - $montoPagadoTotal, 2));
         }
 
-        $saldoPendiente = max(0.0, round($precioTurno - $montoPagadoTotal, 2));
         $estadoPago = $validated['estado_pago'] ?? ($saldoPendiente <= 0 ? 'pagado' : 'senado');
         if ($saldoPendiente <= 0 && $estadoPago === 'senado') {
             $estadoPago = 'pagado';
@@ -2029,7 +2052,7 @@ class ClubDashboardController extends Controller
                 $montoCobrado,
                 'pago_turno',
                 $turno->id,
-                "Pago de turno {$turno->fecha} {$turno->hora_inicio}"
+                "Pago unificado de turno y buffet {$turno->fecha} {$turno->hora_inicio}"
             );
 
             if (!$debitado) {

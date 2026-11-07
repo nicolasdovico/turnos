@@ -104,6 +104,15 @@ export interface RetainedLock {
   is_mine?: boolean;
 }
 
+export interface ConsumoBuffetItem {
+  venta_id: number;
+  producto_id: number;
+  nombre: string;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+}
+
 export interface TurnoOcupado {
   id: number;
   cancha_id: number;
@@ -116,6 +125,9 @@ export interface TurnoOcupado {
   estado_pago?: string;
   monto_pagado?: number;
   saldo_pendiente?: number;
+  total_buffet?: number;
+  saldo_total_a_cobrar?: number;
+  consumos_buffet?: ConsumoBuffetItem[];
   estado: string;
   es_fijo?: boolean;
   cliente_id?: number | null;
@@ -1425,7 +1437,8 @@ export default function GrillaHoraria({
     e.preventDefault();
     if (!turnoToPay) return;
     const targetTurno = turnoToPay;
-    const montoCobrado = pagoMonto ? parseFloat(pagoMonto) : (targetTurno.saldo_pendiente ?? targetTurno.precio);
+    const totalAdeudado = Number(targetTurno.saldo_total_a_cobrar ?? targetTurno.saldo_pendiente ?? targetTurno.precio);
+    const montoCobrado = pagoMonto ? parseFloat(pagoMonto) : totalAdeudado;
     try {
       setIsProcessingPago(true);
       const token = getAuthToken(propToken);
@@ -1460,6 +1473,9 @@ export default function GrillaHoraria({
               ...t,
               estado_pago: data.estado_pago || "pagado",
               estado: "pagado",
+              total_buffet: 0,
+              saldo_total_a_cobrar: 0,
+              consumos_buffet: [],
               monto_pagado: data.monto_pagado !== undefined ? data.monto_pagado : targetTurno.precio,
               saldo_pendiente: data.saldo_pendiente !== undefined ? data.saldo_pendiente : 0,
               metodo_pago: pagoMetodo,
@@ -1473,7 +1489,7 @@ export default function GrillaHoraria({
         })
       );
 
-      addToast("success", `¡Pago registrado exitosamente con ${pagoMetodo.toUpperCase()}!`);
+      addToast("success", `¡Cobro unificado (Turno + Buffet) registrado exitosamente con ${pagoMetodo.toUpperCase()}!`);
       setTurnoToPay(null);
       setPagoMonto("");
       await fetchDisponibilidad(fecha);
@@ -3911,13 +3927,13 @@ export default function GrillaHoraria({
             </div>
 
             <form onSubmit={handleRegistrarPago} className="space-y-4 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
                 <div className="flex justify-between text-slate-400">
                   <span>Titular:</span>
                   <span className="font-bold text-white">{turnoToPay.cliente_nombre || "Cliente Mostrador"}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
-                  <span>Precio Acordado:</span>
+                  <span>Alquiler Cancha:</span>
                   <span className="font-bold text-slate-200 font-mono">${turnoToPay.precio?.toLocaleString()}</span>
                 </div>
                 {turnoToPay.monto_pagado !== undefined && turnoToPay.monto_pagado > 0 && (
@@ -3926,12 +3942,42 @@ export default function GrillaHoraria({
                     <span className="font-bold font-mono">-${turnoToPay.monto_pagado.toLocaleString()}</span>
                   </div>
                 )}
-                {turnoToPay.saldo_pendiente !== undefined && turnoToPay.saldo_pendiente > 0 && (
-                  <div className="flex justify-between text-amber-400 font-bold border-t border-slate-800/80 pt-1">
-                    <span>Saldo Restante a Cobrar:</span>
-                    <span className="font-mono">${turnoToPay.saldo_pendiente.toLocaleString()}</span>
+                {turnoToPay.saldo_pendiente !== undefined && (
+                  <div className="flex justify-between text-slate-300">
+                    <span>Resta Cancha:</span>
+                    <span className="font-mono font-bold">${(turnoToPay.saldo_pendiente ?? 0).toLocaleString()}</span>
                   </div>
                 )}
+
+                {/* Desglose de Consumos de Buffet / Comanda */}
+                {Array.isArray(turnoToPay.consumos_buffet) && turnoToPay.consumos_buffet.length > 0 && (
+                  <div className="border-t border-slate-800/80 pt-2 space-y-1.5" data-testid="seccion-consumos-buffet">
+                    <div className="flex justify-between text-xs font-bold text-amber-400">
+                      <span>🥤 Consumos Buffet / Tercer Tiempo:</span>
+                      <span className="font-mono">+${(turnoToPay.total_buffet || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/80 space-y-1">
+                      {turnoToPay.consumos_buffet.map((c, idx) => (
+                        <div key={idx} className="flex justify-between text-[11px] text-slate-300">
+                          <span>
+                            {c.cantidad}x {c.nombre}
+                          </span>
+                          <span className="font-mono text-slate-400">
+                            ${c.subtotal.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Total Definitivo Unificado a Cobrar */}
+                <div className="flex justify-between items-center text-sm font-black text-emerald-400 border-t border-slate-800 pt-2">
+                  <span>TOTAL A COBRAR:</span>
+                  <span className="font-mono text-base">
+                    ${(turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio).toLocaleString()}
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -3957,14 +4003,12 @@ export default function GrillaHoraria({
                       type="button"
                       onClick={() => {
                         setPagoMetodo(m.id as any);
-                        const saldoPend = turnoToPay.saldo_pendiente !== undefined && turnoToPay.saldo_pendiente > 0
-                          ? turnoToPay.saldo_pendiente
-                          : turnoToPay.precio || 0;
+                        const totalAdeudado = Number((turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio) || 0);
                         if (m.id === "billetera") {
                           const saldoDisp = Number(turnoToPay.cliente_saldo_billetera || 0);
-                          setPagoMonto(String(Math.min(saldoPend, saldoDisp)));
+                          setPagoMonto(String(Math.min(totalAdeudado, saldoDisp)));
                         } else if (pagoMetodo === "billetera") {
-                          setPagoMonto(String(saldoPend));
+                          setPagoMonto(String(totalAdeudado));
                         }
                       }}
                       className={`p-2.5 rounded-xl border text-left font-bold transition text-xs ${
@@ -3988,7 +4032,7 @@ export default function GrillaHoraria({
                   value={pagoMonto}
                   onChange={(e) => setPagoMonto(e.target.value)}
                   className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-white font-mono focus:border-emerald-500 focus:outline-none"
-                  placeholder={String(turnoToPay.saldo_pendiente !== undefined && turnoToPay.saldo_pendiente > 0 ? turnoToPay.saldo_pendiente : turnoToPay.precio || 0)}
+                  placeholder={String((turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio) || 0)}
                   min="0"
                   step="100"
                 />

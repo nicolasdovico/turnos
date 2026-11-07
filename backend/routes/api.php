@@ -58,7 +58,10 @@ Route::post('/turnos/fijos', \App\Http\Controllers\Api\TurnoFijoController::clas
 
 Route::middleware('tenant.has_module:pos_buffet')->group(function () {
     Route::get('/pos/productos', [\App\Http\Controllers\Api\POSController::class, 'indexProductos']);
+    Route::get('/pos/turnos-activos', [\App\Http\Controllers\Api\POSController::class, 'turnosActivos']);
     Route::post('/pos/productos', [\App\Http\Controllers\Api\POSController::class, 'storeProducto']);
+    Route::put('/pos/productos/{id}', [\App\Http\Controllers\Api\POSController::class, 'updateProducto']);
+    Route::delete('/pos/productos/{id}', [\App\Http\Controllers\Api\POSController::class, 'destroyProducto']);
     Route::post('/pos/ventas', [\App\Http\Controllers\Api\POSController::class, 'storeVenta']);
     Route::post('/turnos/{id}/consumos', [\App\Http\Controllers\Api\POSController::class, 'storeConsumoTurno']);
 });

@@ -261,4 +261,43 @@ class POSTest extends TestCase
         $this->assertContains('Empanada Carne Suave', $nombres);
         $this->assertNotContains('Agua Mineral Bronce', $nombres);
     }
+
+    public function test_admin_puede_actualizar_y_dar_de_baja_producto(): void
+    {
+        $producto = Producto::create([
+            'nombre' => 'Turrón Clásico',
+            'categoria' => 'alimentos',
+            'precio_costo' => 200.00,
+            'precio_venta' => 600.00,
+            'stock_actual' => 30,
+            'stock_minimo' => 5,
+        ]);
+
+        // Actualizar
+        $updateRes = $this->actingAs($this->cajero)
+            ->withHeader('X-Tenant-ID', $this->complejoOro->uuid)
+            ->putJson("/api/pos/productos/{$producto->id}", [
+                'precio_venta' => 750.00,
+                'stock_actual' => 45,
+            ]);
+
+        $updateRes->assertStatus(200)
+            ->assertJsonPath('data.precio_venta', '750.00')
+            ->assertJsonPath('data.stock_actual', 45);
+
+        // Dar de baja (soft deactivate)
+        $destroyRes = $this->actingAs($this->cajero)
+            ->withHeader('X-Tenant-ID', $this->complejoOro->uuid)
+            ->deleteJson("/api/pos/productos/{$producto->id}");
+
+        $destroyRes->assertStatus(200);
+
+        // Ya no aparece en el listado activo
+        $listRes = $this->actingAs($this->cajero)
+            ->withHeader('X-Tenant-ID', $this->complejoOro->uuid)
+            ->getJson('/api/pos/productos');
+
+        $nombres = array_column($listRes->json('data'), 'nombre');
+        $this->assertNotContains('Turrón Clásico', $nombres);
+    }
 }

@@ -34,6 +34,35 @@ class POSController extends Controller
     }
 
     /**
+     * List active and recent turnos of today to assign buffet orders easily.
+     */
+    public function turnosActivos(Request $request): JsonResponse
+    {
+        $today = now()->format('Y-m-d');
+
+        $turnos = Turno::where('fecha', $today)
+            ->whereIn('estado', ['confirmado', 'reservado', 'pendiente', 'pagado'])
+            ->with(['cancha', 'cliente'])
+            ->orderBy('hora_inicio', 'desc')
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'hora_inicio' => substr($t->hora_inicio, 0, 5),
+                    'hora_fin' => substr($t->hora_fin, 0, 5),
+                    'cancha_nombre' => $t->cancha->nombre ?? 'Cancha',
+                    'cliente_nombre' => $t->cliente_nombre ?: ($t->cliente?->nombre ?: ($t->nombre_contacto ?: 'Sin Nombre')),
+                    'estado' => $t->estado,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $turnos,
+        ]);
+    }
+
+    /**
      * Create a new product in the buffet catalog.
      */
     public function storeProducto(Request $request): JsonResponse
@@ -55,6 +84,60 @@ class POSController extends Controller
             'message' => 'Producto creado exitosamente.',
             'data' => $producto,
         ], 201);
+    }
+
+    /**
+     * Update an existing product in the buffet catalog.
+     */
+    public function updateProducto(Request $request, int $id): JsonResponse
+    {
+        $producto = Producto::find($id);
+        if (!$producto) {
+            return response()->json([
+                'error' => 'PRODUCT_NOT_FOUND',
+                'message' => 'Producto no encontrado.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'nombre' => ['sometimes', 'required', 'string', 'max:255'],
+            'codigo_barra' => ['nullable', 'string', 'max:100'],
+            'categoria' => ['nullable', 'string', 'max:100'],
+            'precio_costo' => ['nullable', 'numeric', 'min:0'],
+            'precio_venta' => ['sometimes', 'required', 'numeric', 'min:0'],
+            'stock_actual' => ['nullable', 'integer', 'min:0'],
+            'stock_minimo' => ['nullable', 'integer', 'min:0'],
+            'estado' => ['nullable', 'string', 'in:activo,inactivo'],
+        ]);
+
+        $producto->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Producto actualizado exitosamente.',
+            'data' => $producto,
+        ]);
+    }
+
+    /**
+     * Delete / deactivate a product in the buffet catalog.
+     */
+    public function destroyProducto(int $id): JsonResponse
+    {
+        $producto = Producto::find($id);
+        if (!$producto) {
+            return response()->json([
+                'error' => 'PRODUCT_NOT_FOUND',
+                'message' => 'Producto no encontrado.',
+            ], 404);
+        }
+
+        $producto->update(['estado' => 'inactivo']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Producto dado de baja exitosamente.',
+        ]);
     }
 
     /**
