@@ -3227,3 +3227,28 @@ Tarea: Subida e Inserción Directa de Imágenes en el Gestor de Páginas CMS (Ex
      * Backend: 5/5 tests pasados en `CMSSanitizationAndRevalidationTest` y 310/310 tests en la suite completa de PHPUnit.
 ==============================================================================================================================
 
+Fecha: 2026-11-07
+Tarea: Módulo de Recuperación y Reseteo Seguro de Contraseña Olvidada (Forgot Password & OTP Flow)
+- Contexto y Requerimiento:
+  * El usuario reportó que en la página de inicio de sesión no existía la opción para resetear la contraseña si un usuario se la olvidaba.
+- Implementación Realizada:
+  1. Backend (Laravel 11):
+     * Creación de `PasswordResetOtpMail`: Mailable con plantilla responsive corporativa Turnos SaaS que incluye el código de seguridad de 6 dígitos, validez de 15 minutos e instrucciones claras.
+     * Creación de `PasswordResetController` con dos endpoints públicos en `routes/api.php`:
+       - `POST /api/auth/forgot-password`: valida email, verifica cooldown de 60 segundos contra spam, genera código OTP de 6 dígitos con expiración a 15 minutos en `email_verifications` (`tipo = 'password_reset'`), despacha el correo y devuelve respuesta neutral para proteger contra ataques de enumeración de cuentas.
+       - `POST /api/auth/reset-password`: valida email, código de 6 dígitos, nueva contraseña y confirmación (`min:6`, `confirmed`); verifica validez del código (retorna 410 si expiró y 422 con contador de intentos si es incorrecto, bloqueando tras 5 fallos); actualiza el hash de contraseña en `users` con `Hash::make()`; revoca todos los tokens anteriores de Sanctum del usuario y elimina el registro de verificación.
+     * Suite de pruebas automatizadas en `tests/Feature/PasswordResetTest.php`: 5 tests pasados (solicitud y envío de correo, protección contra enumeración, cooldown de 60s, reseteo exitoso con revocación de tokens y rechazo de códigos incorrectos o expirados).
+  2. Frontend (Next.js 14):
+     * En `app/login/page.tsx`:
+       - Incorporación del enlace interactivo "¿Olvidaste tu contraseña?" (`data-testid="link-olvido-password"`) junto al campo de contraseña, que enlaza a `/recuperar-password` con prefijado opcional del email ingresado.
+     * Creación de la página `app/recuperar-password/page.tsx`:
+       - **Paso 1:** Formulario de solicitud de email con icono `Mail` y botón con estado de carga.
+       - **Paso 2:** Formulario de validación de código con `OtpInput` (6 dígitos), `PasswordInput` para nueva contraseña y confirmación, y botón de reenvío con temporizador de cuenta regresiva de 60 segundos.
+       - **Paso 3:** Vista de éxito con tarjeta de confirmación y botón directo para iniciar sesión con la nueva clave.
+     * Suite de pruebas frontend en `tests/PasswordReset.test.tsx`: 3 tests pasados en Vitest (renderizado de enlace en login, solicitud de código y transición al paso 2, y validación de contraseñas no coincidentes y confirmación en paso 3).
+- Verificación y Tests:
+  * Frontend: 170/170 tests pasados en Vitest (19 archivos de prueba 100% en verde).
+  * Backend: 5/5 tests pasados en `PasswordResetTest` y 315/315 tests en la suite global de PHPUnit.
+==============================================================================================================================
+
+

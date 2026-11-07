@@ -194,6 +194,10 @@ Route::prefix('auth')->group(function () {
     Route::post('/resend-otp', [\App\Http\Controllers\Api\OtpVerificationController::class, 'resendOtp']);
     Route::post('/send-otp', [\App\Http\Controllers\Api\OtpVerificationController::class, 'resendOtp']);
 
+    // Recuperación de Contraseña (Forgot Password & Reset OTP)
+    Route::post('/forgot-password', [\App\Http\Controllers\Api\PasswordResetController::class, 'forgotPassword']);
+    Route::post('/reset-password', [\App\Http\Controllers\Api\PasswordResetController::class, 'resetPassword']);
+
     // Google OAuth 2.0
     Route::get('/google/redirect', [\App\Http\Controllers\Api\GoogleAuthController::class, 'redirect']);
     Route::get('/google/callback', [\App\Http\Controllers\Api\GoogleAuthController::class, 'callback']);

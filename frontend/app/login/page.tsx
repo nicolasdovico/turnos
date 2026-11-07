@@ -183,13 +183,25 @@ export default function LoginPage() {
               />
             </div>
 
-            <PasswordInput
-              label="Contraseña"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span />
+                <Link
+                  href={email ? `/recuperar-password?email=${encodeURIComponent(email)}` : "/recuperar-password"}
+                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition cursor-pointer"
+                  data-testid="link-olvido-password"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+              <PasswordInput
+                label="Contraseña"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
 
             <button
               type="submit"
