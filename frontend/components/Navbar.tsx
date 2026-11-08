@@ -16,7 +16,7 @@ export default function Navbar() {
   const [isSubdomain, setIsSubdomain] = useState(Boolean(routeSubdomain));
   const [tenantSlug, setTenantSlug] = useState(routeSubdomain);
   const [mainDomainUrl, setMainDomainUrl] = useState("");
-  const [demoClubUrl, setDemoClubUrl] = useState("http://padelpro.localhost:3000");
+  const [demoClubUrl, setDemoClubUrl] = useState("/tenants/padelpro");
   const [isClubAdmin, setIsClubAdmin] = useState(false);
   const [showClubsDropdown, setShowClubsDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -75,11 +75,15 @@ export default function Navbar() {
         setMainDomainUrl(`${protocol}//${mainHost}${port}`);
       } else {
         setMainDomainUrl("");
-        let baseSubdomainHost = "localhost";
-        if (hostname.endsWith("turnos.com")) {
-          baseSubdomainHost = "turnos.com";
+        if (isIpAddress) {
+          setDemoClubUrl("/tenants/padelpro");
+        } else {
+          let baseSubdomainHost = "localhost";
+          if (hostname.endsWith("turnos.com")) {
+            baseSubdomainHost = "turnos.com";
+          }
+          setDemoClubUrl(`${protocol}//padelpro.${baseSubdomainHost}${port}`);
         }
-        setDemoClubUrl(`${protocol}//padelpro.${baseSubdomainHost}${port}`);
       }
     }
   }, [routeSubdomain]);
@@ -132,6 +136,12 @@ export default function Navbar() {
       const protocol = window.location.protocol;
       const port = window.location.port ? `:${window.location.port}` : "";
       const hostname = window.location.hostname;
+      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
+
+      if (isIp) {
+        return `/tenants/${subdomain}/panel${tokenQuery}`;
+      }
+
       let baseHost = "localhost";
       if (hostname.endsWith("turnos.com")) {
         baseHost = "turnos.com";

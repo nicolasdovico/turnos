@@ -14,18 +14,24 @@ import CtaBanner from "@/components/landing/CtaBanner";
 
 export default function PortalPage() {
   const { user, token } = useAuth();
-  const [demoClubUrl, setDemoClubUrl] = useState("http://padelpro.localhost:8080");
+  const [demoClubUrl, setDemoClubUrl] = useState("/tenants/padelpro");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const protocol = window.location.protocol;
       const port = window.location.port ? `:${window.location.port}` : "";
       const hostname = window.location.hostname || "localhost";
-      let base = "localhost";
-      if (hostname && hostname.endsWith("turnos.com")) {
-        base = "turnos.com";
+      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
+
+      if (isIp) {
+        setDemoClubUrl("/tenants/padelpro");
+      } else {
+        let base = "localhost";
+        if (hostname && hostname.endsWith("turnos.com")) {
+          base = "turnos.com";
+        }
+        setDemoClubUrl(`${protocol}//padelpro.${base}${port}`);
       }
-      setDemoClubUrl(`${protocol}//padelpro.${base}${port}`);
     }
   }, []);
 
@@ -42,6 +48,12 @@ export default function PortalPage() {
       const protocol = window.location.protocol;
       const port = window.location.port ? `:${window.location.port}` : "";
       const hostname = window.location.hostname;
+      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
+
+      if (isIp) {
+        return `/tenants/${subdomain}/panel${tokenQuery}`;
+      }
+
       let baseHost = "localhost";
       if (hostname.endsWith("turnos.com")) {
         baseHost = "turnos.com";
@@ -56,6 +68,12 @@ export default function PortalPage() {
       const protocol = window.location.protocol;
       const port = window.location.port ? `:${window.location.port}` : "";
       const hostname = window.location.hostname;
+      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
+
+      if (isIp) {
+        return `/tenants/${subdomain}`;
+      }
+
       let baseHost = "localhost";
       if (hostname.endsWith("turnos.com")) {
         baseHost = "turnos.com";

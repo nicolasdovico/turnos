@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             ModuloSeeder::class,
             PlanSeeder::class,
             DeportesYEquipamientosSeeder::class,
+            DemoComplejoSeeder::class,
         ]);
     }
 }
