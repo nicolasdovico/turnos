@@ -59,7 +59,9 @@ export default function Navbar() {
         "app.turnos.com",
       ];
 
-      const onSubdomain = Boolean(routeSubdomain) || !rootDomains.includes(hostname.toLowerCase());
+      // Cualquier acceso directo por IP se considera dominio principal
+      const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
+      const onSubdomain = !isIpAddress && (Boolean(routeSubdomain) || !rootDomains.includes(hostname.toLowerCase()));
       setIsSubdomain(onSubdomain);
 
       if (onSubdomain) {
@@ -367,7 +369,7 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2">
               <a
                 href={getGlobalLink("/login")}
                 className="rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
@@ -376,14 +378,14 @@ export default function Navbar() {
               </a>
               <a
                 href={getGlobalLink("/registro")}
-                className="hidden sm:inline-flex rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
+                className="rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
               >
                 Registrarse
               </a>
               {!effectiveIsSubdomain && (
                 <a
                   href={getGlobalLink("/registro-club")}
-                  className="hidden xs:inline-flex rounded-xl bg-emerald-600 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
                 >
                   Registrar mi Club
                 </a>
@@ -487,22 +489,20 @@ export default function Navbar() {
                     Registrar mi Club
                   </a>
                 )}
-                <div className="grid grid-cols-2 gap-2">
-                  <a
-                    href={getGlobalLink("/login")}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-center py-2 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs hover:bg-slate-200 transition"
-                  >
-                    Iniciar Sesión
-                  </a>
-                  <a
-                    href={getGlobalLink("/registro")}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-center py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition"
-                  >
-                    Registrarse
-                  </a>
-                </div>
+                <a
+                  href={getGlobalLink("/login")}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full text-center py-2.5 rounded-xl bg-slate-100 text-slate-800 font-bold text-sm hover:bg-slate-200 transition"
+                >
+                  Iniciar Sesión
+                </a>
+                <a
+                  href={getGlobalLink("/registro")}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full text-center py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition"
+                >
+                  Registrarse
+                </a>
               </>
             ) : (
               <div className="space-y-2">
@@ -513,11 +513,25 @@ export default function Navbar() {
                   <a
                     href={getGlobalLink("/registro-club")}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="block text-center py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs hover:bg-emerald-100 transition"
+                    className="block text-center py-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs hover:bg-emerald-100 transition"
                   >
                     + Crear Club
                   </a>
                 )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsMobileMenuOpen(false);
+                    await logout();
+                    if (typeof window !== "undefined") {
+                      const isPanel = window.location.pathname.includes("/panel");
+                      window.location.href = isPanel ? "/" : window.location.pathname;
+                    }
+                  }}
+                  className="w-full text-center py-2.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs hover:bg-rose-100 transition"
+                >
+                  Cerrar Sesión
+                </button>
               </div>
             )}
           </div>
