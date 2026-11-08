@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
   const { user, token, isLoading, logout } = useAuth();
   const params = useParams();
+  const pathname = usePathname();
   const routeSubdomain = (params?.subdomain as string) || "";
 
   const [currentHost, setCurrentHost] = useState("");
@@ -17,7 +19,13 @@ export default function Navbar() {
   const [demoClubUrl, setDemoClubUrl] = useState("http://padelpro.localhost:3000");
   const [isClubAdmin, setIsClubAdmin] = useState(false);
   const [showClubsDropdown, setShowClubsDropdown] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar menú móvil al navegar
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   const effectiveIsSubdomain = Boolean(isSubdomain || routeSubdomain);
   const effectiveTenantSlug = tenantSlug || routeSubdomain;
@@ -375,15 +383,146 @@ export default function Navbar() {
               {!effectiveIsSubdomain && (
                 <a
                   href={getGlobalLink("/registro-club")}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+                  className="hidden xs:inline-flex rounded-xl bg-emerald-600 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
                 >
                   Registrar mi Club
                 </a>
               )}
             </div>
           )}
+
+          {/* Botón Hamburguesa Mobile */}
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú de navegación"}
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
       </div>
+
+      {/* Menú Desplegable Móvil */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-200 bg-white/95 backdrop-blur-md px-4 pt-3 pb-6 space-y-3 shadow-xl animate-in slide-in-from-top duration-200">
+          <nav className="flex flex-col space-y-1">
+            {!effectiveIsSubdomain ? (
+              <>
+                <Link
+                  href="/"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3.5 py-2.5 rounded-xl font-bold text-slate-900 hover:bg-emerald-50 hover:text-emerald-700 transition flex items-center justify-between"
+                >
+                  <span>Inicio</span>
+                  <span className="text-xs text-slate-400 font-normal">Principal</span>
+                </Link>
+                <Link
+                  href="/jugar"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3.5 py-2.5 rounded-xl font-bold text-emerald-800 bg-emerald-50/60 hover:bg-emerald-100 transition flex items-center gap-2"
+                >
+                  <span>🎾 Buscar Canchas</span>
+                  <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-1.5 py-0.5 rounded-md ml-auto">
+                    Explorar
+                  </span>
+                </Link>
+                <Link
+                  href="/#funcionalidades"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3.5 py-2.5 rounded-xl font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition flex items-center gap-2"
+                >
+                  <span>⚡ Funcionalidades</span>
+                </Link>
+                {!ownedClub && (
+                  <a
+                    href={demoClubUrl}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="px-3.5 py-2.5 rounded-xl font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition flex items-center justify-between"
+                  >
+                    <span>🏢 Demo Club</span>
+                    <span className="text-xs text-slate-400 font-mono">padelpro</span>
+                  </a>
+                )}
+                <Link
+                  href="/planes"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3.5 py-2.5 rounded-xl font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition flex items-center gap-2"
+                >
+                  <span>🏷️ Planes & Precios</span>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3.5 py-2.5 rounded-xl font-bold text-slate-900 hover:bg-slate-100 transition"
+                >
+                  Inicio del Club
+                </Link>
+                {isCurrentAdmin && (
+                  <Link
+                    href="/panel"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="px-3.5 py-2.5 rounded-xl font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition flex items-center gap-2"
+                  >
+                    <span>⚙️ Panel de Administración</span>
+                  </Link>
+                )}
+              </>
+            )}
+          </nav>
+
+          {/* Accesos de Cuenta en Mobile */}
+          <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
+            {!user ? (
+              <>
+                {!effectiveIsSubdomain && (
+                  <a
+                    href={getGlobalLink("/registro-club")}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full text-center py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-sm shadow-sm hover:bg-emerald-700 transition"
+                  >
+                    Registrar mi Club
+                  </a>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={getGlobalLink("/login")}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="text-center py-2 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs hover:bg-slate-200 transition"
+                  >
+                    Iniciar Sesión
+                  </a>
+                  <a
+                    href={getGlobalLink("/registro")}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="text-center py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition"
+                  >
+                    Registrarse
+                  </a>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-2 py-1 text-xs text-slate-500 font-medium">
+                  <span>Conectado como <strong className="text-slate-800">{user.name}</strong></span>
+                </div>
+                {!effectiveIsSubdomain && !ownedClub && (
+                  <a
+                    href={getGlobalLink("/registro-club")}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="block text-center py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs hover:bg-emerald-100 transition"
+                  >
+                    + Crear Club
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

@@ -17,6 +17,7 @@ vi.mock("next/navigation", () => ({
     prefetch: vi.fn(),
   }),
   useParams: () => mockParams,
+  usePathname: () => "/",
 }));
 
 import PlanesPage from "../app/planes/page";
