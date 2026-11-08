@@ -114,6 +114,7 @@ export default function GestionPOSBuffet({ subdomain, token }: GestionPOSBuffetP
     return {
       Accept: "application/json",
       "Content-Type": "application/json",
+      "X-Tenant-ID": subdomain,
       "X-Tenant-Subdomain": subdomain,
       ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
     };

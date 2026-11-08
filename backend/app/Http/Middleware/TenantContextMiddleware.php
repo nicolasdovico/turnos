@@ -18,8 +18,8 @@ class TenantContextMiddleware
     {
         $tenant = null;
 
-        // 1. Resolve from X-Tenant-ID header if provided
-        $tenantHeader = $request->header('X-Tenant-ID');
+        // 1. Resolve from X-Tenant-ID or X-Tenant-Subdomain header if provided
+        $tenantHeader = $request->header('X-Tenant-ID') ?: $request->header('X-Tenant-Subdomain');
         if ($tenantHeader !== null && $tenantHeader !== '') {
             $tenant = $this->resolveByHeader((string) $tenantHeader);
 

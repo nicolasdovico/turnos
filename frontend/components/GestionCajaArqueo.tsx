@@ -39,6 +39,7 @@ export default function GestionCajaArqueo({ subdomain, token }: GestionCajaArque
     return {
       Accept: "application/json",
       "Content-Type": "application/json",
+      "X-Tenant-ID": subdomain,
       "X-Tenant-Subdomain": subdomain,
       ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
     };
