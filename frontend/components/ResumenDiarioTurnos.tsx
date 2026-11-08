@@ -135,7 +135,7 @@ export default function ResumenDiarioTurnos({
   subdomain,
   token: propToken,
   canchas = [],
-  apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api",
+  apiUrl = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "/api"),
 }: ResumenDiarioTurnosProps) {
   // Helper for local date YYYY-MM-DD
   const getLocalDate = (d: Date = new Date()) => {

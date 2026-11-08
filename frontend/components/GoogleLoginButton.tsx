@@ -40,7 +40,7 @@ export default function GoogleLoginButton({
       target = `${window.location.origin}/${target.replace(/^\//, "")}`;
     }
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+    const apiBase = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
     const googleRedirectUrl = `${apiBase}/auth/google/redirect?returnTo=${encodeURIComponent(target)}`;
 
     if (typeof window !== "undefined") {

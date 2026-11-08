@@ -239,7 +239,7 @@ export default function GrillaHoraria({
   precio120Min,
   isAdmin = false,
   token: propToken,
-  apiUrl = process.env.NEXT_PUBLIC_API_URL || "/api",
+  apiUrl = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "/api"),
   initialSlots,
   onConfirmSuccess,
   porcentajeSena: propPorcentajeSena,

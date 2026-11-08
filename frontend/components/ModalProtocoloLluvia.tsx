@@ -73,7 +73,7 @@ export default function ModalProtocoloLluvia({
   isOpen,
   onClose,
   subdomain,
-  apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api",
+  apiUrl = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api"),
   initialDate,
   onSuccess,
 }: ModalProtocoloLluviaProps) {
