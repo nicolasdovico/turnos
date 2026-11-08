@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getTenantAdminUrl } from "@/lib/navigationUrls";
 import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
@@ -128,28 +129,7 @@ export default function Navbar() {
   const isCurrentAdmin = isClubAdmin || isOwnerOfCurrentTenant;
 
   // Build club admin URL from current host/protocol/port with SSO token transfer
-  const getClubAdminUrl = (subdomain: string) => {
-    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
-    const tokenQuery = activeToken ? `?auth_token=${encodeURIComponent(activeToken)}` : "";
-
-    if (typeof window !== "undefined") {
-      const protocol = window.location.protocol;
-      const port = window.location.port ? `:${window.location.port}` : "";
-      const hostname = window.location.hostname;
-      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
-
-      if (isIp) {
-        return `/tenants/${subdomain}/panel${tokenQuery}`;
-      }
-
-      let baseHost = "localhost";
-      if (hostname.endsWith("turnos.com")) {
-        baseHost = "turnos.com";
-      }
-      return `${protocol}//${subdomain}.${baseHost}${port}/panel${tokenQuery}`;
-    }
-    return `http://${subdomain}.localhost:8080/panel${tokenQuery}`;
-  };
+  const getClubAdminUrl = (subdomain: string) => getTenantAdminUrl(subdomain, token);
 
   // Helper to build links: if on subdomain, global links point to mainDomainUrl
   const getGlobalLink = (path: string) => {

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { getTenantAdminUrl, getTenantPublicUrl } from "@/lib/navigationUrls";
 import HeroSection from "@/components/landing/HeroSection";
 import BeforeAfterSection from "@/components/landing/BeforeAfterSection";
 import FeaturesShowcase from "@/components/landing/FeaturesShowcase";
@@ -40,48 +41,8 @@ export default function PortalPage() {
   const isOwner = userClubs.length > 0;
   const isPlayer = playerClubs.length > 0;
 
-  const getClubAdminUrl = (subdomain: string) => {
-    const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") : null);
-    const tokenQuery = activeToken ? `?auth_token=${encodeURIComponent(activeToken)}` : "";
-
-    if (typeof window !== "undefined") {
-      const protocol = window.location.protocol;
-      const port = window.location.port ? `:${window.location.port}` : "";
-      const hostname = window.location.hostname;
-      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
-
-      if (isIp) {
-        return `/tenants/${subdomain}/panel${tokenQuery}`;
-      }
-
-      let baseHost = "localhost";
-      if (hostname.endsWith("turnos.com")) {
-        baseHost = "turnos.com";
-      }
-      return `${protocol}//${subdomain}.${baseHost}${port}/panel${tokenQuery}`;
-    }
-    return `http://${subdomain}.localhost:8080/panel${tokenQuery}`;
-  };
-
-  const getClubPublicUrl = (subdomain: string) => {
-    if (typeof window !== "undefined") {
-      const protocol = window.location.protocol;
-      const port = window.location.port ? `:${window.location.port}` : "";
-      const hostname = window.location.hostname;
-      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
-
-      if (isIp) {
-        return `/tenants/${subdomain}`;
-      }
-
-      let baseHost = "localhost";
-      if (hostname.endsWith("turnos.com")) {
-        baseHost = "turnos.com";
-      }
-      return `${protocol}//${subdomain}.${baseHost}${port}`;
-    }
-    return `http://${subdomain}.localhost:8080`;
-  };
+  const getClubAdminUrl = (subdomain: string) => getTenantAdminUrl(subdomain, token);
+  const getClubPublicUrl = (subdomain: string) => getTenantPublicUrl(subdomain);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 selection:bg-emerald-500 selection:text-white">

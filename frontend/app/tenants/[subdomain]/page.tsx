@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { formatWhatsAppNumber } from "@/components/GrillaHoraria";
+import { getPortalUrl } from "@/lib/navigationUrls";
 import ClubHeader, { NavigationLink } from "@/components/templates/ClubHeader";
 import ClubFooter from "@/components/templates/ClubFooter";
 import BookingDirectTemplate, { CanchaItem } from "@/components/templates/BookingDirectTemplate";
@@ -263,7 +264,7 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
           </p>
           <div className="pt-2">
             <a
-              href="http://localhost:8080/portal"
+              href={getPortalUrl("/")}
               className="inline-block rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white transition cursor-pointer"
             >
               ← Ir al Portal de Complejos

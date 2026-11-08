@@ -13,6 +13,7 @@ import GestionPaginasCMS from "@/components/GestionPaginasCMS";
 import GestionPOSBuffet from "@/components/GestionPOSBuffet";
 import GestionCajaArqueo from "@/components/GestionCajaArqueo";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
+import { getTenantPublicUrl as resolvePublicUrl, getPortalUrl } from "@/lib/navigationUrls";
 
 interface ComplejoData {
   id: number;
@@ -459,7 +460,7 @@ const ALL_MODULOS = [
     icon: "🔁",
     descripcion: "Generación automática periódica de turnos semanales y mensuales para socios y clientes fijos.",
     actionLabel: "Ver Turnos Fijos ↗",
-    actionHref: "http://localhost:8080/admin",
+    actionHref: "/admin",
     isExternal: true,
     planMinimo: "Plata",
   },
@@ -469,7 +470,7 @@ const ALL_MODULOS = [
     icon: "💳",
     descripcion: "Cobro fraccionado por jugador y convocatorias automáticas de partidos abiertos con matchmaking.",
     actionLabel: "Ver Pagos Divididos ↗",
-    actionHref: "http://localhost:8080/admin",
+    actionHref: "/admin",
     isExternal: true,
     planMinimo: "Plata",
   },
@@ -479,7 +480,7 @@ const ALL_MODULOS = [
     icon: "🏆",
     descripcion: "Generador automático de llaves eliminatorias, carga de scores y tablas de posiciones.",
     actionLabel: "Ver Torneos & Brackets ↗",
-    actionHref: "http://localhost:8080/admin",
+    actionHref: "/admin",
     isExternal: true,
     planMinimo: "Oro",
   },
@@ -489,7 +490,7 @@ const ALL_MODULOS = [
     icon: "💡",
     descripcion: "Encendido y apagado sincronizado de iluminación de canchas según horarios de reservas activas.",
     actionLabel: "Ver Dispositivos IoT ↗",
-    actionHref: "http://localhost:8080/admin",
+    actionHref: "/admin",
     isExternal: true,
     planMinimo: "Oro",
   },
@@ -2440,14 +2441,7 @@ export default function ClubAdminPanel() {
   };
 
   const getTenantPublicUrl = (path: string = "") => {
-    if (typeof window !== "undefined") {
-      const hostname = window.location.hostname;
-      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
-      if (isIp) {
-        return `/tenants/${subdomain}${path}`;
-      }
-    }
-    return path || "/";
+    return resolvePublicUrl(subdomain, path);
   };
 
   if (loading) {
@@ -2482,7 +2476,7 @@ export default function ClubAdminPanel() {
               ← Ir a Reservar Turnos
             </Link>
             <a
-              href="http://localhost:8080/login"
+              href={getPortalUrl("/login")}
               className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white transition"
             >
               Iniciar Sesión
@@ -3979,7 +3973,7 @@ export default function ClubAdminPanel() {
                 </p>
               </div>
               <a
-                href="http://localhost:8080/planes"
+                href={getPortalUrl("/planes")}
                 className="self-start sm:self-auto rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-bold text-emerald-400 border border-slate-700 transition"
               >
                 ⚡ Ver Comparativa de Planes
@@ -4030,7 +4024,7 @@ export default function ClubAdminPanel() {
                           </button>
                         ) : mod.isExternal ? (
                           <a
-                            href={mod.actionHref}
+                            href={getPortalUrl(mod.actionHref)}
                             target="_blank"
                             rel="noreferrer"
                             className="block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
@@ -4047,7 +4041,7 @@ export default function ClubAdminPanel() {
                         )
                       ) : (
                         <a
-                          href="http://localhost:8080/planes"
+                          href={getPortalUrl("/planes")}
                           className="block w-full text-center rounded-xl bg-slate-900/60 hover:bg-slate-800/80 py-2.5 text-xs font-semibold text-slate-400 border border-slate-800 transition"
                         >
                           Actualizar a Plan {mod.planMinimo} ↗

@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Info,
 } from "lucide-react";
+import { getTenantPublicUrl } from "@/lib/navigationUrls";
 
 interface ValeData {
   id: number;
@@ -60,7 +61,7 @@ export default function PaginaValeDigital() {
   const [claiming, setClaiming] = useState<boolean>(false);
   const [claimSuccess, setClaimSuccess] = useState<string | null>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+  const apiUrl = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
 
   const fetchVale = async () => {
     setLoading(true);
@@ -276,7 +277,13 @@ export default function PaginaValeDigital() {
               <div className="space-y-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => router.push(`/?subdomain=${vale.complejo?.subdominio || ""}`)}
+                  onClick={() => {
+                    if (vale.complejo?.subdominio) {
+                      window.location.href = getTenantPublicUrl(vale.complejo.subdominio);
+                    } else {
+                      router.push("/");
+                    }
+                  }}
                   className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-sm font-black shadow-lg shadow-cyan-500/20 transition-all hover:scale-[1.02]"
                 >
                   <span>Reservar Nuevo Turno con este Vale</span>

@@ -15,6 +15,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { NavigationLink } from "./ClubHeader";
+import { getPortalUrl } from "@/lib/navigationUrls";
 
 function formatSocialUrl(
   url: string,
@@ -250,7 +251,7 @@ export default function ClubFooter({
           <div className="flex items-center gap-1 text-[11px]">
             <span>Potenciado por</span>
             <a
-              href="http://localhost:8080/portal"
+              href={getPortalUrl("/")}
               className="text-emerald-400 hover:text-emerald-300 font-bold transition"
             >
               TuTurno SaaS

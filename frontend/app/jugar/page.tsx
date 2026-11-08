@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { getTenantPublicUrl, getPortalUrl } from "@/lib/navigationUrls";
 import { Search, MapPin, Navigation, Trophy, Sparkles, ArrowRight, ExternalLink, Calendar, Filter } from "lucide-react";
 
 interface ComplejoCercano {
@@ -206,11 +207,7 @@ export default function JugarMarketplacePage() {
   };
 
   const getClubReservationUrl = (subdomain: string) => {
-    if (typeof window !== "undefined") {
-      const protocol = window.location.protocol;
-      return `${protocol}//${subdomain}.${baseDomain}/?ref=marketplace`;
-    }
-    return `http://${subdomain}.localhost:8080/?ref=marketplace`;
+    return `${getTenantPublicUrl(subdomain)}?ref=marketplace`;
   };
 
   // ==========================================
@@ -228,7 +225,7 @@ export default function JugarMarketplacePage() {
               </span>
             </div>
             <a
-              href="http://localhost:8080"
+              href={getPortalUrl("/")}
               className="text-xs font-semibold text-slate-400 hover:text-white transition"
             >
               ← Volver al Portal de Negocios
@@ -262,7 +259,7 @@ export default function JugarMarketplacePage() {
             </p>
             <div className="pt-2 flex flex-col sm:flex-row gap-3">
               <a
-                href="http://localhost:8080/registro-club"
+                href={getPortalUrl("/registro-club")}
                 className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-950/50 text-center flex items-center justify-center gap-2"
               >
                 <span>🚀 Registrar mi Club Gratis</span>
@@ -317,7 +314,7 @@ export default function JugarMarketplacePage() {
               <span>{loading ? "Localizando..." : "📍 Mi Ubicación"}</span>
             </button>
             <a
-              href="http://localhost:8080"
+              href={getPortalUrl("/")}
               className="text-xs font-semibold text-slate-400 hover:text-white transition hidden md:block"
             >
               Para Clubes ↗
