@@ -36,6 +36,7 @@ const iconMap: Record<string, React.ReactNode> = {
 export default function FeaturesShowcase() {
   const activeFeatures = LANDING_CONFIG.features.filter((f) => f.status === "available");
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [expandedMobileIndex, setExpandedMobileIndex] = useState<number | null>(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [timerKey, setTimerKey] = useState<number>(0);
@@ -56,6 +57,12 @@ export default function FeaturesShowcase() {
 
   // Selección manual de cualquier funcionalidad (resetea el contador para permitir lectura completa)
   const handleSelect = (index: number) => {
+    setCurrentIndex(index);
+    setTimerKey((k) => k + 1);
+  };
+
+  const handleToggleMobile = (index: number) => {
+    setExpandedMobileIndex((prev) => (prev === index ? null : index));
     setCurrentIndex(index);
     setTimerKey((k) => k + 1);
   };
@@ -272,12 +279,12 @@ export default function FeaturesShowcase() {
       {/* VISTA MÓVIL EN ACORDEÓN TÁCTIL (LG:HIDDEN): El detalle se expande inmediatamente debajo de cada oblea */}
       <div className="lg:hidden space-y-3">
         {activeFeatures.map((f, idx) => {
-          const isSelected = idx === currentIndex;
+          const isExpanded = idx === expandedMobileIndex;
           return (
             <div
               key={f.id}
               className={`rounded-2xl border transition-all duration-200 overflow-hidden shadow-sm ${
-                isSelected
+                isExpanded
                   ? "bg-slate-900 border-slate-800 shadow-md ring-1 ring-emerald-500/30"
                   : "bg-white border-slate-200"
               }`}
@@ -285,13 +292,13 @@ export default function FeaturesShowcase() {
               {/* Cabecera / Oblea clickeable */}
               <button
                 type="button"
-                onClick={() => handleSelect(idx)}
+                onClick={() => handleToggleMobile(idx)}
                 className="w-full text-left p-3.5 sm:p-4 flex items-center justify-between gap-2.5"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <div
                     className={`p-2 rounded-xl border shrink-0 transition-colors ${
-                      isSelected
+                      isExpanded
                         ? "bg-slate-800 border-slate-700"
                         : "bg-emerald-50 border-emerald-100 text-emerald-600"
                     }`}
@@ -301,14 +308,14 @@ export default function FeaturesShowcase() {
                   <div className="min-w-0 flex-1 pr-1">
                     <h3
                       className={`font-bold text-xs sm:text-sm leading-tight truncate ${
-                        isSelected ? "text-white" : "text-slate-900"
+                        isExpanded ? "text-white" : "text-slate-900"
                       }`}
                     >
                       {f.title}
                     </h3>
                     <p
                       className={`text-[11px] truncate mt-0.5 ${
-                        isSelected ? "text-slate-400" : "text-slate-500"
+                        isExpanded ? "text-slate-400" : "text-slate-500"
                       }`}
                     >
                       {f.shortDesc}
@@ -319,16 +326,16 @@ export default function FeaturesShowcase() {
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
-                      isSelected
+                      isExpanded
                         ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                         : "bg-slate-100 text-slate-600 border-slate-200"
                     }`}
                   >
-                    {isSelected ? "Cerrar" : "Ver más"}
+                    {isExpanded ? "Cerrar" : "Ver más"}
                   </span>
                   <div
                     className={`p-1 rounded-md transition-transform duration-200 ${
-                      isSelected ? "rotate-180 text-emerald-400" : "text-slate-400"
+                      isExpanded ? "rotate-180 text-emerald-400" : "text-slate-400"
                     }`}
                   >
                     <ChevronDown className="w-4 h-4" />
@@ -337,7 +344,7 @@ export default function FeaturesShowcase() {
               </button>
 
               {/* Detalle integrado dentro del acordeón (solo visible cuando está seleccionado) */}
-              {isSelected && (
+              {isExpanded && (
                 <div className="px-4 pb-5 pt-1 border-t border-slate-800 text-white animate-in fade-in duration-200 space-y-4">
                   <p className="text-xs text-slate-300 leading-relaxed pt-2">
                     {f.fullDesc}
