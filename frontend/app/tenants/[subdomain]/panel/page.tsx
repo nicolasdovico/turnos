@@ -2439,6 +2439,17 @@ export default function ClubAdminPanel() {
     }
   };
 
+  const getTenantPublicUrl = (path: string = "") => {
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname;
+      const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname === "::1" || hostname.includes(":");
+      if (isIp) {
+        return `/tenants/${subdomain}${path}`;
+      }
+    }
+    return path || "/";
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8 bg-slate-950 text-white">
@@ -2465,7 +2476,7 @@ export default function ClubAdminPanel() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              href="/"
+              href={getTenantPublicUrl()}
               className="rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-2.5 text-xs font-bold text-slate-200 transition"
             >
               ← Ir a Reservar Turnos
@@ -2561,7 +2572,7 @@ export default function ClubAdminPanel() {
             {/* Header Actions */}
             <div className="flex items-center gap-3">
               <Link
-                href="/"
+                href={getTenantPublicUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5"
@@ -3938,7 +3949,7 @@ export default function ClubAdminPanel() {
                       </div>
 
                       <Link
-                        href="/"
+                        href={getTenantPublicUrl(`?cancha=${c.id}`)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-emerald-400 font-bold hover:underline text-xs"
@@ -4028,7 +4039,7 @@ export default function ClubAdminPanel() {
                           </a>
                         ) : (
                           <Link
-                            href={mod.actionHref}
+                            href={getTenantPublicUrl(mod.actionHref === "/" ? "" : mod.actionHref)}
                             className="block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
                           >
                             {mod.actionLabel}
