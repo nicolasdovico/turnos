@@ -286,9 +286,9 @@ export default function FeaturesShowcase() {
               <button
                 type="button"
                 onClick={() => handleSelect(idx)}
-                className="w-full text-left p-4 flex items-center justify-between gap-3"
+                className="w-full text-left p-3.5 sm:p-4 flex items-center justify-between gap-2.5"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <div
                     className={`p-2 rounded-xl border shrink-0 transition-colors ${
                       isSelected
@@ -298,16 +298,16 @@ export default function FeaturesShowcase() {
                   >
                     {iconMap[f.iconName] || <Calendar className="w-4 h-4 text-emerald-500" />}
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1 pr-1">
                     <h3
-                      className={`font-bold text-sm leading-tight ${
+                      className={`font-bold text-xs sm:text-sm leading-tight truncate ${
                         isSelected ? "text-white" : "text-slate-900"
                       }`}
                     >
                       {f.title}
                     </h3>
                     <p
-                      className={`text-xs truncate max-w-[220px] mt-0.5 ${
+                      className={`text-[11px] truncate mt-0.5 ${
                         isSelected ? "text-slate-400" : "text-slate-500"
                       }`}
                     >
@@ -316,21 +316,23 @@ export default function FeaturesShowcase() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <span
-                    className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 border ${
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
                       isSelected
                         ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                         : "bg-slate-100 text-slate-600 border-slate-200"
                     }`}
                   >
-                    {f.badge}
+                    {isSelected ? "Cerrar" : "Ver más"}
                   </span>
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform duration-200 ${
+                  <div
+                    className={`p-1 rounded-md transition-transform duration-200 ${
                       isSelected ? "rotate-180 text-emerald-400" : "text-slate-400"
                     }`}
-                  />
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
                 </div>
               </button>
 
