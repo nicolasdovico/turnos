@@ -36,7 +36,7 @@ describe("Landing Page Vendedora (PortalPage)", () => {
     // 3. Funcionalidades Operativas Hoy
     expect(screen.getByText("Funcionalidades Operativas Hoy")).toBeDefined();
     expect(screen.getAllByText("Reservas & Agenda en Tiempo Real").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Cobro de Señas & Billetera Virtual")).toBeDefined();
+    expect(screen.getAllByText("Cobro de Señas & Billetera Virtual").length).toBeGreaterThanOrEqual(1);
 
     // 4. Calculadora de Impacto Financiero
     expect(screen.getByText("¿Cuánto dinero pierde tu club por turnos colgados?")).toBeDefined();
@@ -118,18 +118,18 @@ describe("Landing Page Vendedora (PortalPage)", () => {
     // Inicialmente muestra la primera feature (1 / 8)
     expect(screen.getByText("1 / 8")).toBeDefined();
     expect(
-      screen.getByText(/Tus clientes ven la disponibilidad en vivo desde su celular/i)
-    ).toBeDefined();
+      screen.getAllByText(/Tus clientes ven la disponibilidad en vivo desde su celular/i).length
+    ).toBeGreaterThanOrEqual(1);
 
     // Hacemos click en la oblea "Cobro de Señas & Billetera Virtual"
-    const obleaSenas = screen.getByRole("button", { name: /Cobro de Señas & Billetera Virtual/i });
-    fireEvent.click(obleaSenas);
+    const obleasSenas = screen.getAllByRole("button", { name: /Cobro de Señas & Billetera Virtual/i });
+    fireEvent.click(obleasSenas[0]);
 
     // Ahora muestra la feature 2 (2 / 8) y su detalle correspondiente
     expect(screen.getByText("2 / 8")).toBeDefined();
     expect(
-      screen.getByText(/Configurá el porcentaje de seña requerido o cobro total/i)
-    ).toBeDefined();
+      screen.getAllByText(/Configurá el porcentaje de seña requerido o cobro total/i).length
+    ).toBeGreaterThanOrEqual(1);
 
     // Probamos el botón Siguiente
     const btnNext = screen.getByRole("button", { name: /Siguiente funcionalidad/i });
@@ -137,8 +137,8 @@ describe("Landing Page Vendedora (PortalPage)", () => {
 
     expect(screen.getByText("3 / 8")).toBeDefined();
     expect(
-      screen.getByText(/Cargá los turnos semanales fijos con un solo clic/i)
-    ).toBeDefined();
+      screen.getAllByText(/Cargá los turnos semanales fijos con un solo clic/i).length
+    ).toBeGreaterThanOrEqual(1);
 
     // Probamos el botón Anterior
     const btnPrev = screen.getByRole("button", { name: /Funcionalidad anterior/i });

@@ -20,7 +20,8 @@ export default function BeforeAfterSection() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+      {/* VISTA EN PANTALLAS GRANDES (MD EN ADELANTE): 2 Columnas lado a lado */}
+      <div className="hidden md:grid md:grid-cols-2 gap-6 lg:gap-8">
         {/* Columna: Sin la Plataforma (El Pasado) */}
         <div className="rounded-3xl bg-rose-50/70 border border-rose-200/80 p-6 sm:p-8 space-y-5 shadow-sm">
           <div className="flex items-center gap-2.5 pb-4 border-b border-rose-200">
@@ -72,6 +73,42 @@ export default function BeforeAfterSection() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* VISTA MÓVIL OPTIMIZADA: Tarjetas comparativas problema vs solución directas */}
+      <div className="md:hidden space-y-4">
+        {LANDING_CONFIG.beforeAfter.map((item, idx) => (
+          <div
+            key={idx}
+            className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm bg-white"
+          >
+            {/* Problema (Rojo) */}
+            <div className="p-3.5 bg-rose-50/80 border-b border-rose-100 flex items-start gap-2.5">
+              <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[10px] uppercase font-bold text-rose-700 tracking-wider block mb-0.5">
+                  Antes (Sin Sistema)
+                </span>
+                <p className="text-xs text-rose-950 font-medium leading-snug">
+                  {item.pain}
+                </p>
+              </div>
+            </div>
+
+            {/* Solución (Verde) */}
+            <div className="p-3.5 bg-emerald-950 text-white flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block mb-0.5">
+                  Con Nuestra Plataforma
+                </span>
+                <p className="text-xs text-emerald-100 font-medium leading-snug">
+                  {item.solution}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );

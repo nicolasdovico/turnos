@@ -31,7 +31,9 @@ export function middleware(req: NextRequest) {
     "app.turnos.com",
   ];
 
-  const isMainDomain = rootDomains.includes(cleanHostname);
+  // Any raw IPv4 or IPv6 access is treated as main domain portal
+  const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(cleanHostname) || cleanHostname === "::1" || cleanHostname.includes(":");
+  const isMainDomain = rootDomains.includes(cleanHostname) || isIpAddress;
 
   // 1. If on main domain
   if (isMainDomain) {

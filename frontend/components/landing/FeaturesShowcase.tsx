@@ -14,6 +14,7 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Play,
   Pause,
 } from "lucide-react";
@@ -101,10 +102,11 @@ export default function FeaturesShowcase() {
         </p>
       </div>
 
+      {/* VISTA DESKTOP / TABLET (LG EN ADELANTE): Panel dividido clásico con 12 columnas */}
       <div
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch"
+        className="hidden lg:grid lg:grid-cols-12 gap-6 lg:gap-8 items-stretch"
       >
         {/* Selector de Features (Pestañas a la izquierda con barra de progreso) */}
         <div className="lg:col-span-5 space-y-2.5">
@@ -265,6 +267,103 @@ export default function FeaturesShowcase() {
             <span className="font-mono text-emerald-400 font-bold">Activo en todos los planes</span>
           </div>
         </div>
+      </div>
+
+      {/* VISTA MÓVIL EN ACORDEÓN TÁCTIL (LG:HIDDEN): El detalle se expande inmediatamente debajo de cada oblea */}
+      <div className="lg:hidden space-y-3">
+        {activeFeatures.map((f, idx) => {
+          const isSelected = idx === currentIndex;
+          return (
+            <div
+              key={f.id}
+              className={`rounded-2xl border transition-all duration-200 overflow-hidden shadow-sm ${
+                isSelected
+                  ? "bg-slate-900 border-slate-800 shadow-md ring-1 ring-emerald-500/30"
+                  : "bg-white border-slate-200"
+              }`}
+            >
+              {/* Cabecera / Oblea clickeable */}
+              <button
+                type="button"
+                onClick={() => handleSelect(idx)}
+                className="w-full text-left p-4 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`p-2 rounded-xl border shrink-0 transition-colors ${
+                      isSelected
+                        ? "bg-slate-800 border-slate-700"
+                        : "bg-emerald-50 border-emerald-100 text-emerald-600"
+                    }`}
+                  >
+                    {iconMap[f.iconName] || <Calendar className="w-4 h-4 text-emerald-500" />}
+                  </div>
+                  <div>
+                    <h3
+                      className={`font-bold text-sm leading-tight ${
+                        isSelected ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {f.title}
+                    </h3>
+                    <p
+                      className={`text-xs truncate max-w-[220px] mt-0.5 ${
+                        isSelected ? "text-slate-400" : "text-slate-500"
+                      }`}
+                    >
+                      {f.shortDesc}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 border ${
+                      isSelected
+                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
+                  >
+                    {f.badge}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isSelected ? "rotate-180 text-emerald-400" : "text-slate-400"
+                    }`}
+                  />
+                </div>
+              </button>
+
+              {/* Detalle integrado dentro del acordeón (solo visible cuando está seleccionado) */}
+              {isSelected && (
+                <div className="px-4 pb-5 pt-1 border-t border-slate-800 text-white animate-in fade-in duration-200 space-y-4">
+                  <p className="text-xs text-slate-300 leading-relaxed pt-2">
+                    {f.fullDesc}
+                  </p>
+
+                  <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block">
+                      Puntos clave incluidos:
+                    </span>
+                    <ul className="space-y-2">
+                      {f.highlights.map((h, hIdx) => (
+                        <li key={hIdx} className="flex items-start gap-2 text-xs text-slate-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                          <span>{h}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                    <span>Configurable desde el panel admin</span>
+                    <span className="text-emerald-400 font-bold">100% Operativo</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
