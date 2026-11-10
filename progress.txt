@@ -3252,3 +3252,99 @@ Tarea: Módulo de Recuperación y Reseteo Seguro de Contraseña Olvidada (Forgot
 ==============================================================================================================================
 
 
+
+Fecha: 2026-11-10
+Tarea: Corrección de Diseño Responsive en Navbar Móvil (Prevención de Desborde Horizontal y Visibilidad del Menú Hamburguesa)
+- Problema Reportado:
+  * Al ingresar desde un dispositivo móvil con sesión iniciada de administrador, la cabecera desbordaba hacia la derecha (exigía deslizar horizontalmente hacia la izquierda en la pantalla táctil) provocando que el botón de cerrar sesión y el botón del menú hamburguesa quedaran fuera de la pantalla.
+- Causa Raíz Identificada:
+  * En `frontend/components/Navbar.tsx`:
+    1. El bloque contenedor de acciones a la derecha (`Right Auth & CTA Actions`) no tenía `shrink-0`, lo que permitía que se empujara más allá del ancho del viewport (`100vw`).
+    2. El badge con el nombre del usuario logueado tenía un ancho máximo fijo de `max-w-[120px] truncate` y espaciados `gap-3`, `px-3` y `py-1` sin adaptación para pantallas angostas (`< 400px`).
+    3. El botón de "Cerrar Sesión" de texto se renderizaba inline en la barra superior aún en pantallas móviles pequeñas, sumando ~95px adicionales de ancho horizontal cuando ese mismo botón ya existe destacado y de ancho completo dentro del menú hamburguesa desplegable.
+- Solución Implementada:
+  1. En `frontend/components/Navbar.tsx`:
+     * Se agregó `shrink-0` y espaciado adaptativo `gap-1.5 sm:gap-3` al contenedor de acciones de cabecera.
+     * Se ocultó el botón inline de "Cerrar Sesión" en pantallas móviles (`hidden sm:inline-flex`), preservándolo como acción accesible de ancho completo dentro del menú desplegable hamburguesa.
+     * Se calibró el ancho máximo del nombre de usuario de forma fluida (`max-w-[70px] xs:max-w-[100px] sm:max-w-[140px] truncate`) y el padding del badge (`pr-2 sm:pr-3`), asegurando que la barra superior quepa holgadamente dentro del ancho del teléfono (320px a 430px) sin ningún desborde horizontal.
+- Verificación y Tests:
+  * Suite completa de Vitest en frontend: 176/176 tests pasados en verde (20 archivos de prueba).
+  * Suite de autenticación y navegación validada con éxito sin regresiones.
+==============================================================================================================================
+
+Fecha: 2026-11-10
+Tarea: Calibración Responsiva de Fichas/Tarjetas de Turnos en GrillaHoraria (Móviles Angostos)
+- Problema Reportado:
+  * En ciertos celulares (según captura enviada por el usuario `capturareserva.jpg`), las fichas de los turnos disponibles se renderizaban como rectángulos verticales alargados y estrechos. La tipografía de la hora se veía desproporcionadamente grande respecto al ancho disponible y las etiquetas (Pico, Con Luz, Libre) se apilaban de manera forzada hacia abajo.
+- Causa Raíz Identificada:
+  * El grid de turnos utilizaba una configuración rígida `grid-cols-2 sm:grid-cols-3 md:grid-cols-4`.
+  * En dispositivos móviles con pantallas estrechas (320px a 390px) o configuraciones de zoom/densidad alta de texto en Android, forzar 2 columnas dentro de una sección con padding lateral (`px-4` a `px-8` del layout más `p-6` del card principal) dejaba apenas ~110px a 130px útiles de ancho para cada tarjeta de turno.
+  * Al tener tan poco ancho, las etiquetas no cabían en horizontal y caían hacia abajo, estirando la tarjeta verticalmente en una forma de torre angosta.
+- Solución Implementada:
+  1. En `frontend/components/GrillaHoraria.tsx`:
+     * Se actualizó la grilla para tener un escalonamiento responsivo fluido:
+       `grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3`.
+       - En móviles angostos (< 640px) las tarjetas ocupan el ancho natural disponible en formato apaisado horizontal mucho más legible y proporcionado.
+       - En pantallas intermedias (sm) se adaptan a 2 columnas.
+       - En tablets y monitores (md / lg) se expanden a 3 y 4 columnas.
+     * En el interior de las tarjetas (disponibles, reserva propia, ocupadas y suspendidas por lluvia):
+       - Se alinearon la hora de inicio y los badges con `flex items-center justify-between gap-2`.
+       - Se calibró la tipografía de la hora con `font-mono text-base sm:text-lg font-extrabold shrink-0` para mantener proporciones armoniosas.
+       - Se agregó un separador visual sutil (`border-t border-slate-700/40`) y espaciado proporcional (`p-3.5 sm:p-4`) entre la cabecera y el pie de la tarjeta (horario de fin y precio en verde).
+- Verificación y Tests:
+  * Suite completa de Vitest en frontend: 176/176 tests en verde (20 archivos de prueba).
+  * 39/39 tests de `GrillaHoraria.test.tsx` pasados exitosamente sin regresiones.
+==============================================================================================================================
+
+Fecha: 2026-11-10
+Tarea: Homogeneización Global de Formato de Precios sin Separador de Miles (Frontend Web & Mobile)
+- Problema Reportado:
+  * En dispositivos móviles el precio se mostraba con separador de miles en coma (`,`), mientras que en la web existían discrepancias: algunas vistas mostraban `$10.000` con punto, otras `$8000` sin separador y en la grilla de turnos `$8500`.
+  * Se requirió unificar y homogeneizar todo para mostrar los precios de manera limpia y uniforme sin separador de miles (ej: `$10000`, `$8000`, `$8500`).
+- Causa Raíz Identificada:
+  * El uso disperso de `toLocaleString()` sin configuración de locale fija (lo que hacía que en navegadores o dispositivos móviles con idioma en-US renderizara coma `,` y en es-AR punto `.`).
+  * En algunas tarjetas de canchas se concatenaba directamente el valor crudo `${c.precio_base}` mientras que en otras se llamaba a `toLocaleString()`.
+- Solución Implementada:
+  1. En `frontend/lib/formatters.ts`:
+     * Se crearon las utilidades centralizadas:
+       - `formatPrecio(monto, incluirSigno = true)`: Parsea cadenas o números y devuelve el precio sin separadores de miles (ej: `$10000`, `$8000`, `$8500`), eliminando discrepancias de locale de navegadores.
+       - `formatMonto(monto)`: Devuelve únicamente el número formateado sin separador de miles.
+  2. En `mobile/src/services/formatters.ts`:
+     * Se creó la utilidad análoga `formatPrecio` / `formatMonto` para la app móvil en React Native.
+  3. En componentes Frontend Web:
+     * `GrillaHoraria.tsx`: Se homogeneizó la visualización de precios en slots de la grilla horaria, desglose de checkout, modal de seña, confirmación, y turnos confirmados.
+     * Plantillas Web Públicas (`ModernShowcaseTemplate.tsx`, `BookingDirectTemplate.tsx`, `InstitucionalTemplate.tsx`): Se unificaron las tarjetas de canchas y tarifas de turnos con `formatPrecio(c.precio_base)`.
+     * Panel de Club (`panel/page.tsx`): Se homogeneizaron las tarifas en la pestaña de canchas, chips de franjas valle/pico/luz y selectores de turnos fijos.
+  4. En Mobile (`HomeScreen.tsx`):
+     * Se aplicó `formatPrecio` en el listado de reservas del usuario y en los diálogos de cancelación y reembolso.
+- Verificación y Tests:
+  * Suite completa de Vitest en frontend: 176/176 tests pasados en verde (20 archivos de prueba).
+  * 39/39 tests de `GrillaHoraria.test.tsx` pasados al 100%.
+==============================================================================================================================
+
+Fecha: 2026-11-10
+Tarea: Implementación de la Identidad de Marca Oficial TurnosFlow (turnosflow.com)
+- Contexto y Requerimiento:
+  * El usuario adquirió el dominio `turnosflow.com` y aportó el nuevo logotipo en `docs/logo.jpg`.
+  * Se requirió procesar el activo e implementarlo en la plataforma web y mobile.
+- Implementación Realizada:
+  1. Procesamiento de Imágenes y Transparencias:
+     * Script de recorte preciso y canal alfa con Pillow:
+       - `frontend/public/logo-icon.png`: Isotipo cuadrado con fondo transparente para navbar, avatares y favicons.
+       - `frontend/public/logo-full.png`: Imagotipo completo (isotipo + texto "TurnosFlow") con fondo transparente.
+       - `frontend/public/favicon.ico` y `backend/public/favicon.ico`: Favicon multi-resolución de 64x64.
+       - `mobile/assets/icon.png` y `mobile/assets/adaptive-icon.png`: Iconos para la aplicación móvil Expo.
+  2. Frontend Web:
+     * `frontend/components/Navbar.tsx`:
+       - Se reemplazó el emoji anterior por el isotipo oficial `<img src="/logo-icon.png" />` con animación suave al hover.
+       - Se adaptó la tipografía del nombre a `Turnos`<span className="text-emerald-600">Flow</span>.
+       - Se agregó soporte para resolución y redirección con el dominio oficial `turnosflow.com` en `rootDomains` y resolución de subdominios.
+     * `frontend/app/layout.tsx`:
+       - Título de plataforma actualizado a `"TurnosFlow | Plataforma de Gestión Deportiva & Turnos"`.
+       - Vinculación oficial de `favicon.ico` y `apple-touch-icon`.
+     * `frontend/middleware.ts` y `frontend/lib/navigationUrls.ts`:
+       - Soporte perimetral para `turnosflow.com`, `*.turnosflow.com`, y preservación retrocompatible de `turnos.com` y `localhost`.
+- Verificación y Tests:
+  * Suite completa de Vitest: 176/176 tests en verde (20 archivos de prueba).
+  * 9/9 tests de `middleware.test.ts` pasados al 100%.
+==============================================================================================================================

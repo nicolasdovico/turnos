@@ -1,0 +1,43 @@
+FROM caddy:2-alpine AS caddy_bin
+
+FROM php:8.3-fpm-alpine
+
+# Copiar binario de Caddy desde la imagen oficial
+COPY --from=caddy_bin /usr/bin/caddy /usr/bin/caddy
+
+# Instalar extension installer
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+
+# Instalar utilidades y extensiones requeridas para Laravel
+RUN apk add --no-cache bash git curl tzdata \
+    && install-php-extensions pdo_pgsql redis-6.0.2 gd bcmath opcache zip intl
+
+# Instalar Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www/html
+
+# Copiar archivos de dependencias
+COPY composer.json composer.lock ./
+
+# Instalar dependencias de producción
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+# Copiar el resto del código
+COPY . .
+
+# Ejecutar scripts de composer post-autoload
+RUN composer dump-autoload --optimize --no-dev
+
+# Copiar configuración de Caddy y Entrypoint
+COPY docker/Caddyfile.prod /etc/caddy/Caddyfile
+COPY docker/entrypoint.prod.sh /usr/local/bin/entrypoint.prod.sh
+RUN chmod +x /usr/local/bin/entrypoint.prod.sh
+
+# Permisos para el usuario www-data
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+ENV PORT=80
+EXPOSE 80
+
+CMD ["/usr/local/bin/entrypoint.prod.sh"]

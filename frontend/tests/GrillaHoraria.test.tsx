@@ -2164,7 +2164,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
     // Esperar a que renderice la tarjeta del turno ocupado
     await waitFor(() => {
       expect(screen.getByText("Claudio Magnano")).toBeDefined();
-      expect(screen.getByText("$20,000")).toBeDefined();
+      expect(screen.getByText("$20000")).toBeDefined();
     });
 
     // Abrir modal de liberación
@@ -2172,7 +2172,7 @@ describe("Componente Reactivo GrillaHoraria", () => {
     fireEvent.click(btnLiberar);
 
     // Debe mostrar la sección de gestión de reembolso
-    expect(screen.getByText(/Gestión del Reembolso \(\$20,000\)/i)).toBeDefined();
+    expect(screen.getByText(/Gestión del Reembolso \(\$20000\)/i)).toBeDefined();
     expect(screen.getByText(/Billetera Virtual/i)).toBeDefined();
     expect(screen.getByText(/Devolver en Caja/i)).toBeDefined();
 
@@ -2885,8 +2885,8 @@ describe("Componente Reactivo GrillaHoraria", () => {
 
     // 2. El slot de las 19:30 debe tener el badge "💡 Con Luz"
     expect(screen.getByText(/💡 Con Luz/i)).toBeDefined();
-    expect(screen.getByText(/\$?\s*14[,.]000/)).toBeDefined();
-    expect(screen.getByText(/\$?\s*10[,.]000/)).toBeDefined();
+    expect(screen.getByText(/\$?\s*14000/)).toBeDefined();
+    expect(screen.getByText(/\$?\s*10000/)).toBeDefined();
 
     // 3. Clickear en 19:30 para bloquear el turno
     const btnSlot1930 = screen.getByRole("button", { name: /Turno 19:30 a 21:00 Disponible/i });
@@ -2906,14 +2906,14 @@ describe("Componente Reactivo GrillaHoraria", () => {
     const nocturnalBanner = screen.getByTestId("nocturnal-tariff-banner");
     expect(nocturnalBanner).toBeDefined();
     expect(nocturnalBanner.textContent).toContain("Tarifa Nocturna (Luz artificial incluida)");
-    expect(nocturnalBanner.textContent).toContain("14,000");
+    expect(nocturnalBanner.textContent).toContain("14000");
 
     expect(screen.getByText(/Tarifa total del turno \(con luz\):/i)).toBeDefined();
 
     const senaBreakdown = screen.getByTestId("sena-breakdown");
     expect(senaBreakdown).toBeDefined();
     expect(senaBreakdown.textContent).toContain("Seña a Cobrar (50%)");
-    expect(senaBreakdown.textContent).toContain("7,000");
+    expect(senaBreakdown.textContent).toContain("7000");
   });
 
   it("muestra a un usuario logueado sus reservas existentes en la grilla y en la sección de reservas confirmadas", async () => {
@@ -3117,8 +3117,8 @@ describe("Componente Reactivo GrillaHoraria", () => {
     expect(screen.getByText(/🟢 Promo/i)).toBeDefined();
     expect(screen.getByText(/🔥 Pico/i)).toBeDefined();
     expect(screen.getByText(/💡 Con Luz/i)).toBeDefined();
-    expect(screen.getByText("$8,000")).toBeDefined();
-    expect(screen.getByText("$16,000")).toBeDefined();
+    expect(screen.getByText("$8000")).toBeDefined();
+    expect(screen.getByText("$16000")).toBeDefined();
 
     // 2. Al seleccionar el turno de las 20:00 (pico con luz), se adquiere el lock y se abre el modal
     const slotPicoBtn = screen.getByLabelText("Turno 20:00 a 21:00 Disponible");
@@ -3133,11 +3133,11 @@ describe("Componente Reactivo GrillaHoraria", () => {
     await waitFor(() => {
       expect(screen.getByText(/Confirmar Reserva de Turno/i)).toBeDefined();
       expect(screen.getByText(/Horario Central \(Pico\)/i)).toBeDefined();
-      expect(screen.getByText(/\$14,000/i)).toBeDefined(); // Base de franja pico
+      expect(screen.getByText(/\$14000/i)).toBeDefined(); // Base de franja pico
       expect(screen.getByText(/Recargo Luz Artificial/i)).toBeDefined();
-      expect(screen.getByText(/\+\$2,000/i)).toBeDefined(); // Adicional luz
-      expect(screen.getAllByText(/\$16,000/i).length).toBeGreaterThanOrEqual(1); // Total calculado
-      expect(screen.getAllByText(/\$8,000/i).length).toBeGreaterThanOrEqual(1); // Seña (50%)
+      expect(screen.getByText(/\+\$2000/i)).toBeDefined(); // Adicional luz
+      expect(screen.getAllByText(/\$16000/i).length).toBeGreaterThanOrEqual(1); // Total calculado
+      expect(screen.getAllByText(/\$8000/i).length).toBeGreaterThanOrEqual(1); // Seña (50%)
     });
   });
 

@@ -31,7 +31,7 @@ describe("Landing Page Vendedora (PortalPage)", () => {
     // 2. Sección Antes vs Después
     expect(screen.getByText("El Antes y el Después de tu Club")).toBeDefined();
     expect(screen.getByText("Gestión Tradicional (Sin Sistema)")).toBeDefined();
-    expect(screen.getByText("Con Nuestra Plataforma SaaS")).toBeDefined();
+    expect(screen.getByText("Con TurnosFlow")).toBeDefined();
 
     // 3. Funcionalidades Operativas Hoy
     expect(screen.getByText("Funcionalidades Operativas Hoy")).toBeDefined();

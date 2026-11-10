@@ -4,8 +4,16 @@ import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "SaaS Gestión Deportiva & Turnos",
-  description: "Plataforma multitenant de reservas y gestión deportiva",
+  title: "TurnosFlow | Gestión Deportiva y Reservas de Turnos",
+  description: "Plataforma de reservas online y gestión integral para clubes y complejos deportivos.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/logo-icon.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/logo-icon.png",
+  },
 };
 
 export default function RootLayout({

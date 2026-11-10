@@ -1,0 +1,30 @@
+{
+    admin off
+    auto_https off
+}
+
+:{$PORT:80} {
+    root * /var/www/html/public
+    encode gzip zstd
+
+    # Health check endpoint
+    handle /health {
+        respond "OK" 200
+    }
+
+    # Pass all PHP requests to local php-fpm on 127.0.0.1:9000
+    @phpFiles {
+        path *.php
+    }
+    handle @phpFiles {
+        php_fastcgi 127.0.0.1:9000
+    }
+
+    # Serve static assets or route everything to index.php
+    handle {
+        try_files {path} {path}/ /index.php?{query}
+        php_fastcgi 127.0.0.1:9000
+    }
+
+    file_server
+}

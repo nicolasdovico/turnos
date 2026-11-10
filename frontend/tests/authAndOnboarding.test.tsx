@@ -730,7 +730,7 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
       </AuthProvider>
     );
 
-    expect(screen.getByText(/Plataforma SaaS de Gestión Deportiva/i)).toBeDefined();
+    expect(screen.getByText(/Gestión Inteligente de Clubes Deportivos/i)).toBeDefined();
     expect(screen.getAllByText(/Registrar mi Negocio/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Reservas & Agenda/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/POS & Buffet/i).length).toBeGreaterThanOrEqual(1);

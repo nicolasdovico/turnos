@@ -32,7 +32,9 @@ export function getTenantPublicUrl(subdomain: string, path: string = ""): string
     }
 
     let baseHost = "localhost";
-    if (hostname.endsWith("turnos.com")) {
+    if (hostname.endsWith("turnosflow.com")) {
+      baseHost = "turnosflow.com";
+    } else if (hostname.endsWith("turnos.com")) {
       baseHost = "turnos.com";
     }
     return `${protocol}//${subdomain}.${baseHost}${port}${cleanPath}`;
@@ -62,7 +64,9 @@ export function getTenantAdminUrl(subdomain: string, token?: string | null): str
     }
 
     let baseHost = "localhost";
-    if (hostname.endsWith("turnos.com")) {
+    if (hostname.endsWith("turnosflow.com")) {
+      baseHost = "turnosflow.com";
+    } else if (hostname.endsWith("turnos.com")) {
       baseHost = "turnos.com";
     }
     return `${protocol}//${subdomain}.${baseHost}${port}/panel${tokenQuery}`;
@@ -91,9 +95,11 @@ export function getPortalUrl(path: string = "/"): string {
       return cleanPath;
     }
 
-    // Si estamos en localhost o turnos.com
+    // Si estamos en localhost, turnosflow.com o turnos.com
     let baseHost = "localhost";
-    if (hostname.endsWith("turnos.com")) {
+    if (hostname.endsWith("turnosflow.com")) {
+      baseHost = "turnosflow.com";
+    } else if (hostname.endsWith("turnos.com")) {
       baseHost = "turnos.com";
     }
 

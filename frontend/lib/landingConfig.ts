@@ -25,7 +25,7 @@ export const LANDING_CONFIG = {
   trialText: "Prueba Gratis por 30 Días",
   trialSubtext: "Sin tarjeta de crédito. Configuración en 2 minutos.",
   hero: {
-    badge: "⚡ Plataforma SaaS de Gestión Deportiva & Turnos",
+    badge: "⚡ Gestión Inteligente de Clubes Deportivos & Turnos",
     title: "La plataforma integral que transforma tu complejo en un club de primer nivel",
     subtitle:
       "Agenda online en tiempo real, cobros automáticos, cantina POS, caja diaria, torneos y control de luces. Todo tu club funcionando de forma autónoma con tu propia web.",

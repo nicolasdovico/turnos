@@ -14,6 +14,7 @@ import GestionPOSBuffet from "@/components/GestionPOSBuffet";
 import GestionCajaArqueo from "@/components/GestionCajaArqueo";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 import { getTenantPublicUrl as resolvePublicUrl, getPortalUrl } from "@/lib/navigationUrls";
+import { formatPrecio, formatMonto } from "@/lib/formatters";
 
 interface ComplejoData {
   id: number;
@@ -3851,7 +3852,7 @@ export default function ClubAdminPanel() {
                             Tarifa {c.permite_duracion_flexible ? "Base (60 min)" : `(${c.duracion_minutos || 60} min)`}:
                           </span>
                           <div className="text-xl font-black text-emerald-400">
-                            ${c.precio_base}{" "}
+                            {formatPrecio(c.precio_base)}{" "}
                             <span className="text-xs font-normal text-slate-400">
                               / {c.duracion_minutos === 90 ? "1h 30m" : c.duracion_minutos === 120 ? "2 hrs" : "turno"}
                             </span>
@@ -3862,7 +3863,7 @@ export default function ClubAdminPanel() {
                           <div className="text-right">
                             <span className="text-[10px] uppercase font-bold text-slate-500">90 min:</span>
                             <div className="text-sm font-bold text-slate-200">
-                              ${c.precio_90_min}
+                              {formatPrecio(c.precio_90_min)}
                             </div>
                           </div>
                         )}
@@ -3871,7 +3872,7 @@ export default function ClubAdminPanel() {
                           <div className="text-right">
                             <span className="text-[10px] uppercase font-bold text-amber-400/80">🌙 Con Luz:</span>
                             <div className="text-base font-bold text-amber-300">
-                              ${c.precio_con_luz}
+                              {formatPrecio(c.precio_con_luz)}
                             </div>
                           </div>
                         )}
@@ -3884,7 +3885,7 @@ export default function ClubAdminPanel() {
                             <div className="bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
                               <span className="text-slate-400 block text-[10px] font-bold">🟢 Valle</span>
                               <span className="font-bold text-emerald-300 text-xs font-mono">
-                                ${Number(c.precio_valle).toLocaleString()}
+                                {formatPrecio(c.precio_valle)}
                               </span>
                             </div>
                           )}
@@ -3892,7 +3893,7 @@ export default function ClubAdminPanel() {
                             <div className="bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
                               <span className="text-rose-400 block text-[10px] font-bold">🔥 Pico</span>
                               <span className="font-bold text-rose-300 text-xs font-mono">
-                                ${Number(c.precio_pico).toLocaleString()}
+                                {formatPrecio(c.precio_pico)}
                               </span>
                             </div>
                           )}
@@ -3900,7 +3901,7 @@ export default function ClubAdminPanel() {
                             <div className="bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
                               <span className="text-indigo-400 block text-[10px] font-bold">⭐ FDS</span>
                               <span className="font-bold text-indigo-300 text-xs font-mono">
-                                ${Number(c.precio_fin_semana).toLocaleString()}
+                                {formatPrecio(c.precio_fin_semana)}
                               </span>
                             </div>
                           )}
@@ -3908,7 +3909,7 @@ export default function ClubAdminPanel() {
                             <div className="bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
                               <span className="text-amber-400 block text-[10px] font-bold">💡 +Luz</span>
                               <span className="font-bold text-amber-300 text-xs font-mono">
-                                +${Number(c.precio_luz_adicional).toLocaleString()}
+                                +{formatPrecio(c.precio_luz_adicional)}
                               </span>
                             </div>
                           )}
@@ -4666,7 +4667,7 @@ export default function ClubAdminPanel() {
                             <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">
                               <span>Tarifa por Turno:</span>
                               <span className="font-bold text-emerald-400 font-mono text-xs">
-                                ${serie.precio?.toLocaleString()}
+                                {formatPrecio(serie.precio)}
                               </span>
                             </div>
 
@@ -4827,7 +4828,7 @@ export default function ClubAdminPanel() {
                     <option value="">Selecciona una Cancha</option>
                     {canchas.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.nombre} • {c.deporte?.toUpperCase()} (${c.precio_base?.toLocaleString()}) {c.permite_duracion_flexible ? "(Duración Variable)" : ""}
+                        {c.nombre} • {c.deporte?.toUpperCase()} ({formatPrecio(c.precio_base)}) {c.permite_duracion_flexible ? "(Duración Variable)" : ""}
                       </option>
                     ))}
                   </select>
@@ -4865,7 +4866,7 @@ export default function ClubAdminPanel() {
                       >
                         {duraciones.map((dur) => (
                           <option key={dur} value={dur}>
-                            {dur} Minutos {dur === 90 && selCancha.precio_90_min ? `($${Number(selCancha.precio_90_min).toLocaleString()})` : dur === 120 && selCancha.precio_120_min ? `($${Number(selCancha.precio_120_min).toLocaleString()})` : `($${Number(selCancha.precio_base).toLocaleString()})`}
+                            {dur} Minutos {dur === 90 && selCancha.precio_90_min ? `(${formatPrecio(selCancha.precio_90_min)})` : dur === 120 && selCancha.precio_120_min ? `(${formatPrecio(selCancha.precio_120_min)})` : `(${formatPrecio(selCancha.precio_base)})`}
                           </option>
                         ))}
                       </select>
@@ -5495,15 +5496,15 @@ export default function ClubAdminPanel() {
                     {/* Live Simulation Box */}
                     <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-center justify-between text-xs">
                       <span className="text-slate-400">
-                        Ejemplo para un turno de <strong>$10.000</strong>:
+                        Ejemplo para un turno de <strong>$10000</strong>:
                       </span>
                       <div className="flex items-center gap-3">
                         <span className="text-emerald-400 font-bold">
-                          Seña Online: ${(10000 * porcentajeSena / 100).toLocaleString()}
+                          Seña Online: {formatPrecio(10000 * porcentajeSena / 100)}
                         </span>
                         <span className="text-slate-400">•</span>
                         <span className="text-slate-300 font-bold">
-                          En el Club: ${(10000 - (10000 * porcentajeSena / 100)).toLocaleString()}
+                          En el Club: {formatPrecio(10000 - (10000 * porcentajeSena / 100))}
                         </span>
                       </div>
                     </div>

@@ -2,6 +2,7 @@
 
 import React from "react";
 import GrillaHoraria from "@/components/GrillaHoraria";
+import { formatPrecio } from "@/lib/formatters";
 import {
   Trophy,
   Coffee,
@@ -222,7 +223,7 @@ export default function InstitucionalTemplate({
                   >
                     <span>{c.nombre}</span>
                     <span className="text-[10px] opacity-80 font-mono">
-                      ${Number(c.precio_base).toLocaleString()}
+                      {formatPrecio(c.precio_base)}
                     </span>
                   </button>
                 );

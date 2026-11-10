@@ -2,6 +2,7 @@
 
 import React from "react";
 import GrillaHoraria from "@/components/GrillaHoraria";
+import { formatPrecio } from "@/lib/formatters";
 import {
   Sparkles,
   Camera,
@@ -220,7 +221,7 @@ export default function ModernShowcaseTemplate({
                         className="text-base font-black font-mono"
                         style={{ color: "var(--club-accent, #10b981)" }}
                       >
-                        ${Number(c.precio_base).toLocaleString()}
+                        {formatPrecio(c.precio_base)}
                       </div>
                     </div>
 
@@ -263,7 +264,7 @@ export default function ModernShowcaseTemplate({
               </div>
 
               <div className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/20 px-3 py-1 rounded-xl self-start sm:self-auto">
-                Tarifa: ${Number(selectedCancha.precio_base).toLocaleString()}
+                Tarifa: {formatPrecio(selectedCancha.precio_base)}
               </div>
             </div>
 

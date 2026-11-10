@@ -2,6 +2,7 @@
 
 import React from "react";
 import GrillaHoraria from "@/components/GrillaHoraria";
+import { formatPrecio } from "@/lib/formatters";
 import { Zap, ShieldCheck, Clock, MapPin } from "lucide-react";
 
 export interface CanchaItem {
@@ -259,7 +260,7 @@ export default function BookingDirectTemplate({
                           Tarifa Base:
                         </span>
                         <span className="text-xs font-bold text-emerald-400 font-mono">
-                          ${Number(c.precio_base).toLocaleString()}
+                          {formatPrecio(c.precio_base)}
                         </span>
                       </div>
                     </button>

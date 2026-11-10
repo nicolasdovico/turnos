@@ -14,6 +14,7 @@ import { Complejo, TurnoCliente } from '../types';
 import { getCurrentCoordinates, fetchNearbyComplejos } from '../services/locationService';
 import { registerForPushNotificationsAsync } from '../services/notificationService';
 import { fetchMisTurnosApi, cancelarTurnoClienteApi } from '../services/api';
+import { formatPrecio } from '../services/formatters';
 
 export const formatFechaDDMMAAAA = (fechaStr?: string): string => {
   if (!fechaStr) return '';
@@ -57,9 +58,9 @@ export function HomeScreen() {
     const aplicaReembolso = horas >= limite && turno.monto_pagado > 0;
 
     const mensajeExplicativo = aplicaReembolso
-      ? `Faltan aproximadamente ${horas} horas para tu partido (mínimo del club: ${limite} hs).\n\nSe reembolsarán $${turno.monto_pagado.toLocaleString()} de forma automática a tu Billetera Virtual en este club.`
+      ? `Faltan aproximadamente ${horas} horas para tu partido (mínimo del club: ${limite} hs).\n\nSe reembolsarán ${formatPrecio(turno.monto_pagado)} de forma automática a tu Billetera Virtual en este club.`
       : turno.monto_pagado > 0
-      ? `Faltan menos de ${limite} horas para tu partido.\n\nPor cancelación fuera de término, la seña abonada de $${turno.monto_pagado.toLocaleString()} no será reembolsable y quedará retenida en concepto de penalidad.`
+      ? `Faltan menos de ${limite} horas para tu partido.\n\nPor cancelación fuera de término, la seña abonada de ${formatPrecio(turno.monto_pagado)} no será reembolsable y quedará retenida en concepto de penalidad.`
       : `¿Estás seguro de que deseas cancelar tu reserva para el ${formatFechaDDMMAAAA(turno.fecha)} a las ${turno.hora_inicio} hs?`;
 
     Alert.alert(
@@ -260,13 +261,13 @@ export function HomeScreen() {
                 {/* Desglose Financiero */}
                 <View className="flex-row justify-between items-center text-xs pt-1">
                   <Text className="text-xs text-slate-400">
-                    Abonado: <Text className="font-bold text-white">${turno.monto_pagado.toLocaleString()}</Text>
+                    Abonado: <Text className="font-bold text-white">{formatPrecio(turno.monto_pagado)}</Text>
                     {turno.saldo_pendiente > 0 && (
-                      <Text className="text-amber-400"> (Resta: ${turno.saldo_pendiente.toLocaleString()})</Text>
+                      <Text className="text-amber-400"> (Resta: {formatPrecio(turno.saldo_pendiente)})</Text>
                     )}
                   </Text>
                   <Text className="text-xs font-bold text-slate-300">
-                    Total: ${turno.precio.toLocaleString()}
+                    Total: {formatPrecio(turno.precio)}
                   </Text>
                 </View>
 

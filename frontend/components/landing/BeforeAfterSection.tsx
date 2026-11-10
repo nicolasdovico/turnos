@@ -57,7 +57,7 @@ export default function BeforeAfterSection() {
               ✓
             </span>
             <div>
-              <h3 className="text-lg font-black text-white">Con Nuestra Plataforma SaaS</h3>
+              <h3 className="text-lg font-black text-white">Con TurnosFlow</h3>
               <p className="text-xs text-emerald-300">Club operativo 24/7 y recaudación asegurada</p>
             </div>
           </div>

@@ -55,6 +55,9 @@ export default function Navbar() {
         "localhost",
         "127.0.0.1",
         "0.0.0.0",
+        "turnosflow.com",
+        "www.turnosflow.com",
+        "app.turnosflow.com",
         "turnos.com",
         "www.turnos.com",
         "app.turnos.com",
@@ -70,7 +73,9 @@ export default function Navbar() {
         setTenantSlug(slug);
 
         let mainHost = "localhost";
-        if (hostname.endsWith(".turnos.com")) {
+        if (hostname.endsWith(".turnosflow.com")) {
+          mainHost = "turnosflow.com";
+        } else if (hostname.endsWith(".turnos.com")) {
           mainHost = "turnos.com";
         }
         setMainDomainUrl(`${protocol}//${mainHost}${port}`);
@@ -80,7 +85,9 @@ export default function Navbar() {
           setDemoClubUrl("/tenants/padelpro");
         } else {
           let baseSubdomainHost = "localhost";
-          if (hostname.endsWith("turnos.com")) {
+          if (hostname.endsWith("turnosflow.com")) {
+            baseSubdomainHost = "turnosflow.com";
+          } else if (hostname.endsWith("turnos.com")) {
             baseSubdomainHost = "turnos.com";
           }
           setDemoClubUrl(`${protocol}//padelpro.${baseSubdomainHost}${port}`);
@@ -148,19 +155,21 @@ export default function Navbar() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 h-16">
         {/* Brand Logo & Context */}
         <div className="flex items-center gap-3">
-          <Link href={effectiveIsSubdomain ? "/" : getGlobalLink("/")} className="flex items-center gap-2 font-black text-xl tracking-tight text-slate-900">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold shadow-md shadow-emerald-500/20">
-              ⚡
-            </span>
+          <Link href={effectiveIsSubdomain ? "/" : getGlobalLink("/")} className="flex items-center gap-2 font-black text-xl tracking-tight text-slate-900 group">
+            <img
+              src="/logo-icon.png"
+              alt=""
+              width={36}
+              height={36}
+              className="h-9 w-9 object-contain drop-shadow-sm transition-transform duration-200 group-hover:scale-105"
+            />
             <span className="flex items-center gap-1.5">
-              Turnos
-              {effectiveIsSubdomain ? (
+              <span>
+                Turnos<span className="text-emerald-600">Flow</span>
+              </span>
+              {effectiveIsSubdomain && (
                 <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800 uppercase tracking-wider">
                   {effectiveTenantSlug}
-                </span>
-              ) : (
-                <span className="text-xs font-semibold text-slate-500 hidden sm:inline">
-                  Plataforma SaaS
                 </span>
               )}
             </span>
@@ -193,7 +202,7 @@ export default function Navbar() {
         </nav>
 
         {/* Right Auth & CTA Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {/* Subdomain: Club Admin single button + Switcher if multiple */}
           {effectiveIsSubdomain && isCurrentAdmin && (
             <div className="flex items-center gap-2">
@@ -328,12 +337,12 @@ export default function Navbar() {
           {isLoading ? (
             <div className="h-9 w-24 animate-pulse rounded-lg bg-slate-100" />
           ) : user ? (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full bg-slate-100 py-1 pl-1 pr-3 border border-slate-200">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white uppercase">
+            <div className="flex items-center gap-1.5 sm:gap-3">
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-slate-100 py-1 pl-1 pr-2 sm:pr-3 border border-slate-200">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white uppercase shrink-0">
                   {user.name.charAt(0)}
                 </span>
-                <span className="text-xs font-semibold text-slate-800 max-w-[120px] truncate">
+                <span className="text-xs font-semibold text-slate-800 max-w-[70px] xs:max-w-[100px] sm:max-w-[140px] truncate">
                   {user.name}
                 </span>
               </div>
@@ -353,7 +362,7 @@ export default function Navbar() {
                     window.location.href = isPanel ? "/" : window.location.pathname;
                   }
                 }}
-                className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-rose-600 transition"
+                className="hidden sm:inline-flex rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-rose-600 transition"
               >
                 Cerrar Sesión
               </button>

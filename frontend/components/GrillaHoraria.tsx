@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, X, Lock, DollarSign, User, Calendar, Loader2, Eye, EyeOff } from "lucide-react";
 import { useAuth, setCrossDomainCookie } from "@/context/AuthContext";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
+import { formatPrecio, formatMonto } from "@/lib/formatters";
 
 export interface Slot {
   hora_inicio: string;
@@ -2923,7 +2924,7 @@ export default function GrillaHoraria({
               </div>
 
               {loading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} className="h-20 bg-slate-800/40 rounded-2xl animate-pulse" />
                   ))}
@@ -2948,14 +2949,14 @@ export default function GrillaHoraria({
                   <p className="text-slate-400 font-medium">No hay turnos disponibles para la fecha seleccionada.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {displaySlots.map((slot) => {
                     if (slot.disponible) {
                       const isLockedByMe = activeLock?.horaInicio === slot.hora_inicio;
                       const isLocking = lockingSlot === slot.hora_inicio;
 
                       let buttonClasses =
-                        "relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 ";
+                        "relative flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 ";
 
                       if (isLockedByMe) {
                         buttonClasses += "bg-emerald-950/80 border-emerald-500 text-white ring-2 ring-emerald-500 shadow-lg";
@@ -2972,17 +2973,17 @@ export default function GrillaHoraria({
                           className={buttonClasses}
                           aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Disponible`}
                         >
-                          <div className="flex justify-between items-start w-full">
-                            <span className="font-mono text-lg font-extrabold tracking-tight">
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            <span className="font-mono text-base sm:text-lg font-extrabold tracking-tight shrink-0">
                               {slot.hora_inicio}
                             </span>
                             {isLockedByMe ? (
-                              <span className="flex h-2 w-2 relative">
+                              <span className="flex h-2 w-2 relative shrink-0">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                               </span>
                             ) : (
-                              <div className="flex items-center gap-1 flex-wrap justify-end">
+                              <div className="flex items-center gap-1.5 flex-wrap justify-end">
                                 {slot.tipo_franja === "valle" && (
                                   <span
                                     title={slot.nombre_franja || "Horario Promocional (Valle)"}
@@ -3022,10 +3023,10 @@ export default function GrillaHoraria({
                             )}
                           </div>
 
-                          <div className="mt-3 flex justify-between items-end w-full">
+                          <div className="mt-2.5 pt-2 border-t border-slate-700/40 flex justify-between items-center w-full">
                             <span className="text-xs text-slate-400 font-medium">hasta {slot.hora_fin}</span>
-                            <span className="text-xs font-black text-emerald-400">
-                              ${slot.precio?.toLocaleString() || precioBase || 0}
+                            <span className="text-xs sm:text-sm font-black text-emerald-400">
+                              {formatPrecio(slot.precio ?? precioBase ?? 0)}
                             </span>
                           </div>
                         </button>
@@ -3046,11 +3047,11 @@ export default function GrillaHoraria({
                         <div
                           key={slot.hora_inicio}
                           data-testid={`client-own-slot-${slot.hora_inicio}`}
-                          className="relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 bg-emerald-950/40 border-emerald-500/60 ring-1 ring-emerald-500/40 text-white shadow-sm"
+                          className="relative flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 bg-emerald-950/40 border-emerald-500/60 ring-1 ring-emerald-500/40 text-white shadow-sm"
                           aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Tu Reserva`}
                         >
-                          <div className="flex justify-between items-start w-full">
-                            <span className="font-mono text-lg font-extrabold tracking-tight text-white">
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            <span className="font-mono text-base sm:text-lg font-extrabold tracking-tight text-white shrink-0">
                               {slot.hora_inicio}
                             </span>
                             <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
@@ -3059,7 +3060,7 @@ export default function GrillaHoraria({
                             </span>
                           </div>
 
-                          <div className="mt-3 flex justify-between items-end w-full">
+                          <div className="mt-2.5 pt-2 border-t border-emerald-500/20 flex justify-between items-center w-full">
                             <span className="text-xs text-slate-400 font-medium">hasta {slot.hora_fin}</span>
                             <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
                               {isPagado ? "✓ 100% Abonado" : isSenado ? "✓ Seña Abonada" : "✓ Confirmado"}
@@ -3076,11 +3077,11 @@ export default function GrillaHoraria({
                         <div
                           key={slot.hora_inicio}
                           data-testid={`rain-slot-${slot.hora_inicio}`}
-                          className="relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 bg-cyan-950/20 border-cyan-500/30 text-cyan-300"
+                          className="relative flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 bg-cyan-950/20 border-cyan-500/30 text-cyan-300"
                           aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Suspendido por Lluvia`}
                         >
-                          <div className="flex justify-between items-start w-full">
-                            <span className="font-mono text-lg font-extrabold tracking-tight text-cyan-200">
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            <span className="font-mono text-base sm:text-lg font-extrabold tracking-tight text-cyan-200 shrink-0">
                               {slot.hora_inicio}
                             </span>
                             <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
@@ -3088,7 +3089,7 @@ export default function GrillaHoraria({
                             </span>
                           </div>
 
-                          <div className="mt-3 flex justify-between items-center w-full gap-1.5">
+                          <div className="mt-2.5 pt-2 border-t border-cyan-500/20 flex justify-between items-center w-full gap-1.5">
                             <span className="text-xs text-cyan-400/80 font-medium">hasta {slot.hora_fin}</span>
                             <span className="text-[11px] text-cyan-300/80 font-bold">
                               Cancha suspendida
@@ -3105,11 +3106,11 @@ export default function GrillaHoraria({
                       <div
                         key={slot.hora_inicio}
                         data-testid={`waitlist-card-${slot.hora_inicio}`}
-                        className="relative flex flex-col justify-between p-4 rounded-2xl border text-left transition-all duration-200 bg-slate-900/80 border-slate-800/90 text-slate-400"
+                        className="relative flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 bg-slate-900/80 border-slate-800/90 text-slate-400"
                         aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Ocupado`}
                       >
-                        <div className="flex justify-between items-start w-full">
-                          <span className="font-mono text-lg font-extrabold tracking-tight text-slate-400">
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <span className="font-mono text-base sm:text-lg font-extrabold tracking-tight text-slate-400 shrink-0">
                             {slot.hora_inicio}
                           </span>
                           <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-rose-400/90 border border-rose-500/20">
@@ -3117,7 +3118,7 @@ export default function GrillaHoraria({
                           </span>
                         </div>
 
-                        <div className="mt-3 flex justify-between items-center w-full gap-1.5">
+                        <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex justify-between items-center w-full gap-1.5">
                           <span className="text-xs text-slate-500 font-medium">hasta {slot.hora_fin}</span>
                           <button
                             type="button"
@@ -3238,20 +3239,20 @@ export default function GrillaHoraria({
                       <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
                         <span className="text-slate-400 block text-[10px]">Abonado Online</span>
                         <span className="font-mono font-bold text-emerald-400 text-xs">
-                          ${(turno.monto_pagado || 0).toLocaleString()}
+                          {formatPrecio(turno.monto_pagado || 0)}
                         </span>
                       </div>
                       <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
                         <span className="text-slate-400 block text-[10px]">Saldo en Club</span>
                         <span className="font-mono font-bold text-slate-200 text-xs">
-                          ${(turno.saldo_pendiente !== undefined ? turno.saldo_pendiente : Math.max(0, (turno.precio || 0) - (turno.monto_pagado || 0))).toLocaleString()}
+                          {formatPrecio(turno.saldo_pendiente !== undefined ? turno.saldo_pendiente : Math.max(0, (turno.precio || 0) - (turno.monto_pagado || 0)))}
                         </span>
                       </div>
                     </div>
                   </div>
 
                   <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Total: <strong className="text-white">${(turno.precio || 0).toLocaleString()}</strong></span>
+                    <span>Total: <strong className="text-white">{formatPrecio(turno.precio || 0)}</strong></span>
                     <div className="flex items-center gap-2">
                       <span className="text-emerald-400 font-medium">✓ Cancha confirmada</span>
                       {turno.id && (
@@ -3418,7 +3419,7 @@ export default function GrillaHoraria({
                         {isClima ? (
                           <>
                             <span className="font-bold text-slate-400 font-mono text-xs">
-                              {(turno.monto_pagado || 0) > 0 ? `Reembolsado: $${(turno.monto_pagado || 0).toLocaleString()}` : "Sin Cargo"}
+                              {(turno.monto_pagado || 0) > 0 ? `Reembolsado: ${formatPrecio(turno.monto_pagado || 0)}` : "Sin Cargo"}
                             </span>
                             <span className="text-[10px] text-cyan-400 font-mono">
                               Resta: $0
@@ -3427,11 +3428,11 @@ export default function GrillaHoraria({
                         ) : (
                           <>
                             <span className="font-bold text-emerald-400 font-mono text-sm">
-                              ${turno.precio ? turno.precio.toLocaleString() : "0"}
+                              {formatPrecio(turno.precio || 0)}
                             </span>
                             {isSenado && turno.saldo_pendiente !== undefined && (
                               <span className="text-[10px] text-amber-400 font-mono">
-                                Resta: ${turno.saldo_pendiente.toLocaleString()}
+                                Resta: {formatPrecio(turno.saldo_pendiente)}
                               </span>
                             )}
                           </>
@@ -3551,7 +3552,7 @@ export default function GrillaHoraria({
                 <div className="flex justify-between items-center text-slate-300">
                   <span className="text-slate-400">Abonado Online:</span>
                   <span className={`font-mono font-bold ${montoPagado > 0 ? "text-emerald-400" : "text-slate-400"}`}>
-                    ${montoPagado.toLocaleString()}
+                    {formatPrecio(montoPagado)}
                   </span>
                 </div>
               </div>
@@ -3565,7 +3566,7 @@ export default function GrillaHoraria({
                       <span>Reembolso 100% en Billetera Virtual</span>
                     </div>
                     <p className="text-[11px] text-emerald-300/90 leading-relaxed">
-                      Faltan aproximadamente <strong>{diffHours} horas</strong> para el inicio de tu turno (política del club: mínimo {clubHorasLimiteCancelacion} hs). Se acreditarán <strong>${montoPagado.toLocaleString()}</strong> de forma inmediata en tu Billetera Virtual de este club.
+                      Faltan aproximadamente <strong>{diffHours} horas</strong> para el inicio de tu turno (política del club: mínimo {clubHorasLimiteCancelacion} hs). Se acreditarán <strong>{formatPrecio(montoPagado)}</strong> de forma inmediata en tu Billetera Virtual de este club.
                     </p>
                   </div>
                 ) : (
@@ -3575,7 +3576,7 @@ export default function GrillaHoraria({
                       <span>Cancelación fuera de término</span>
                     </div>
                     <p className="text-[11px] text-amber-300/90 leading-relaxed">
-                      Faltan menos de {clubHorasLimiteCancelacion} horas para el turno. Por política de cancelaciones tardías del club, la seña abonada de <strong>${montoPagado.toLocaleString()}</strong> no es reembolsable y quedará retenida en concepto de penalidad.
+                      Faltan menos de {clubHorasLimiteCancelacion} horas para el turno. Por política de cancelaciones tardías del club, la seña abonada de <strong>{formatPrecio(montoPagado)}</strong> no es reembolsable y quedará retenida en concepto de penalidad.
                     </p>
                   </div>
                 )
@@ -3667,7 +3668,7 @@ export default function GrillaHoraria({
               <div className="flex justify-between">
                 <span className="text-slate-400">Monto Abonado:</span>
                 <span className={`font-bold ${Number(turnoToCancel.monto_pagado || 0) > 0 ? "text-emerald-400" : "text-slate-400"}`}>
-                  ${Number(turnoToCancel.monto_pagado || 0).toLocaleString()}
+                  {formatPrecio(Number(turnoToCancel.monto_pagado || 0))}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -3683,7 +3684,7 @@ export default function GrillaHoraria({
               <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 text-xs">
                 <div className="font-bold text-slate-200 flex items-center gap-1.5">
                   <span>💰</span>
-                  <span>Gestión del Reembolso (${Number(turnoToCancel.monto_pagado || 0).toLocaleString()})</span>
+                  <span>Gestión del Reembolso ({formatPrecio(Number(turnoToCancel.monto_pagado || 0))})</span>
                 </div>
 
                 {/* Selector Billetera vs Devolución en Efectivo */}
@@ -3812,7 +3813,7 @@ export default function GrillaHoraria({
                   <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] flex items-center gap-2">
                     <span>💵</span>
                     <span>
-                      Recuerda entregar <strong>${Number(turnoToCancel.monto_pagado || 0).toLocaleString()}</strong> en mano al cliente desde la caja.
+                      Recuerda entregar <strong>{formatPrecio(Number(turnoToCancel.monto_pagado || 0))}</strong> en mano al cliente desde la caja.
                     </span>
                   </div>
                 )}
@@ -3934,18 +3935,18 @@ export default function GrillaHoraria({
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Alquiler Cancha:</span>
-                  <span className="font-bold text-slate-200 font-mono">${turnoToPay.precio?.toLocaleString()}</span>
+                  <span className="font-bold text-slate-200 font-mono">{formatPrecio(turnoToPay.precio)}</span>
                 </div>
                 {turnoToPay.monto_pagado !== undefined && turnoToPay.monto_pagado > 0 && (
                   <div className="flex justify-between text-emerald-400">
                     <span>Seña Ya Pagada:</span>
-                    <span className="font-bold font-mono">-${turnoToPay.monto_pagado.toLocaleString()}</span>
+                    <span className="font-bold font-mono">-{formatPrecio(turnoToPay.monto_pagado)}</span>
                   </div>
                 )}
                 {turnoToPay.saldo_pendiente !== undefined && (
                   <div className="flex justify-between text-slate-300">
                     <span>Resta Cancha:</span>
-                    <span className="font-mono font-bold">${(turnoToPay.saldo_pendiente ?? 0).toLocaleString()}</span>
+                    <span className="font-mono font-bold">{formatPrecio(turnoToPay.saldo_pendiente ?? 0)}</span>
                   </div>
                 )}
 
@@ -3954,7 +3955,7 @@ export default function GrillaHoraria({
                   <div className="border-t border-slate-800/80 pt-2 space-y-1.5" data-testid="seccion-consumos-buffet">
                     <div className="flex justify-between text-xs font-bold text-amber-400">
                       <span>🥤 Consumos Buffet / Tercer Tiempo:</span>
-                      <span className="font-mono">+${(turnoToPay.total_buffet || 0).toLocaleString()}</span>
+                      <span className="font-mono">+{formatPrecio(turnoToPay.total_buffet || 0)}</span>
                     </div>
                     <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/80 space-y-1">
                       {turnoToPay.consumos_buffet.map((c, idx) => (
@@ -3963,7 +3964,7 @@ export default function GrillaHoraria({
                             {c.cantidad}x {c.nombre}
                           </span>
                           <span className="font-mono text-slate-400">
-                            ${c.subtotal.toLocaleString()}
+                            {formatPrecio(c.subtotal)}
                           </span>
                         </div>
                       ))}
@@ -3975,7 +3976,7 @@ export default function GrillaHoraria({
                 <div className="flex justify-between items-center text-sm font-black text-emerald-400 border-t border-slate-800 pt-2">
                   <span>TOTAL A COBRAR:</span>
                   <span className="font-mono text-base">
-                    ${(turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio).toLocaleString()}
+                    {formatPrecio(turnoToPay.saldo_total_a_cobrar ?? turnoToPay.saldo_pendiente ?? turnoToPay.precio)}
                   </span>
                 </div>
               </div>
@@ -3992,7 +3993,7 @@ export default function GrillaHoraria({
                       ? [
                           {
                             id: "billetera",
-                            label: `👛 Billetera Virtual ($${Number(turnoToPay.cliente_saldo_billetera).toLocaleString()} disp.)`,
+                            label: `👛 Billetera Virtual (${formatPrecio(Number(turnoToPay.cliente_saldo_billetera))} disp.)`,
                           },
                         ]
                       : []),
@@ -4181,10 +4182,10 @@ export default function GrillaHoraria({
                             )}
                           </div>
                           <div className="text-sm font-extrabold text-emerald-400 mt-1">
-                            ${montoSena.toLocaleString()}
+                            {formatPrecio(montoSena)}
                           </div>
                           <span className="text-[10px] text-slate-400 mt-0.5">
-                            Resta ${(tarifaTotal - montoSena).toLocaleString()}
+                            Resta {formatPrecio(tarifaTotal - montoSena)}
                           </span>
                         </button>
 
@@ -4207,7 +4208,7 @@ export default function GrillaHoraria({
                             )}
                           </div>
                           <div className="text-sm font-extrabold text-emerald-400 mt-1">
-                            ${tarifaTotal.toLocaleString()}
+                            {formatPrecio(tarifaTotal)}
                           </div>
                           <span className="text-[10px] text-emerald-300/80 mt-0.5">
                             100% saldado
@@ -4239,10 +4240,10 @@ export default function GrillaHoraria({
                               )}
                             </div>
                             <div className="text-sm font-extrabold text-emerald-400 mt-1">
-                              ${montoSena.toLocaleString()}
+                              {formatPrecio(montoSena)}
                             </div>
                             <span className="text-[10px] text-slate-400 mt-0.5">
-                              Restan ${(tarifaTotal - montoSena).toLocaleString()} en el club
+                              Restan {formatPrecio(tarifaTotal - montoSena)} en el club
                             </span>
                           </button>
 
@@ -4262,7 +4263,7 @@ export default function GrillaHoraria({
                               )}
                             </div>
                             <div className="text-sm font-extrabold text-emerald-400 mt-1">
-                              ${tarifaTotal.toLocaleString()}
+                              {formatPrecio(tarifaTotal)}
                             </div>
                             <span className="text-[10px] text-emerald-300/80 mt-0.5">
                               Turno 100% saldado
@@ -4283,7 +4284,7 @@ export default function GrillaHoraria({
                           <span>{activeLock.nombreFranja || (activeLock.tipoFranja === "pico" ? "Horario Central (Pico)" : activeLock.tipoFranja === "valle" ? "Horario Promocional (Valle)" : "Tarifa Fin de Semana")}</span>
                         </span>
                         <span className="font-mono font-bold text-slate-200">
-                          ${(activeLock.precioBase ?? (tarifaTotal - (activeLock.recargoLuz || 0))).toLocaleString()}
+                          {formatPrecio(activeLock.precioBase ?? (tarifaTotal - (activeLock.recargoLuz || 0)))}
                         </span>
                       </div>
                     )}
@@ -4296,7 +4297,7 @@ export default function GrillaHoraria({
                           <span>💡</span> Tarifa Nocturna (Luz artificial incluida)
                         </span>
                         <span className="font-mono font-extrabold text-amber-200">
-                          ${tarifaTotal.toLocaleString()}
+                          {formatPrecio(tarifaTotal)}
                         </span>
                       </div>
                     )}
@@ -4309,7 +4310,7 @@ export default function GrillaHoraria({
                           <span>💡</span> Recargo Luz Artificial
                         </span>
                         <span className="font-mono font-extrabold text-amber-200">
-                          +${(activeLock.recargoLuz ?? 0).toLocaleString()}
+                          +{formatPrecio(activeLock.recargoLuz ?? 0)}
                         </span>
                       </div>
                     )}
@@ -4317,7 +4318,7 @@ export default function GrillaHoraria({
                       <span className="text-slate-400">
                         {activeLock.recargoLuz || activeLock.tarifaConLuz ? "Tarifa total del turno (con luz):" : "Tarifa total del turno:"}
                       </span>
-                      <span className="font-bold text-slate-300">${tarifaTotal.toLocaleString()}</span>
+                      <span className="font-bold text-slate-300">{formatPrecio(tarifaTotal)}</span>
                     </div>
                     <div data-testid="sena-breakdown" className="flex justify-between items-center text-xs bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
                       <span className="font-bold text-emerald-300">
@@ -4328,13 +4329,13 @@ export default function GrillaHoraria({
                           : `💳 Seña a Cobrar (${porcentajeSena}%):`}
                       </span>
                       <span className={`font-extrabold text-sm ${modalidadEfectiva === "ninguno" ? "text-amber-400" : "text-emerald-400"}`}>
-                        ${montoBaseACobrar.toLocaleString()}
+                        {formatPrecio(montoBaseACobrar)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-xs px-1 text-slate-400">
                       <span>Saldo a pagar en el club:</span>
                       <span className={`font-medium ${saldoPendiente === 0 ? "text-emerald-400 font-bold" : "text-slate-300"}`}>
-                        ${saldoPendiente.toLocaleString()}
+                        {formatPrecio(saldoPendiente)}
                       </span>
                     </div>
                   </div>
@@ -4351,11 +4352,11 @@ export default function GrillaHoraria({
                           className="rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700"
                         />
                         <label htmlFor="use-wallet-check" className="text-blue-200 cursor-pointer font-medium">
-                          💰 Usar saldo en Billetera Virtual (${walletBalance.toLocaleString()} disponibles)
+                          💰 Usar saldo en Billetera Virtual ({formatPrecio(walletBalance)} disponibles)
                         </label>
                       </div>
                       {useWalletCredit && (
-                        <span className="font-bold text-emerald-400 font-mono">-${descuentoWallet.toLocaleString()}</span>
+                        <span className="font-bold text-emerald-400 font-mono">-{formatPrecio(descuentoWallet)}</span>
                       )}
                     </div>
                   )}
@@ -4528,7 +4529,7 @@ export default function GrillaHoraria({
                       </div>
                       {typeof deskRegisteredUser.saldo_billetera === "number" && deskRegisteredUser.saldo_billetera > 0 && (
                         <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-bold px-2 py-0.5 rounded-full font-mono">
-                          Billetera: ${deskRegisteredUser.saldo_billetera.toLocaleString()}
+                          Billetera: {formatPrecio(deskRegisteredUser.saldo_billetera)}
                         </span>
                       )}
                     </div>
@@ -4664,7 +4665,7 @@ export default function GrillaHoraria({
                     {modalidadCobro === "ninguno" && (
                       <p className="text-[11px] text-amber-400/90 mt-1.5 flex items-center gap-1.5">
                         <span>ℹ️</span>
-                        <span>No se registra cobro ahora. El saldo total (${tarifaTotal.toLocaleString()}) quedará pendiente para cuando el cliente asista al club.</span>
+                        <span>No se registra cobro ahora. El saldo total ({formatPrecio(tarifaTotal)}) quedará pendiente para cuando el cliente asista al club.</span>
                       </p>
                     )}
                   </div>
@@ -5052,19 +5053,19 @@ export default function GrillaHoraria({
                     ? "Procesando..."
                     : isAdmin
                     ? deskOtpStep === "otp"
-                      ? `✓ Verificar OTP & Asignar ($${montoFinalAPagar.toLocaleString()})`
+                      ? `✓ Verificar OTP & Asignar (${formatPrecio(montoFinalAPagar)})`
                       : modalidadCobro === "ninguno"
                       ? "📝 Asignar en Mostrador (Sin Cobro)"
                       : modalidadCobro === "sena"
-                      ? `📝 Asignar en Mostrador (Seña: $${montoFinalAPagar.toLocaleString()})`
-                      : `📝 Asignar en Mostrador ($${montoFinalAPagar.toLocaleString()})`
+                      ? `📝 Asignar en Mostrador (Seña: ${formatPrecio(montoFinalAPagar)})`
+                      : `📝 Asignar en Mostrador (${formatPrecio(montoFinalAPagar)})`
                     : currentUser
-                    ? `✓ Confirmar Turno ($${montoFinalAPagar.toLocaleString()})`
+                    ? `✓ Confirmar Turno (${formatPrecio(montoFinalAPagar)})`
                     : authMode === "register"
                     ? registrationStep === "otp"
-                      ? `✓ Verificar & Confirmar ($${montoFinalAPagar.toLocaleString()})`
+                      ? `✓ Verificar & Confirmar (${formatPrecio(montoFinalAPagar)})`
                       : "✨ Continuar (Paso 1/2)"
-                    : `🔑 Ingresar & Confirmar ($${montoFinalAPagar.toLocaleString()})`}
+                    : `🔑 Ingresar & Confirmar (${formatPrecio(montoFinalAPagar)})`}
                 </button>
               </div>
             </form>

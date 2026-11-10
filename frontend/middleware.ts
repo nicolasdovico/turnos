@@ -26,6 +26,9 @@ export function middleware(req: NextRequest) {
     "localhost",
     "127.0.0.1",
     "0.0.0.0",
+    "turnosflow.com",
+    "www.turnosflow.com",
+    "app.turnosflow.com",
     "turnos.com",
     "www.turnos.com",
     "app.turnos.com",
@@ -58,7 +61,9 @@ export function middleware(req: NextRequest) {
 
   if (globalRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
     let mainHost = "localhost";
-    if (cleanHostname.endsWith(".turnos.com")) {
+    if (cleanHostname.endsWith(".turnosflow.com")) {
+      mainHost = "turnosflow.com";
+    } else if (cleanHostname.endsWith(".turnos.com")) {
       mainHost = "turnos.com";
     }
     const redirectUrl = `${url.protocol}//${mainHost}${port}${pathname}${url.search}`;
@@ -69,6 +74,8 @@ export function middleware(req: NextRequest) {
   let tenantIdentifier = cleanHostname;
   if (cleanHostname.endsWith(".localhost")) {
     tenantIdentifier = cleanHostname.replace(".localhost", "");
+  } else if (cleanHostname.endsWith(".turnosflow.com")) {
+    tenantIdentifier = cleanHostname.replace(".turnosflow.com", "");
   } else if (cleanHostname.endsWith(".turnos.com")) {
     tenantIdentifier = cleanHostname.replace(".turnos.com", "");
   }
