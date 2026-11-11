@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const host = request.headers.get("host") || "turnos.com";
+  const host = request.headers.get("host") || "turnosflow.com";
   const protocol =
     host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
 

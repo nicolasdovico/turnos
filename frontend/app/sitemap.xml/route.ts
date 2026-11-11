@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
     "localhost",
     "127.0.0.1",
     "0.0.0.0",
+    "turnosflow.com",
+    "www.turnosflow.com",
+    "app.turnosflow.com",
     "turnos.com",
     "www.turnos.com",
     "app.turnos.com",
@@ -35,6 +38,8 @@ export async function GET(request: NextRequest) {
   if (!tenantSubdomain && !rootDomains.includes(cleanHost)) {
     if (cleanHost.endsWith(".localhost")) {
       tenantSubdomain = cleanHost.replace(".localhost", "");
+    } else if (cleanHost.endsWith(".turnosflow.com")) {
+      tenantSubdomain = cleanHost.replace(".turnosflow.com", "");
     } else if (cleanHost.endsWith(".turnos.com")) {
       tenantSubdomain = cleanHost.replace(".turnos.com", "");
     } else {
