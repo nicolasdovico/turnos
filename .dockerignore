@@ -1,0 +1,16 @@
+# Dependencies and cache
+node_modules
+.next
+out
+.turbo
+*.log
+
+# Git & Docker
+.git
+.github
+Dockerfile*
+docker*
+caddy
+backend
+mobile
+docs
