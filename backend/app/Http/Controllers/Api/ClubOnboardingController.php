@@ -218,7 +218,9 @@ class ClubOnboardingController extends Controller
         }
 
         $baseHost = 'localhost';
-        if (str_ends_with($incomingHost, 'turnos.com')) {
+        if (str_ends_with($incomingHost, 'turnosflow.com')) {
+            $baseHost = 'turnosflow.com';
+        } elseif (str_ends_with($incomingHost, 'turnos.com')) {
             $baseHost = 'turnos.com';
         }
 

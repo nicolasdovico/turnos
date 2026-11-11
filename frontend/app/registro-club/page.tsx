@@ -138,7 +138,9 @@ export default function RegistroClubPage() {
       const port = window.location.port ? `:${window.location.port}` : "";
       const hostname = window.location.hostname;
       let base = "localhost";
-      if (hostname.endsWith("turnos.com")) {
+      if (hostname.endsWith("turnosflow.com")) {
+        base = "turnosflow.com";
+      } else if (hostname.endsWith("turnos.com")) {
         base = "turnos.com";
       }
       setHostSuffix(`.${base}${port}`);
@@ -302,7 +304,9 @@ export default function RegistroClubPage() {
         const port = window.location.port ? `:${window.location.port}` : "";
         const host = window.location.hostname;
         let baseDomain = "localhost";
-        if (host.endsWith("turnos.com")) {
+        if (host.endsWith("turnosflow.com")) {
+          baseDomain = "turnosflow.com";
+        } else if (host.endsWith("turnos.com")) {
           baseDomain = "turnos.com";
         }
         finalSubdomainUrl = `${protocol}//${data.complejo.subdominio}.${baseDomain}${port}`;
