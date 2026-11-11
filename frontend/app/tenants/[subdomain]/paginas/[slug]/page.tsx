@@ -17,7 +17,7 @@ interface PageProps {
 
 async function getPagina(subdomain: string, slug: string) {
   const isServer = typeof window === "undefined";
-  const internalApiUrl = process.env.BACKEND_INTERNAL_URL || "http://saas_webserver/api";
+  const internalApiUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "https://api.turnosflow.com/api";
   const apiUrl = isServer ? internalApiUrl : (process.env.NEXT_PUBLIC_API_URL || "/api");
 
   try {
@@ -49,7 +49,7 @@ async function getPagina(subdomain: string, slug: string) {
 
 async function getClubBranding(subdomain: string) {
   const isServer = typeof window === "undefined";
-  const internalApiUrl = process.env.BACKEND_INTERNAL_URL || "http://saas_webserver/api";
+  const internalApiUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "https://api.turnosflow.com/api";
   const apiUrl = isServer ? internalApiUrl : (process.env.NEXT_PUBLIC_API_URL || "/api");
 
   try {

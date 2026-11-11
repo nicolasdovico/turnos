@@ -45,9 +45,10 @@ export async function fetchClubData(subdomain: string): Promise<ClubBrandingResp
   const urlsToTry = isServer
     ? [
         process.env.BACKEND_INTERNAL_URL,
+        process.env.NEXT_PUBLIC_API_URL,
+        "https://api.turnosflow.com/api",
         "http://saas_webserver/api",
         "http://backend:80/api",
-        process.env.NEXT_PUBLIC_API_URL,
       ].filter(Boolean) as string[]
     : [process.env.NEXT_PUBLIC_API_URL || "/api"];
 
