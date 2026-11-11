@@ -2597,7 +2597,7 @@ export default function ClubAdminPanel() {
             </div>
             <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
               <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Prueba Gratuita</span>
-              <div className="mt-1 text-sm font-bold text-emerald-300">✓ 14 Días Activos</div>
+              <div className="mt-1 text-sm font-bold text-emerald-300">✓ 30 Días Activos</div>
             </div>
           </div>
         </div>

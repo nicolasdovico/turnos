@@ -144,6 +144,8 @@ class ClubOnboardingController extends Controller
                 'plan_id' => $plan->id,
                 'tipo_negocio_id' => $tipoNegocioId,
                 'estado' => 'activo',
+                'suscripcion_estado' => 'trial',
+                'suscripcion_trial_vence_at' => now()->addDays(30),
                 'deporte_principal' => $validated['deporte_principal'] ?? 'padel',
                 'telefono' => $validated['telefono'] ?? null,
                 'ciudad' => $validated['ciudad'] ?? null,

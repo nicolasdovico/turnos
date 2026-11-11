@@ -355,7 +355,7 @@ export default function RegistroClubPage() {
             Bienvenido a {successData.complejo.nombre}
           </h1>
           <p className="mt-3 text-base text-slate-600">
-            Tu {tipoNombre.toLowerCase()} deportivo ha sido configurado y tu prueba gratuita de 14 días ya está activa.
+            Tu {tipoNombre.toLowerCase()} deportivo ha sido configurado y tu prueba gratuita de 30 días ya está activa.
           </p>
 
           <div className="my-8 rounded-2xl bg-slate-50 p-6 border border-slate-200 text-left space-y-2">
@@ -578,7 +578,7 @@ export default function RegistroClubPage() {
             </span>
             <div>
               <h2 className="text-xl font-bold text-slate-900">Selecciona tu Plan</h2>
-              <p className="text-xs text-slate-500">Todos los planes incluyen 14 días de prueba gratis sin compromiso</p>
+              <p className="text-xs text-slate-500">Todos los planes incluyen 30 días de prueba gratis sin compromiso</p>
             </div>
           </div>
 
@@ -810,7 +810,7 @@ export default function RegistroClubPage() {
                   </div>
                   <p className="text-xs mt-1 text-slate-600">
                     {canchasExtras > 0
-                      ? `Se adicionan +$${costoExtraTotal}/mes (+$${precioExtra}/mes c/u) a tu abono luego de los 14 días gratis de prueba.`
+                      ? `Se adicionan +$${costoExtraTotal}/mes (+$${precioExtra}/mes c/u) a tu abono luego de los 30 días gratis de prueba.`
                       : `Todas las canchas que diste de alta están 100% cubiertas por tu cuota base de $${currentPlanObj.precio_mensual}/mes.`
                     }
                   </p>
@@ -860,7 +860,7 @@ export default function RegistroClubPage() {
             {isSubmitting ? `Creando tu ${tipoNombre}...` : `🚀 Crear mi ${tipoNombre} y Comenzar Prueba Gratis`}
           </button>
           <p className="mt-3 text-xs text-slate-500">
-            Al registrarte aceptas los términos del servicio. 14 días gratis sin compromiso.
+            Al registrarte aceptas los términos del servicio. 30 días gratis sin compromiso.
           </p>
         </div>
       </form>

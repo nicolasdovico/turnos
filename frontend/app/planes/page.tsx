@@ -106,7 +106,7 @@ export default function PlanesPage() {
         </h1>
         <p className="mt-5 text-lg text-slate-600">
           Digitaliza tu complejo deportivo con grilla interactiva, pagos automáticos y control total. 
-          Prueba cualquier plan gratis durante 14 días sin necesidad de ingresar tarjeta.
+          Prueba cualquier plan gratis durante 30 días sin necesidad de ingresar tarjeta.
         </p>
       </div>
 
@@ -201,7 +201,7 @@ export default function PlanesPage() {
                       : "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-600/20"
                   }`}
                 >
-                  Comenzar Prueba Gratis (14 Días)
+                  Comenzar Prueba Gratis (30 Días)
                 </Link>
                 <div className={`text-center text-[11px] mt-2.5 ${isOro ? "text-slate-400" : "text-slate-500"}`}>
                   Sin tarjeta requerida • Cancela cuando quieras
@@ -390,7 +390,7 @@ export default function PlanesPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100">
-            <h3 className="font-bold text-slate-900 text-base mb-2">¿Cómo funciona la prueba gratuita de 14 días?</h3>
+            <h3 className="font-bold text-slate-900 text-base mb-2">¿Cómo funciona la prueba gratuita de 30 días?</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
               Puedes registrar tu club y acceder inmediatamente a todas las funcionalidades del plan seleccionado sin necesidad de ingresar datos de tarjeta de crédito.
             </p>

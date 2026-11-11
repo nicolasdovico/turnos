@@ -71,7 +71,7 @@ export default function PricingOverview() {
           Elegí el plan que mejor se adapte al tamaño de tu club
         </h2>
         <p className="mt-3 text-sm sm:text-base text-slate-600">
-          Probá cualquier plan <strong>gratis durante 14 días</strong>. Sin costo de instalación y sin tarjeta de crédito.
+          Probá cualquier plan <strong>gratis durante 30 días</strong>. Sin costo de instalación y sin tarjeta de crédito.
         </p>
       </div>
 
@@ -100,7 +100,7 @@ export default function PricingOverview() {
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
                   p.isPopular ? "bg-slate-800 text-emerald-400" : "bg-slate-100 text-slate-600"
                 }`}>
-                  14 Días Gratis
+                  30 Días Gratis
                 </span>
               </div>
 
@@ -118,7 +118,7 @@ export default function PricingOverview() {
                   </span>
                 </div>
                 <span className={`text-[11px] block mt-1 ${p.isPopular ? "text-emerald-400" : "text-emerald-600 font-semibold"}`}>
-                  ✓ Primeros 14 días sin cargo • Sin tarjeta
+                  ✓ Primeros 30 días sin cargo • Sin tarjeta
                 </span>
               </div>
 

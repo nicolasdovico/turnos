@@ -267,7 +267,7 @@ export default function LoginPage() {
             href="/registro-club"
             className="mt-4 inline-block rounded-xl bg-emerald-500 px-5 py-2 text-xs font-bold text-white shadow hover:bg-emerald-400 transition"
           >
-            Registrar mi Club (Prueba Gratis 14 Días)
+            Registrar mi Club (Prueba Gratis 30 Días)
           </Link>
         </div>
       </div>
