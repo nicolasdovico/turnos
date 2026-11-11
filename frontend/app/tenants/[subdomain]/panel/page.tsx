@@ -2605,27 +2605,13 @@ export default function ClubAdminPanel() {
 
       {/* Tabs Navigation */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
-        <div className="relative group">
-          {/* Botón Scroll Izquierda */}
-          <button
-            type="button"
-            onClick={() => {
-              const el = document.getElementById("panel-tabs-container");
-              if (el) el.scrollBy({ left: -260, behavior: "smooth" });
-            }}
-            className="absolute left-0 top-0 bottom-4 z-10 hidden sm:flex items-center justify-center w-8 bg-gradient-to-r from-slate-950 via-slate-950/90 to-transparent text-slate-400 hover:text-white transition"
-            aria-label="Desplazar menú a la izquierda"
-          >
-            ‹
-          </button>
-
-          <div
-            id="panel-tabs-container"
-            className="flex border-b border-slate-800 space-x-6 sm:space-x-8 text-sm font-bold overflow-x-auto scroll-smooth pb-1 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
-          >
+        <div
+          id="panel-tabs-container"
+          className="flex flex-nowrap md:flex-wrap border-b border-slate-800 gap-x-6 sm:gap-x-8 gap-y-3 text-sm font-bold overflow-x-auto md:overflow-x-visible no-scrollbar scroll-smooth pb-2 md:pb-0"
+        >
           <button
             onClick={() => setActiveTab("canchas")}
-            className={`pb-4 transition border-b-2 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 ${
               activeTab === "canchas"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2635,7 +2621,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("resumen")}
-            className={`pb-4 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "resumen"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2645,7 +2631,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("caja")}
-            className={`pb-4 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "caja"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2656,7 +2642,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("clientes")}
-            className={`pb-4 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "clientes"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2666,7 +2652,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("pos-buffet")}
-            className={`pb-4 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "pos-buffet"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2677,7 +2663,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("modulos")}
-            className={`pb-4 transition border-b-2 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 ${
               activeTab === "modulos"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2687,7 +2673,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("horarios")}
-            className={`pb-4 transition border-b-2 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 ${
               activeTab === "horarios"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2697,7 +2683,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("turnos-fijos")}
-            className={`pb-4 transition border-b-2 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 ${
               activeTab === "turnos-fijos"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2707,7 +2693,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("politicas")}
-            className={`pb-4 transition border-b-2 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 ${
               activeTab === "politicas"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2717,7 +2703,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("billeteras")}
-            className={`pb-4 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "billeteras"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2727,7 +2713,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("config")}
-            className={`pb-4 transition border-b-2 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 ${
               activeTab === "config"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2737,7 +2723,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("sitio-web")}
-            className={`pb-4 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "sitio-web"
                 ? "border-emerald-500 text-emerald-400 font-bold"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2749,7 +2735,7 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("facturacion")}
-            className={`pb-4 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "facturacion"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -2757,20 +2743,6 @@ export default function ClubAdminPanel() {
             data-testid="tab-facturacion"
           >
             💳 Facturación & Abono
-          </button>
-          </div>
-
-          {/* Botón Scroll Derecha */}
-          <button
-            type="button"
-            onClick={() => {
-              const el = document.getElementById("panel-tabs-container");
-              if (el) el.scrollBy({ left: 260, behavior: "smooth" });
-            }}
-            className="absolute right-0 top-0 bottom-4 z-10 hidden sm:flex items-center justify-center w-8 bg-gradient-to-l from-slate-950 via-slate-950/90 to-transparent text-slate-400 hover:text-white transition"
-            aria-label="Desplazar menú a la derecha"
-          >
-            ›
           </button>
         </div>
 
