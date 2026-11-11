@@ -5,13 +5,14 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Copiar archivos del frontend desde la raíz del repo
-WORKDIR /app
+# Copiar paquetes
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
+RUN npm install
 
+# Copiar el código del frontend
 COPY frontend/ ./
 
+# Compilar Next.js en producción
 RUN npm run build
 
 # Runner stage
