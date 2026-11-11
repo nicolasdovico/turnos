@@ -2605,7 +2605,24 @@ export default function ClubAdminPanel() {
 
       {/* Tabs Navigation */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
-        <div className="flex border-b border-slate-800 space-x-6 sm:space-x-8 text-sm font-bold overflow-x-auto no-scrollbar scroll-smooth">
+        <div className="relative group">
+          {/* Botón Scroll Izquierda */}
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("panel-tabs-container");
+              if (el) el.scrollBy({ left: -260, behavior: "smooth" });
+            }}
+            className="absolute left-0 top-0 bottom-4 z-10 hidden sm:flex items-center justify-center w-8 bg-gradient-to-r from-slate-950 via-slate-950/90 to-transparent text-slate-400 hover:text-white transition"
+            aria-label="Desplazar menú a la izquierda"
+          >
+            ‹
+          </button>
+
+          <div
+            id="panel-tabs-container"
+            className="flex border-b border-slate-800 space-x-6 sm:space-x-8 text-sm font-bold overflow-x-auto scroll-smooth pb-1 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+          >
           <button
             onClick={() => setActiveTab("canchas")}
             className={`pb-4 transition border-b-2 whitespace-nowrap shrink-0 ${
@@ -2740,6 +2757,20 @@ export default function ClubAdminPanel() {
             data-testid="tab-facturacion"
           >
             💳 Facturación & Abono
+          </button>
+          </div>
+
+          {/* Botón Scroll Derecha */}
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("panel-tabs-container");
+              if (el) el.scrollBy({ left: 260, behavior: "smooth" });
+            }}
+            className="absolute right-0 top-0 bottom-4 z-10 hidden sm:flex items-center justify-center w-8 bg-gradient-to-l from-slate-950 via-slate-950/90 to-transparent text-slate-400 hover:text-white transition"
+            aria-label="Desplazar menú a la derecha"
+          >
+            ›
           </button>
         </div>
 
