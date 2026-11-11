@@ -45,6 +45,23 @@ class ComplejoResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->default('activo'),
+                Forms\Components\Select::make('suscripcion_estado')
+                    ->label('Estado Suscripción')
+                    ->options([
+                        'trial' => 'Prueba Gratuita (Trial)',
+                        'activa' => 'Suscripción Activa',
+                        'gracia' => 'Período de Gracia',
+                        'vencida' => 'Vencida / Impaga',
+                        'suspendida' => 'Suspendida',
+                    ])
+                    ->default('trial')
+                    ->required(),
+                Forms\Components\DateTimePicker::make('suscripcion_trial_vence_at')
+                    ->label('Vencimiento Prueba Gratuita (Trial)'),
+                Forms\Components\DateTimePicker::make('suscripcion_proximo_vencimiento')
+                    ->label('Próximo Vencimiento Pago'),
+                Forms\Components\DateTimePicker::make('suscripcion_gracia_vence_at')
+                    ->label('Límite Período de Gracia'),
             ]);
     }
 
@@ -68,8 +85,45 @@ class ComplejoResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('plan.nombre')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('suscripcion_estado')
+                    ->label('Suscripción')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'activa' => 'success',
+                        'trial' => 'info',
+                        'gracia' => 'warning',
+                        'vencida', 'suspendida' => 'danger',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'trial' => 'Prueba',
+                        'activa' => 'Activa',
+                        'gracia' => 'En Gracia',
+                        'vencida' => 'Vencida',
+                        'suspendida' => 'Suspendida',
+                        default => $state,
+                    })
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('suscripcion_trial_vence_at')
+                    ->label('Vence Prueba')
+                    ->dateTime('d/m/Y H:i')
+                    ->description(function (Complejo $record): ?string {
+                        if ($record->suscripcion_estado === 'trial' && $record->suscripcion_trial_vence_at) {
+                            $dias = (int) round(now()->diffInDays($record->suscripcion_trial_vence_at, false));
+                            if ($dias > 0) {
+                                return "Quedan {$dias} días";
+                            } elseif ($dias === 0) {
+                                return "Vence hoy";
+                            } else {
+                                return "Venció hace " . abs($dias) . " días";
+                            }
+                        }
+                        return null;
+                    })
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('estado')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
