@@ -5,12 +5,13 @@ export const config = {
     /*
      * Match all request paths except for:
      * - api (API routes)
+     * - storage (uploaded user/club assets)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico, sitemap.xml, robots.txt
      * - static files with extensions (.png, .jpg, .svg, .css, .js, etc.)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|[\\w-]+\\.\\w+).*)",
+    "/((?!api|storage|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|[\\w-]+\\.\\w+).*)",
   ],
 };
 
