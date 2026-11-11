@@ -1,0 +1,3 @@
+storage/framework/testing
+bootstrap/cache/*.php
+vendor

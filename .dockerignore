@@ -14,3 +14,6 @@ caddy
 backend
 mobile
 docs
+storage/framework/testing
+bootstrap/cache/*.php
+vendor

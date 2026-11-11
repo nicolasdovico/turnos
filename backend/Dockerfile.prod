@@ -26,6 +26,9 @@ RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoload
 # Copiar el resto del código
 COPY . .
 
+# Limpiar cache residual de desarrollo para que el autodiscover de produccion funcione limpio
+RUN rm -f bootstrap/cache/*.php
+
 # Ejecutar scripts de composer post-autoload
 RUN composer dump-autoload --optimize --no-dev
 
