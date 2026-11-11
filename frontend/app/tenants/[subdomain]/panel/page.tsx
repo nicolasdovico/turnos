@@ -2607,7 +2607,7 @@ export default function ClubAdminPanel() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
         <div
           id="panel-tabs-container"
-          className="flex flex-nowrap md:flex-wrap border-b border-slate-800 gap-x-6 sm:gap-x-8 gap-y-3 text-sm font-bold overflow-x-auto md:overflow-x-visible no-scrollbar scroll-smooth pb-2 md:pb-0"
+          className="flex flex-nowrap md:flex-wrap md:justify-center border-b border-slate-800 gap-x-6 sm:gap-x-8 gap-y-3 text-sm font-bold overflow-x-auto md:overflow-x-visible no-scrollbar scroll-smooth pb-2 md:pb-0"
         >
           <button
             onClick={() => setActiveTab("canchas")}
