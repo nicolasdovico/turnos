@@ -9,7 +9,9 @@ chmod -R 775 storage bootstrap/cache
 
 # Optimización y migraciones
 if [ "$APP_ENV" = "production" ] || [ "$APP_ENV" = "prod" ]; then
-    echo "Optimizando Laravel para producción..."
+    echo "Optimizando Laravel y Filament para producción..."
+    php artisan filament:optimize || true
+    php artisan filament:upgrade || true
     php artisan config:cache || true
     php artisan route:cache || true
     php artisan view:cache || true
