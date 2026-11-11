@@ -28,7 +28,9 @@ export default function PortalPage() {
         setDemoClubUrl("/tenants/padelpro");
       } else {
         let base = "localhost";
-        if (hostname && hostname.endsWith("turnos.com")) {
+        if (hostname && (hostname.endsWith("turnosflow.com") || hostname === "turnosflow.com")) {
+          base = "turnosflow.com";
+        } else if (hostname && (hostname.endsWith("turnos.com") || hostname === "turnos.com")) {
           base = "turnos.com";
         }
         setDemoClubUrl(`${protocol}//padelpro.${base}${port}`);

@@ -89,7 +89,7 @@ export default function HeroSection({ demoClubUrl }: { demoClubUrl: string }) {
             <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
             <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
             <span className="ml-2 font-mono text-[11px] text-slate-500 hidden sm:inline">
-              padelpro.localhost:8080/panel
+              padelpro.turnosflow.com/panel
             </span>
           </div>
           <div className="flex items-center gap-3">
