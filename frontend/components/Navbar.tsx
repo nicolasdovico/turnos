@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { getTenantAdminUrl } from "@/lib/navigationUrls";
+import { getTenantAdminUrl, getTenantDisplayDomain } from "@/lib/navigationUrls";
 import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
@@ -309,7 +309,7 @@ export default function Navbar() {
                                 {club.nombre}
                               </div>
                               <div className="text-[10px] text-slate-500 font-mono">
-                                {club.subdominio}.localhost:8080
+                                {getTenantDisplayDomain(club.subdominio)}
                               </div>
                             </div>
                           </div>

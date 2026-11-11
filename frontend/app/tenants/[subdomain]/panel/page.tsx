@@ -13,7 +13,7 @@ import GestionPaginasCMS from "@/components/GestionPaginasCMS";
 import GestionPOSBuffet from "@/components/GestionPOSBuffet";
 import GestionCajaArqueo from "@/components/GestionCajaArqueo";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
-import { getTenantPublicUrl as resolvePublicUrl, getPortalUrl } from "@/lib/navigationUrls";
+import { getTenantPublicUrl as resolvePublicUrl, getPortalUrl, getTenantDisplayDomain } from "@/lib/navigationUrls";
 import { formatPrecio, formatMonto } from "@/lib/formatters";
 
 interface ComplejoData {
@@ -2554,7 +2554,7 @@ export default function ClubAdminPanel() {
                       {complejo?.tipo_negocio?.nombre || "Club"}
                     </span>
                     <span className="rounded-full bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-0.5 text-xs font-mono hidden sm:inline">
-                      {subdomain}.localhost:8080
+                      {getTenantDisplayDomain(subdomain)}
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
@@ -6259,7 +6259,7 @@ export default function ClubAdminPanel() {
                 <div>
                   <span className="text-xs font-bold uppercase text-slate-500">Subdominio Dedicado (URL Oficial)</span>
                   <div className="text-base font-black text-emerald-400 mt-1 font-mono flex items-center gap-1.5">
-                    <span>{complejo?.subdominio}.localhost:8080</span>
+                    <span>{getTenantDisplayDomain(complejo?.subdominio || subdomain)}</span>
                     <span className="text-xs text-slate-600">🔒</span>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-1">

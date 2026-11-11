@@ -76,6 +76,27 @@ export function getTenantAdminUrl(subdomain: string, token?: string | null): str
 }
 
 /**
+ * Obtiene el hostname/dominio base para mostrar de un subdominio (ej: nico-padel.turnosflow.com o nico-padel.localhost:8080).
+ */
+export function getTenantDisplayDomain(subdomain: string): string {
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    const port = window.location.port ? `:${window.location.port}` : "";
+
+    let baseHost = "localhost";
+    if (hostname.endsWith("turnosflow.com")) {
+      baseHost = "turnosflow.com";
+    } else if (hostname.endsWith("turnos.com")) {
+      baseHost = "turnos.com";
+    }
+
+    return `${subdomain}.${baseHost}${port}`;
+  }
+
+  return `${subdomain}.localhost:8080`;
+}
+
+/**
  * Obtiene la URL hacia el portal o página del dominio raíz central.
  * Ejemplo de uso:
  * - getPortalUrl("/planes") -> en IP: "/planes", en subdominio PC: "http://localhost:8080/planes"

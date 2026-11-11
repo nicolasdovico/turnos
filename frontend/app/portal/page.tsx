@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { getTenantAdminUrl, getTenantPublicUrl } from "@/lib/navigationUrls";
+import { getTenantAdminUrl, getTenantPublicUrl, getTenantDisplayDomain } from "@/lib/navigationUrls";
 import HeroSection from "@/components/landing/HeroSection";
 import BeforeAfterSection from "@/components/landing/BeforeAfterSection";
 import FeaturesShowcase from "@/components/landing/FeaturesShowcase";
@@ -115,7 +115,7 @@ export default function PortalPage() {
 
                     <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between gap-2">
                       <span className="text-[11px] text-slate-400 font-mono">
-                        {club.subdominio}.localhost:8080
+                        {getTenantDisplayDomain(club.subdominio)}
                       </span>
                       <a
                         href={publicUrl}
@@ -182,7 +182,7 @@ export default function PortalPage() {
                       </div>
                       <h3 className="text-base font-bold text-white">{club.nombre}</h3>
                       <div className="text-xs text-slate-400 font-mono mt-1">
-                        {club.subdominio}.localhost:8080
+                        {getTenantDisplayDomain(club.subdominio)}
                       </div>
                     </div>
 
