@@ -395,7 +395,7 @@ export default function RegistroClubPage() {
       {/* Page Header */}
       <div className="text-center mb-12">
         <span className="inline-block rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-bold text-emerald-800 mb-3">
-          Onboarding SaaS Multitenant
+          Alta de Club
         </span>
         <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
           Registra tu {tipoNombre} Deportivo

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceder con Google (Simulador Dev) - Turnos SaaS</title>
+    <title>Acceder con Google (Simulador Dev) - TurnosFlow</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
@@ -23,7 +23,7 @@
                 </svg>
             </div>
             <h1 class="text-xl font-bold text-slate-800">Acceder con Google</h1>
-            <p class="text-xs text-slate-500 mt-1">para continuar a <strong class="text-slate-700">Turnos SaaS</strong></p>
+            <p class="text-xs text-slate-500 mt-1">para continuar a <strong class="text-slate-700">TurnosFlow</strong></p>
             
             <div class="mt-3 inline-block px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-[11px] font-medium text-amber-800">
                 🛠️ Modo Simulación de Desarrollo Local

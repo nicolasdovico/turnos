@@ -512,7 +512,7 @@ export default function FacturacionClubPanel({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-black text-white capitalize">
-                Suscripción SaaS: {sub?.estado === "trial" ? "Prueba Gratuita" : sub?.estado === "gracia" ? "En Período de Gracia" : sub?.estado === "activa" ? "Activa" : sub?.estado}
+                Suscripción: {sub?.estado === "trial" ? "Prueba Gratuita" : sub?.estado === "gracia" ? "En Período de Gracia" : sub?.estado === "activa" ? "Activa" : sub?.estado}
               </h2>
               <span
                 className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
@@ -816,7 +816,7 @@ export default function FacturacionClubPanel({
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-emerald-400" />
-                  <span>Abonar Servicio SaaS</span>
+                  <span>Abonar Servicio</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Factura: <strong className="text-slate-200">{facturaSeleccionada?.numero_factura || "Mes en curso"}</strong> • Período {facturaSeleccionada?.periodo || resumen?.periodo}
@@ -978,11 +978,11 @@ export default function FacturacionClubPanel({
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Alias:</span>
-                    <span className="text-white select-all">TURNOS.SAAS.PAGOS</span>
+                    <span className="text-white select-all">TURNOSFLOW.PAGOS</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Titular:</span>
-                    <span className="text-white">Turnos S.A.S.</span>
+                    <span className="text-white">TurnosFlow</span>
                   </div>
                   <div className="flex justify-between text-slate-400">
                     <span>Monto ARS a transferir:</span>

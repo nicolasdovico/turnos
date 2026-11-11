@@ -178,7 +178,7 @@ describe("Facturación Club B2B & Pasarelas de Pago", () => {
 
     // Cambiar a Transferencia Bancaria
     fireEvent.click(screen.getByTestId("btn-metodo-transferencia"));
-    expect(screen.getByText("TURNOS.SAAS.PAGOS")).toBeDefined();
+    expect(screen.getByText("TURNOSFLOW.PAGOS")).toBeDefined();
     expect(screen.getByText("0000003100010000000001")).toBeDefined();
     expect(screen.getByText(/Informar Transferencia Realizada/i)).toBeDefined();
   });

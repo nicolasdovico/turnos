@@ -371,7 +371,7 @@ export default function RecuperarPasswordPage() {
 
         {/* Security advice card */}
         <div className="mt-6 text-center text-xs text-slate-400">
-          <span>🔒 Acceso seguro con encriptación de extremo a extremo • Turnos SaaS</span>
+          <span>🔒 Acceso seguro con encriptación de extremo a extremo • TurnosFlow</span>
         </div>
       </div>
     </div>

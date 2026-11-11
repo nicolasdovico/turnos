@@ -254,7 +254,7 @@ export default function ClubFooter({
               href={getPortalUrl("/")}
               className="text-emerald-400 hover:text-emerald-300 font-bold transition"
             >
-              TuTurno SaaS
+              TurnosFlow
             </a>
           </div>
         </div>
