@@ -23,6 +23,9 @@ if [ -n "$DB_HOST" ]; then
     php artisan migrate --force || echo "Aviso: Error temporal al ejecutar migraciones"
 fi
 
+# Asegurar enlace simbólico de storage
+php artisan storage:link --force || true
+
 # Iniciar PHP-FPM en segundo plano
 echo "Iniciando PHP-FPM..."
 php-fpm -D
