@@ -5,25 +5,15 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Soporta tanto si Railway toma como contexto la raíz del repo o la subcarpeta frontend
-COPY frontend/package*.json ./package.json ./temp/
-RUN if [ -f ./temp/package.json ]; then \
-      cp ./temp/package*.json ./ 2>/dev/null || true; \
-    fi \
-    && rm -rf ./temp \
-    && if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
+# Copia package.json y package-lock.json de frontend
+COPY frontend/package.json ./package.json
+COPY frontend/package-lock.json* ./
 
-# Copiar el código fuente del frontend
-COPY frontend/. ./temp_src/
-RUN if [ -d ./temp_src/app ]; then \
-      cp -r ./temp_src/* ./ && cp -r ./temp_src/.[!.]* ./ 2>/dev/null || true; \
-    fi \
-    && rm -rf ./temp_src
+RUN if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
 
-# Si el contexto ya era la subcarpeta directamente
-COPY . .
+# Copia todo el directorio frontend
+COPY frontend/ ./
 
-# Compilar Next.js en producción
 RUN npm run build
 
 # Runner stage
