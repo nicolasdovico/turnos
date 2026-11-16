@@ -3978,53 +3978,56 @@ export default function ClubAdminPanel() {
               </a>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
               {getModulosProduccion().map((mod) => {
                 const isActivo = plan?.modulos?.some((m) => m.slug === mod.slug) ?? false;
 
                 return (
                   <div
                     key={mod.slug}
-                    className={`rounded-3xl p-6 flex flex-col justify-between transition border ${
+                    className={`rounded-2xl p-4 flex flex-col justify-between transition border ${
                       isActivo
-                        ? "bg-slate-900 border-slate-800 hover:border-emerald-500/50"
+                        ? "bg-slate-900/90 border-slate-800 hover:border-emerald-500/40 hover:bg-slate-900"
                         : "bg-slate-950/40 border-slate-900/80 opacity-70"
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <span className="text-3xl">{mod.icon}</span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xl shrink-0">{mod.icon}</span>
+                          <h3 className="font-bold text-sm text-white truncate">{mod.nombre}</h3>
+                        </div>
                         {isActivo ? (
-                          <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold px-2.5 py-0.5">
+                          <span className="shrink-0 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold px-2 py-0.5">
                             ✓ Activo
                           </span>
                         ) : (
-                          <span className="rounded-full bg-slate-800/80 text-slate-400 border border-slate-700 text-[10px] font-bold px-2.5 py-0.5">
-                            🔒 Requiere Plan {mod.planMinimo}
+                          <span className="shrink-0 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700 text-[10px] font-bold px-2 py-0.5">
+                            🔒 Plan {mod.planMinimo.toUpperCase()}
                           </span>
                         )}
                       </div>
-                      <h3 className="font-bold text-lg text-white">{mod.nombre}</h3>
-                      <p className="mt-2 text-xs text-slate-400 leading-relaxed">
+                      <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
                         {mod.descripcionCorta || (mod as any).descripcion}
                       </p>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-slate-800/60">
+                    <div className="mt-3 pt-2.5 border-t border-slate-800/60">
                       {isActivo ? (
                         mod.tabId ? (
                           <button
                             type="button"
                             onClick={() => setActiveTab(mod.tabId as any)}
-                            className="block w-full text-center rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition cursor-pointer"
+                            className="w-full text-center rounded-xl bg-slate-800 hover:bg-emerald-600 hover:text-white py-1.5 px-3 text-xs font-bold text-slate-200 transition cursor-pointer flex items-center justify-center gap-1.5"
                           >
-                            Abrir {mod.nombre} →
+                            <span>Gestionar</span>
+                            <span className="text-[10px]">→</span>
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => setActiveTab("canchas")}
-                            className="block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
+                            className="w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-1.5 px-3 text-xs font-bold text-emerald-400 border border-slate-700 transition"
                           >
                             Ver Módulo →
                           </button>
@@ -4033,9 +4036,9 @@ export default function ClubAdminPanel() {
                         <button
                           type="button"
                           onClick={() => setActiveTab("facturacion")}
-                          className="block w-full text-center rounded-xl bg-slate-900/60 hover:bg-slate-800/80 py-2.5 text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 transition"
+                          className="w-full text-center rounded-xl bg-slate-900/60 hover:bg-slate-800/80 py-1.5 px-3 text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 transition"
                         >
-                          Actualizar a Plan {mod.planMinimo.toUpperCase()} ↗
+                          Mejorar a {mod.planMinimo.toUpperCase()} ↗
                         </button>
                       )}
                     </div>
