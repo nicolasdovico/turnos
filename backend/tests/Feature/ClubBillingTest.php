@@ -459,4 +459,79 @@ class ClubBillingTest extends TestCase
         $cercanosReactivados = $geoService->buscarComplejosCercanos(-34.6037, -58.3816, 10.0);
         $this->assertTrue($cercanosReactivados->contains('id', $complejo->id));
     }
+
+    public function test_owner_can_change_plan_in_trial_mode_and_modules_unlock(): void
+    {
+        [$owner, $complejo, $planBronce] = $this->crearComplejoConPlan('bronce');
+
+        $planPlata = Plan::create([
+            'nombre' => 'Plata',
+            'slug' => 'plata',
+            'precio_mensual' => 59.00,
+            'canchas_incluidas' => 4,
+            'precio_cancha_adicional' => 10.00,
+            'estado' => 'activo',
+        ]);
+        $modTurnosFijos = Modulo::firstOrCreate(['slug' => 'turnos_fijos'], ['nombre' => 'Turnos Fijos']);
+        $modPos = Modulo::firstOrCreate(['slug' => 'pos_buffet'], ['nombre' => 'POS Buffet']);
+        $planPlata->modulos()->sync([$modTurnosFijos->id, $modPos->id]);
+
+        $complejo->update([
+            'suscripcion_estado' => 'trial',
+            'suscripcion_trial_vence_at' => Carbon::now()->addDays(25),
+        ]);
+
+        $this->assertFalse($complejo->hasModule('turnos_fijos'));
+
+        // 1. Dueño realiza el upgrade a Plata
+        $response = $this->actingAs($owner)->postJson("/api/clubs/{$complejo->subdominio}/plan/cambiar", [
+            'plan_slug' => 'plata',
+            'confirmado' => true,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'plan' => [
+                        'slug' => 'plata',
+                        'nombre' => 'Plata',
+                    ],
+                ],
+            ]);
+
+        $complejoActualizado = $complejo->fresh();
+        $this->assertEquals($planPlata->id, $complejoActualizado->plan_id);
+        $this->assertTrue($complejoActualizado->hasModule('turnos_fijos'));
+        $this->assertTrue($complejoActualizado->hasModule('pos_buffet'));
+        $this->assertEquals('trial', $complejoActualizado->suscripcion_estado);
+    }
+
+    public function test_non_owner_cannot_change_plan(): void
+    {
+        [$owner, $complejo] = $this->crearComplejoConPlan('bronce');
+        $empleado = User::factory()->create();
+
+        $response = $this->actingAs($empleado)->postJson("/api/clubs/{$complejo->subdominio}/plan/cambiar", [
+            'plan_slug' => 'plata',
+            'confirmado' => true,
+        ]);
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+            ]);
+    }
+
+    public function test_change_plan_requires_explicit_confirmation(): void
+    {
+        [$owner, $complejo] = $this->crearComplejoConPlan('bronce');
+
+        $response = $this->actingAs($owner)->postJson("/api/clubs/{$complejo->subdominio}/plan/cambiar", [
+            'plan_slug' => 'plata',
+            'confirmado' => false,
+        ]);
+
+        $response->assertStatus(422);
+    }
 }

@@ -3390,3 +3390,42 @@ Tarea: Corrección Contable en Caja Diaria & Purga de Turnos Fijos Anticipados
   * Backend: 318/318 tests en verde en PHPUnit (1826 aserciones).
   * Frontend: 177/177 tests en verde en Vitest.
 ==============================================================================================================================
+
+
+Fecha: 2026-11-16
+Tarea: Sistema de Cambio de Plan (Upgrade / Downgrade) con Confirmación Previa y Restricción a Dueños
+- Requerimiento del Usuario:
+  * Permitir que el administrador/dueño del club pueda cambiar su plan de suscripción (ej: de Bronce a Plata u Oro) directamente desde la sección de Facturación del panel.
+  * Durante los 30 días de prueba gratuita, el club puede cambiar de plan libremente para probar todos los módulos sin costo por adelantado.
+  * En caso de downgrade (ej: de Plata/Oro a Bronce), los turnos fijos previamente otorgados se mantienen vigentes (no se borran), pero queda bloqueada la emisión o renovación de nuevos turnos fijos.
+  * Requerir confirmación explícita mediante modal antes de ejecutar el cambio para evitar disputas.
+  * Restringir la acción estrictamente al dueño del club (`complejo.user_id === user.id`) o Superadmin de la plataforma, impidiendo que empleados de mostrador modifiquen la suscripción.
+- Solución Implementada:
+  1. Backend (Laravel 11):
+     * En `ClubFacturacionController.php`:
+       - Se agregó el método `cambiarPlan(Request $request, string $subdomain)` validando que el usuario autenticado sea el dueño legítimo (`$complejo->user_id === $user->id`) o superadmin. Si es empleado de mostrador u otro usuario, retorna 403 `FORBIDDEN_NOT_OWNER`.
+       - Valida `plan_slug` (`required|in:bronce,plata,oro`) y `confirmado` (`required|boolean|accepted`).
+       - Actualiza `$complejo->plan_id` de forma inmediata. Si está en período de prueba (`suscripcion_estado === 'trial'`), conserva la vigencia y estado de prueba.
+       - Retorna el nuevo plan y el resumen de facturación actualizado.
+     * En `backend/routes/api.php`:
+       - Se registró la ruta `POST /api/clubs/{subdomain}/plan/cambiar`.
+     * En `backend/tests/Feature/ClubBillingTest.php`:
+       - Se añadieron 3 tests de integración:
+         * `test_owner_can_change_plan_in_trial_mode_and_modules_unlock`
+         * `test_non_owner_cannot_change_plan`
+         * `test_change_plan_requires_explicit_confirmation`
+  2. Frontend Web (Next.js 14):
+     * En `frontend/components/FacturacionClubPanel.tsx`:
+       - Se implementó la sección `"Planes de Suscripción & Módulos Disponibles"` con tarjetas comparativas para Bronce ($29), Plata ($59) y Oro ($99).
+       - Destaca visualmente el plan actual (`✓ Plan Actual` con botón deshabilitado `Activo`) y ofrece botones `"Mejorar a [Plan]"` o `"Cambiar a [Plan]"`.
+       - Se implementó el modal interactivo de confirmación previa (`modal-cambiar-plan`):
+         * Detalla el costo mensual del nuevo plan y módulos incluidos.
+         * Muestra advertencia clara en caso de downgrade sobre la preservación de turnos fijos existentes y bloqueo de nuevas emisiones.
+         * Incorpora casilla de verificación obligatoria con confirmación explícita para habilitar el botón de acción.
+       - Tras la confirmación exitosa, invoca `onRefreshSummary()` lo que recarga los datos del panel en `frontend/app/tenants/[subdomain]/panel/page.tsx`, actualizando los permisos y removiendo instantáneamente los candados sin recargar la página.
+     * En `frontend/tests/FacturacionClub.test.tsx`:
+       - Se añadió el test `"permite solicitar el cambio de plan y muestra modal con advertencia y confirmación obligatoria"`.
+- Verificación y Tests:
+  * Backend: 321/321 tests en verde en PHPUnit (1836 aserciones al 100%).
+  * Frontend: 178/178 tests en verde en Vitest (20 archivos de prueba al 100%).
+==============================================================================================================================

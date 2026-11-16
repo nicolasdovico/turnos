@@ -258,4 +258,78 @@ class ClubFacturacionController extends Controller
             'message' => 'Comprobante verificado y pago acreditado exitosamente. Tu abono ha sido renovado y las restricciones han sido levantadas.',
         ]);
     }
+
+    /**
+     * Cambiar el plan de suscripción del club (Upgrade o Downgrade).
+     * Solo permitido para el dueño/titular del club o Superadmin.
+     */
+    public function cambiarPlan(Request $request, string $subdomain): JsonResponse
+    {
+        $cleanSubdomain = strtolower(trim($subdomain));
+        $complejo = Complejo::withoutGlobalScopes()
+            ->where('subdominio', $cleanSubdomain)
+            ->first();
+
+        if (!$complejo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Complejo no encontrado.',
+            ], 404);
+        }
+
+        $user = $request->user('sanctum') ?: ($request->bearerToken() ? \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable : null);
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autenticado.',
+            ], 401);
+        }
+
+        $isOwner = ($complejo->user_id && $complejo->user_id === $user->id) || ($user->role ?? '') === 'admin' || !empty($user->is_admin);
+
+        if (!$isOwner) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Solo el titular o dueño del club puede modificar el plan de suscripción.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'plan_slug' => ['required', 'string', 'in:bronce,plata,oro'],
+            'confirmado' => ['required', 'boolean', 'accepted'],
+        ]);
+
+        $nuevoPlan = \App\Models\Plan::where('slug', $validated['plan_slug'])->first();
+
+        if (!$nuevoPlan) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El plan seleccionado no existe.',
+            ], 404);
+        }
+
+        $complejo->update([
+            'plan_id' => $nuevoPlan->id,
+        ]);
+
+        $this->billingService->evaluarEstadoSuscripcion($complejo);
+        $resumen = $this->billingService->obtenerResumenFacturacion($complejo);
+
+        return response()->json([
+            'success' => true,
+            'message' => "¡Plan cambiado exitosamente a {$nuevoPlan->nombre}!",
+            'data' => [
+                'plan' => [
+                    'id' => $nuevoPlan->id,
+                    'nombre' => $nuevoPlan->nombre,
+                    'slug' => $nuevoPlan->slug,
+                    'precio_mensual' => (float) $nuevoPlan->precio_mensual,
+                    'canchas_incluidas' => (int) $nuevoPlan->canchas_incluidas,
+                    'modulos' => $nuevoPlan->modulos,
+                ],
+                'resumen' => $resumen,
+            ],
+        ]);
+    }
 }

@@ -319,4 +319,98 @@ describe("Facturación Club B2B & Pasarelas de Pago", () => {
     });
     expect(screen.queryByText("Gracia 7 Días")).toBeNull();
   });
+
+  it("permite solicitar el cambio de plan y muestra modal con advertencia y confirmación obligatoria", async () => {
+    let currentPlanSlug = "bronce";
+    const onRefreshMock = vi.fn();
+
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any, opts: any) => {
+      const urlStr = String(url);
+      if (urlStr.includes("/facturacion/resumen")) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              ...mockResumen,
+              plan: {
+                ...mockResumen.plan,
+                slug: currentPlanSlug,
+                nombre: currentPlanSlug === "bronce" ? "Bronce" : "Plata",
+              },
+            },
+          }),
+        } as any;
+      }
+      if (urlStr.includes("/facturacion/facturas")) {
+        return {
+          ok: true,
+          json: async () => ({ data: [] }),
+        } as any;
+      }
+      if (urlStr.includes("/plan/cambiar")) {
+        const body = JSON.parse(opts?.body || "{}");
+        if (!body.confirmado) {
+          return {
+            ok: false,
+            status: 422,
+            json: async () => ({ message: "Debes confirmar el cambio de plan." }),
+          } as any;
+        }
+        currentPlanSlug = body.plan_slug;
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            message: "¡Plan actualizado exitosamente al Plan PLATA!",
+            data: {
+              nuevo_plan: { slug: "plata", nombre: "Plata" },
+            },
+          }),
+        } as any;
+      }
+      return { ok: true, json: async () => ({}) } as any;
+    });
+
+    render(
+      <FacturacionClubPanel
+        subdomain="nico-futbol-bronce"
+        token="admin-token"
+        onRefreshSummary={onRefreshMock}
+      />
+    );
+
+    // Esperar a que renderice la sección de planes
+    await waitFor(() => {
+      expect(screen.getByTestId("seccion-cambio-planes")).toBeDefined();
+    });
+
+    // En plan Bronce, el botón a Plata dice "Mejorar a Plata"
+    const btnMejorarPlata = screen.getByText("Mejorar a Plata");
+    expect(btnMejorarPlata).toBeDefined();
+
+    // Clic en Mejorar a Plata -> Abre modal
+    fireEvent.click(btnMejorarPlata);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("modal-cambiar-plan")).toBeDefined();
+      expect(screen.getByText("Confirmar Cambio de Plan")).toBeDefined();
+    });
+
+    // El botón Confirmar Cambio debe estar deshabilitado hasta que se tilde la casilla de confirmación
+    const btnConfirmar = screen.getByTestId("btn-confirmar-cambio-plan");
+    expect((btnConfirmar as HTMLButtonElement).disabled).toBe(true);
+
+    // Tildar la casilla de confirmación explícita
+    const checkbox = screen.getByTestId("checkbox-confirmar-cambio-plan");
+    fireEvent.click(checkbox);
+    expect((btnConfirmar as HTMLButtonElement).disabled).toBe(false);
+
+    // Confirmar cambio de plan
+    fireEvent.click(btnConfirmar);
+
+    // Esperar a que se procese y se cierre el modal, llamando a onRefreshSummary
+    await waitFor(() => {
+      expect(onRefreshMock).toHaveBeenCalled();
+    });
+  });
 });

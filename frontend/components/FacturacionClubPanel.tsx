@@ -19,6 +19,8 @@ import {
   UploadCloud,
   Check,
   Info,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 
 export const formatFechaDDMMAAAA = (fechaStr?: string | null): string => {
@@ -163,6 +165,12 @@ export default function FacturacionClubPanel({
   // Formulario Transferencia
   const [comprobanteUrl, setComprobanteUrl] = useState("");
   const [comprobanteNotas, setComprobanteNotas] = useState("");
+
+  // Modal y Estado de Cambio de Plan
+  const [modalCambiarPlanOpen, setModalCambiarPlanOpen] = useState(false);
+  const [planDestino, setPlanDestino] = useState<"bronce" | "plata" | "oro">("plata");
+  const [confirmadoCambioPlan, setConfirmadoCambioPlan] = useState(false);
+  const [isChangingPlan, setIsChangingPlan] = useState(false);
 
   const getAuthHeaders = useCallback(() => {
     let activeToken = token;
@@ -403,6 +411,65 @@ export default function FacturacionClubPanel({
       setActionAlert({ type: "error", message: err.message || "Error al enviar comprobante." });
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  const handleOpenCambiarPlan = (targetSlug: "bronce" | "plata" | "oro") => {
+    setPlanDestino(targetSlug);
+    setConfirmadoCambioPlan(false);
+    setActionAlert(null);
+    setModalCambiarPlanOpen(true);
+  };
+
+  const handleEjecutarCambioPlan = async () => {
+    if (!confirmadoCambioPlan) {
+      setActionAlert({
+        type: "error",
+        message: "Debes marcar la casilla confirmando que estás de acuerdo con el cambio de plan.",
+      });
+      return;
+    }
+
+    setIsChangingPlan(true);
+    setActionAlert(null);
+
+    try {
+      const res = await fetch(`${effectiveApiUrl}/clubs/${subdomain}/plan/cambiar`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          plan_slug: planDestino,
+          confirmado: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Error al procesar el cambio de plan.");
+      }
+
+      const successMsg = data.message || `¡Plan actualizado exitosamente al Plan ${planDestino.toUpperCase()}!`;
+      setPanelNotification({
+        type: "success",
+        message: successMsg,
+      });
+
+      setModalCambiarPlanOpen(false);
+      setConfirmadoCambioPlan(false);
+
+      // Refrescar facturación y panel general
+      fetchData(true);
+      if (onRefreshSummary) {
+        onRefreshSummary();
+      }
+    } catch (err: any) {
+      setActionAlert({
+        type: "error",
+        message: err.message || "No se pudo actualizar el plan.",
+      });
+    } finally {
+      setIsChangingPlan(false);
     }
   };
 
@@ -720,6 +787,216 @@ export default function FacturacionClubPanel({
         )}
       </div>
 
+      {/* Selector y Gestión de Planes (Upgrade / Downgrade) */}
+      <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-6" data-testid="seccion-cambio-planes">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              <span>Planes de Suscripción & Módulos Disponibles</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {sub?.estado === "trial"
+                ? "Durante el período de prueba gratuita de 30 días puedes cambiar de plan libremente para probar todas las funciones sin costo adicional."
+                : "Mejora tu plan en cualquier momento para desbloquear más funciones y canchas."}
+            </p>
+          </div>
+          <span className="text-xs px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full font-bold self-start sm:self-auto">
+            {sub?.estado === "trial" ? "Prueba sin cargo activa" : "Cambio inmediato"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Plan Bronce */}
+          <div
+            className={`rounded-2xl border p-5 flex flex-col justify-between transition relative ${
+              pln?.slug === "bronce"
+                ? "bg-emerald-950/20 border-emerald-500/60 ring-2 ring-emerald-500/30"
+                : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+            }`}
+          >
+            {pln?.slug === "bronce" && (
+              <span className="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full shadow">
+                ✓ Plan Actual
+              </span>
+            )}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-600">🥉 Plan Bronce</span>
+                <span className="text-xs font-mono text-slate-400">$29 USD/mes</span>
+              </div>
+              <div className="text-xl font-black text-white">$29 <span className="text-xs font-normal text-slate-400">/ mes</span></div>
+              <p className="text-xs text-slate-400">Ideal para clubes pequeños que inician su digitalización.</p>
+              
+              <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Hasta 2 canchas incluidas</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Agenda y reservas diarias</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Control de Caja & Arqueo</span>
+                </li>
+                <li className="flex items-center gap-1.5 text-slate-500">
+                  <span className="text-xs">🔒</span>
+                  <span>Sin turnos fijos recurrentes</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-5 mt-4 border-t border-slate-800">
+              {pln?.slug === "bronce" ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800/80 text-emerald-400 font-bold text-xs cursor-default flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" /> Activo
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleOpenCambiarPlan("bronce")}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition border border-slate-700 flex items-center justify-center gap-1.5"
+                >
+                  Cambiar a Bronce
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Plan Plata */}
+          <div
+            className={`rounded-2xl border p-5 flex flex-col justify-between transition relative ${
+              pln?.slug === "plata"
+                ? "bg-emerald-950/20 border-emerald-500/60 ring-2 ring-emerald-500/30"
+                : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+            }`}
+          >
+            {pln?.slug === "plata" && (
+              <span className="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full shadow">
+                ✓ Plan Actual
+              </span>
+            )}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-300">🥈 Plan Plata</span>
+                <span className="text-xs font-mono text-slate-400">$59 USD/mes</span>
+              </div>
+              <div className="text-xl font-black text-white">$59 <span className="text-xs font-normal text-slate-400">/ mes</span></div>
+              <p className="text-xs text-slate-400">Para clubes consolidados con clientes semanales y buffet.</p>
+
+              <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Hasta 4 canchas incluidas</span>
+                </li>
+                <li className="flex items-center gap-1.5 text-cyan-300 font-semibold">
+                  <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Turnos Fijos semestrales</span>
+                </li>
+                <li className="flex items-center gap-1.5 text-cyan-300 font-semibold">
+                  <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Buffet & Punto de Venta (POS)</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Billeteras virtuales de clientes</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-5 mt-4 border-t border-slate-800">
+              {pln?.slug === "plata" ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800/80 text-emerald-400 font-bold text-xs cursor-default flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" /> Activo
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleOpenCambiarPlan("plata")}
+                  className="w-full py-2.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-lg shadow-cyan-950/40 flex items-center justify-center gap-1.5"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{pln?.slug === "bronce" ? "Mejorar a Plata" : "Cambiar a Plata"}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Plan Oro */}
+          <div
+            className={`rounded-2xl border p-5 flex flex-col justify-between transition relative ${
+              pln?.slug === "oro"
+                ? "bg-emerald-950/20 border-emerald-500/60 ring-2 ring-emerald-500/30"
+                : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+            }`}
+          >
+            {pln?.slug === "oro" && (
+              <span className="absolute -top-3 right-4 bg-emerald-600 text-white text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full shadow">
+                ✓ Plan Actual
+              </span>
+            )}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-400">🥇 Plan Oro (Full)</span>
+                <span className="text-xs font-mono text-slate-400">$99 USD/mes</span>
+              </div>
+              <div className="text-xl font-black text-white">$99 <span className="text-xs font-normal text-slate-400">/ mes</span></div>
+              <p className="text-xs text-slate-400">Potencia total: Torneos, sitio web y control de luces IoT.</p>
+
+              <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Hasta 8 canchas incluidas</span>
+                </li>
+                <li className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Gestión de Torneos & Cuadros</span>
+                </li>
+                <li className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Sitio Web CMS & Marca Propia</span>
+                </li>
+                <li className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Automatización de Luces IoT</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-5 mt-4 border-t border-slate-800">
+              {pln?.slug === "oro" ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800/80 text-emerald-400 font-bold text-xs cursor-default flex items-center justify-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" /> Activo
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleOpenCambiarPlan("oro")}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-950/40 flex items-center justify-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Mejorar a Oro (Full)</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Historial de Facturas Emitidas */}
       <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -1032,6 +1309,132 @@ export default function FacturacionClubPanel({
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+      {/* Modal de Confirmación Previa para Cambio de Plan */}
+      {modalCambiarPlanOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+          data-testid="modal-cambiar-plan"
+        >
+          <div className="w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <h3 className="text-lg font-bold text-white">Confirmar Cambio de Plan</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCambiarPlanOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-sm transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {actionAlert && (
+              <div
+                className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center gap-2 ${
+                  actionAlert.type === "success"
+                    ? "bg-emerald-950/60 border border-emerald-500/40 text-emerald-300"
+                    : "bg-rose-950/60 border border-rose-500/40 text-rose-300"
+                }`}
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{actionAlert.message}</span>
+              </div>
+            )}
+
+            <div className="space-y-4 text-xs text-slate-300">
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>Plan actual:</span>
+                  <span className="font-bold text-white uppercase">{pln?.nombre || "Bronce"}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>Nuevo plan solicitado:</span>
+                  <span className="font-black text-amber-400 uppercase text-sm">
+                    {planDestino === "oro" ? "Oro (Full) — $99 USD/mes" : planDestino === "plata" ? "Plata — $59 USD/mes" : "Bronce — $29 USD/mes"}
+                  </span>
+                </div>
+                {sub?.estado === "trial" && (
+                  <div className="pt-2 border-t border-slate-800/80 text-[11px] text-cyan-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>Tu período de prueba sin cargo continúa activo hasta el {formatFechaDDMMAAAA(sub?.trial_vence_at) || "vencimiento"}.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Información sobre módulos ganados / advertencia si es downgrade */}
+              {planDestino === "bronce" && (
+                <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/30 text-amber-200 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    <span>Aviso importante sobre Turnos Fijos</span>
+                  </div>
+                  <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                    Al pasar al Plan Bronce, los turnos fijos previamente creados se mantendrán vigentes y no se borrarán, pero no podrás emitir ni renovar nuevas series de turnos fijos.
+                  </p>
+                </div>
+              )}
+
+              {planDestino !== "bronce" && (
+                <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-200 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Beneficios inmediatos al cambiar</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-300/90 leading-relaxed">
+                    Se desbloquearán al instante las solapas de {planDestino === "oro" ? "Turnos Fijos, Buffet/POS, Torneos y Sitio Web" : "Turnos Fijos y Buffet/POS"} en tu panel de control.
+                  </p>
+                </div>
+              )}
+
+              {/* Checkbox de Confirmación Explícita */}
+              <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700 transition">
+                <input
+                  type="checkbox"
+                  data-testid="checkbox-confirmar-cambio-plan"
+                  checked={confirmadoCambioPlan}
+                  onChange={(e) => setConfirmadoCambioPlan(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 text-emerald-600 bg-slate-900 border-slate-700 rounded focus:ring-emerald-500 focus:ring-2 cursor-pointer"
+                />
+                <span className="text-slate-200 text-xs select-none">
+                  Confirmo que soy el administrador del club y estoy de acuerdo con el cambio al Plan{" "}
+                  <strong className="text-white capitalize">{planDestino}</strong> conforme a los términos del servicio.
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalCambiarPlanOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                data-testid="btn-confirmar-cambio-plan"
+                disabled={!confirmadoCambioPlan || isChangingPlan}
+                onClick={handleEjecutarCambioPlan}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-950/50 flex items-center gap-2"
+              >
+                {isChangingPlan ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Cambiando Plan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Confirmar Cambio</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -163,6 +163,7 @@ Route::prefix('clubs')->group(function () {
     Route::get('/{subdomain}/facturacion/resumen', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'resumen']);
     Route::get('/{subdomain}/facturacion/facturas', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'facturas']);
     Route::post('/{subdomain}/facturacion/generar-factura', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'generarFactura']);
+    Route::post('/{subdomain}/plan/cambiar', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'cambiarPlan']);
     Route::post('/{subdomain}/facturacion/pagar-mercadopago', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'pagarMercadoPago']);
     Route::post('/{subdomain}/facturacion/pagar-stripe', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'pagarStripe']);
     Route::post('/{subdomain}/facturacion/comprobante-transferencia', [\App\Http\Controllers\Api\ClubFacturacionController::class, 'subirComprobanteTransferencia']);
