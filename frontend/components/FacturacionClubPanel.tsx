@@ -901,6 +901,10 @@ export default function FacturacionClubPanel({
                 </li>
                 <li className="flex items-center gap-1.5 text-cyan-300 font-semibold">
                   <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span>Turnos Abiertos & Split Payment (Pago dividido)</span>
+                </li>
+                <li className="flex items-center gap-1.5 text-cyan-300 font-semibold">
+                  <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                   <span>Buffet & Punto de Venta (POS)</span>
                 </li>
                 <li className="flex items-center gap-1.5">
@@ -1386,7 +1390,12 @@ export default function FacturacionClubPanel({
                     <span>Beneficios inmediatos al cambiar</span>
                   </div>
                   <p className="text-[11px] text-emerald-300/90 leading-relaxed">
-                    Se desbloquearán al instante las solapas de {planDestino === "oro" ? "Turnos Fijos, Buffet/POS, Torneos y Sitio Web" : "Turnos Fijos y Buffet/POS"} en tu panel de control.
+                    Se desbloquearán al instante en tu club:{" "}
+                    <strong>
+                      {planDestino === "oro"
+                        ? "Turnos Fijos, Turnos Abiertos & Pagos Divididos, Buffet/POS, Torneos & Brackets, Sitio Web CMS y Automatización de Luces IoT"
+                        : "Turnos Fijos recurrentes, Turnos Abiertos & Split Payment y Buffet & POS"}
+                    </strong>.
                   </p>
                 </div>
               )}
