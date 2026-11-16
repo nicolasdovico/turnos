@@ -29,6 +29,31 @@ Route::get('/', function () {
 
 Route::get('/health', HealthCheckController::class);
 
+Route::get('/vincular-whatsapp', function () {
+    $res = \Illuminate\Support\Facades\Http::withHeaders(['apikey' => config('services.evolution_api.api_key', 'evolution_secret_token_saas')])
+        ->get('http://evolution_api:8080/instance/connect/turnos');
+    $json = $res->json();
+    $qrBase64 = $json['base64'] ?? null;
+
+    $stateRes = \Illuminate\Support\Facades\Http::withHeaders(['apikey' => config('services.evolution_api.api_key', 'evolution_secret_token_saas')])
+        ->get('http://evolution_api:8080/instance/connectionState/turnos');
+    $state = $stateRes->json()['instance']['state'] ?? 'connecting';
+
+    if ($state === 'open') {
+        return response('<html><head><meta charset="utf-8"><title>WhatsApp Conectado</title><style>body{background:#022c22;color:#34d399;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}</style></head><body><h1>✅ ¡WhatsApp Conectado Exitosamente!</h1><p style="color:#a7f3d0;font-size:16px;">La instancia turnos ya está activa y lista para enviar recordatorios.</p></body></html>', 200)
+            ->header('Content-Type', 'text/html');
+    }
+
+    if (!$qrBase64) {
+        return response('<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="3"><title>Cargando QR...</title><style>body{background:#0f172a;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}</style></head><body><h2>Generando código QR...</h2><p>Aguarde un momento (se actualiza automáticamente)</p></body></html>', 200)
+            ->header('Content-Type', 'text/html');
+    }
+
+    $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Vincular WhatsApp</title><meta http-equiv="refresh" content="8"><style>body{background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;}img{background:#fff;padding:16px;border-radius:16px;box-shadow:0 10px 25px rgba(0,0,0,0.5);width:300px;height:300px;}h2{margin-bottom:6px;}p{color:#94a3b8;font-size:14px;margin-bottom:20px;}</style></head><body><h2>Escanear con WhatsApp Business</h2><p>Abre WhatsApp Business > Dispositivos vinculados > Vincular un dispositivo</p><img src="' . $qrBase64 . '" alt="QR WhatsApp"><p style="font-size:12px;margin-top:16px;">🔄 Esta pantalla se actualiza automáticamente cada 8 segundos</p></body></html>';
+
+    return response($html, 200)->header('Content-Type', 'text/html');
+});
+
 Route::get('/canchas/{id}/disponibilidad', DisponibilidadController::class)
     ->middleware('tenant.has_module:reservas');
 
