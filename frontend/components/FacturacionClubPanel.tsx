@@ -22,6 +22,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
+import { getFeaturesParaPlan, PLATFORM_MODULES } from "@/lib/modulesRegistry";
 
 export const formatFechaDDMMAAAA = (fechaStr?: string | null): string => {
   if (!fechaStr) return "";
@@ -833,17 +834,15 @@ export default function FacturacionClubPanel({
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span>Hasta 2 canchas incluidas</span>
                 </li>
-                <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Agenda y reservas diarias</span>
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Control de Caja & Arqueo</span>
-                </li>
+                {getFeaturesParaPlan("bronce").map((mod) => (
+                  <li key={mod.slug} className="flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>{mod.nombre}</span>
+                  </li>
+                ))}
                 <li className="flex items-center gap-1.5 text-slate-500">
                   <span className="text-xs">🔒</span>
-                  <span>Sin turnos fijos recurrentes</span>
+                  <span>Sin turnos fijos ni módulos avanzados</span>
                 </li>
               </ul>
             </div>
@@ -895,21 +894,15 @@ export default function FacturacionClubPanel({
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span>Hasta 4 canchas incluidas</span>
                 </li>
-                <li className="flex items-center gap-1.5 text-cyan-300 font-semibold">
-                  <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>Turnos Fijos semestrales</span>
-                </li>
-                <li className="flex items-center gap-1.5 text-cyan-300 font-semibold">
-                  <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>Turnos Abiertos & Split Payment (Pago dividido)</span>
-                </li>
-                <li className="flex items-center gap-1.5 text-cyan-300 font-semibold">
-                  <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>Buffet & Punto de Venta (POS)</span>
-                </li>
-                <li className="flex items-center gap-1.5">
+                {getFeaturesParaPlan("plata").map((mod) => (
+                  <li key={mod.slug} className="flex items-center gap-1.5 text-cyan-300 font-semibold">
+                    <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <span>{mod.nombre}</span>
+                  </li>
+                ))}
+                <li className="flex items-center gap-1.5 text-slate-300">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Billeteras virtuales de clientes</span>
+                  <span>Todo lo incluido en Plan Bronce</span>
                 </li>
               </ul>
             </div>
@@ -955,24 +948,26 @@ export default function FacturacionClubPanel({
                 <span className="text-xs font-mono text-slate-400">$99 USD/mes</span>
               </div>
               <div className="text-xl font-black text-white">$99 <span className="text-xs font-normal text-slate-400">/ mes</span></div>
-              <p className="text-xs text-slate-400">Potencia total: Torneos, sitio web y control de luces IoT.</p>
+              <p className="text-xs text-slate-400">Mayor escala operativa: hasta 8 canchas y soporte para toda la plataforma.</p>
 
               <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
                 <li className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span>Hasta 8 canchas incluidas</span>
                 </li>
+                {getFeaturesParaPlan("oro").map((mod) => (
+                  <li key={mod.slug} className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>{mod.nombre}</span>
+                  </li>
+                ))}
                 <li className="flex items-center gap-1.5 text-amber-300 font-semibold">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>Gestión de Torneos & Cuadros</span>
+                  <span>Todas las funciones operativas de Plata & Bronce</span>
                 </li>
-                <li className="flex items-center gap-1.5 text-amber-300 font-semibold">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>Sitio Web CMS & Marca Propia</span>
-                </li>
-                <li className="flex items-center gap-1.5 text-amber-300 font-semibold">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>Automatización de Luces IoT</span>
+                <li className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Tarifa reducida en comisiones de marketplace</span>
                 </li>
               </ul>
             </div>
@@ -1393,8 +1388,8 @@ export default function FacturacionClubPanel({
                     Se desbloquearán al instante en tu club:{" "}
                     <strong>
                       {planDestino === "oro"
-                        ? "Turnos Fijos, Turnos Abiertos & Pagos Divididos, Buffet/POS, Torneos & Brackets, Sitio Web CMS y Automatización de Luces IoT"
-                        : "Turnos Fijos recurrentes, Turnos Abiertos & Split Payment y Buffet & POS"}
+                        ? "Hasta 8 canchas incluidas y todas las funciones operativas avanzadas de la plataforma (Turnos Fijos, Buffet/POS y Sitio Web)"
+                        : "Turnos Fijos recurrentes, Buffet & Punto de Venta (POS) y hasta 4 canchas incluidas"}
                     </strong>.
                   </p>
                 </div>

@@ -15,6 +15,7 @@ import GestionCajaArqueo from "@/components/GestionCajaArqueo";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 import { getTenantPublicUrl as resolvePublicUrl, getPortalUrl, getTenantDisplayDomain } from "@/lib/navigationUrls";
 import { formatPrecio, formatMonto } from "@/lib/formatters";
+import { getModulosProduccion } from "@/lib/modulesRegistry";
 
 interface ComplejoData {
   id: number;
@@ -423,81 +424,6 @@ const DIAS_CONFIG = [
 
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const API_BASE = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
-
-const ALL_MODULOS = [
-  {
-    slug: "reservas",
-    nombre: "Reservas & Agenda",
-    icon: "📅",
-    descripcion: "Grilla interactiva con bloqueos atómicos en Redis para evitar doble reserva.",
-    actionLabel: "Abrir Grilla en Vivo →",
-    actionHref: "/",
-    isExternal: false,
-    planMinimo: "Bronce",
-  },
-  {
-    slug: "cms_web",
-    nombre: "CMS Web & Landing Page",
-    icon: "🌐",
-    descripcion: "Páginas institucionales con renderizado dinámico y sanitización de contenido.",
-    actionLabel: "Ver Página CMS Demo →",
-    actionHref: "/paginas/tarifas",
-    isExternal: false,
-    planMinimo: "Bronce",
-  },
-  {
-    slug: "pos_buffet",
-    nombre: "Punto de Venta (POS) & Buffet",
-    icon: "🍔",
-    descripcion: "Control de stock, comandas asignadas a turnos y arqueo de caja diaria.",
-    actionLabel: "Abrir Terminal Buffet & POS →",
-    actionHref: "#pos-buffet",
-    isExternal: false,
-    planMinimo: "Plata",
-  },
-  {
-    slug: "turnos_fijos",
-    nombre: "Turnos Fijos Recurrentes",
-    icon: "🔁",
-    descripcion: "Generación automática periódica de turnos semanales y mensuales para socios y clientes fijos.",
-    actionLabel: "Ver Turnos Fijos ↗",
-    actionHref: "/admin",
-    isExternal: true,
-    planMinimo: "Plata",
-  },
-  {
-    slug: "split_payment",
-    nombre: "Split Payment & Partidos Abiertos",
-    icon: "💳",
-    descripcion: "Cobro fraccionado por jugador y convocatorias automáticas de partidos abiertos con matchmaking.",
-    actionLabel: "Ver Pagos Divididos ↗",
-    actionHref: "/admin",
-    isExternal: true,
-    planMinimo: "Plata",
-  },
-  {
-    slug: "torneos",
-    nombre: "Torneos & Fixtures",
-    icon: "🏆",
-    descripcion: "Generador automático de llaves eliminatorias, carga de scores y tablas de posiciones.",
-    actionLabel: "Ver Torneos & Brackets ↗",
-    actionHref: "/admin",
-    isExternal: true,
-    planMinimo: "Oro",
-  },
-  {
-    slug: "domotica",
-    nombre: "Domótica IoT & Luces",
-    icon: "💡",
-    descripcion: "Encendido y apagado sincronizado de iluminación de canchas según horarios de reservas activas.",
-    actionLabel: "Ver Dispositivos IoT ↗",
-    actionHref: "/admin",
-    isExternal: true,
-    planMinimo: "Oro",
-  },
-];
-
-
 
 export default function ClubAdminPanel() {
   const params = useParams();
@@ -4053,7 +3979,7 @@ export default function ClubAdminPanel() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {ALL_MODULOS.map((mod) => {
+              {getModulosProduccion().map((mod) => {
                 const isActivo = plan?.modulos?.some((m) => m.slug === mod.slug) ?? false;
 
                 return (
@@ -4080,44 +4006,37 @@ export default function ClubAdminPanel() {
                       </div>
                       <h3 className="font-bold text-lg text-white">{mod.nombre}</h3>
                       <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-                        {mod.descripcion}
+                        {mod.descripcionCorta || (mod as any).descripcion}
                       </p>
                     </div>
 
                     <div className="mt-6 pt-4 border-t border-slate-800/60">
                       {isActivo ? (
-                        mod.actionHref === "#pos-buffet" ? (
+                        mod.tabId ? (
                           <button
                             type="button"
-                            onClick={() => setActiveTab("pos-buffet")}
+                            onClick={() => setActiveTab(mod.tabId as any)}
                             className="block w-full text-center rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition cursor-pointer"
                           >
-                            {mod.actionLabel}
+                            Abrir {mod.nombre} →
                           </button>
-                        ) : mod.isExternal ? (
-                          <a
-                            href={getPortalUrl(mod.actionHref)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
-                          >
-                            {mod.actionLabel}
-                          </a>
                         ) : (
-                          <Link
-                            href={getTenantPublicUrl(mod.actionHref === "/" ? "" : mod.actionHref)}
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("canchas")}
                             className="block w-full text-center rounded-xl bg-slate-800 hover:bg-slate-700 py-2.5 text-xs font-bold text-emerald-400 border border-slate-700 transition"
                           >
-                            {mod.actionLabel}
-                          </Link>
+                            Ver Módulo →
+                          </button>
                         )
                       ) : (
-                        <a
-                          href={getPortalUrl("/planes")}
-                          className="block w-full text-center rounded-xl bg-slate-900/60 hover:bg-slate-800/80 py-2.5 text-xs font-semibold text-slate-400 border border-slate-800 transition"
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("facturacion")}
+                          className="block w-full text-center rounded-xl bg-slate-900/60 hover:bg-slate-800/80 py-2.5 text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 transition"
                         >
-                          Actualizar a Plan {mod.planMinimo} ↗
-                        </a>
+                          Actualizar a Plan {mod.planMinimo.toUpperCase()} ↗
+                        </button>
                       )}
                     </div>
                   </div>
