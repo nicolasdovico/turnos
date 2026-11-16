@@ -34,6 +34,16 @@ export const formatFechaDDMMAAAA = (fechaStr?: string | null): string => {
   return fechaStr;
 };
 
+interface PlanCatalogoItem {
+  id: number;
+  nombre: string;
+  slug: string;
+  precio_mensual: number;
+  canchas_incluidas: number;
+  precio_cancha_adicional: number;
+  comision_marketplace?: number;
+}
+
 interface FacturacionClubPanelProps {
   subdomain: string;
   token?: string | null;
@@ -172,6 +182,20 @@ export default function FacturacionClubPanel({
   const [planDestino, setPlanDestino] = useState<"bronce" | "plata" | "oro">("plata");
   const [confirmadoCambioPlan, setConfirmadoCambioPlan] = useState(false);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
+  const [planesCatalogo, setPlanesCatalogo] = useState<PlanCatalogoItem[]>([
+    { id: 1, nombre: "Bronce", slug: "bronce", precio_mensual: 29, canchas_incluidas: 2, precio_cancha_adicional: 8 },
+    { id: 2, nombre: "Plata", slug: "plata", precio_mensual: 59, canchas_incluidas: 4, precio_cancha_adicional: 10 },
+    { id: 3, nombre: "Oro", slug: "oro", precio_mensual: 99, canchas_incluidas: 6, precio_cancha_adicional: 12 },
+  ]);
+
+  const getPlanInfo = (slug: string) => {
+    return (
+      planesCatalogo.find((p) => p.slug.toLowerCase() === slug.toLowerCase()) || {
+        canchas_incluidas: slug === "bronce" ? 2 : slug === "plata" ? 4 : 6,
+        precio_mensual: slug === "bronce" ? 29 : slug === "plata" ? 59 : 99,
+      }
+    );
+  };
 
   const getAuthHeaders = useCallback(() => {
     let activeToken = token;
@@ -195,9 +219,10 @@ export default function FacturacionClubPanel({
       setError(null);
       const headers = getAuthHeaders();
 
-      const [resumenRes, facturasRes] = await Promise.all([
+      const [resumenRes, facturasRes, planesRes] = await Promise.all([
         fetch(`${effectiveApiUrl}/clubs/${subdomain}/facturacion/resumen`, { headers }),
         fetch(`${effectiveApiUrl}/clubs/${subdomain}/facturacion/facturas`, { headers }),
+        fetch(`${effectiveApiUrl}/planes`),
       ]);
 
       if (!resumenRes.ok) {
@@ -217,6 +242,13 @@ export default function FacturacionClubPanel({
       if (facturasRes.ok) {
         const facturasJson = await facturasRes.json();
         setFacturas(facturasJson.data || []);
+      }
+
+      if (planesRes.ok) {
+        const planesJson = await planesRes.json();
+        if (Array.isArray(planesJson.data) && planesJson.data.length > 0) {
+          setPlanesCatalogo(planesJson.data);
+        }
       }
     } catch (err: any) {
       if (!isBackground) {
@@ -832,7 +864,7 @@ export default function FacturacionClubPanel({
               <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
                 <li className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Hasta 2 canchas incluidas</span>
+                  <span>Hasta {getPlanInfo("bronce").canchas_incluidas} canchas incluidas</span>
                 </li>
                 {getFeaturesParaPlan("bronce").map((mod) => (
                   <li key={mod.slug} className="flex items-center gap-1.5">
@@ -892,7 +924,7 @@ export default function FacturacionClubPanel({
               <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
                 <li className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Hasta 4 canchas incluidas</span>
+                  <span>Hasta {getPlanInfo("plata").canchas_incluidas} canchas incluidas</span>
                 </li>
                 {getFeaturesParaPlan("plata").map((mod) => (
                   <li key={mod.slug} className="flex items-center gap-1.5 text-cyan-300 font-semibold">
@@ -947,13 +979,13 @@ export default function FacturacionClubPanel({
                 <span className="text-xs font-black uppercase tracking-wider text-amber-400">🥇 Plan Oro (Full)</span>
                 <span className="text-xs font-mono text-slate-400">$99 USD/mes</span>
               </div>
-              <div className="text-xl font-black text-white">$99 <span className="text-xs font-normal text-slate-400">/ mes</span></div>
-              <p className="text-xs text-slate-400">Mayor escala operativa: hasta 8 canchas y soporte para toda la plataforma.</p>
+              <div className="text-xl font-black text-white">${getPlanInfo("oro").precio_mensual} <span className="text-xs font-normal text-slate-400">/ mes</span></div>
+              <p className="text-xs text-slate-400">Mayor escala operativa: hasta {getPlanInfo("oro").canchas_incluidas} canchas y soporte para toda la plataforma.</p>
 
               <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
                 <li className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Hasta 8 canchas incluidas</span>
+                  <span>Hasta {getPlanInfo("oro").canchas_incluidas} canchas incluidas</span>
                 </li>
                 {getFeaturesParaPlan("oro").map((mod) => (
                   <li key={mod.slug} className="flex items-center gap-1.5 text-amber-300 font-semibold">
@@ -1388,8 +1420,8 @@ export default function FacturacionClubPanel({
                     Se desbloquearán al instante en tu club:{" "}
                     <strong>
                       {planDestino === "oro"
-                        ? "Hasta 8 canchas incluidas y todas las funciones operativas avanzadas de la plataforma (Turnos Fijos, Buffet/POS y Sitio Web)"
-                        : "Turnos Fijos recurrentes, Buffet & Punto de Venta (POS) y hasta 4 canchas incluidas"}
+                        ? `Hasta ${getPlanInfo("oro").canchas_incluidas} canchas incluidas y todas las funciones operativas avanzadas de la plataforma (Turnos Fijos, Buffet/POS y Sitio Web)`
+                        : `Turnos Fijos recurrentes, Buffet & Punto de Venta (POS) y hasta ${getPlanInfo("plata").canchas_incluidas} canchas incluidas`}
                     </strong>.
                   </p>
                 </div>
