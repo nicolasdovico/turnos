@@ -229,6 +229,36 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText(/\$37 \/ mes/i)).toBeDefined();
   });
 
+  it("updates default court suggestions and surface reactively when changing Deporte Principal", () => {
+    render(
+      <AuthProvider>
+        <RegistroClubPage />
+      </AuthProvider>
+    );
+
+    // Initial default is Pádel
+    expect(screen.getByDisplayValue("Cancha 1 (Panorámica Cristal)")).toBeDefined();
+    expect(screen.getByDisplayValue("Cancha 2 (Blindex & Sintético)")).toBeDefined();
+
+    // Select Fútbol 5 / 7
+    const deporteSelect = screen.getByRole("combobox", { name: "" }) || screen.getByDisplayValue("Pádel");
+    fireEvent.change(deporteSelect, { target: { value: "futbol" } });
+
+    // Court suggestions should update automatically to football
+    expect(screen.getByDisplayValue("Cancha 1 (Fútbol 5 - Sintético)")).toBeDefined();
+    expect(screen.getByDisplayValue("Cancha 2 (Fútbol 7 - Sintético)")).toBeDefined();
+
+    // Adding a cancha in football suggests "Cancha 3 (Fútbol 5)"
+    const addCanchaBtn = screen.getByText("+ Agregar Cancha");
+    fireEvent.click(addCanchaBtn);
+    expect(screen.getByDisplayValue("Cancha 3 (Fútbol 5)")).toBeDefined();
+
+    // Select Tenis
+    fireEvent.change(deporteSelect, { target: { value: "tenis" } });
+    expect(screen.getByDisplayValue("Cancha 1 (Polvo de Ladrillo)")).toBeDefined();
+    expect(screen.getByDisplayValue("Cancha 2 (Cemento Rápida)")).toBeDefined();
+  });
+
   it("renders Verificar Email page with 6-digit OTP input boxes and resend cooldown", () => {
     render(
       <AuthProvider>

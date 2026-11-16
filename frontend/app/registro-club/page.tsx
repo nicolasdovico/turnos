@@ -26,6 +26,64 @@ export interface TipoNegocioItem {
 
 const API_BASE = typeof window !== "undefined" ? "/api" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");
 
+interface DeportePreset {
+  nombre: string;
+  superficieDefault: string;
+  canchasDefault: string[];
+  sugerenciaNueva: (index: number) => string;
+}
+
+const DEPORTE_PRESETS: Record<string, DeportePreset> = {
+  futbol: {
+    nombre: "Fútbol",
+    superficieDefault: "sintetico_caucho",
+    canchasDefault: ["Cancha 1 (Fútbol 5 - Sintético)", "Cancha 2 (Fútbol 7 - Sintético)"],
+    sugerenciaNueva: (i) => `Cancha ${i} (Fútbol 5)`,
+  },
+  padel: {
+    nombre: "Pádel",
+    superficieDefault: "sintetico_wpt",
+    canchasDefault: ["Cancha 1 (Panorámica Cristal)", "Cancha 2 (Blindex & Sintético)"],
+    sugerenciaNueva: (i) => `Cancha ${i} (Cristal)`,
+  },
+  tenis: {
+    nombre: "Tenis",
+    superficieDefault: "polvo_ladrillo",
+    canchasDefault: ["Cancha 1 (Polvo de Ladrillo)", "Cancha 2 (Cemento Rápida)"],
+    sugerenciaNueva: (i) => `Cancha ${i} (Polvo de Ladrillo)`,
+  },
+  basquet: {
+    nombre: "Básquet",
+    superficieDefault: "parquet_madera",
+    canchasDefault: ["Cancha 1 (Parquet Flotante)", "Cancha 2 (Pintura Epoxi)"],
+    sugerenciaNueva: (i) => `Cancha ${i} (Parquet)`,
+  },
+  squash: {
+    nombre: "Squash",
+    superficieDefault: "parquet",
+    canchasDefault: ["Cancha 1 (Frontis Cristal)", "Cancha 2 (Estándar)"],
+    sugerenciaNueva: (i) => `Cancha ${i} (Squash)`,
+  },
+  pickleball: {
+    nombre: "Pickleball",
+    superficieDefault: "resina_acrilica",
+    canchasDefault: ["Cancha 1 (Hard Court)", "Cancha 2 (Resina Acrílica)"],
+    sugerenciaNueva: (i) => `Cancha ${i} (Pickleball)`,
+  },
+  voley: {
+    nombre: "Vóley",
+    superficieDefault: "parquet",
+    canchasDefault: ["Cancha 1 (Indoor Salón)", "Cancha 2 (Beach Arena)"],
+    sugerenciaNueva: (i) => `Cancha ${i} (Vóley)`,
+  },
+  multideporte: {
+    nombre: "Multideporte",
+    superficieDefault: "cemento",
+    canchasDefault: ["Cancha 1 (Multiuso)", "Cancha 2 (Multiuso)"],
+    sugerenciaNueva: (i) => `Cancha ${i} (Multiuso)`,
+  },
+};
+
 export default function RegistroClubPage() {
   const router = useRouter();
   const { user, token, setAuthSession, login } = useAuth();
@@ -81,8 +139,15 @@ export default function RegistroClubPage() {
   const [direccion, setDireccion] = useState("");
   const [telefono, setTelefono] = useState("");
 
-  // Canchas iniciales
-  const [canchas, setCanchas] = useState<string[]>(["Cancha 1 (Cristal)", "Cancha 2 (Sintético)"]);
+  // Canchas iniciales contextualizadas por deporte
+  const [canchas, setCanchas] = useState<string[]>(DEPORTE_PRESETS.padel.canchasDefault);
+
+  // Cambiar canchas por defecto al cambiar el deporte principal
+  const handleDeporteChange = (nuevoDeporte: string) => {
+    setDeporte(nuevoDeporte);
+    const preset = DEPORTE_PRESETS[nuevoDeporte] || DEPORTE_PRESETS.multideporte;
+    setCanchas([...preset.canchasDefault]);
+  };
 
   // Guest admin inputs
   const [nombreAdmin, setNombreAdmin] = useState("");
@@ -208,7 +273,9 @@ export default function RegistroClubPage() {
 
   // Court management
   const addCancha = () => {
-    setCanchas([...canchas, `Cancha ${canchas.length + 1}`]);
+    const preset = DEPORTE_PRESETS[deporte] || DEPORTE_PRESETS.multideporte;
+    const nuevoNombre = preset.sugerenciaNueva(canchas.length + 1);
+    setCanchas([...canchas, nuevoNombre]);
   };
 
   const removeCancha = (idx: number) => {
@@ -250,6 +317,8 @@ export default function RegistroClubPage() {
 
     setIsSubmitting(true);
 
+    const preset = DEPORTE_PRESETS[deporte] || DEPORTE_PRESETS.multideporte;
+
     const payload: any = {
       nombre_club: nombreClub,
       subdominio: subdominio,
@@ -263,7 +332,7 @@ export default function RegistroClubPage() {
       canchas: canchas.map((name) => ({
         nombre: name,
         deporte: deporte,
-        tipo_superficie: "cristal",
+        tipo_superficie: preset.superficieDefault,
         precio: 8000,
       })),
     };
@@ -515,14 +584,16 @@ export default function RegistroClubPage() {
               </label>
               <select
                 value={deporte}
-                onChange={(e) => setDeporte(e.target.value)}
+                onChange={(e) => handleDeporteChange(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-900 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition bg-white"
               >
                 <option value="padel">Pádel</option>
                 <option value="tenis">Tenis</option>
                 <option value="futbol">Fútbol 5 / 7</option>
+                <option value="basquet">Básquet</option>
                 <option value="squash">Squash</option>
                 <option value="pickleball">Pickleball</option>
+                <option value="voley">Vóley</option>
                 <option value="multideporte">Multideporte</option>
               </select>
             </div>
@@ -779,8 +850,12 @@ export default function RegistroClubPage() {
                     4
                   </span>
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900">Canchas Iniciales</h2>
-                    <p className="text-xs text-slate-500">Podrás añadir más canchas en cualquier momento desde tu panel</p>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      Canchas Iniciales ({DEPORTE_PRESETS[deporte]?.nombre || "Deporte"})
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Sugerencias automáticas para {DEPORTE_PRESETS[deporte]?.nombre || "tu club"}. Podrás personalizar nombres o añadir más en cualquier momento.
+                    </p>
                   </div>
                 </div>
                 <button
