@@ -1,64 +1,111 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { CheckCircle2, ArrowRight, Sparkles, ShieldCheck } from "lucide-react";
 
+interface PlanItem {
+  id?: number;
+  nombre: string;
+  slug: string;
+  precio_mensual?: number | string;
+  canchas_incluidas?: number;
+  precio_cancha_adicional?: number | string;
+  comision_marketplace?: number | string;
+}
+
+const DEFAULT_PLANS = [
+  {
+    nombre: "Bronce",
+    slug: "bronce",
+    precio: "$29",
+    periodo: "/mes",
+    canchasBase: 2,
+    precioExtra: 8,
+    desc: "Para clubes que inician y buscan digitalizar su grilla sin complicaciones.",
+    features: [
+      "Motor de Reservas & Grilla en Tiempo Real",
+      "Bloqueos Atómicos Anti-Sobreturno (Redis)",
+      "Subdominio Propio y CMS Web Multitenant",
+      "Cobro de Señas Online & Billetera Virtual",
+      "Soporte Estándar",
+    ],
+    isPopular: false,
+  },
+  {
+    nombre: "Plata",
+    slug: "plata",
+    precio: "$59",
+    periodo: "/mes",
+    canchasBase: 4,
+    precioExtra: 10,
+    desc: "El plan ideal para complejos con alto volumen de turnos fijos, buffet y caja.",
+    features: [
+      "Todo lo incluido en el Plan Bronce",
+      "Turnos Fijos Semanales y Recurrentes",
+      "Punto de Venta (POS) & Control de Buffet",
+      "Arqueo Ciego y Control de Caja Diaria",
+      "Partidos Abiertos & Split Payment (Pago Fraccionado)",
+      "Tarifas Estacionales de Iluminación",
+    ],
+    isPopular: true,
+  },
+  {
+    nombre: "Oro",
+    slug: "oro",
+    precio: "$99",
+    periodo: "/mes",
+    canchasBase: 6,
+    precioExtra: 12,
+    desc: "Tecnología de punta integral para clubes de mayor escala operativa.",
+    features: [
+      "Todo lo incluido en el Plan Plata",
+      "Mayor cupo de canchas base incluidas",
+      "Comisión bonificada en reservas marketplace (3%)",
+      "Subida Segura a Cloudflare R2 / AWS S3",
+      "Soporte Prioritario VIP 24/7",
+    ],
+    isPopular: false,
+  },
+];
+
 export default function PricingOverview() {
-  const plans = [
-    {
-      nombre: "Bronce",
-      slug: "bronce",
-      precio: "$29",
-      periodo: "/mes",
-      canchasBase: 2,
-      precioExtra: 8,
-      desc: "Para clubes que inician y buscan digitalizar su grilla sin complicaciones.",
-      features: [
-        "Motor de Reservas & Grilla en Tiempo Real",
-        "Bloqueos Atómicos Anti-Sobreturno (Redis)",
-        "Subdominio Propio y CMS Web Multitenant",
-        "Cobro de Señas Online & Billetera Virtual",
-        "Soporte Estándar",
-      ],
-      isPopular: false,
-    },
-    {
-      nombre: "Plata",
-      slug: "plata",
-      precio: "$59",
-      periodo: "/mes",
-      canchasBase: 4,
-      precioExtra: 10,
-      desc: "El plan ideal para complejos con alto volumen de turnos fijos, buffet y caja.",
-      features: [
-        "Todo lo incluido en el Plan Bronce",
-        "Turnos Fijos Semanales y Recurrentes",
-        "Punto de Venta (POS) & Control de Buffet",
-        "Arqueo Ciego y Control de Caja Diaria",
-        "Partidos Abiertos & Split Payment (Pago Fraccionado)",
-        "Tarifas Estacionales de Iluminación",
-      ],
-      isPopular: true,
-    },
-    {
-      nombre: "Oro",
-      slug: "oro",
-      precio: "$99",
-      periodo: "/mes",
-      canchasBase: 6,
-      precioExtra: 12,
-      desc: "Tecnología de punta integral para clubes de primer nivel y torneos.",
-      features: [
-        "Todo lo incluido en el Plan Plata",
-        "Gestor de Torneos, Fixtures & Brackets",
-        "Domótica IoT: Control Automático de Luces",
-        "Subida Segura a Cloudflare R2 / AWS S3",
-        "Soporte Prioritario VIP 24/7",
-      ],
-      isPopular: false,
-    },
-  ];
+  const [plansData, setPlansData] = useState<PlanItem[]>([]);
+
+  useEffect(() => {
+    const apiBase =
+      typeof window !== "undefined"
+        ? window.location.origin + "/api"
+        : process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+
+    fetch(`${apiBase}/planes`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+          setPlansData(data.data);
+        }
+      })
+      .catch(() => {
+        // En caso de error o entorno de testing sin backend, usa planes por defecto
+      });
+  }, []);
+
+  const plans = DEFAULT_PLANS.map((defaultPlan) => {
+    const dbPlan = plansData.find((p) => p.slug.toLowerCase() === defaultPlan.slug.toLowerCase());
+    if (!dbPlan) return defaultPlan;
+
+    const precioNum = Number(dbPlan.precio_mensual) || (defaultPlan.slug === "bronce" ? 29 : defaultPlan.slug === "plata" ? 59 : 99);
+    const canchasNum = Number(dbPlan.canchas_incluidas) || (defaultPlan.slug === "bronce" ? 2 : defaultPlan.slug === "plata" ? 4 : 6);
+    const extraNum = Number(dbPlan.precio_cancha_adicional) || (defaultPlan.slug === "bronce" ? 8 : defaultPlan.slug === "plata" ? 10 : 12);
+
+    return {
+      ...defaultPlan,
+      nombre: dbPlan.nombre || defaultPlan.nombre,
+      precio: `$${precioNum}`,
+      canchasBase: canchasNum,
+      precioExtra: extraNum,
+    };
+  });
 
   return (
     <section id="planes" className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">

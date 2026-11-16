@@ -856,9 +856,9 @@ export default function FacturacionClubPanel({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-amber-600">🥉 Plan Bronce</span>
-                <span className="text-xs font-mono text-slate-400">$29 USD/mes</span>
+                <span className="text-xs font-mono text-slate-400">${getPlanInfo("bronce").precio_mensual} USD/mes</span>
               </div>
-              <div className="text-xl font-black text-white">$29 <span className="text-xs font-normal text-slate-400">/ mes</span></div>
+              <div className="text-xl font-black text-white">${getPlanInfo("bronce").precio_mensual} <span className="text-xs font-normal text-slate-400">/ mes</span></div>
               <p className="text-xs text-slate-400">Ideal para clubes pequeños que inician su digitalización.</p>
               
               <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
@@ -916,9 +916,9 @@ export default function FacturacionClubPanel({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-300">🥈 Plan Plata</span>
-                <span className="text-xs font-mono text-slate-400">$59 USD/mes</span>
+                <span className="text-xs font-mono text-slate-400">${getPlanInfo("plata").precio_mensual} USD/mes</span>
               </div>
-              <div className="text-xl font-black text-white">$59 <span className="text-xs font-normal text-slate-400">/ mes</span></div>
+              <div className="text-xl font-black text-white">${getPlanInfo("plata").precio_mensual} <span className="text-xs font-normal text-slate-400">/ mes</span></div>
               <p className="text-xs text-slate-400">Para clubes consolidados con clientes semanales y buffet.</p>
 
               <ul className="space-y-1.5 text-xs text-slate-300 pt-2 border-t border-slate-800/80">
@@ -977,7 +977,7 @@ export default function FacturacionClubPanel({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-amber-400">🥇 Plan Oro (Full)</span>
-                <span className="text-xs font-mono text-slate-400">$99 USD/mes</span>
+                <span className="text-xs font-mono text-slate-400">${getPlanInfo("oro").precio_mensual} USD/mes</span>
               </div>
               <div className="text-xl font-black text-white">${getPlanInfo("oro").precio_mensual} <span className="text-xs font-normal text-slate-400">/ mes</span></div>
               <p className="text-xs text-slate-400">Mayor escala operativa: hasta {getPlanInfo("oro").canchas_incluidas} canchas y soporte para toda la plataforma.</p>
@@ -1386,7 +1386,11 @@ export default function FacturacionClubPanel({
                 <div className="flex justify-between items-center text-slate-400">
                   <span>Nuevo plan solicitado:</span>
                   <span className="font-black text-amber-400 uppercase text-sm">
-                    {planDestino === "oro" ? "Oro (Full) — $99 USD/mes" : planDestino === "plata" ? "Plata — $59 USD/mes" : "Bronce — $29 USD/mes"}
+                    {planDestino === "oro"
+                      ? `Oro (Full) — $${getPlanInfo("oro").precio_mensual} USD/mes`
+                      : planDestino === "plata"
+                      ? `Plata — $${getPlanInfo("plata").precio_mensual} USD/mes`
+                      : `Bronce — $${getPlanInfo("bronce").precio_mensual} USD/mes`}
                   </span>
                 </div>
                 {sub?.estado === "trial" && (
