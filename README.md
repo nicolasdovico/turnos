@@ -225,3 +225,16 @@ password: password123
 
 URL del frontend
 http://localhost:8080/
+
+URL del backend en produccion
+https://api.turnosflow.com
+
+ Panel Superadministrador (Filament): 
+ https://api.turnosflow.com/admin
+
+ usuario administrador Filament Produccion
+ nicolasdovico@gmail.com
+ admin1234
+
+ Usuario de prueba en produccion
+ tamarakshop@gmail.com (con cuenta de Google0)

@@ -2162,4 +2162,100 @@ describe("Frontend Auth & Club Onboarding Suite", () => {
     expect(screen.getByText("Nico Pádel & Sport Club")).toBeDefined();
     expect(screen.getByText(/Reservar Turno →/i)).toBeDefined();
   });
+
+  it("renders lock badge and upgrade callout when club has Bronce plan and accesses Turnos Fijos or Buffet & POS", async () => {
+    localStorage.setItem(
+      "saas_user",
+      JSON.stringify({
+        id: 1,
+        name: "Dueño Bronce",
+        email: "owner@bronce.com",
+        complejos: [{ id: 10, subdominio: "nico-padel", rol: "dueño" }],
+      })
+    );
+    localStorage.setItem("saas_token", "test-token");
+
+    vi.spyOn(global, "fetch").mockImplementation(async (url: any) => {
+      const urlStr = String(url);
+
+      if (urlStr.includes("/api/clubs/nico-padel/is-admin")) {
+        return {
+          ok: true,
+          json: async () => ({ is_admin: true, is_authenticated: true }),
+        } as any;
+      }
+
+      if (urlStr.includes("/api/clubs/nico-padel/dashboard")) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              complejo: {
+                id: 10,
+                nombre: "Nico Bronce Club",
+                subdominio: "nico-padel",
+                deporte_principal: "padel",
+                branding: {},
+              },
+              plan: {
+                id: 1,
+                nombre: "Bronce",
+                slug: "bronce",
+                precio_mensual: 29,
+                canchas_incluidas: 2,
+                modulos: [
+                  { id: 1, slug: "reservas", nombre: "Reservas" },
+                  { id: 2, slug: "cms_web", nombre: "CMS Web" },
+                ],
+              },
+              canchas: [],
+              horarios_atencion: [],
+              stats: { total_canchas: 0, total_turnos: 0, modulos_count: 2 },
+            },
+          }),
+        } as any;
+      }
+
+      if (urlStr.includes("/api/clubs/nico-padel/turnos-fijos")) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: [] }),
+        } as any;
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ success: true }),
+      } as any;
+    });
+
+    render(
+      <AuthProvider>
+        <ClubAdminPanel />
+      </AuthProvider>
+    );
+
+    // Verify lock badges in tabs
+    const turnosFijosTab = await screen.findByTestId("tab-turnos-fijos");
+    expect(turnosFijosTab.textContent).toContain("🔒 Plata");
+
+    const posBuffetTab = await screen.findByTestId("tab-pos-buffet");
+    expect(posBuffetTab.textContent).toContain("🔒 Plata");
+
+    // Click on Turnos Fijos tab
+    fireEvent.click(turnosFijosTab);
+
+    // Verify locked upgrade callout appears
+    expect(await screen.findByTestId("locked-module-turnos-fijos")).toBeDefined();
+    expect(screen.getByText(/Función Exclusiva Plan Plata u Oro/i)).toBeDefined();
+    expect(screen.getByText(/Actualizar a Plan Plata u Oro/i)).toBeDefined();
+
+    // Click on Buffet & POS tab
+    fireEvent.click(posBuffetTab);
+
+    // Verify locked upgrade callout appears for POS
+    expect(await screen.findByTestId("locked-module-pos-buffet")).toBeDefined();
+    expect(screen.getByText(/Actualizar Mi Plan Ahora/i)).toBeDefined();
+  });
 });

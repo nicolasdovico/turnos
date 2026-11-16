@@ -74,9 +74,11 @@ class CajaService
                 })
                 ->get()
                 ->sum(function ($t) {
-                    return $t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad'
-                        ? (float) $t->monto_pagado
-                        : (float) $t->precio;
+                    if ($t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad') {
+                        return (float) $t->monto_pagado;
+                    }
+                    // Si se cobró seña o total en mostrador/caja, computar el monto cobrado; de lo contrario si está completamente pago
+                    return (float) ($t->monto_pagado > 0 ? $t->monto_pagado : ($t->estado_pago === 'pagado' ? $t->precio : 0.00));
                 });
 
             $totalEsperadoEfectivo = round((float) $sesion->monto_apertura + $totalVentasEfectivo, 2);
@@ -135,9 +137,10 @@ class CajaService
             })
             ->get()
             ->sum(function ($t) {
-                return $t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad'
-                    ? (float) $t->monto_pagado
-                    : (float) $t->precio;
+                if ($t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad') {
+                    return (float) $t->monto_pagado;
+                }
+                return (float) ($t->monto_pagado > 0 ? $t->monto_pagado : ($t->estado_pago === 'pagado' ? $t->precio : 0.00));
             });
 
         $totalAperturas = (float) $sesiones->sum('monto_apertura');

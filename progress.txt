@@ -3348,3 +3348,45 @@ Tarea: Implementación de la Identidad de Marca Oficial TurnosFlow (turnosflow.c
   * Suite completa de Vitest: 176/176 tests en verde (20 archivos de prueba).
   * 9/9 tests de `middleware.test.ts` pasados al 100%.
 ==============================================================================================================================
+
+
+Fecha: 2026-11-16
+Tarea: Restricción Estricta de Módulos por Plan & Candados de Upgrade en Panel de Club (Turnos Fijos, POS & Buffet)
+- Problema Reportado:
+  * Al registrar o administrar un club con Plan Bronce (ej: "nico futbol bronce"), el panel de administración mostraba todas las pestañas sin restricción y permitía crear y asignar turnos fijos a clientes, a pesar de que por definición de negocio el Plan Bronce no incluye dicho módulo.
+- Causa Raíz Identificada:
+  1. En Backend (`ClubDashboardController.php`): Los endpoints de turnos fijos (`storeTurnoFijo`, `getTurnosFijos`, `verificarDisponibilidadTurnoFijo`, `renovarTurnoFijo`, `destroySerieTurnoFijo`) validaban propiedad y abono vencido, pero no invocaban `$complejo->hasModule('turnos_fijos')`.
+  2. En Frontend (`frontend/app/tenants/[subdomain]/panel/page.tsx`): La barra de navegación de solapas (`activeTab`) renderizaba los botones estáticamente sin verificar los módulos contratados en `plan.modulos`, y los componentes de las pestañas no contaban con protección de acceso visual o mensajes de upgrade.
+- Solución Implementada:
+  1. Backend (Laravel 11):
+     * Se incorporó la validación `$complejo->hasModule('turnos_fijos')` en los 5 métodos de gestión de turnos fijos en `ClubDashboardController.php`, retornando HTTP 403 `MODULE_NOT_ENABLED` con mensaje descriptivo en caso de que el plan no lo incluya.
+     * Se agregó test de integración en `tests/Feature/TurnoFijoManagementTest.php` (`test_club_with_plan_without_turnos_fijos_returns_403_module_not_enabled`).
+  2. Frontend Web (Next.js 14):
+     * En `frontend/app/tenants/[subdomain]/panel/page.tsx`:
+       - Se introdujo el helper reactivo `hasModule(slug)` derivado de `plan.modulos`.
+       - En las pestañas de navegación, aquellas correspondientes a módulos no contratados (ej: `turnos-fijos` y `pos-buffet` en Plan Bronce) ahora despliegan una insignia visible de candado con el plan requerido (`🔒 Plata`).
+       - Al hacer clic en una solapa bloqueada, en lugar de cargar la interfaz operativa, se renderiza una tarjeta de venta/upgrade (`locked-module-turnos-fijos` y `locked-module-pos-buffet`) que detalla las características de la funcionalidad y ofrece el botón de llamada a la acción `"Actualizar Mi Plan Ahora"` redirigiendo a la solapa de Facturación.
+     * Se agregó test en Vitest en `frontend/tests/authAndOnboarding.test.tsx` verificando la visualización del candado y la tarjeta de upgrade.
+- Verificación y Tests:
+  * Backend: 318/318 tests en verde en PHPUnit (1826 aserciones sin fallas ni regresiones).
+  * Frontend: 177/177 tests en verde en Vitest (20 archivos de prueba al 100%).
+==============================================================================================================================
+
+
+Fecha: 2026-11-16
+Tarea: Corrección Contable en Caja Diaria & Purga de Turnos Fijos Anticipados
+- Problema Reportado:
+  * Al ingresar a la solapa "💵 Caja & Arqueo" de un club recién creado con Plan Bronce ("nico futbol bronce"), el Resumen Operativo Diario mostraba $208.000 facturados en "Turnos de Canchas", a pesar de que el club no tuvo actividad ni cobros reales.
+- Causa Raíz Identificada:
+  1. Durante la prueba previa se habían creado 26 semanas de turnos fijos a $8.000 ($8.000 * 26 = $208.000) a nombre de "Juani Barnech" con fecha de creación de hoy (`created_at = hoy`), todos con `estado_pago = 'pendiente'` y `monto_pagado = 0.00`.
+  2. En `CajaService.php`, el cálculo de turnos sumaba `(float) $t->precio` para todos los turnos cuyo `created_at` estuviera dentro del rango diario, computando erróneamente compromisos a futuro sin cobro real como si fuese dinero ingresado en mostrador/caja.
+- Solución Implementada:
+  1. En `backend/app/Services/CajaService.php`:
+     * Se ajustaron los métodos `cerrarCaja` y `obtenerResumenDiario` para sumar únicamente los cobros efectivamente ingresados: `(float) ($t->monto_pagado > 0 ? $t->monto_pagado : ($t->estado_pago === 'pagado' ? $t->precio : 0.00))`. De este modo, los turnos con saldo pendiente no inflan la recaudación de caja.
+  2. En la base de datos:
+     * Se eliminaron definitivamente los 26 turnos fijos asignados indebidamente al complejo `nico-futbol-bronce`.
+- Verificación y Tests:
+  * Verificación directa: `CajaService::obtenerResumenDiario()` para el complejo `nico-futbol-bronce` ahora devuelve `total_turnos_reservados = 0` y `total_ingresos_brutos = 0`.
+  * Backend: 318/318 tests en verde en PHPUnit (1826 aserciones).
+  * Frontend: 177/177 tests en verde en Vitest.
+==============================================================================================================================

@@ -548,6 +548,18 @@ export default function ClubAdminPanel() {
   const [showHorariosConflictModal, setShowHorariosConflictModal] = useState<boolean>(false);
   const [stats, setStats] = useState({ total_canchas: 0, total_turnos: 0, modulos_count: 0 });
 
+  const activeModuleSlugs = useMemo(() => {
+    return (plan?.modulos || []).map((m) => m.slug);
+  }, [plan]);
+
+  const hasModule = (slug: string) => {
+    if (!plan) return true; // Mientras carga o fallback permisivo inicial
+    return activeModuleSlugs.includes(slug);
+  };
+
+  const hasTurnosFijosModule = useMemo(() => hasModule("turnos_fijos"), [plan, activeModuleSlugs]);
+  const hasPosBuffetModule = useMemo(() => hasModule("pos_buffet"), [plan, activeModuleSlugs]);
+
   // Estados para Datos del Club
   const [tiposNegocio, setTiposNegocio] = useState<TipoNegocioItem[]>([]);
   const [clubNombre, setClubNombre] = useState<string>("");
@@ -2655,11 +2667,19 @@ export default function ClubAdminPanel() {
             className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "pos-buffet"
                 ? "border-emerald-500 text-emerald-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                : hasPosBuffetModule
+                ? "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-500 hover:text-amber-400/90"
             }`}
             data-testid="tab-pos-buffet"
           >
-            🍔 Buffet & POS
+            <span>🍔</span>
+            <span>Buffet & POS</span>
+            {!hasPosBuffetModule && (
+              <span className="ml-1 text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-0.5">
+                🔒 Plata
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("modulos")}
@@ -2683,13 +2703,22 @@ export default function ClubAdminPanel() {
           </button>
           <button
             onClick={() => setActiveTab("turnos-fijos")}
-            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               activeTab === "turnos-fijos"
                 ? "border-emerald-500 text-emerald-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                : hasTurnosFijosModule
+                ? "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-500 hover:text-purple-400/90"
             }`}
+            data-testid="tab-turnos-fijos"
           >
-            🔁 Turnos Fijos ({turnosFijos.length})
+            <span>🔁</span>
+            <span>Turnos Fijos {hasTurnosFijosModule ? `(${turnosFijos.length})` : ""}</span>
+            {!hasTurnosFijosModule && (
+              <span className="ml-1 text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-0.5">
+                🔒 Plata
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("politicas")}
@@ -2751,10 +2780,49 @@ export default function ClubAdminPanel() {
         {/* ========================================================================= */}
         {activeTab === "pos-buffet" && (
           <div className="mt-8">
-            <GestionPOSBuffet
-              subdomain={subdomain}
-              token={token}
-            />
+            {!hasPosBuffetModule ? (
+              <div
+                data-testid="locked-module-pos-buffet"
+                className="rounded-3xl border border-amber-500/30 bg-gradient-to-b from-slate-900 to-slate-950 p-8 sm:p-12 text-center max-w-3xl mx-auto shadow-2xl relative overflow-hidden"
+              >
+                <div className="absolute -top-24 -right-24 w-60 h-60 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-amber-500/10 border border-amber-500/30 text-4xl mb-6 shadow-inner">
+                  🔒
+                </div>
+                <div className="inline-block px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black uppercase tracking-wider border border-amber-500/30 mb-3">
+                  Función Exclusiva Plan Plata u Oro
+                </div>
+                <h3 className="text-2xl font-black text-white sm:text-3xl tracking-tight">
+                  Punto de Venta (POS) & Buffet
+                </h3>
+                <p className="mt-4 text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
+                  Tu club actualmente tiene asignado el <strong className="text-white">Plan {plan?.nombre || "Bronce"}</strong>, el cual incluye Reservas y Sitio Web Institucional. Para acceder a la terminal de ventas de cantina, inventario en vivo y comandas vinculadas a turnos, actualiza a <strong className="text-amber-400">Plan Plata ($59/mes)</strong> u <strong className="text-amber-400">Oro ($99/mes)</strong>.
+                </p>
+
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("facturacion")}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 transition cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>⚡</span>
+                    <span>Actualizar Mi Plan Ahora</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("canchas")}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm border border-slate-700 transition cursor-pointer"
+                  >
+                    Volver a Canchas
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <GestionPOSBuffet
+                subdomain={subdomain}
+                token={token}
+              />
+            )}
           </div>
         )}
 
@@ -4392,6 +4460,45 @@ export default function ClubAdminPanel() {
         {/* ========================================================================= */}
         {activeTab === "turnos-fijos" && (
           <div className="mt-8 space-y-6">
+            {!hasTurnosFijosModule ? (
+              <div
+                data-testid="locked-module-turnos-fijos"
+                className="rounded-3xl border border-purple-500/30 bg-gradient-to-b from-slate-900 to-slate-950 p-8 sm:p-12 text-center max-w-3xl mx-auto shadow-2xl relative overflow-hidden"
+              >
+                <div className="absolute -top-24 -right-24 w-60 h-60 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-purple-500/10 border border-purple-500/30 text-4xl mb-6 shadow-inner">
+                  🔒
+                </div>
+                <div className="inline-block px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-black uppercase tracking-wider border border-purple-500/30 mb-3">
+                  Función Exclusiva Plan Plata u Oro
+                </div>
+                <h3 className="text-2xl font-black text-white sm:text-3xl tracking-tight">
+                  Gestión de Turnos Fijos & Abonados
+                </h3>
+                <p className="mt-4 text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
+                  Tu club actualmente tiene asignado el <strong className="text-white">Plan {plan?.nombre || "Bronce"}</strong>. La generación masiva de turnos recurrentes por 6 meses para abonados y socios fijos con alertas de renovación es una funcionalidad disponible a partir del <strong className="text-purple-400">Plan Plata ($59/mes)</strong> u <strong className="text-purple-400">Oro ($99/mes)</strong>.
+                </p>
+
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("facturacion")}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-black text-sm shadow-xl shadow-purple-500/25 transition cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>⚡</span>
+                    <span>Actualizar a Plan Plata u Oro</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("canchas")}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm border border-slate-700 transition cursor-pointer"
+                  >
+                    Volver a Canchas
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white">🔁 Gestión de Turnos Fijos & Abonados</h2>
@@ -4764,6 +4871,8 @@ export default function ClubAdminPanel() {
                 </div>
               );
             })()}
+            </>
+            )}
           </div>
         )}
 

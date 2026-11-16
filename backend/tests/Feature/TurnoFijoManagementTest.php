@@ -761,6 +761,44 @@ class TurnoFijoManagementTest extends TestCase
         $this->assertStringContainsString('15-09-2026', $responseConflict->json('message'));
         $this->assertStringContainsString('Esteban Casual', $responseConflict->json('message'));
     }
+
+    public function test_club_with_plan_without_turnos_fijos_returns_403_module_not_enabled(): void
+    {
+        $planBronce = Plan::firstOrCreate(
+            ['slug' => 'bronce-test'],
+            ['nombre' => 'Bronce Test', 'precio_mensual' => 29, 'estado' => 'activo']
+        );
+        $moduloReservas = Modulo::firstOrCreate(['slug' => 'reservas'], ['nombre' => 'Reservas']);
+        $planBronce->modulos()->sync([$moduloReservas->id]);
+
+        $this->complejo->update(['plan_id' => $planBronce->id]);
+
+        $response = $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos", [
+                'cancha_id' => $this->cancha->id,
+                'dia_semana' => 2,
+                'hora_inicio' => '19:00',
+                'hora_fin' => '20:30',
+                'semanas' => 26,
+            ]);
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'error' => 'MODULE_NOT_ENABLED',
+                'module' => 'turnos_fijos',
+            ]);
+
+        $responseGet = $this->actingAs($this->owner, 'sanctum')
+            ->getJson("/api/clubs/{$this->complejo->subdominio}/turnos-fijos");
+
+        $responseGet->assertStatus(403)
+            ->assertJson([
+                'success' => false,
+                'error' => 'MODULE_NOT_ENABLED',
+                'module' => 'turnos_fijos',
+            ]);
+    }
 }
 
 

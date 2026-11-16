@@ -1240,6 +1240,15 @@ class ClubDashboardController extends Controller
             return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
         }
 
+        if (!$complejo->hasModule('turnos_fijos')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'MODULE_NOT_ENABLED',
+                'module' => 'turnos_fijos',
+                'message' => 'El módulo de Turnos Fijos no está habilitado en tu plan actual. Actualiza a Plan Plata u Oro para activarlo.',
+            ], 403);
+        }
+
         $user = $request->user('sanctum');
         if ($user) {
             $isOwner = $complejo->user_id && $complejo->user_id === $user->id;
@@ -1350,6 +1359,15 @@ class ClubDashboardController extends Controller
         $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
         if (!$complejo) {
             return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        if (!$complejo->hasModule('turnos_fijos')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'MODULE_NOT_ENABLED',
+                'module' => 'turnos_fijos',
+                'message' => 'El módulo de Turnos Fijos no está habilitado en tu plan actual. Actualiza a Plan Plata u Oro para activarlo.',
+            ], 403);
         }
 
         if (!$complejo->suscripcionValida()) {
@@ -1581,6 +1599,15 @@ class ClubDashboardController extends Controller
             return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
         }
 
+        if (!$complejo->hasModule('turnos_fijos')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'MODULE_NOT_ENABLED',
+                'module' => 'turnos_fijos',
+                'message' => 'El módulo de Turnos Fijos no está habilitado en tu plan actual. Actualiza a Plan Plata u Oro para activarlo.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'cancha_id' => 'required|integer|exists:canchas,id',
             'dia_semana' => 'required|integer|between:0,6',
@@ -1711,6 +1738,15 @@ class ClubDashboardController extends Controller
         $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
         if (!$complejo) {
             return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        if (!$complejo->hasModule('turnos_fijos')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'MODULE_NOT_ENABLED',
+                'module' => 'turnos_fijos',
+                'message' => 'El módulo de Turnos Fijos no está habilitado en tu plan actual. Actualiza a Plan Plata u Oro para activarlo.',
+            ], 403);
         }
 
         $user = $request->user('sanctum');
@@ -1916,6 +1952,15 @@ class ClubDashboardController extends Controller
         $complejo = Complejo::withoutGlobalScopes()->where('subdominio', $cleanSubdomain)->first();
         if (!$complejo) {
             return response()->json(['success' => false, 'message' => 'Complejo no encontrado.'], 404);
+        }
+
+        if (!$complejo->hasModule('turnos_fijos')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'MODULE_NOT_ENABLED',
+                'module' => 'turnos_fijos',
+                'message' => 'El módulo de Turnos Fijos no está habilitado en tu plan actual. Actualiza a Plan Plata u Oro para activarlo.',
+            ], 403);
         }
 
         $user = $request->user('sanctum');

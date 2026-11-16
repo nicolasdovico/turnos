@@ -164,7 +164,7 @@ class CajaSessionTest extends TestCase
             ['producto_id' => $this->producto->id, 'cantidad' => 2],
         ]);
 
-        // 4. Confirm a court booking ($12,000)
+        // 4. Confirm a court booking ($12,000 paid)
         Turno::create([
             'complejo_id' => $this->complejo->id,
             'cancha_id' => $this->cancha->id,
@@ -173,6 +173,8 @@ class CajaSessionTest extends TestCase
             'hora_inicio' => '18:00',
             'hora_fin' => '19:00',
             'precio' => 12000.00,
+            'monto_pagado' => 12000.00,
+            'estado_pago' => 'pagado',
             'estado' => 'reservado',
         ]);
 
