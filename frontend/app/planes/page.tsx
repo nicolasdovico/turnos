@@ -28,8 +28,9 @@ export default function PlanesPage() {
       modulos: [
         { id: 1, nombre: "Reservas y Agenda en Tiempo Real", slug: "reservas" },
         { id: 2, nombre: "CMS Web & Landing Page Propia", slug: "cms_web" },
-        { id: 3, nombre: "Subdominio Personalizado", slug: "subdominio" },
-        { id: 4, nombre: "Soporte Estándar", slug: "soporte" },
+        { id: 3, nombre: "Control de Caja & Arqueo Ciego", slug: "caja" },
+        { id: 4, nombre: "Directorio de Clientes & CRM", slug: "clientes" },
+        { id: 5, nombre: "Subdominio Personalizado", slug: "subdominio" },
       ],
     },
     {
@@ -40,11 +41,11 @@ export default function PlanesPage() {
       canchas_incluidas: 4,
       precio_cancha_adicional: 10,
       modulos: [
-        { id: 1, nombre: "Todo lo del Plan Bronce", slug: "reservas" },
+        { id: 1, nombre: "Todo lo del Plan Bronce", slug: "bronce" },
         { id: 2, nombre: "Turnos Fijos y Recurrentes", slug: "turnos_fijos" },
-        { id: 3, nombre: "Partidos Abiertos & Split Payment", slug: "split_payment" },
-        { id: 4, nombre: "Punto de Venta (POS) & Control de Buffet", slug: "pos_buffet" },
-        { id: 5, nombre: "Arqueo Ciego de Caja Diaria", slug: "caja" },
+        { id: 3, nombre: "Punto de Venta (POS) & Control de Buffet", slug: "pos_buffet" },
+        { id: 4, nombre: "Billeteras Virtuales de Clientes", slug: "billeteras" },
+        { id: 5, nombre: "Hasta 4 Canchas Base Incluidas", slug: "canchas_4" },
       ],
     },
     {
@@ -56,10 +57,10 @@ export default function PlanesPage() {
       precio_cancha_adicional: 12,
       modulos: [
         { id: 1, nombre: "Todo lo del Plan Plata", slug: "plata" },
-        { id: 2, nombre: "Gestor de Torneos, Llaves y Fixtures", slug: "torneos" },
-        { id: 3, nombre: "Domótica IoT: Control Automático de Luces", slug: "domotica" },
-        { id: 4, nombre: "Subida a S3/R2 con Presigned URLs", slug: "storage" },
-        { id: 5, nombre: "Soporte Prioritario 24/7", slug: "soporte_oro" },
+        { id: 2, nombre: "Hasta 6 Canchas Base Incluidas", slug: "canchas_6" },
+        { id: 3, nombre: "Comisión Reducida en Marketplace", slug: "comision_baja" },
+        { id: 4, nombre: "Subida Segura de Logo y Portada", slug: "branding" },
+        { id: 5, nombre: "Soporte Prioritario de Operaciones", slug: "soporte_oro" },
       ],
     },
   ]);
@@ -85,13 +86,13 @@ export default function PlanesPage() {
     { name: "Motor de Reservas y Grilla Horaria", bronce: true, plata: true, oro: true },
     { name: "Subdominio y CMS Web Multitenant", bronce: true, plata: true, oro: true },
     { name: "Bloqueos Atómicos Anti Doble Reserva (Redis)", bronce: true, plata: true, oro: true },
+    { name: "Control de Caja & Arqueo Ciego Diario", bronce: true, plata: true, oro: true },
+    { name: "Directorio de Clientes & Padrón 360°", bronce: true, plata: true, oro: true },
+    { name: "Billeteras Virtuales de Clientes", bronce: true, plata: true, oro: true },
     { name: "Turnos Fijos y Recurrentes Semanales", bronce: false, plata: true, oro: true },
-    { name: "Matchmaking & Split Payment (Pago Fraccionado)", bronce: false, plata: true, oro: true },
     { name: "Punto de Venta (POS) & Inventario de Buffet", bronce: false, plata: true, oro: true },
-    { name: "Arqueo y Control de Caja Diaria", bronce: false, plata: true, oro: true },
-    { name: "Gestor de Torneos, Fixtures y Tablas", bronce: false, plata: false, oro: true },
-    { name: "Domótica IoT (Encendido Automático de Luces)", bronce: false, plata: false, oro: true },
-    { name: "Subida Segura de Imágenes S3/Cloudflare R2", bronce: false, plata: false, oro: true },
+    { name: "Identidad Visual (Logo y Portada)", bronce: true, plata: true, oro: true },
+    { name: "Soporte Técnico de Operaciones", bronce: true, plata: true, oro: true },
   ];
 
   return (

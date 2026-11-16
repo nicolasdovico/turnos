@@ -47,7 +47,7 @@ export default function RegistroClubPage() {
       precio_mensual: 29,
       canchas_incluidas: 2,
       precio_cancha_adicional: 8,
-      modulos: [{ id: 1, nombre: "Reservas y Agenda", slug: "reservas" }, { id: 2, nombre: "CMS Web", slug: "cms_web" }],
+      modulos: [{ id: 1, nombre: "Reservas y Agenda", slug: "reservas" }, { id: 2, nombre: "CMS Web", slug: "cms_web" }, { id: 3, nombre: "Caja & Arqueo", slug: "caja" }],
     },
     {
       id: 2,
@@ -56,7 +56,7 @@ export default function RegistroClubPage() {
       precio_mensual: 59,
       canchas_incluidas: 4,
       precio_cancha_adicional: 10,
-      modulos: [{ id: 1, nombre: "Reservas", slug: "reservas" }, { id: 2, nombre: "Turnos Fijos", slug: "turnos_fijos" }, { id: 3, nombre: "Split Payment", slug: "split_payment" }, { id: 4, nombre: "POS & Buffet", slug: "pos_buffet" }],
+      modulos: [{ id: 1, nombre: "Todo lo de Bronce", slug: "reservas" }, { id: 2, nombre: "Turnos Fijos", slug: "turnos_fijos" }, { id: 3, nombre: "POS & Buffet", slug: "pos_buffet" }, { id: 4, nombre: "4 Canchas Base", slug: "canchas_4" }],
     },
     {
       id: 3,
@@ -65,7 +65,7 @@ export default function RegistroClubPage() {
       precio_mensual: 99,
       canchas_incluidas: 6,
       precio_cancha_adicional: 12,
-      modulos: [{ id: 1, nombre: "Todo Incluido", slug: "reservas" }, { id: 2, nombre: "Torneos y Brackets", slug: "torneos" }, { id: 3, nombre: "Domótica IoT", slug: "domotica" }, { id: 4, nombre: "Split Payment", slug: "split_payment" }],
+      modulos: [{ id: 1, nombre: "Todo lo de Plata", slug: "plata" }, { id: 2, nombre: "6 Canchas Base", slug: "canchas_6" }, { id: 3, nombre: "Comisión Reducida", slug: "comision_baja" }, { id: 4, nombre: "Soporte Prioritario", slug: "soporte_oro" }],
     },
   ]);
 
