@@ -2510,7 +2510,7 @@ export default function ClubAdminPanel() {
                 rel="noopener noreferrer"
                 className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5"
               >
-                <span>🎾 Ver Sitio Público ↗</span>
+                <span>{getSportEmoji(complejo?.deporte_principal)} Ver Sitio Público ↗</span>
               </Link>
             </div>
           </div>
@@ -2549,13 +2549,14 @@ export default function ClubAdminPanel() {
         >
           <button
             onClick={() => setActiveTab("canchas")}
-            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 ${
+            className={`pb-3 transition border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
               activeTab === "canchas"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            🎾 Canchas ({canchas.length})
+            <span>{getSportEmoji(complejo?.deporte_principal)}</span>
+            <span>Canchas ({canchas.length})</span>
           </button>
           <button
             onClick={() => setActiveTab("resumen")}
