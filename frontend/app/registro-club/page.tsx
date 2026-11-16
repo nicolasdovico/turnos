@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import PasswordInput from "../../components/PasswordInput";
+import { getTenantPublicUrl } from "@/lib/navigationUrls";
 
 interface PlanItem {
   id: number;
@@ -443,10 +444,16 @@ export default function RegistroClubPage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href={successData.subdomain_url}
+              href={`${successData.subdomain_url}?auth_token=${encodeURIComponent(token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") || localStorage.getItem("token") || "" : ""))}`}
               className="rounded-xl bg-emerald-600 px-8 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition"
             >
               Ir al Sitio de mi {tipoNombre} 🚀
+            </a>
+            <a
+              href={`${successData.subdomain_url}/panel?auth_token=${encodeURIComponent(token || (typeof window !== "undefined" ? localStorage.getItem("saas_token") || localStorage.getItem("token") || "" : ""))}`}
+              className="rounded-xl bg-slate-900 px-8 py-3.5 text-base font-bold text-white shadow-lg shadow-slate-900/30 hover:bg-slate-800 transition"
+            >
+              Ir al Panel de Administración ⚙️
             </a>
             <Link
               href="/"
