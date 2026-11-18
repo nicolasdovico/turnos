@@ -158,14 +158,24 @@ class WhatsAppEvolutionService
         $enviado = $this->enviarMensajeTexto($numeroLimpio, $mensaje, false);
 
         // Si el complejo tiene coordenadas GPS, enviar la ubicación interactiva nativa de WhatsApp
-        if ($enviado && !empty($complejo?->latitud) && !empty($complejo?->longitud)) {
-            $this->enviarUbicacion(
-                $numeroLimpio,
-                (float) $complejo->latitud,
-                (float) $complejo->longitud,
-                $complejoNombre,
-                $complejo->direccion ?: 'Ubicación del Club'
-            );
+        if ($enviado) {
+            $lat = $complejo?->latitud;
+            $lng = $complejo?->longitud;
+
+            if (!empty($lat) && !empty($lng)) {
+                // Pausa breve de 1 segundo para evitar colisiones en el socket de WhatsApp/Baileys
+                sleep(1);
+
+                $this->enviarUbicacion(
+                    $numeroLimpio,
+                    (float) $lat,
+                    (float) $lng,
+                    $complejoNombre,
+                    $complejo->direccion ?: 'Ubicación del Club'
+                );
+            } else {
+                Log::info("WhatsApp recordatorio: El complejo ID {$complejo?->id} no posee latitud/longitud configuradas para enviar ubicación.");
+            }
         }
 
         return $enviado;
@@ -273,18 +283,24 @@ class WhatsAppEvolutionService
         try {
             $endpoint = "{$this->baseUrl}/message/sendLocation/{$this->instance}";
 
+            // Payload híbrido: compatible con Evolution API v1 y v2
             $payload = [
                 'number' => $numero,
-                'latitude' => $latitud,
-                'longitude' => $longitud,
+                'latitude' => (float) $latitud,
+                'longitude' => (float) $longitud,
+                'name' => $nombre ?: 'Ubicación',
+                'address' => $direccion ?: 'Dirección',
+                'locationMessage' => [
+                    'latitude' => (float) $latitud,
+                    'longitude' => (float) $longitud,
+                    'name' => $nombre ?: 'Ubicación',
+                    'address' => $direccion ?: 'Dirección',
+                ],
+                'options' => [
+                    'delay' => 1200,
+                    'presence' => 'composing',
+                ],
             ];
-
-            if (!empty($nombre)) {
-                $payload['name'] = $nombre;
-            }
-            if (!empty($direccion)) {
-                $payload['address'] = $direccion;
-            }
 
             $response = Http::timeout(15)
                 ->withHeaders([
