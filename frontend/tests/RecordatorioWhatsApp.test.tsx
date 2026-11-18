@@ -235,8 +235,18 @@ describe("Frontend WhatsApp Reminders Suite", () => {
     // Toast should show success message
     expect(await screen.findByText(/Recordatorio de WhatsApp enviado exitosamente a 1133221100/i)).toBeDefined();
 
-    // Button should now transition to "Recordatorio enviado"
+    // Button should now transition to "Recordatorio enviado" and show "Reenviar"
     expect(await screen.findByText(/Recordatorio enviado/i)).toBeDefined();
+    expect(screen.getByRole("button", { name: /Reenviar/i })).toBeDefined();
+
+    // Verify clicking "Reenviar" triggers reminder again
+    const resendBtn = screen.getByRole("button", { name: /Reenviar/i });
+    reminderDispatchedTurnoId = null;
+    fireEvent.click(resendBtn);
+
+    await waitFor(() => {
+      expect(reminderDispatchedTurnoId).toBe(99);
+    });
   });
 
   it("formats phone numbers entered without '+' or country code correctly", () => {

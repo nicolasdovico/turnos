@@ -1180,16 +1180,28 @@ export default function ResumenDiarioTurnos({
 
                                     {/* WhatsApp Reminder Button / Status */}
                                     {!isPenalidad && !isClima && t.estado !== "cancelado" && (
-                                      <div className="shrink-0">
+                                      <div className="shrink-0 flex items-center gap-1.5">
                                         {t.recordatorio_enviado_at ? (
-                                          <span
-                                            title={`Recordatorio enviado: ${t.recordatorio_enviado_at}`}
-                                            className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1 cursor-default"
-                                          >
-                                            <span>📲</span>
-                                            <span className="hidden sm:inline">Recordatorio enviado</span>
-                                            <span className="sm:hidden">Enviado</span>
-                                          </span>
+                                          <>
+                                            <span
+                                              title={`Recordatorio enviado: ${t.recordatorio_enviado_at}`}
+                                              className="px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold flex items-center gap-1 cursor-default"
+                                            >
+                                              <span>📲</span>
+                                              <span className="hidden sm:inline">Recordatorio enviado</span>
+                                              <span className="sm:hidden">Enviado</span>
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => handleEnviarRecordatorio(e, t.id)}
+                                              disabled={sendingReminderId === t.id}
+                                              className="px-2 py-1 rounded-xl bg-slate-800 hover:bg-emerald-600/30 text-slate-400 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/50 text-[11px] font-medium transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                              title="Reenviar recordatorio por WhatsApp"
+                                            >
+                                              <span className={sendingReminderId === t.id ? "animate-spin" : ""}>🔄</span>
+                                              <span className="hidden md:inline">{sendingReminderId === t.id ? "Reenviando..." : "Reenviar"}</span>
+                                            </button>
+                                          </>
                                         ) : (
                                           <button
                                             type="button"

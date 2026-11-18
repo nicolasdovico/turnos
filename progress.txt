@@ -2750,8 +2750,52 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * 286/286 tests de backend en verde en PHPUnit.
   * 126/126 tests de frontend en verde en Vitest.
   * Total Ecosistema: 432/432 tests automatizados pasando exitosamente.
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================================================
 [2026-09-21] - CORRECCIÓN: RESOLUCIÓN DE RUTA DE API Y CORS EN FACTURACIÓN DEL CLUB ("FAILED TO FETCH" EN SUBDOMINIOS)
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================================================
 - Diagnóstico del Error:
   * Al ingresar al panel de administración del club en un subdominio local (ej. `http://club-padel-bronce.localhost:8080/panel`), la sección de facturación arrojaba:
@@ -2777,8 +2821,52 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * 4. Ajuste de Test Nocturno (`backend/tests/Feature/CancelacionLluviaTest.php`):
     - Se fijó la hora de ejecución del test con `Carbon::setTestNow()` para evitar que ejecuciones automáticas pasadas las 22:00 hs fallen por horario de cierre del club.
 - Verificación:
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================================================
 [2026-09-21] - CORRECCIÓN: ACCIÓN "APROBAR PAGO" EN EDICIÓN DE FACTURAS DE CLUBES (FILAMENT SUPERADMIN)
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================================================
 - Diagnóstico del Requerimiento:
   * Al ingresar a Filament Superadmin (`/admin`) en la sección **Facturación & Finanzas > Facturas de Clubes** y entrar a editar una factura (`/admin/factura-clubs/{id}/edit`), no aparecía disponible la acción de botón **"Aprobar Pago"**.
@@ -2807,8 +2895,52 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * 288/288 tests de backend pasando en verde en PHPUnit.
   * 126/126 tests de frontend pasando en verde en Vitest.
   * Total Ecosistema: 414 tests automatizados pasando exitosamente.
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================================================
 [2026-09-22] - SUSPENSIÓN TÉCNICA DE RESERVAS Y OPERACIONES POR ABONO VENCIDO CON REACTIVACIÓN AUTOMÁTICA POR PAGO
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 - Diagnóstico:
   * Cuando un club superaba su fecha de vencimiento y consumía los 7 días de gracia (suscripcion_estado = 'vencida'), el panel de administración (/panel) mostraba el banner rojo de advertencia, pero los clientes y visitantes aún podían bloquear y reservar turnos en la web del club y encontrarlo en el marketplace, debido a que el chequeo de suscripcionValida() no estaba conectado al motor de reservas del backend ni a la búsqueda espacial.
@@ -2830,7 +2962,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: Nuevo test en tests/GrillaHoraria.test.tsx validando el renderizado de la tarjeta de suspensión para clientes públicos (129 tests pasados al 100% en 13 suites de Vitest).
   * Total Ecosistema: 439 tests automatizados exitosos (0 fallas, 0 regresiones).
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 [2026-09-22] - ACREDITACIÓN INMEDIATA DE PAGO POR TRANSFERENCIA Y CIERRE AUTOMÁTICO DE MODAL DE PAGO
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 - Diagnóstico:
   * Al hacer clic en "Informar transferencia realizada" en el modal de Abonar Servicio SaaS (/panel), la solicitud se registraba en el backend pero únicamente seteaba estado = 'revision_transferencia' sin ejecutar procesarPagoAprobado(), por lo que la suscripción permanecía 'vencida', las restricciones operativas no se levantaban y el pago no se consumaba.
@@ -2849,7 +3025,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: Test it("submits bank transfer receipt and refreshes data and closes modal") en tests/FacturacionClub.test.tsx verificando envío de POST, llamada a onRefreshSummary, cierre del modal e inserción de panel-notification-alert (129 tests de frontend pasados al 100% en Vitest).
   * BD en Vivo: Se regularizó y reactivó exitosamente Factura #4 de Complejo 125 ("Club Padel Bronce"), dejando suscripcion_estado = 'activa' y vencimiento extendido al 2026-10-22.
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 [2026-09-22] - GESTIÓN DINÁMICA DE DEPORTES, SUPERFICIES Y ATRIBUTOS DE CANCHAS (MODELO HÍBRIDO SUPERADMIN / CLUB)
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 - Diagnóstico:
   * El sistema contaba con configuraciones estáticas en frontend (DEPORTES_CONFIG) y columnas booleanas fijas en la tabla canchas (techada, iluminacion, camara_grabacion, marcador_digital, climatizada).
@@ -2897,7 +3117,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: tests/DeportesYEquipamientosClub.test.tsx con 3 pruebas completas (renderizado de badges, guardado con IDs de deporte/superficie/equipamientos, y alta inline de atributo propio) pasando al 100%. Suite completa: 132 tests de frontend pasando en 14 suites de Vitest.
   * Total Ecosistema: 446 tests automatizados exitosos (0 fallas, 0 regresiones).
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 [2026-09-22] - RESOLUCIÓN: DESPLEGABLE DINÁMICO DE DEPORTES Y SUPERFICIES EN PANEL DE CLUB (CLUB PÁDEL BRONCE)
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 - Diagnóstico:
   * El usuario consultó por qué al editar o crear una cancha en "Club Pádel Bronce" no aparecían en el combo todos los deportes definidos en el backend (por ejemplo, 'Rugby' creado en Filament o los deportes de catálogo como Pickleball, Vóley, Hockey).
@@ -2924,7 +3188,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Frontend: 132 tests pasados al 100% en Vitest (14 suites).
   * Total Ecosistema: 426 tests automatizados exitosos (0 fallas).
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 [2026-09-22] - CORRECCIÓN: VISUALIZACIÓN DE EMOJIS EN ATRIBUTOS Y EQUIPAMIENTOS ADICIONALES
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 - Diagnóstico:
   * Al editar o crear una cancha en el modal, en la sección de "Atributos y Equipamientos Adicionales" aparecían las cadenas de texto del nombre del icono (ej. "tv", "users", "door-open", "volume-2", "maximize-2", "package") directamente delante del nombre del atributo en lugar de renderizar su emoji correspondiente.
@@ -2941,7 +3249,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * Vitest frontend: suites pasando al 100%.
   * Backend: 294 tests pasando al 100%.
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 [2026-09-22] - MEJORA UX: LECTURA COMPLETA DE DESCRIPCIONES EN ATRIBUTOS ADICIONALES DE CANCHAS
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 - Diagnóstico:
   * En el modal de creación y edición de canchas, las descripciones técnicas de los atributos adicionales (ej. "Espacio perimetral reglamentario (mínimo 2 metros) para recuperar pelotas fuera de pista") quedaban cortadas con puntos suspensivos debido a la clase Tailwind `line-clamp-1`.
@@ -2953,7 +3305,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
 - Verificación:
   * Vitest frontend: 100% pasando sin regresiones.
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 [2026-09-22] - CORRECCIÓN: WORKFLOW CI DE GITHUB ACTIONS - FRONTEND TESTS & BUILD (NEXT.JS & VITEST)
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 - Diagnóstico:
   * En GitHub Actions, el job `Frontend Tests (Next.js & Vitest)` fallaba durante el paso `Build Next.js Application` (`npm run build` / `next build`).
@@ -2967,7 +3363,51 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
   * TypeScript compiler: `npx tsc --noEmit` ejecuta con código 0 (cero errores de tipos en todo el frontend).
   * Vitest frontend: 132 tests pasando al 100% en 14 suites.
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 [2026-09-23] - SUBIDA, PREVISUALIZACIÓN EN VIVO Y DESPLIEGUE PÚBLICO DE LOGOTIPO Y PORTADA DE CLUBES
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 - Diagnóstico:
   * Los botones "Subir Logotipo" y "Subir Portada" en la pestaña de Identidad & Diseño Web (/panel) no funcionaban: las imágenes no se previsualizaban y tampoco se mostraban en la web final del club.
@@ -3019,6 +3459,28 @@ STACK: Laravel 11 (PHP 8.3), Next.js 14+ (Node 22), React Native (Expo), Postgre
     - Suite completa Mobile: 20/20 tests pasados en verde en Jest.
   * Total Ecosistema: 491 tests automatizados en verde (0 fallas, 0 regresiones).
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 Fecha: 2026-09-23
 Tarea: Optimización de Visibilidad, Luminosidad y Contraste de Banner de Portada en Plantillas Web Públicas
 - Problema Reportado:
@@ -3047,6 +3509,28 @@ Tarea: Optimización de Visibilidad, Luminosidad y Contraste de Banner de Portad
   * Backend: 15/15 tests pasados en `ClubBrandingTest` (58 assertions).
   * Resultado visual: La imagen de portada ahora se muestra con colores intensos, nitidez fotográfica y perfecta legibilidad de todos los textos.
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
 Fecha: 2026-09-23
 Tarea: Incorporación del Icono y Enlace a Canal de YouTube en el Pie de Página (ClubFooter)
 - Problema Reportado:
@@ -3070,6 +3554,28 @@ Tarea: Incorporación del Icono y Enlace a Canal de YouTube en el Pie de Página
   * Frontend: 163/163 tests pasados en Vitest (`npx vitest run tests/PublicClubTemplates.test.tsx` y suite completa de 18 archivos).
   * Backend: 15/15 tests pasados en `ClubBrandingTest` (58 assertions).
   * En club `club-padel-bronce`: verificado en base de datos que cuenta con `youtube: "https://youtube.com/club_padel_bronce"` y ahora se visualiza correctamente en el pie de página de la web pública.
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 Fecha: 2026-09-23
 Tarea: Corrección de Ruta Duplicada `/api/api/` y Autorización en Gestor de Páginas CMS (`GestionPaginasCMS`)
@@ -3095,6 +3601,28 @@ Tarea: Corrección de Ruta Duplicada `/api/api/` y Autorización en Gestor de P�
   * Backend: 19/19 tests pasados en `ClubBrandingTest` y `CMSSanitizationAndRevalidationTest` (78 assertions).
   * Frontend: 163/163 tests pasados en Vitest (`tests/GestionPaginasCMS.test.tsx` y suite completa).
   * En club `club-padel-bronce`: página "Quiénes Somos e Instalaciones" creada exitosamente (`id: 7`, `slug: "quienes-somos"`), publicada y verificada en `http://club-padel-bronce.localhost:8080/paginas/quienes-somos` respondiendo HTTP 200 con su contenido y metadatos SEO.
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 Fecha: 2026-09-23
 Tarea: Corrección de "The slug has already been taken" en Plantillas Rápidas CMS y Revalidación en Tiempo Real
@@ -3128,6 +3656,28 @@ Tarea: Corrección de "The slug has already been taken" en Plantillas Rápidas C
   * Frontend: 165/165 tests pasados en Vitest (`tests/GestionPaginasCMS.test.tsx` 9/9 pasados; suite completa de 18 archivos 165/165 pasados).
   * Backend: 19/19 tests pasados en `ClubBrandingTest` y `CMSSanitizationAndRevalidationTest` (78 assertions).
   * Verificación en vivo: `http://club-padel-bronce.localhost:8080/paginas/quienes-somos` renderiza de forma íntegra y nítida todo el contenido de la plantilla rápida (canchas panorámicas, iluminación LED, vestuarios, Resto Bar & Terraza panorámica, footer con canal de YouTube y metadatos Open Graph completos).
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 Fecha: 2026-09-23
 Tarea: Corrección del Renderizado de Tags HTML (H1-H6, UL, OL, LI, Blockquote, etc.) en Páginas Institucionales CMS
@@ -3169,6 +3719,28 @@ Tarea: Corrección del Renderizado de Tags HTML (H1-H6, UL, OL, LI, Blockquote, 
 ==============================================================================================================================
 
 
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
+
+
 Fecha: 2026-09-23
 Tarea: Visualización Integral de "Reseña Corta / Sobre Nosotros" en Plantillas Web Públicas, Footer y Mockup de Administración
 - Problema Reportado:
@@ -3200,6 +3772,28 @@ Tarea: Visualización Integral de "Reseña Corta / Sobre Nosotros" en Plantillas
   * Verificación en vivo: La reseña corta del club se visualiza de forma elegante en el Hero de la web pública, en el pie de página de todas las vistas, en los metadatos SEO y en el mockup interactivo del panel de administración.
 ==============================================================================================================================
 
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
+
 Fecha: 2026-11-07
 Tarea: Subida e Inserción Directa de Imágenes en el Gestor de Páginas CMS (Exhibición de Canchas e Instalaciones)
 - Contexto y Requerimiento:
@@ -3227,6 +3821,28 @@ Tarea: Subida e Inserción Directa de Imágenes en el Gestor de Páginas CMS (Ex
      * Backend: 5/5 tests pasados en `CMSSanitizationAndRevalidationTest` y 310/310 tests en la suite completa de PHPUnit.
 ==============================================================================================================================
 
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
+
 Fecha: 2026-11-07
 Tarea: Módulo de Recuperación y Reseteo Seguro de Contraseña Olvidada (Forgot Password & OTP Flow)
 - Contexto y Requerimiento:
@@ -3252,6 +3868,28 @@ Tarea: Módulo de Recuperación y Reseteo Seguro de Contraseña Olvidada (Forgot
 ==============================================================================================================================
 
 
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
+
+
 
 Fecha: 2026-11-10
 Tarea: Corrección de Diseño Responsive en Navbar Móvil (Prevención de Desborde Horizontal y Visibilidad del Menú Hamburguesa)
@@ -3270,6 +3908,28 @@ Tarea: Corrección de Diseño Responsive en Navbar Móvil (Prevención de Desbor
 - Verificación y Tests:
   * Suite completa de Vitest en frontend: 176/176 tests pasados en verde (20 archivos de prueba).
   * Suite de autenticación y navegación validada con éxito sin regresiones.
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 
 Fecha: 2026-11-10
@@ -3296,6 +3956,28 @@ Tarea: Calibración Responsiva de Fichas/Tarjetas de Turnos en GrillaHoraria (M�
   * 39/39 tests de `GrillaHoraria.test.tsx` pasados exitosamente sin regresiones.
 ==============================================================================================================================
 
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
+
 Fecha: 2026-11-10
 Tarea: Homogeneización Global de Formato de Precios sin Separador de Miles (Frontend Web & Mobile)
 - Problema Reportado:
@@ -3320,6 +4002,28 @@ Tarea: Homogeneización Global de Formato de Precios sin Separador de Miles (Fro
 - Verificación y Tests:
   * Suite completa de Vitest en frontend: 176/176 tests pasados en verde (20 archivos de prueba).
   * 39/39 tests de `GrillaHoraria.test.tsx` pasados al 100%.
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 
 Fecha: 2026-11-10
@@ -3350,6 +4054,28 @@ Tarea: Implementación de la Identidad de Marca Oficial TurnosFlow (turnosflow.c
 ==============================================================================================================================
 
 
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
+
+
 Fecha: 2026-11-16
 Tarea: Restricción Estricta de Módulos por Plan & Candados de Upgrade en Panel de Club (Turnos Fijos, POS & Buffet)
 - Problema Reportado:
@@ -3373,6 +4099,28 @@ Tarea: Restricción Estricta de Módulos por Plan & Candados de Upgrade en Panel
 ==============================================================================================================================
 
 
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
+==============================================================================================================================
+
+
 Fecha: 2026-11-16
 Tarea: Corrección Contable en Caja Diaria & Purga de Turnos Fijos Anticipados
 - Problema Reportado:
@@ -3389,6 +4137,28 @@ Tarea: Corrección Contable en Caja Diaria & Purga de Turnos Fijos Anticipados
   * Verificación directa: `CajaService::obtenerResumenDiario()` para el complejo `nico-futbol-bronce` ahora devuelve `total_turnos_reservados = 0` y `total_ingresos_brutos = 0`.
   * Backend: 318/318 tests en verde en PHPUnit (1826 aserciones).
   * Frontend: 177/177 tests en verde en Vitest.
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
 
 
@@ -3428,4 +4198,26 @@ Tarea: Sistema de Cambio de Plan (Upgrade / Downgrade) con Confirmación Previa 
 - Verificación y Tests:
   * Backend: 321/321 tests en verde en PHPUnit (1836 aserciones al 100%).
   * Frontend: 178/178 tests en verde en Vitest (20 archivos de prueba al 100%).
+==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual con Ubicación Nativa
+- Contexto y Problemas Reportados:
+  * El botón manual de recordatorio en la UI quedaba deshabilitado tras el primer despacho (sea manual o automático por el scheduler cron cada 5 min).
+  * Los mensajes con tarjeta de vista previa de Google Maps comprimían el ancho del chat en WhatsApp Web resultando en un formato angosto e irregular.
+  * Intermitencias de timeout en Evolution API por latencia de resolución OpenGraph de Google Maps en 5 segundos.
+- Solución Implementada:
+  1. Frontend (Next.js 14):
+     * En `frontend/components/ResumenDiarioTurnos.tsx`: se incorporó el botón secundario interactivo `🔄 Reenviar` junto a la insignia `📲 Recordatorio enviado`. Al pulsarlo, muestra feedback de carga (`Reenviando...` con animación spin), ejecuta la petición a la API y notifica el resultado mediante toast toast.
+     * En `frontend/tests/RecordatorioWhatsApp.test.tsx`: se actualizó el test para cubrir el botón `Reenviar` y su llamada a la API.
+  2. Backend (Laravel 11):
+     * En `backend/app/Services/WhatsAppEvolutionService.php`:
+       - Se amplió el timeout de las solicitudes HTTP hacia Evolution API de 5 a 15 segundos.
+       - Se desacopló la vista previa del mensaje de texto enviándolo como texto puro (`linkPreview: false`) para garantizar que la burbuja se mantenga 100% ancha, fluida y sin deformarse en WhatsApp Web y móvil.
+       - Se implementó el método `enviarUbicacion()` que consume el endpoint `/message/sendLocation/{instance}` de Evolution API para despachar la tarjeta de ubicación interactiva nativa oficial de WhatsApp con pin GPS, nombre del club y dirección física.
+     * En `backend/tests/Feature/RecordatorioWhatsAppTest.php`:
+       - Se agregó aserción verificando el despacho de la tarjeta de ubicación nativa a `/message/sendLocation/`.
+- Verificación:
+  * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================

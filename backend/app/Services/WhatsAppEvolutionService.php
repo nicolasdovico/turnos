@@ -155,7 +155,20 @@ class WhatsAppEvolutionService
             . "\n👉 *Sitio del Club:*\n{$clubUrl}\n\n"
             . "⚡ _¡Te esperamos para jugar! Recordá asistir con ropa deportiva y calzado adecuado._";
 
-        return $this->enviarMensajeTexto($numeroLimpio, $mensaje);
+        $enviado = $this->enviarMensajeTexto($numeroLimpio, $mensaje, false);
+
+        // Si el complejo tiene coordenadas GPS, enviar la ubicación interactiva nativa de WhatsApp
+        if ($enviado && !empty($complejo?->latitud) && !empty($complejo?->longitud)) {
+            $this->enviarUbicacion(
+                $numeroLimpio,
+                (float) $complejo->latitud,
+                (float) $complejo->longitud,
+                $complejoNombre,
+                $complejo->direccion ?: 'Ubicación del Club'
+            );
+        }
+
+        return $enviado;
     }
 
     /**
@@ -218,12 +231,12 @@ class WhatsAppEvolutionService
     /**
      * Envía mensaje de texto plano a través de Evolution API.
      */
-    public function enviarMensajeTexto(string $numero, string $texto): bool
+    public function enviarMensajeTexto(string $numero, string $texto, bool $linkPreview = false): bool
     {
         try {
             $endpoint = "{$this->baseUrl}/message/sendText/{$this->instance}";
 
-            $response = Http::timeout(5)
+            $response = Http::timeout(15)
                 ->withHeaders([
                     'apikey' => $this->apiKey,
                     'Content-Type' => 'application/json',
@@ -231,6 +244,7 @@ class WhatsAppEvolutionService
                 ->post($endpoint, [
                     'number' => $numero,
                     'text' => $texto,
+                    'linkPreview' => $linkPreview,
                 ]);
 
             if ($response->successful()) {
@@ -242,6 +256,52 @@ class WhatsAppEvolutionService
             return false;
         } catch (\Throwable $e) {
             Log::warning("No se pudo conectar con Evolution API ({$this->baseUrl}): " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Envía tarjeta de ubicación nativa interactiva de WhatsApp (Google Maps / Waze).
+     */
+    public function enviarUbicacion(
+        string $numero,
+        float $latitud,
+        float $longitud,
+        ?string $nombre = null,
+        ?string $direccion = null
+    ): bool {
+        try {
+            $endpoint = "{$this->baseUrl}/message/sendLocation/{$this->instance}";
+
+            $payload = [
+                'number' => $numero,
+                'latitude' => $latitud,
+                'longitude' => $longitud,
+            ];
+
+            if (!empty($nombre)) {
+                $payload['name'] = $nombre;
+            }
+            if (!empty($direccion)) {
+                $payload['address'] = $direccion;
+            }
+
+            $response = Http::timeout(15)
+                ->withHeaders([
+                    'apikey' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($endpoint, $payload);
+
+            if ($response->successful()) {
+                Log::info("Ubicación WhatsApp enviada exitosamente vía Evolution API a {$numero} ({$latitud}, {$longitud})");
+                return true;
+            }
+
+            Log::warning("Evolution API sendLocation error ({$response->status()}): " . $response->body());
+            return false;
+        } catch (\Throwable $e) {
+            Log::warning("No se pudo enviar ubicación vía Evolution API ({$this->baseUrl}): " . $e->getMessage());
             return false;
         }
     }

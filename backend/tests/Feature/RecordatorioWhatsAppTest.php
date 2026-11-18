@@ -491,5 +491,11 @@ class RecordatorioWhatsAppTest extends TestCase
             return str_contains($text, '📍 *Ubicación:* Av. San Martín 1500')
                 && str_contains($text, '🗺️ *Cómo llegar:* https://www.google.com/maps/dir/?api=1&destination=-34.603722,-58.381592');
         });
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/message/sendLocation/')
+                && isset($request['latitude'])
+                && isset($request['longitude']);
+        });
     }
 }
