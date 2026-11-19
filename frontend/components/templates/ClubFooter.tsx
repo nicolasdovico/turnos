@@ -248,13 +248,17 @@ export default function ClubFooter({
         {/* Bottom Bar: Copyright & Platform mention */}
         <div className="mt-12 pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© {currentYear} {clubNombre}. Todos los derechos reservados.</p>
-          <div className="flex items-center gap-1 text-[11px]">
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
             <span>Potenciado por</span>
             <a
               href={getPortalUrl("/")}
-              className="text-emerald-400 hover:text-emerald-300 font-bold transition"
+              target="_blank"
+              rel="noopener"
+              title="TurnosFlow - Software de Gestión de Canchas y Turnos Online"
+              className="text-emerald-400 hover:text-emerald-300 font-bold transition flex items-center gap-1"
             >
-              TurnosFlow
+              <span>TurnosFlow</span>
+              <span className="text-slate-500 font-normal hidden md:inline">| Software de Gestión Deportiva</span>
             </a>
           </div>
         </div>
