@@ -4221,3 +4221,20 @@ Tarea: Optimización de Recordatorios WhatsApp & Soporte para Reenvío Manual co
 - Verificación:
   * Envíos probados y validados en WhatsApp Web y Mobile.
 ==============================================================================================================================
+
+
+Fecha: 2026-11-18
+Tarea: Solución de Jerarquía de Planes en Módulos del Panel & Sección de Contacto Comercial en Landing
+- Correcciones y Mejoras Implementadas:
+  1. Panel del Club (`frontend/app/tenants/[subdomain]/panel/page.tsx`):
+     * Se implementó jerarquía de niveles de planes (`bronce: 1, plata: 2, oro: 3`) para la evaluación de activación de módulos en la solapa "⚡ Módulos & Herramientas".
+     * Módulos base de la plataforma con `planMinimo: bronce` (Caja & Arqueo Ciego, Billeteras Virtuales y CRM de Clientes 360°) se marcan automáticamente como `✓ Activo` con botón `Gestionar →` cuando el club tiene Plan Oro o Plata.
+     * Se corrigieron los botones de upgrade para que un club con Plan Oro o superior jamás visualice sugerencias confusas de downgrade a Bronce.
+  2. Landing Page & Conversión Comercial (`frontend/components/landing/ContactSection.tsx`, `portal/page.tsx`, `Navbar.tsx`, `CtaBanner.tsx`):
+     * Se creó la sección `ContactSection` destacando la propuesta de valor sin fricción ni formularios: trato directo vía WhatsApp (+5491149790220).
+     * Coordinación de videollamada demostrativa de 15 minutos en vivo (Google Meet / Zoom).
+     * Beneficio exclusivo de bienvenida: Puesta en marcha inicial 100% bonificada ($0) con carga de canchas, horarios, logo y capacitación rápida.
+     * Accesos directos integrados en la barra de navegación superior (`Navbar.tsx`) y en el banner final de cierre (`CtaBanner.tsx`).
+  3. Documentación y Roadmap:
+     * Creación de `docs/modulos_pendientes_roadmap.md` con el detalle técnico de los módulos faltantes (Torneos, Split Payment, Domótica IoT, Grilla Elástica, Gateways descentralizados, WhatsApp Multi-sesión y Módulo de Academia/Profesores).
+==============================================================================================================================

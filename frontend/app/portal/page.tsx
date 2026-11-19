@@ -10,6 +10,7 @@ import FeaturesShowcase from "@/components/landing/FeaturesShowcase";
 import RoiCalculator from "@/components/landing/RoiCalculator";
 import RoadmapSection from "@/components/landing/RoadmapSection";
 import PricingOverview from "@/components/landing/PricingOverview";
+import ContactSection from "@/components/landing/ContactSection";
 import FaqSection from "@/components/landing/FaqSection";
 import CtaBanner from "@/components/landing/CtaBanner";
 
@@ -227,10 +228,13 @@ export default function PortalPage() {
       {/* 6. Planes & Precios (Prueba 30 Días) */}
       <PricingOverview />
 
-      {/* 7. Preguntas Frecuentes */}
+      {/* 7. Contacto Directo, Videollamada & Onboarding Bonificado */}
+      <ContactSection />
+
+      {/* 8. Preguntas Frecuentes */}
       <FaqSection />
 
-      {/* 8. Banner Final de Cierre (CTA) */}
+      {/* 9. Banner Final de Cierre (CTA) */}
       <CtaBanner demoClubUrl={demoClubUrl} />
     </main>
   );

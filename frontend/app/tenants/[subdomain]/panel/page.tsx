@@ -3981,7 +3981,13 @@ export default function ClubAdminPanel() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
               {getModulosProduccion().map((mod) => {
-                const isActivo = plan?.modulos?.some((m) => m.slug === mod.slug) ?? false;
+                const planNiveles: Record<string, number> = { bronce: 1, plata: 2, oro: 3 };
+                const clubPlanSlug = (plan?.slug || "bronce").toLowerCase();
+                const clubPlanNivel = planNiveles[clubPlanSlug] ?? 1;
+                const modPlanNivel = planNiveles[mod.planMinimo.toLowerCase()] ?? 1;
+
+                // Un módulo está activo si viene explicitamente en plan.modulos, o si el nivel del plan del club cubre su planMinimo
+                const isActivo = (plan?.modulos?.some((m) => m.slug === mod.slug) ?? false) || (clubPlanNivel >= modPlanNivel);
 
                 return (
                   <div
@@ -4039,7 +4045,9 @@ export default function ClubAdminPanel() {
                           onClick={() => setActiveTab("facturacion")}
                           className="w-full text-center rounded-xl bg-slate-900/60 hover:bg-slate-800/80 py-1.5 px-3 text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 transition"
                         >
-                          Mejorar a {mod.planMinimo.toUpperCase()} ↗
+                          {clubPlanNivel < modPlanNivel
+                            ? `Mejorar a ${mod.planMinimo.toUpperCase()} ↗`
+                            : "Contratar Módulo ↗"}
                         </button>
                       )}
                     </div>
