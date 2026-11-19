@@ -4,7 +4,7 @@ import PadelLandingClient from "./PadelLandingClient";
 export const metadata: Metadata = {
   title: "Software para Canchas de Pádel | Sistema de Gestión y Turnos Online - TurnosFlow",
   description:
-    "La plataforma definitiva para complejos de pádel. Turnos de 90 minutos, partidos abiertos (matchmaking), cobro automático de señas con Mercado Pago, control de canchas techadas/cristal y web propia. Probá 30 días gratis.",
+    "La plataforma definitiva para complejos de pádel. Grilla horaria inteligente, partidos abiertos (matchmaking), cobro automático de señas con Mercado Pago, control de canchas techadas/cristal y web propia. Probá 30 días gratis.",
   keywords: [
     "software para canchas de padel",
     "sistema de turnos de padel",
