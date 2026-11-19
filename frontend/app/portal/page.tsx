@@ -13,6 +13,7 @@ import PricingOverview from "@/components/landing/PricingOverview";
 import ContactSection from "@/components/landing/ContactSection";
 import FaqSection from "@/components/landing/FaqSection";
 import CtaBanner from "@/components/landing/CtaBanner";
+import JsonLd from "@/components/landing/JsonLd";
 
 export default function PortalPage() {
   const { user, token } = useAuth();
@@ -236,6 +237,9 @@ export default function PortalPage() {
 
       {/* 9. Banner Final de Cierre (CTA) */}
       <CtaBanner demoClubUrl={demoClubUrl} />
+
+      {/* SEO: Marcado Estructurado JSON-LD (Schema.org SoftwareApplication, Organization & FAQPage) */}
+      <JsonLd />
     </main>
   );
 }
