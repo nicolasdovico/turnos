@@ -14,6 +14,7 @@ import ContactSection from "@/components/landing/ContactSection";
 import FaqSection from "@/components/landing/FaqSection";
 import CtaBanner from "@/components/landing/CtaBanner";
 import JsonLd from "@/components/landing/JsonLd";
+import MainFooter from "@/components/landing/MainFooter";
 
 export default function PortalPage() {
   const { user, token } = useAuth();
@@ -237,6 +238,9 @@ export default function PortalPage() {
 
       {/* 9. Banner Final de Cierre (CTA) */}
       <CtaBanner demoClubUrl={demoClubUrl} />
+
+      {/* 10. Footer General del SaaS con Links Internos SEO */}
+      <MainFooter />
 
       {/* SEO: Marcado Estructurado JSON-LD (Schema.org SoftwareApplication, Organization & FAQPage) */}
       <JsonLd />
