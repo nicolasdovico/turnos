@@ -93,15 +93,38 @@ interface TurnoElegible {
   } | null;
 }
 
+interface CanchaSimple {
+  id: number;
+  nombre: string;
+  deporte: string;
+}
+
+interface SlotSimple {
+  hora_inicio: string;
+  hora_fin: string;
+  precio: number;
+  disponible: boolean;
+}
+
 export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAbiertosProps) {
   const [partidos, setPartidos] = useState<PartidoAbiertoItem[]>([]);
   const [turnosElegibles, setTurnosElegibles] = useState<TurnoElegible[]>([]);
+  const [canchasClub, setCanchasClub] = useState<CanchaSimple[]>([]);
+  const [slotsDisponibles, setSlotsDisponibles] = useState<SlotSimple[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "buscando" | "completo" | "cancelado">("todos");
 
   // Modal Crear Convocatoria
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modoCreacion, setModoCreacion] = useState<"libre" | "turno_existente">("libre");
+  const [selectedCanchaId, setSelectedCanchaId] = useState<string>("");
+  const [selectedFecha, setSelectedFecha] = useState<string>(() => {
+    const today = new Date();
+    return today.toISOString().split("T")[0];
+  });
+  const [selectedHoraInicio, setSelectedHoraInicio] = useState<string>("");
   const [selectedTurnoId, setSelectedTurnoId] = useState<string>("");
   const [cuotasCount, setCuotasCount] = useState<number>(4);
   const [nivelMin, setNivelMin] = useState<string>("");
@@ -164,36 +187,130 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
     fetchPartidos();
   }, [subdomain]);
 
+  const fetchCanchasYTurnos = async () => {
+    try {
+      const res = await fetch(`/api/clubs/${subdomain}/dashboard`, {
+        headers: {
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const canchas = json?.data?.canchas || [];
+        setCanchasClub(canchas);
+        if (canchas.length > 0 && !selectedCanchaId) {
+          setSelectedCanchaId(String(canchas[0].id));
+        }
+      }
+    } catch (err) {
+      console.error("Error al cargar canchas del club:", err);
+    }
+  };
+
+  const fetchSlotsDisponibles = async (canchaId: string, fecha: string) => {
+    if (!canchaId || !fecha) return;
+    try {
+      setLoadingSlots(true);
+      const res = await fetch(`/api/canchas/${canchaId}/disponibilidad?fecha=${fecha}`, {
+        headers: {
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const slots: SlotSimple[] = (json.slots_disponibles || json.data?.slots || []).filter(
+          (s: any) => s.disponible
+        );
+        setSlotsDisponibles(slots);
+        if (slots.length > 0) {
+          setSelectedHoraInicio(slots[0].hora_inicio);
+        } else {
+          setSelectedHoraInicio("");
+        }
+      } else {
+        setSlotsDisponibles([]);
+        setSelectedHoraInicio("");
+      }
+    } catch (err) {
+      console.error("Error al cargar slots disponibles:", err);
+      setSlotsDisponibles([]);
+      setSelectedHoraInicio("");
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isModalOpen && modoCreacion === "libre" && selectedCanchaId && selectedFecha) {
+      fetchSlotsDisponibles(selectedCanchaId, selectedFecha);
+    }
+  }, [isModalOpen, modoCreacion, selectedCanchaId, selectedFecha]);
+
   const handleOpenCreateModal = () => {
+    fetchCanchasYTurnos();
     fetchTurnosElegibles();
     setIsModalOpen(true);
   };
 
   const handleCrearSplit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTurnoId) {
-      showToast("error", "Seleccioná un turno para fraccionar.");
-      return;
-    }
 
     try {
       setSubmitting(true);
-      const res = await fetch(`/api/turnos/${selectedTurnoId}/split`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
-        },
-        body: JSON.stringify({
-          cuotas: cuotasCount,
-          es_partido_abierto: true,
-          nivel_min: nivelMin || null,
-          nivel_max: nivelMax || null,
-          tipo_partido: tipoPartido,
-          organizador_nombre: organizadorNombre.trim() || null,
-          organizador_email: organizadorEmail.trim() || null,
-        }),
-      });
+      let res: Response;
+
+      if (modoCreacion === "libre") {
+        if (!selectedCanchaId || !selectedFecha || !selectedHoraInicio) {
+          showToast("error", "Seleccioná la cancha, fecha y horario para la convocatoria.");
+          setSubmitting(false);
+          return;
+        }
+
+        const slot = slotsDisponibles.find((s) => s.hora_inicio === selectedHoraInicio);
+
+        res = await fetch("/api/partidos-abiertos/crear", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+          },
+          body: JSON.stringify({
+            cancha_id: parseInt(selectedCanchaId, 10),
+            fecha: selectedFecha,
+            hora_inicio: selectedHoraInicio,
+            hora_fin: slot?.hora_fin || null,
+            cuotas: cuotasCount,
+            nivel_min: nivelMin || null,
+            nivel_max: nivelMax || null,
+            tipo_partido: tipoPartido,
+            organizador_nombre: organizadorNombre.trim() || null,
+            organizador_email: organizadorEmail.trim() || null,
+          }),
+        });
+      } else {
+        if (!selectedTurnoId) {
+          showToast("error", "Seleccioná un turno para fraccionar.");
+          setSubmitting(false);
+          return;
+        }
+
+        res = await fetch(`/api/turnos/${selectedTurnoId}/split`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+          },
+          body: JSON.stringify({
+            cuotas: cuotasCount,
+            es_partido_abierto: true,
+            nivel_min: nivelMin || null,
+            nivel_max: nivelMax || null,
+            tipo_partido: tipoPartido,
+            organizador_nombre: organizadorNombre.trim() || null,
+            organizador_email: organizadorEmail.trim() || null,
+          }),
+        });
+      }
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -575,31 +692,121 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
             </div>
 
             <form onSubmit={handleCrearSplit} className="space-y-4 text-xs">
-              {/* Selección de Turno */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Seleccionar Cancha y Turno: *
-                </label>
-                {turnosElegibles.length === 0 ? (
-                  <p className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px]">
-                    No se encontraron turnos disponibles para fraccionar en los próximos días. Verificá tu grilla horaria.
-                  </p>
-                ) : (
-                  <select
-                    required
-                    value={selectedTurnoId}
-                    onChange={(e) => setSelectedTurnoId(e.target.value)}
-                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
-                  >
-                    <option value="">-- Elegir Turno --</option>
-                    {turnosElegibles.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {formatFechaDDMMAAAA(t.fecha)} • {t.hora_inicio?.substring(0, 5)} hs • {t.cancha?.nombre} ({t.cancha?.deporte}) — Total: {formatPrecio(t.precio)}
-                      </option>
-                    ))}
-                  </select>
-                )}
+              {/* Selector de Modo: Elegir Horario Libre vs Turno Existente */}
+              <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModoCreacion("libre")}
+                  className={`flex-1 py-1.5 px-3 rounded-lg font-bold text-xs transition ${
+                    modoCreacion === "libre"
+                      ? "bg-emerald-500 text-slate-950 shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Elegir Cancha, Día y Hora
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoCreacion("turno_existente")}
+                  className={`flex-1 py-1.5 px-3 rounded-lg font-bold text-xs transition ${
+                    modoCreacion === "turno_existente"
+                      ? "bg-emerald-500 text-slate-950 shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Turno Ya Agendado
+                </button>
               </div>
+
+              {modoCreacion === "libre" ? (
+                <div className="space-y-3 p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800">
+                  {/* Cancha */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Cancha: *
+                    </label>
+                    <select
+                      required
+                      value={selectedCanchaId}
+                      onChange={(e) => setSelectedCanchaId(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
+                    >
+                      {canchasClub.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre} ({c.deporte})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Fecha */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">
+                        Fecha: *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        min={new Date().toISOString().split("T")[0]}
+                        value={selectedFecha}
+                        onChange={(e) => setSelectedFecha(e.target.value)}
+                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
+                      />
+                    </div>
+
+                    {/* Horario */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">
+                        Horario Disponible: *
+                      </label>
+                      {loadingSlots ? (
+                        <div className="py-2 text-[11px] text-slate-400 italic">Consultando horarios...</div>
+                      ) : slotsDisponibles.length === 0 ? (
+                        <div className="py-2 text-[11px] text-amber-400">Sin slots libres en esta fecha</div>
+                      ) : (
+                        <select
+                          required
+                          value={selectedHoraInicio}
+                          onChange={(e) => setSelectedHoraInicio(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
+                        >
+                          {slotsDisponibles.map((s) => (
+                            <option key={s.hora_inicio} value={s.hora_inicio}>
+                              {s.hora_inicio} a {s.hora_fin} hs ({formatPrecio(s.precio)})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Selección de Turno Existente */
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Seleccionar Turno Agendado: *
+                  </label>
+                  {turnosElegibles.length === 0 ? (
+                    <p className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px]">
+                      No se encontraron turnos agendados pendientes de split. Utilizá la opción "Elegir Cancha, Día y Hora".
+                    </p>
+                  ) : (
+                    <select
+                      value={selectedTurnoId}
+                      onChange={(e) => setSelectedTurnoId(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
+                    >
+                      <option value="">-- Elegir Turno --</option>
+                      {turnosElegibles.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {formatFechaDDMMAAAA(t.fecha)} • {t.hora_inicio?.substring(0, 5)} hs • {t.cancha?.nombre} ({t.cancha?.deporte}) — Total: {formatPrecio(t.precio)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
 
               {/* Cantidad de Cuotas */}
               <div>
@@ -703,7 +910,12 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
 
                 <button
                   type="submit"
-                  disabled={submitting || !selectedTurnoId}
+                  disabled={
+                    submitting ||
+                    (modoCreacion === "libre"
+                      ? !selectedCanchaId || !selectedFecha || !selectedHoraInicio
+                      : !selectedTurnoId)
+                  }
                   className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black uppercase tracking-wider transition shadow-lg shadow-emerald-500/20"
                 >
                   {submitting ? "Generando..." : "Crear y Fraccionar"}

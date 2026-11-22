@@ -3,18 +3,130 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cancha;
+use App\Models\HorarioAtencion;
 use App\Models\PartidoAbierto;
 use App\Models\Turno;
 use App\Models\TurnoPagoDividido;
+use App\Services\DisponibilidadService;
 use App\Services\SplitPaymentService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SplitPaymentController extends Controller
 {
     public function __construct(
-        protected SplitPaymentService $splitPaymentService
+        protected SplitPaymentService $splitPaymentService,
+        protected DisponibilidadService $disponibilidadService
     ) {}
+
+    /**
+     * POST /api/partidos-abiertos/crear
+     * Crea un turno y genera inmediatamente una convocatoria de partido abierto
+     * a partir de cancha, fecha y hora_inicio (usado por el club y por particulares).
+     */
+    public function crearPartidoDirecto(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'cancha_id' => 'required|integer|exists:canchas,id',
+            'fecha' => 'required|date_format:Y-m-d',
+            'hora_inicio' => 'required|string',
+            'hora_fin' => 'nullable|string',
+            'cuotas' => 'required|integer|min:2|max:30',
+            'nivel_min' => 'nullable|string|max:50',
+            'nivel_max' => 'nullable|string|max:50',
+            'tipo_partido' => 'nullable|string|max:50',
+            'organizador_nombre' => 'nullable|string|max:255',
+            'organizador_email' => 'nullable|email|max:255',
+            'organizador_telefono' => 'nullable|string|max:50',
+        ]);
+
+        $cancha = Cancha::with('complejo')->findOrFail($validated['cancha_id']);
+        $timezone = $cancha->complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
+
+        $fechaNormalizada = Carbon::parse($validated['fecha'], $timezone)->format('Y-m-d');
+        $horaInicioNormalizada = Carbon::parse($validated['hora_inicio'], $timezone)->format('H:i');
+
+        $slotStartDateTime = Carbon::parse($fechaNormalizada . ' ' . $horaInicioNormalizada, $timezone);
+        if ($slotStartDateTime->lessThanOrEqualTo(Carbon::now($timezone))) {
+            return response()->json([
+                'error' => 'PAST_SLOT_NOT_ALLOWED',
+                'message' => 'No es posible crear una convocatoria en una fecha u horario que ya ha pasado.',
+            ], 422);
+        }
+
+        // Obtener o calcular hora_fin
+        if (!empty($validated['hora_fin'])) {
+            $horaFinNormalizada = Carbon::parse($validated['hora_fin'])->format('H:i');
+        } else {
+            $horario = HorarioAtencion::where('complejo_id', $cancha->complejo_id)
+                ->where('dia_semana', Carbon::parse($fechaNormalizada)->dayOfWeek)
+                ->first();
+            $duracion = $cancha->duracion_minutos ?: ($horario?->duracion_turno_minutos ?: 60);
+            $horaFinNormalizada = Carbon::parse($fechaNormalizada . ' ' . $horaInicioNormalizada)
+                ->addMinutes($duracion)
+                ->format('H:i');
+        }
+
+        // Verificar disponibilidad en tiempo real
+        $disponibilidad = $this->disponibilidadService->obtenerDisponibilidadCompleta($cancha->id, $fechaNormalizada, null, true);
+        $slots = $disponibilidad['slots'] ?? [];
+        $slotElegido = collect($slots)->first(function ($s) use ($horaInicioNormalizada) {
+            return Carbon::parse($s['hora_inicio'])->format('H:i') === $horaInicioNormalizada && ($s['disponible'] ?? false);
+        });
+
+        // Verificar si ya existe un turno ocupado o solapado
+        $turnoSolapado = Turno::where('cancha_id', $cancha->id)
+            ->where('fecha', $fechaNormalizada)
+            ->whereIn('estado', ['disponible', 'bloqueado', 'reservado', 'pagado'])
+            ->where(function ($q) use ($horaInicioNormalizada, $horaFinNormalizada) {
+                $q->whereBetween('hora_inicio', [$horaInicioNormalizada, $horaFinNormalizada])
+                  ->orWhereBetween('hora_fin', [$horaInicioNormalizada, $horaFinNormalizada]);
+            })
+            ->first();
+
+        if ($turnoSolapado && $turnoSolapado->partidoAbierto && in_array($turnoSolapado->partidoAbierto->estado, ['buscando', 'completo'])) {
+            return response()->json([
+                'error' => 'PARTIDO_YA_EXISTE',
+                'message' => 'Ya existe un partido abierto programado para esta cancha en ese horario.',
+            ], 422);
+        }
+
+        $precioTurno = $slotElegido['precio'] ?? (float) $cancha->precio_base;
+
+        return DB::transaction(function () use ($cancha, $fechaNormalizada, $horaInicioNormalizada, $horaFinNormalizada, $precioTurno, $validated) {
+            // Si ya existía un turno libre o creamos uno nuevo atómicamente
+            $turno = Turno::create([
+                'complejo_id' => $cancha->complejo_id,
+                'cancha_id' => $cancha->id,
+                'fecha' => $fechaNormalizada,
+                'hora_inicio' => $horaInicioNormalizada . ':00',
+                'hora_fin' => $horaFinNormalizada . ':00',
+                'precio' => $precioTurno,
+                'estado' => 'disponible',
+                'cliente_nombre' => $validated['organizador_nombre'] ?? null,
+                'cliente_telefono' => $validated['organizador_telefono'] ?? null,
+                'metodo_pago' => 'split',
+            ]);
+
+            $splitParams = array_merge($validated, [
+                'es_partido_abierto' => true,
+            ]);
+
+            $resultado = $this->splitPaymentService->crearSplit(
+                $turno,
+                (int) $validated['cuotas'],
+                $splitParams
+            );
+
+            return response()->json([
+                'message' => 'Convocatoria de partido abierto creada exitosamente.',
+                'data' => $resultado,
+            ], 201);
+        });
+    }
 
     /**
      * POST /api/turnos/{id}/split

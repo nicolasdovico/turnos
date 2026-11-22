@@ -217,6 +217,49 @@ class SplitPaymentTest extends TestCase
     }
 
     /**
+     * Test crear partido abierto directamente especificando cancha, fecha y hora_inicio.
+     */
+    public function test_crear_partido_abierto_directo_sin_turno_previo(): void
+    {
+        $fechaFutura = now()->addDays(3)->toDateString();
+
+        $response = $this->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson('/api/partidos-abiertos/crear', [
+                'cancha_id' => $this->cancha->id,
+                'fecha' => $fechaFutura,
+                'hora_inicio' => '18:00',
+                'hora_fin' => '19:30',
+                'cuotas' => 4,
+                'nivel_min' => '5ta',
+                'nivel_max' => '4ta',
+                'tipo_partido' => 'amistoso',
+                'organizador_nombre' => 'Gonzalo Pádel',
+                'organizador_email' => 'gonzalo@padel.com',
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'message' => 'Convocatoria de partido abierto creada exitosamente.',
+            ]);
+
+        $partidoId = $response->json('data.partido_abierto.id');
+        $this->assertNotNull($partidoId);
+
+        $this->assertDatabaseHas('partidos_abiertos', [
+            'id' => $partidoId,
+            'estado' => 'buscando',
+            'tipo_partido' => 'amistoso',
+        ]);
+
+        $this->assertDatabaseHas('turnos', [
+            'cancha_id' => $this->cancha->id,
+            'fecha' => $fechaFutura,
+            'hora_inicio' => '18:00:00',
+            'hora_fin' => '19:30:00',
+        ]);
+    }
+
+    /**
      * Test creación de Partido Abierto (Matchmaking) y unión de jugadores.
      */
     public function test_crear_partido_abierto_y_unirse_matchmaking(): void

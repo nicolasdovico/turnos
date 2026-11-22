@@ -142,6 +142,7 @@ Route::post('/tenants/revalidate', [\App\Http\Controllers\Api\PaginaController::
 
 Route::middleware('tenant.has_module:split_payment')->group(function () {
     Route::post('/turnos/{id}/split', [\App\Http\Controllers\Api\SplitPaymentController::class, 'splitTurno']);
+    Route::post('/partidos-abiertos/crear', [\App\Http\Controllers\Api\SplitPaymentController::class, 'crearPartidoDirecto']);
     Route::post('/split-pagos/{token}/pagar', [\App\Http\Controllers\Api\SplitPaymentController::class, 'pagarCuota']);
     Route::get('/split-pagos/{token}', [\App\Http\Controllers\Api\SplitPaymentController::class, 'showCuota']);
     Route::get('/partidos-abiertos', [\App\Http\Controllers\Api\SplitPaymentController::class, 'indexPartidos']);
