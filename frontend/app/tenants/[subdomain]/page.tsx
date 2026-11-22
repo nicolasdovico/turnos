@@ -11,6 +11,7 @@ import ClubFooter from "@/components/templates/ClubFooter";
 import BookingDirectTemplate, { CanchaItem } from "@/components/templates/BookingDirectTemplate";
 import InstitucionalTemplate from "@/components/templates/InstitucionalTemplate";
 import ModernShowcaseTemplate from "@/components/templates/ModernShowcaseTemplate";
+import PartidosAbiertosSection from "@/components/PartidosAbiertosSection";
 
 interface ComplejoData {
   id: number;
@@ -338,6 +339,12 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
         ) : (
           <BookingDirectTemplate {...templateProps} />
         )}
+
+        {/* Sección de Partidos Abiertos & Matchmaking */}
+        <PartidosAbiertosSection
+          subdomain={subdomain}
+          clubNombre={complejo.nombre}
+        />
       </div>
 
       {/* Dynamic Footer */}

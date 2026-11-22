@@ -112,8 +112,9 @@ export const PLATFORM_MODULES: FeatureModule[] = [
     descripcionLarga: "Matchmaking de jugadores incompletos y división automática de la tarifa del turno entre participantes.",
     icon: "💳",
     planMinimo: "plata",
-    estado: "en_desarrollo", // 🚧 Activarlo cuando se desarrolle su solapa en el panel
+    estado: "produccion",
     tabId: "partidos-abiertos",
+    actionHref: "#partidos-abiertos",
   },
   {
     slug: "torneos",

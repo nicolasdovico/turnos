@@ -11,7 +11,7 @@
 | Módulo / Funcionalidad | Plan Mínimo | Estado Actual | Alcance del Trabajo a Desarrollar |
 | :--- | :--- | :--- | :--- |
 | **🏆 Gestor de Torneos & Fixtures** | Oro | Backend 100% listo en Laravel | Pantalla interactiva en Panel (`GestionTorneos.tsx`), llaves de playoffs (bracket), inscripción de equipos y tabla pública |
-| **💳 Turnos Abiertos & Split Payment** | Plata | Backend 100% listo en Laravel | Pantalla en Panel (`GestionPartidosAbiertos.tsx`), portal público de convocatoria y links de pago dividido por jugador |
+| **💳 Turnos Abiertos & Split Payment** | Plata | ✅ Producción (100% Completo) | Pantalla en Panel (`GestionPartidosAbiertos.tsx`), checkout público (`/split-pagos/[token]`), sección web comunitaria y links WhatsApp |
 | **💡 Automatización de Luces IoT & Domótica** | Oro | Backend 100% listo en Laravel | Pantalla en Panel (`GestionDomotica.tsx`), vinculación de relés a canchas, tiempos de gracia y botonera manual de encendido |
 | **⏱️ Grilla Elástica & Turnos Espontáneos** | Todos | Especificado en `docs/` | Algoritmo anti-baches con granularidad a 30 min en `DisponibilidadService` y botón de "Turno Ahora / En el Acto" en mostrador |
 | **💰 Pasarelas de Cobro Descentralizadas (B2C)** | Todos | En Roadmap | Pantalla de configuración para que cada club ingrese sus propias API keys de Mercado Pago, Stripe y CBU/Alias bancario directo |
@@ -37,14 +37,15 @@
 ---
 
 ### 2. 💳 Partidos Abiertos & Split Payment (`split_payment`)
-- **Estado:** Backend completo en Laravel (Modelos `PartidoAbierto`, `TurnoPagoDividido`, servicio `SplitPaymentService`, endpoints en `SplitPaymentController` y tests automatizados con bloqueo pesimista).
-- **Pendiente en Frontend Web (Next.js):**
-  - Crear componente `frontend/components/GestionPartidosAbiertos.tsx` para el panel de administración.
-  - Vista pública o sección en la web del club para que los jugadores vean convocatorias abiertas (ej: *"Pádel 7ma - Falta 1 jugador para hoy 20:00 hs"*).
-  - División automática del total del turno entre los cupos configurados (ej: total $16.000 dividido en 4 cuotas de $4.000).
-  - Generación de links de pago individuales tokenizados (`/split-pagos/[token]`) para compartir por WhatsApp.
-  - Confirmación atómica del turno (`estado = 'reservado'`) una vez que el 100% de las cuotas hayan sido abonadas.
-  - Activar el estado en `frontend/lib/modulesRegistry.ts` a `"produccion"`.
+- **Estado:** ✅ Completado al 100% (Backend & Frontend en Producción).
+- **Alcance Desarrollado:**
+  - Componente de administración `GestionPartidosAbiertos.tsx` con KPIs en vivo, buscador y modal de creación/fraccionamiento.
+  - Pestaña `"partidos-abiertos"` en el panel del club con candado de upgrade `🔒 Plata` en planes no contratados.
+  - Checkout individual responsive en `/split-pagos/[token]` con opción de pago por Mercado Pago y registro de cobro en mostrador.
+  - Sección comunitaria dinámica `PartidosAbiertosSection.tsx` en la web pública del club (`[subdominio].turnosflow.com`).
+  - Botones de acción directa con links personalizados para enviar por WhatsApp.
+  - Endpoints backend en `SplitPaymentController` (`POST /api/partidos-abiertos/{id}/cancelar`, `GET /api/turnos-para-split`).
+  - Activado a `"produccion"` en `frontend/lib/modulesRegistry.ts` y suites de tests automatizados (PHPUnit y Vitest) en verde.
 
 ---
 

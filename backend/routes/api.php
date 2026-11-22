@@ -146,6 +146,8 @@ Route::middleware('tenant.has_module:split_payment')->group(function () {
     Route::get('/split-pagos/{token}', [\App\Http\Controllers\Api\SplitPaymentController::class, 'showCuota']);
     Route::get('/partidos-abiertos', [\App\Http\Controllers\Api\SplitPaymentController::class, 'indexPartidos']);
     Route::post('/partidos-abiertos/{id}/unirse', [\App\Http\Controllers\Api\SplitPaymentController::class, 'unirsePartido']);
+    Route::post('/partidos-abiertos/{id}/cancelar', [\App\Http\Controllers\Api\SplitPaymentController::class, 'cancelarPartido']);
+    Route::get('/turnos-para-split', [\App\Http\Controllers\Api\SplitPaymentController::class, 'turnosParaSplit']);
 });
 
 Route::middleware('tenant.has_module:torneos')->group(function () {

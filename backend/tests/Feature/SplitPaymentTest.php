@@ -311,4 +311,47 @@ class SplitPaymentTest extends TestCase
                 'module' => 'split_payment',
             ]);
     }
+
+    /**
+     * Test cancelar partido abierto y consultar turnos para split.
+     */
+    public function test_cancelar_partido_abierto_y_turnos_para_split(): void
+    {
+        app()->instance('currentTenant', $this->complejoPlata);
+
+        // Crear partido abierto
+        $split = $this->actingAs($this->cliente)
+            ->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson("/api/turnos/{$this->turno->id}/split", [
+                'cuotas' => 4,
+                'es_partido_abierto' => true,
+                'tipo_partido' => 'desafio',
+            ]);
+
+        $split->assertStatus(201);
+        $partidoId = $split->json('data.partido_abierto.id');
+
+        // Cancelar partido abierto
+        $cancelResponse = $this->actingAs($this->cliente)
+            ->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson("/api/partidos-abiertos/{$partidoId}/cancelar", [
+                'motivo' => 'Lluvia repentina',
+            ]);
+
+        $cancelResponse->assertStatus(200)
+            ->assertJsonPath('data.estado', 'cancelado');
+
+        $this->assertDatabaseHas('partidos_abiertos', [
+            'id' => $partidoId,
+            'estado' => 'cancelado',
+        ]);
+
+        // Consultar turnos disponibles para split
+        $turnosResponse = $this->actingAs($this->cliente)
+            ->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->getJson('/api/turnos-para-split');
+
+        $turnosResponse->assertStatus(200)
+            ->assertJsonStructure(['data']);
+    }
 }

@@ -12,6 +12,7 @@ import BrandingClubPanel from "@/components/BrandingClubPanel";
 import GestionPaginasCMS from "@/components/GestionPaginasCMS";
 import GestionPOSBuffet from "@/components/GestionPOSBuffet";
 import GestionCajaArqueo from "@/components/GestionCajaArqueo";
+import GestionPartidosAbiertos from "@/components/GestionPartidosAbiertos";
 import { formatFechaDDMMAAAA, formatWhatsAppNumber, getPhoneValidationError } from "@/components/GrillaHoraria";
 import { getTenantPublicUrl as resolvePublicUrl, getPortalUrl, getTenantDisplayDomain } from "@/lib/navigationUrls";
 import { formatPrecio, formatMonto } from "@/lib/formatters";
@@ -485,6 +486,7 @@ export default function ClubAdminPanel() {
 
   const hasTurnosFijosModule = useMemo(() => hasModule("turnos_fijos"), [plan, activeModuleSlugs]);
   const hasPosBuffetModule = useMemo(() => hasModule("pos_buffet"), [plan, activeModuleSlugs]);
+  const hasSplitPaymentModule = useMemo(() => hasModule("split_payment"), [plan, activeModuleSlugs]);
 
   // Estados para Datos del Club
   const [tiposNegocio, setTiposNegocio] = useState<TipoNegocioItem[]>([]);
@@ -2590,6 +2592,25 @@ export default function ClubAdminPanel() {
             👥 Clientes
           </button>
           <button
+            onClick={() => setActiveTab("partidos-abiertos")}
+            className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+              activeTab === "partidos-abiertos"
+                ? "border-emerald-500 text-emerald-400 font-bold"
+                : hasSplitPaymentModule
+                ? "border-transparent text-slate-400 hover:text-slate-200"
+                : "border-transparent text-slate-500 hover:text-blue-400/90"
+            }`}
+            data-testid="tab-partidos-abiertos"
+          >
+            <span>💳</span>
+            <span>Partidos Abiertos & Split</span>
+            {!hasSplitPaymentModule && (
+              <span className="ml-1 text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/40 flex items-center gap-0.5">
+                🔒 Plata
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab("pos-buffet")}
             className={`pb-3 transition border-b-2 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === "pos-buffet"
@@ -2701,6 +2722,54 @@ export default function ClubAdminPanel() {
             💳 Facturación & Abono
           </button>
         </div>
+
+        {/* ========================================================================= */}
+        {/* TAB: PARTIDOS ABIERTOS & SPLIT PAYMENT                                   */}
+        {/* ========================================================================= */}
+        {activeTab === "partidos-abiertos" && (
+          <div className="mt-8">
+            {!hasSplitPaymentModule ? (
+              <div
+                data-testid="locked-module-split-payment"
+                className="rounded-3xl border border-blue-500/30 bg-gradient-to-b from-slate-900 to-slate-950 p-8 sm:p-12 text-center max-w-3xl mx-auto shadow-2xl relative overflow-hidden"
+              >
+                <div className="absolute -top-24 -right-24 w-60 h-60 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-500/10 border border-blue-500/30 text-4xl mb-6 shadow-inner">
+                  🔒
+                </div>
+                <div className="inline-block px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-black uppercase tracking-wider border border-blue-500/30 mb-3">
+                  Función Exclusiva Plan Plata u Oro
+                </div>
+                <h3 className="text-2xl font-black text-white sm:text-3xl tracking-tight">
+                  Partidos Abiertos & Split Payment
+                </h3>
+                <p className="mt-4 text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
+                  Tu club actualmente tiene asignado el <strong className="text-white">Plan {plan?.nombre || "Bronce"}</strong>. Para activar la publicación de partidos comunitarios en tu web, links de pago por WhatsApp y fraccionamiento automático de tarifas entre jugadores, actualiza a <strong className="text-blue-400">Plan Plata ($59/mes)</strong> u <strong className="text-blue-400">Oro ($99/mes)</strong>.
+                </p>
+
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("facturacion")}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-slate-950 font-black text-sm shadow-xl shadow-blue-500/25 transition cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>⚡</span>
+                    <span>Actualizar Mi Plan Ahora</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("canchas")}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm border border-slate-700 transition cursor-pointer"
+                  >
+                    Volver a Canchas
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <GestionPartidosAbiertos subdomain={subdomain} />
+            )}
+          </div>
+        )}
 
         {/* ========================================================================= */}
         {/* TAB: BUFFET & POS */}

@@ -110,6 +110,45 @@ class SplitPaymentService
     }
 
     /**
+     * Cancela una convocatoria de partido abierto o fraccionamiento,
+     * liberando el turno si aún no estaba confirmado o reembolsando si correspondiese.
+     */
+    public function cancelarPartidoAbierto(PartidoAbierto $partido, ?string $motivo = null): array
+    {
+        return DB::transaction(function () use ($partido, $motivo) {
+            $partidoBloqueado = PartidoAbierto::where('id', $partido->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($partidoBloqueado->estado === 'cancelado') {
+                throw ValidationException::withMessages([
+                    'partido' => ['Este partido ya se encuentra cancelado.'],
+                ]);
+            }
+
+            $partidoBloqueado->estado = 'cancelado';
+            $partidoBloqueado->save();
+
+            // Cancelar cuotas pendientes
+            TurnoPagoDividido::where('partido_abierto_id', $partidoBloqueado->id)
+                ->where('estado', 'pendiente')
+                ->update(['estado' => 'cancelado']);
+
+            // Si el turno estaba en estado bloqueado por este partido y no confirmado, liberarlo a disponible
+            if ($partidoBloqueado->turno && $partidoBloqueado->turno->estado === 'bloqueado') {
+                $partidoBloqueado->turno->estado = 'disponible';
+                $partidoBloqueado->turno->save();
+            }
+
+            return [
+                'partido_id' => $partidoBloqueado->id,
+                'estado' => $partidoBloqueado->estado,
+                'motivo' => $motivo,
+            ];
+        });
+    }
+
+    /**
      * Procesa el pago de una cuota de split payment.
      * Si todas las cuotas quedan pagadas, confirma automáticamente el turno de forma atómica.
      */

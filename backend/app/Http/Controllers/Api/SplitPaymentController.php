@@ -127,4 +127,38 @@ class SplitPaymentController extends Controller
             ],
         ], 200);
     }
+
+    /**
+     * POST /api/partidos-abiertos/{id}/cancelar
+     * Cancela una convocatoria de partido abierto y sus cuotas pendientes.
+     */
+    public function cancelarPartido(Request $request, int $id): JsonResponse
+    {
+        $partido = PartidoAbierto::findOrFail($id);
+        $resultado = $this->splitPaymentService->cancelarPartidoAbierto($partido, $request->input('motivo'));
+
+        return response()->json([
+            'message' => 'Partido abierto cancelado exitosamente.',
+            'data' => $resultado,
+        ], 200);
+    }
+
+    /**
+     * GET /api/turnos-para-split
+     * Lista turnos del complejo que pueden ser fraccionados o puestos como partido abierto.
+     */
+    public function turnosParaSplit(Request $request): JsonResponse
+    {
+        $turnos = Turno::with(['cancha', 'cliente'])
+            ->whereIn('estado', ['disponible', 'bloqueado', 'reservado'])
+            ->whereDate('fecha', '>=', now()->toDateString())
+            ->orderBy('fecha', 'asc')
+            ->orderBy('hora_inicio', 'asc')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'data' => $turnos,
+        ]);
+    }
 }
