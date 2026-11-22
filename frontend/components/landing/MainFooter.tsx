@@ -51,10 +51,16 @@ export default function MainFooter() {
                 </span>
               </li>
               <li>
-                <span className="text-slate-600 inline-flex items-center gap-1.5">
+                <Link
+                  href="/tenis"
+                  className="hover:text-emerald-400 transition inline-flex items-center gap-1.5"
+                >
                   <span>🎾</span>
-                  <span>Tenis & Squash (Próximamente)</span>
-                </span>
+                  <span>Software para Tenis</span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded">
+                    Nuevo
+                  </span>
+                </Link>
               </li>
             </ul>
           </div>

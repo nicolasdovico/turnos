@@ -129,6 +129,7 @@ export async function GET(request: NextRequest) {
     { path: "/", priority: "1.0", changefreq: "daily" },
     { path: "/portal", priority: "0.9", changefreq: "daily" },
     { path: "/padel", priority: "0.9", changefreq: "weekly" },
+    { path: "/tenis", priority: "0.9", changefreq: "weekly" },
     { path: "/jugar", priority: "0.9", changefreq: "hourly" },
     { path: "/registro-club", priority: "0.8", changefreq: "monthly" },
     { path: "/planes", priority: "0.8", changefreq: "weekly" },
