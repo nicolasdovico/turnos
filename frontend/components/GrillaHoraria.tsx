@@ -3347,32 +3347,32 @@ export default function GrillaHoraria({
                     }`}
                   >
                     <div className="space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-sm font-extrabold text-white bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-800">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-mono text-xs sm:text-sm font-extrabold text-white bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-800 whitespace-nowrap shrink-0">
                           ⏰ {turno.hora_inicio} - {turno.hora_fin}
                         </span>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5 justify-end">
                           {isPartidoAbierto ? (
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm flex items-center gap-1">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm flex items-center gap-1 whitespace-nowrap">
                               <span>📢</span> Convocatoria
                             </span>
                           ) : null}
                           {isFixed && (
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm flex items-center gap-1">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm flex items-center gap-1 whitespace-nowrap">
                               <span>🔁</span> Fijo
                             </span>
                           )}
                           {isPartidoAbierto ? (
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 whitespace-nowrap">
                               {turno.partido_abierto?.jugadores_actuales ?? 1}/{turno.partido_abierto?.jugadores_requeridos ?? 4} Jugadores
                             </span>
                           ) : isClima ? (
-                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 whitespace-nowrap">
                               🌧️ {turno.estado === "bloqueado" ? "Bloqueo Lluvia" : "Cancelado Lluvia"}
                             </span>
                           ) : (
                             <span
-                              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border whitespace-nowrap ${
                                 isPagado
                                   ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
                                   : isSenado
