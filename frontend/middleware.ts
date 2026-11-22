@@ -58,6 +58,7 @@ export function middleware(req: NextRequest) {
     "/portal",
     "/verificar-email",
     "/jugar",
+    "/split-pagos",
   ];
 
   if (globalRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {

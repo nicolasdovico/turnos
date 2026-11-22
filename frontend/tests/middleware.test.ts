@@ -50,6 +50,13 @@ describe("Next.js Subdomain Multi-tenant Middleware", () => {
     const resClub = middleware(reqClub);
     expect(resClub.status).toBe(307);
     expect(resClub.headers.get("location")).toBe("http://localhost:3000/registro-club");
+
+    const reqSplit = new NextRequest("http://padelpro.localhost:3000/split-pagos/token-123", {
+      headers: { host: "padelpro.localhost:3000" },
+    });
+    const resSplit = middleware(reqSplit);
+    expect(resSplit.status).toBe(307);
+    expect(resSplit.headers.get("location")).toBe("http://localhost:3000/split-pagos/token-123");
   });
 
   it("allows direct requests to /portal without rewriting", () => {

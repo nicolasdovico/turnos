@@ -140,11 +140,13 @@ Route::middleware('tenant.has_module:cms_web')->group(function () {
 
 Route::post('/tenants/revalidate', [\App\Http\Controllers\Api\PaginaController::class, 'triggerRevalidate']);
 
+// Checkout público de cuotas de Split Payment (no requiere header de tenant ya que el token_pago identifica unívocamente la cuota y su complejo)
+Route::post('/split-pagos/{token}/pagar', [\App\Http\Controllers\Api\SplitPaymentController::class, 'pagarCuota']);
+Route::get('/split-pagos/{token}', [\App\Http\Controllers\Api\SplitPaymentController::class, 'showCuota']);
+
 Route::middleware('tenant.has_module:split_payment')->group(function () {
     Route::post('/turnos/{id}/split', [\App\Http\Controllers\Api\SplitPaymentController::class, 'splitTurno']);
     Route::post('/partidos-abiertos/crear', [\App\Http\Controllers\Api\SplitPaymentController::class, 'crearPartidoDirecto']);
-    Route::post('/split-pagos/{token}/pagar', [\App\Http\Controllers\Api\SplitPaymentController::class, 'pagarCuota']);
-    Route::get('/split-pagos/{token}', [\App\Http\Controllers\Api\SplitPaymentController::class, 'showCuota']);
     Route::get('/partidos-abiertos', [\App\Http\Controllers\Api\SplitPaymentController::class, 'indexPartidos']);
     Route::post('/partidos-abiertos/{id}/unirse', [\App\Http\Controllers\Api\SplitPaymentController::class, 'unirsePartido']);
     Route::post('/partidos-abiertos/{id}/cancelar', [\App\Http\Controllers\Api\SplitPaymentController::class, 'cancelarPartido']);
