@@ -12,6 +12,64 @@ interface CanchaItem {
   deporte: string;
 }
 
+interface OpcionCuota {
+  num: number;
+  label: string;
+}
+
+function getCuotasOptionsForSport(deporte?: string): OpcionCuota[] {
+  const dep = (deporte || "").toLowerCase();
+  if (dep.includes("padel") || dep.includes("pádel")) {
+    return [
+      { num: 4, label: "4 jugadores (Dobles estándar)" },
+      { num: 2, label: "2 jugadores (Singles / Mano a mano)" },
+    ];
+  }
+  if (dep.includes("tenis") || dep.includes("tennis")) {
+    return [
+      { num: 2, label: "2 jugadores (Singles)" },
+      { num: 4, label: "4 jugadores (Dobles)" },
+    ];
+  }
+  if (dep.includes("futbol") || dep.includes("fútbol")) {
+    return [
+      { num: 10, label: "10 jugadores (Fútbol 5)" },
+      { num: 14, label: "14 jugadores (Fútbol 7)" },
+      { num: 16, label: "16 jugadores (Fútbol 8)" },
+      { num: 22, label: "22 jugadores (Fútbol 11)" },
+    ];
+  }
+  if (dep.includes("basquet") || dep.includes("básquet") || dep.includes("basket")) {
+    return [
+      { num: 10, label: "10 jugadores (5 vs 5)" },
+      { num: 6, label: "6 jugadores (3 vs 3)" },
+    ];
+  }
+  if (dep.includes("squash") || dep.includes("racquetball")) {
+    return [
+      { num: 2, label: "2 jugadores (Individual)" },
+    ];
+  }
+  if (dep.includes("pickleball")) {
+    return [
+      { num: 4, label: "4 jugadores (Dobles)" },
+      { num: 2, label: "2 jugadores (Singles)" },
+    ];
+  }
+  if (dep.includes("voley") || dep.includes("voleibol") || dep.includes("vóley")) {
+    return [
+      { num: 12, label: "12 jugadores (6 vs 6)" },
+      { num: 4, label: "4 jugadores (Duplas Beach)" },
+    ];
+  }
+  // Fallback genérico para otros deportes
+  return [
+    { num: 2, label: "2 jugadores" },
+    { num: 4, label: "4 jugadores" },
+    { num: 10, label: "10 jugadores" },
+  ];
+}
+
 interface SlotItem {
   hora_inicio: string;
   hora_fin: string;
@@ -76,6 +134,25 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
   const [telefonoJugador, setTelefonoJugador] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Cancha seleccionada y opciones dinámicas de jugadores
+  const selectedCancha = React.useMemo(() => {
+    return canchas.find((c) => String(c.id) === String(selectedCanchaId));
+  }, [canchas, selectedCanchaId]);
+
+  const opcionesCuotas = React.useMemo(() => {
+    return getCuotasOptionsForSport(selectedCancha?.deporte);
+  }, [selectedCancha?.deporte]);
+
+  // Si cambia la cancha y el número de jugadores ya no es aplicable, se ajusta al predeterminado
+  useEffect(() => {
+    if (opcionesCuotas.length > 0) {
+      const existe = opcionesCuotas.some((o) => o.num === cuotasCount);
+      if (!existe) {
+        setCuotasCount(opcionesCuotas[0].num);
+      }
+    }
+  }, [opcionesCuotas, cuotasCount]);
 
   const fetchPartidos = async () => {
     try {
@@ -446,24 +523,29 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
                 </div>
               </div>
 
-              {/* Cantidad de Jugadores / Cuotas */}
+              {/* Cantidad de Jugadores / Cuotas inteligente según deporte */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Cantidad Total de Jugadores: *
+                  {selectedCancha?.deporte && (
+                    <span className="ml-1.5 text-[10px] font-normal text-blue-400 capitalize">
+                      (Deporte: {selectedCancha.deporte})
+                    </span>
+                  )}
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[2, 3, 4, 10].map((num) => (
+                <div className={`grid gap-2 ${opcionesCuotas.length > 2 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"}`}>
+                  {opcionesCuotas.map((opcion) => (
                     <button
-                      key={num}
+                      key={opcion.num}
                       type="button"
-                      onClick={() => setCuotasCount(num)}
-                      className={`py-2 rounded-xl border text-xs font-bold transition ${
-                        cuotasCount === num
-                          ? "bg-blue-500 text-slate-950 border-blue-400"
+                      onClick={() => setCuotasCount(opcion.num)}
+                      className={`py-2 px-2 rounded-xl border text-xs font-bold transition text-center ${
+                        cuotasCount === opcion.num
+                          ? "bg-blue-500 text-slate-950 border-blue-400 shadow-sm"
                           : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
                       }`}
                     >
-                      {num} {num === 2 ? "(Singles/2)" : num === 4 ? "(Pádel/4)" : num === 10 ? "(Fútbol/10)" : "Jugadores"}
+                      {opcion.label}
                     </button>
                   ))}
                 </div>
