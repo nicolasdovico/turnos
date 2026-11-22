@@ -32,7 +32,7 @@ export default function ContactSection({ whatsappNumber = "5491149790220" }: Con
             </h2>
 
             <p className="text-sm sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-              Sin formularios largos ni esperas de días. Escribinos directamente por WhatsApp, nos contás sobre tu club y coordinamos una <strong className="text-emerald-400 font-bold">videollamada de 15 minutos</strong> para mostrarte la plataforma funcionando en vivo.
+              Sin formularios largos ni esperas de días. Escribinos directamente por WhatsApp, nos contás sobre tu club y coordinamos una <strong className="text-emerald-400 font-bold">videollamada</strong> para mostrarte la plataforma funcionando en vivo y resolver todas tus dudas sin apuro.
             </p>
           </div>
 
@@ -72,7 +72,7 @@ export default function ContactSection({ whatsappNumber = "5491149790220" }: Con
                   </div>
                   <div className="flex items-start gap-2 text-xs sm:text-sm text-slate-200">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Te capacitamos a vos y a tu equipo en 15 minutos</span>
+                    <span>Te capacitamos a vos y a tu equipo de trabajo</span>
                   </div>
                 </div>
               </div>
