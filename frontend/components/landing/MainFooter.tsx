@@ -65,6 +65,18 @@ export default function MainFooter() {
                   <span>Software para Tenis</span>
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/hockey"
+                  className="hover:text-emerald-400 transition inline-flex items-center gap-1.5"
+                >
+                  <span>🏑</span>
+                  <span>Software para Hockey</span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded">
+                    Nuevo
+                  </span>
+                </Link>
+              </li>
             </ul>
           </div>
 
