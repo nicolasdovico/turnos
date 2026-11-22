@@ -118,7 +118,11 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
   const fetchPartidos = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/partidos-abiertos");
+      const res = await fetch("/api/partidos-abiertos", {
+        headers: {
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+      });
       if (res.ok) {
         const json = await res.json();
         setPartidos(json.data || []);
@@ -132,7 +136,11 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
 
   const fetchTurnosElegibles = async () => {
     try {
-      const res = await fetch("/api/turnos-para-split");
+      const res = await fetch("/api/turnos-para-split", {
+        headers: {
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+      });
       if (res.ok) {
         const json = await res.json();
         setTurnosElegibles(json.data || []);
@@ -162,7 +170,10 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
       setSubmitting(true);
       const res = await fetch(`/api/turnos/${selectedTurnoId}/split`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
         body: JSON.stringify({
           cuotas: cuotasCount,
           es_partido_abierto: true,
@@ -198,7 +209,10 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
     try {
       const res = await fetch(`/api/partidos-abiertos/${partidoId}/cancelar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
         body: JSON.stringify({ motivo: "Cancelado desde el panel de administración" }),
       });
 
@@ -220,7 +234,10 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
     try {
       const res = await fetch(`/api/split-pagos/${tokenPago}/pagar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
         body: JSON.stringify({
           metodo_pago: "efectivo",
           nombre_jugador: "Abonado en mostrador",

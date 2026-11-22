@@ -48,7 +48,11 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
     async function fetchPartidos() {
       try {
         setLoading(true);
-        const res = await fetch("/api/partidos-abiertos?estado=buscando");
+        const res = await fetch("/api/partidos-abiertos?estado=buscando", {
+          headers: {
+            ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+          },
+        });
         if (res.ok) {
           const json = await res.json();
           if (Array.isArray(json?.data)) {
