@@ -20,7 +20,7 @@ import {
   Trophy,
   Filter
 } from "lucide-react";
-import { formatMonto } from "@/lib/formatters";
+import { formatPrecio } from "@/lib/formatters";
 import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 interface GestionPartidosAbiertosProps {
@@ -567,7 +567,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                     <option value="">-- Elegir Turno --</option>
                     {turnosElegibles.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {formatFechaDDMMAAAA(t.fecha)} • {t.hora_inicio?.substring(0, 5)} hs • {t.cancha?.nombre} ({t.cancha?.deporte}) — Total: {formatMonto(t.precio)}
+                        {formatFechaDDMMAAAA(t.fecha)} • {t.hora_inicio?.substring(0, 5)} hs • {t.cancha?.nombre} ({t.cancha?.deporte}) — Total: {formatPrecio(t.precio)}
                       </option>
                     ))}
                   </select>
@@ -754,7 +754,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
 
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold text-emerald-400">
-                          {formatMonto(cuota.monto)}
+                          {formatPrecio(cuota.monto)}
                         </span>
                         <span
                           className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${

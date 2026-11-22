@@ -12,7 +12,7 @@ import {
   AlertCircle,
   Share2
 } from "lucide-react";
-import { formatMonto } from "@/lib/formatters";
+import { formatPrecio } from "@/lib/formatters";
 import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 export interface SplitPagoClientProps {
@@ -218,7 +218,7 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
             <div className="text-right">
               <span className="text-[10px] text-slate-400 block">Cuota {cuota.cuota_numero} de {cuota.total_cuotas}</span>
               <span className="text-2xl font-black text-emerald-400 font-mono">
-                {formatMonto(cuota.monto)}
+                {formatPrecio(cuota.monto)}
               </span>
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
             <div className="space-y-1">
               <h3 className="text-xl font-bold text-white">¡Cuota Pagada con Éxito!</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Tu cuota individual de <strong className="text-emerald-300">{formatMonto(cuota.monto)}</strong> ha sido registrada.
+                Tu cuota individual de <strong className="text-emerald-300">{formatPrecio(cuota.monto)}</strong> ha sido registrada.
                 {cuota.nombre_jugador && <span> A nombre de: <strong>{cuota.nombre_jugador}</strong>.</span>}
               </p>
             </div>
@@ -376,7 +376,7 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Pagar Mi Cuota ({formatMonto(cuota.monto)})</span>
+                  <span>Pagar Mi Cuota ({formatPrecio(cuota.monto)})</span>
                 </>
               )}
             </button>

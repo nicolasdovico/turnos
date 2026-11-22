@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Users, Calendar, Clock, Trophy, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
-import { formatMonto } from "@/lib/formatters";
+import { formatPrecio } from "@/lib/formatters";
 import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 interface PartidoPublico {
@@ -140,7 +140,7 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
                     <div className="flex items-baseline justify-between text-xs pt-1 border-t border-slate-800">
                       <span className="text-slate-400">Cuota por jugador:</span>
                       <span className="text-base font-black text-emerald-400 font-mono">
-                        {formatMonto(cuotaPendiente.monto)}
+                        {formatPrecio(cuotaPendiente.monto)}
                       </span>
                     </div>
                   )}
