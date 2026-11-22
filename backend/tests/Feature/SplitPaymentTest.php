@@ -69,7 +69,7 @@ class SplitPaymentTest extends TestCase
         $this->turno = Turno::create([
             'cancha_id' => $this->cancha->id,
             'cliente_id' => $this->cliente->id,
-            'fecha' => '2026-09-01',
+            'fecha' => now()->addDays(2)->toDateString(),
             'hora_inicio' => '19:00',
             'hora_fin' => '20:30',
             'precio' => 12000.00,

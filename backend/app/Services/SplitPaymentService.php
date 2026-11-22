@@ -296,6 +296,9 @@ class SplitPaymentService
     {
         $query = PartidoAbierto::query()
             ->where('estado', $filtros['estado'] ?? 'buscando')
+            ->whereHas('turno', function ($q) {
+                $q->whereDate('fecha', '>=', now()->toDateString());
+            })
             ->with(['turno.cancha', 'organizador', 'pagosDivididos']);
 
         if (!empty($filtros['tipo_partido'])) {
