@@ -21,6 +21,7 @@ import {
   Filter
 } from "lucide-react";
 import { formatMonto } from "@/lib/formatters";
+import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 interface GestionPartidosAbiertosProps {
   subdomain: string;
@@ -460,7 +461,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                   <div className="space-y-1 text-xs text-slate-300">
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>{turno?.fecha || "Fecha no especificada"}</span>
+                      <span>{turno?.fecha ? formatFechaDDMMAAAA(turno.fecha) : "Fecha no especificada"}</span>
                       <span>•</span>
                       <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       <span>{turno ? `${turno.hora_inicio?.substring(0, 5)} hs` : "--:--"}</span>
@@ -566,7 +567,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                     <option value="">-- Elegir Turno --</option>
                     {turnosElegibles.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.fecha} • {t.hora_inicio?.substring(0, 5)} hs • {t.cancha?.nombre} ({t.cancha?.deporte}) — Total: {formatMonto(t.precio)}
+                        {formatFechaDDMMAAAA(t.fecha)} • {t.hora_inicio?.substring(0, 5)} hs • {t.cancha?.nombre} ({t.cancha?.deporte}) — Total: {formatMonto(t.precio)}
                       </option>
                     ))}
                   </select>
@@ -701,7 +702,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                   Cuotas de {selectedPartido.turno?.cancha?.nombre}
                 </h3>
                 <p className="text-xs text-slate-400">
-                  {selectedPartido.turno?.fecha} a las {selectedPartido.turno?.hora_inicio?.substring(0, 5)} hs
+                  {formatFechaDDMMAAAA(selectedPartido.turno?.fecha)} • {selectedPartido.turno?.hora_inicio?.substring(0, 5)} hs
                 </p>
               </div>
 
@@ -727,8 +728,9 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                   ? `${window.location.origin}/split-pagos/${cuota.token_pago}`
                   : `/split-pagos/${cuota.token_pago}`;
 
+                const fechaFormateada = formatFechaDDMMAAAA(selectedPartido.turno?.fecha);
                 const whatsappText = encodeURIComponent(
-                  `¡Hola! Te paso el link para abonar tu parte del turno de ${selectedPartido.turno?.cancha?.deporte} de hoy a las ${selectedPartido.turno?.hora_inicio?.substring(0, 5)} hs en ${selectedPartido.turno?.cancha?.nombre}: ${linkPago}`
+                  `¡Hola! Te paso el link para abonar tu parte del turno de ${selectedPartido.turno?.cancha?.deporte} del ${fechaFormateada} • ${selectedPartido.turno?.hora_inicio?.substring(0, 5)} hs en ${selectedPartido.turno?.cancha?.nombre}: ${linkPago}`
                 );
 
                 return (

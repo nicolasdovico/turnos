@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Users, Calendar, Clock, Trophy, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 import { formatMonto } from "@/lib/formatters";
+import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 interface PartidoPublico {
   id: number;
@@ -121,7 +122,7 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
                     </h3>
                     <div className="flex items-center gap-2 text-xs text-slate-300 mt-1">
                       <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span>{turno?.fecha}</span>
+                      <span>{turno?.fecha ? formatFechaDDMMAAAA(turno.fecha) : ""}</span>
                       <span>•</span>
                       <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                       <span>{turno?.hora_inicio?.substring(0, 5)} hs</span>

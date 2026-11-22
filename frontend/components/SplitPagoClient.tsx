@@ -13,6 +13,7 @@ import {
   Share2
 } from "lucide-react";
 import { formatMonto } from "@/lib/formatters";
+import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 export interface SplitPagoClientProps {
   token: string;
@@ -227,7 +228,7 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
               <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
               <div>
                 <span className="block text-[10px] text-slate-500 font-semibold uppercase">Fecha</span>
-                <span className="font-bold">{turno?.fecha || "A confirmar"}</span>
+                <span className="font-bold">{turno?.fecha ? formatFechaDDMMAAAA(turno.fecha) : "A confirmar"}</span>
               </div>
             </div>
 
