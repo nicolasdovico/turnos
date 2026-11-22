@@ -97,7 +97,7 @@ class SplitPaymentController extends Controller
         $precioTurno = $slotElegido['precio'] ?? (float) $cancha->precio_base;
 
         return DB::transaction(function () use ($cancha, $fechaNormalizada, $horaInicioNormalizada, $horaFinNormalizada, $precioTurno, $validated) {
-            // Si ya existía un turno libre o creamos uno nuevo atómicamente
+            // Si ya existía un turno libre o creamos uno nuevo atómicamente en estado bloqueado por convocatoria
             $turno = Turno::create([
                 'complejo_id' => $cancha->complejo_id,
                 'cancha_id' => $cancha->id,
@@ -105,8 +105,8 @@ class SplitPaymentController extends Controller
                 'hora_inicio' => $horaInicioNormalizada . ':00',
                 'hora_fin' => $horaFinNormalizada . ':00',
                 'precio' => $precioTurno,
-                'estado' => 'disponible',
-                'cliente_nombre' => $validated['organizador_nombre'] ?? null,
+                'estado' => 'bloqueado',
+                'cliente_nombre' => $validated['organizador_nombre'] ?? 'Convocatoria Abierta',
                 'cliente_telefono' => $validated['organizador_telefono'] ?? null,
                 'metodo_pago' => 'split',
             ]);

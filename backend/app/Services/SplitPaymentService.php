@@ -55,6 +55,17 @@ class SplitPaymentService
                 ]);
             }
 
+            // Bloquear el turno para que no quede libre al público ni disponible para otro cliente
+            if ($turno->estado !== 'reservado') {
+                $turno->estado = 'bloqueado';
+                if (empty($turno->cliente_nombre) && !empty($params['organizador_nombre'])) {
+                    $turno->cliente_nombre = $params['organizador_nombre'];
+                } elseif (empty($turno->cliente_nombre)) {
+                    $turno->cliente_nombre = 'Convocatoria Abierta';
+                }
+                $turno->save();
+            }
+
             $cuotasGeneradas = [];
 
             for ($i = 1; $i <= $cuotas; $i++) {

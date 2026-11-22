@@ -163,9 +163,9 @@ class SplitPaymentTest extends TestCase
                 ],
             ]);
 
-        // Verificar que el turno siga en estado disponible (no confirmado)
+        // Verificar que el turno siga bloqueado (no disponible ni confirmado aún)
         app()->instance('currentTenant', $this->complejoPlata);
-        $this->assertEquals('disponible', $this->turno->fresh()->estado);
+        $this->assertEquals('bloqueado', $this->turno->fresh()->estado);
     }
 
     /**
@@ -191,7 +191,7 @@ class SplitPaymentTest extends TestCase
             ->postJson("/api/split-pagos/{$cuotas[1]['token_pago']}/pagar", ['metodo_pago' => 'mercadopago'])
             ->assertStatus(200);
 
-        $this->assertEquals('disponible', $this->turno->fresh()->estado);
+        $this->assertEquals('bloqueado', $this->turno->fresh()->estado);
 
         // Pagar cuota 3 (4000) -> Última cuota
         $finalRes = $this->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)

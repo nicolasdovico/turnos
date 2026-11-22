@@ -139,6 +139,16 @@ export interface TurnoOcupado {
   created_at_local?: number;
   is_mine?: boolean;
   motivo_cancelacion?: string | null;
+  es_partido_abierto?: boolean;
+  partido_abierto?: {
+    id: number;
+    estado: string;
+    jugadores_requeridos: number;
+    jugadores_actuales: number;
+    tipo_partido?: string;
+    nivel_min?: string | null;
+    nivel_max?: string | null;
+  } | null;
 }
 
 export interface CurrentUser {
@@ -3301,10 +3311,12 @@ export default function GrillaHoraria({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {turnosOcupados.map((turno) => {
-                const isClima = turno.motivo_cancelacion === "lluvia" || turno.estado === "bloqueado" || turno.estado === "cancelado";
+                const isPartidoAbierto = Boolean(turno.es_partido_abierto || turno.partido_abierto);
+                const isClima = !isPartidoAbierto && (turno.motivo_cancelacion === "lluvia" || turno.estado === "bloqueado" || turno.estado === "cancelado");
                 const isFixed = Boolean(turno.es_fijo);
                 const isPagado =
                   !isClima &&
+                  !isPartidoAbierto &&
                   (turno.estado_pago === "pagado" ||
                     turno.estado_pago === "pagado_total" ||
                     turno.estado === "pagado" ||
@@ -3314,6 +3326,7 @@ export default function GrillaHoraria({
 
                 const isSenado =
                   !isClima &&
+                  !isPartidoAbierto &&
                   !isPagado &&
                   (turno.estado_pago === "senado" ||
                     turno.estado_pago === "sena_pagada" ||
@@ -3324,7 +3337,9 @@ export default function GrillaHoraria({
                     key={turno.id}
                     data-testid="admin-reserved-card"
                     className={`p-4 rounded-2xl transition flex flex-col justify-between gap-3 shadow-sm ${
-                      isClima
+                      isPartidoAbierto
+                        ? "bg-purple-950/20 border border-purple-500/40 ring-1 ring-purple-500/20 hover:border-purple-400"
+                        : isClima
                         ? "bg-cyan-950/20 border border-cyan-500/30 ring-1 ring-cyan-500/20 hover:border-cyan-400"
                         : isFixed
                         ? "bg-amber-950/20 border border-amber-500/40 ring-1 ring-amber-500/20 hover:border-amber-400"
@@ -3337,12 +3352,21 @@ export default function GrillaHoraria({
                           ⏰ {turno.hora_inicio} - {turno.hora_fin}
                         </span>
                         <div className="flex items-center gap-1.5">
+                          {isPartidoAbierto ? (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm flex items-center gap-1">
+                              <span>📢</span> Convocatoria
+                            </span>
+                          ) : null}
                           {isFixed && (
                             <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm flex items-center gap-1">
                               <span>🔁</span> Fijo
                             </span>
                           )}
-                          {isClima ? (
+                          {isPartidoAbierto ? (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                              {turno.partido_abierto?.jugadores_actuales ?? 1}/{turno.partido_abierto?.jugadores_requeridos ?? 4} Jugadores
+                            </span>
+                          ) : isClima ? (
                             <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                               🌧️ {turno.estado === "bloqueado" ? "Bloqueo Lluvia" : "Cancelado Lluvia"}
                             </span>
@@ -3366,9 +3390,13 @@ export default function GrillaHoraria({
                         <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col gap-1">
                           <div className="font-bold text-white flex items-center justify-between gap-1.5">
                             <span className="flex items-center gap-1.5 truncate">
-                              <span className="text-emerald-400 font-bold text-sm">👤</span>
+                              <span className={isPartidoAbierto ? "text-purple-400 font-bold text-sm" : "text-emerald-400 font-bold text-sm"}>
+                                {isPartidoAbierto ? "📢" : "👤"}
+                              </span>
                               <span className="truncate font-extrabold text-white text-[13px] tracking-tight">
-                                {turno.cliente_nombre || "Cliente Mostrador"}
+                                {isPartidoAbierto
+                                  ? `Convocatoria: ${turno.cliente_nombre || "Partido Abierto"}`
+                                  : turno.cliente_nombre || "Cliente Mostrador"}
                               </span>
                             </span>
                           </div>
@@ -3395,14 +3423,16 @@ export default function GrillaHoraria({
                           </div>
                         ) : (
                           <div className="text-slate-500 text-[11px] italic px-1">
-                            Sin teléfono registrado
+                            {isPartidoAbierto ? "Convocatoria con pagos individuales" : "Sin teléfono registrado"}
                           </div>
                         )}
 
                         <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
                           <span>Método:</span>
                           <span className="text-slate-200 capitalize font-medium">
-                            {turno.metodo_pago === "online"
+                            {isPartidoAbierto
+                              ? "💳 Split / Cuotas"
+                              : turno.metodo_pago === "online"
                               ? "💳 Online"
                               : turno.metodo_pago === "transferencia"
                               ? "📲 Transferencia"

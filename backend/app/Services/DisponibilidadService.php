@@ -114,7 +114,7 @@ class DisponibilidadService
         $ahora = Carbon::now($timezone);
 
         // Fetch non-available turnos in database (reservado, bloqueado, confirmado, etc. o cancelado por lluvia)
-        $turnosOcupados = Turno::with(['cliente', 'ventas.items.producto'])
+        $turnosOcupados = Turno::with(['cliente', 'ventas.items.producto', 'partidoAbierto'])
             ->where('cancha_id', $canchaId)
             ->where('fecha', $fechaCarbon->format('Y-m-d'))
             ->where(function ($q) {
@@ -354,12 +354,18 @@ class DisponibilidadService
         // Formatted occupied turnos list (with client details for admin view and current user view)
         $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($cancha, $esAdmin, $currentUserId, $fechaCarbon) {
             $isLluvia = ($t->motivo_cancelacion === 'lluvia');
+            $partido = $t->partidoAbierto;
+            $isPartidoAbierto = $partido && in_array($partido->estado, ['buscando', 'completo']);
             $isBloqueado = ($t->estado === 'bloqueado');
             $isCancelado = ($t->estado === 'cancelado');
             $precio = (float) $t->precio;
             $montoPagado = (float) ($t->monto_pagado ?? 0);
 
-            if ($isLluvia || $isBloqueado || $isCancelado) {
+            if ($isPartidoAbierto) {
+                // Turno bloqueado por convocatoria de partido abierto
+                $saldoPendiente = max(0.0, round($precio - $montoPagado, 2));
+                $estadoPago = $partido->estado === 'completo' ? 'pagado_total' : ($montoPagado > 0 ? 'senado' : 'pendiente');
+            } elseif ($isLluvia || $isBloqueado || $isCancelado) {
                 $saldoPendiente = 0.0;
                 $estadoPago = $montoPagado > 0 ? ($t->estado_pago ?: 'reembolsado') : 'cancelado';
                 if ($isBloqueado || $isCancelado) {
@@ -427,6 +433,16 @@ class DisponibilidadService
                 'motivo_cancelacion' => $t->motivo_cancelacion,
                 'metodo_pago' => $t->metodo_pago ?: 'mostrador',
                 'es_fijo' => (bool) $t->es_fijo,
+                'es_partido_abierto' => $isPartidoAbierto,
+                'partido_abierto' => $isPartidoAbierto ? [
+                    'id' => $partido->id,
+                    'estado' => $partido->estado,
+                    'jugadores_requeridos' => $partido->jugadores_requeridos,
+                    'jugadores_actuales' => $partido->jugadores_actuales,
+                    'tipo_partido' => $partido->tipo_partido,
+                    'nivel_min' => $partido->nivel_min,
+                    'nivel_max' => $partido->nivel_max,
+                ] : null,
             ];
 
             $userModel = $currentUserId ? \App\Models\User::find($currentUserId) : null;
