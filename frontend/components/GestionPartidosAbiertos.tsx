@@ -115,6 +115,16 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
   const [selectedPartido, setSelectedPartido] = useState<PartidoAbiertoItem | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
+  // Toast / Notificaciones estilizadas
+  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+
+  const showToast = (type: "success" | "error" | "info", text: string) => {
+    setToastMessage({ type, text });
+    setTimeout(() => {
+      setToastMessage((current) => (current?.text === text ? null : current));
+    }, 4000);
+  };
+
   const fetchPartidos = async () => {
     try {
       setLoading(true);
@@ -162,7 +172,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
   const handleCrearSplit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTurnoId) {
-      alert("Seleccioná un turno para fraccionar.");
+      showToast("error", "Seleccioná un turno para fraccionar.");
       return;
     }
 
@@ -190,12 +200,12 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
         throw new Error(errJson.message || "Error al crear el partido abierto.");
       }
 
-      alert("¡Convocatoria de partido abierto creada con éxito!");
+      showToast("success", "¡Convocatoria de partido abierto creada con éxito!");
       setIsModalOpen(false);
       setSelectedTurnoId("");
       fetchPartidos();
     } catch (err: any) {
-      alert(err.message || "No se pudo crear la convocatoria.");
+      showToast("error", err.message || "No se pudo crear la convocatoria.");
     } finally {
       setSubmitting(false);
     }
@@ -217,16 +227,16 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
       });
 
       if (res.ok) {
-        alert("Partido abierto cancelado correctamente.");
+        showToast("success", "Partido abierto cancelado correctamente.");
         fetchPartidos();
         if (selectedPartido?.id === partidoId) {
           setSelectedPartido(null);
         }
       } else {
-        alert("Error al cancelar el partido abierto.");
+        showToast("error", "Error al cancelar el partido abierto.");
       }
     } catch (err) {
-      alert("Error al procesar la cancelación.");
+      showToast("error", "Error al procesar la cancelación.");
     }
   };
 
@@ -245,7 +255,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
       });
 
       if (res.ok) {
-        alert("Cuota registrada como pagada con éxito.");
+        showToast("success", "Cuota registrada como pagada con éxito.");
         fetchPartidos();
         if (selectedPartido) {
           // Refrescar el modal
@@ -255,10 +265,10 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
           setSelectedPartido({ ...selectedPartido, pagos_divididos: updatedCuotas });
         }
       } else {
-        alert("No se pudo registrar el pago de la cuota.");
+        showToast("error", "No se pudo registrar el pago de la cuota.");
       }
     } catch (err) {
-      alert("Error al registrar el cobro.");
+      showToast("error", "Error al registrar el cobro.");
     }
   };
 
@@ -835,6 +845,38 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* NOTIFICACIÓN TOAST ESTILO DEL SITIO                                       */}
+      {/* ========================================================================= */}
+      {toastMessage && (
+        <div
+          data-testid="toast-partidos-abiertos"
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-xs sm:text-sm font-semibold border transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${
+            toastMessage.type === "success"
+              ? "bg-emerald-950/95 border-emerald-500/50 text-emerald-200 shadow-emerald-950/50"
+              : toastMessage.type === "error"
+              ? "bg-rose-950/95 border-rose-500/50 text-rose-200 shadow-rose-950/50"
+              : "bg-blue-950/95 border-blue-500/50 text-blue-200 shadow-blue-950/50"
+          }`}
+        >
+          {toastMessage.type === "success" ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          ) : toastMessage.type === "error" ? (
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+          ) : (
+            <Users className="w-5 h-5 text-blue-400 shrink-0" />
+          )}
+          <span>{toastMessage.text}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="ml-2 text-slate-400 hover:text-white text-xs"
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>
