@@ -152,6 +152,12 @@ class SplitPaymentController extends Controller
         $turnos = Turno::with(['cancha', 'cliente'])
             ->whereIn('estado', ['disponible', 'bloqueado', 'reservado'])
             ->whereDate('fecha', '>=', now()->toDateString())
+            ->whereDoesntHave('partidoAbierto', function ($q) {
+                $q->whereIn('estado', ['buscando', 'completo']);
+            })
+            ->whereDoesntHave('pagosDivididos', function ($q) {
+                $q->where('estado', 'pendiente');
+            })
             ->orderBy('fecha', 'asc')
             ->orderBy('hora_inicio', 'asc')
             ->limit(50)
