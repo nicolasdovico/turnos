@@ -97,6 +97,15 @@ export default function ContactSection({ whatsappNumber = "5491149790220" }: Con
                 Respuesta rápida y personalizada
               </span>
               <span>•</span>
+              <a
+                href="https://instagram.com/turnosflow.oficial"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-pink-400 font-semibold transition inline-flex items-center gap-1 text-slate-300"
+              >
+                <span>📸 @turnosflow.oficial</span>
+              </a>
+              <span>•</span>
               <span className="flex items-center gap-1.5">
                 <Video className="w-3.5 h-3.5 text-emerald-400" />
                 Videollamada por Google Meet / Zoom a coordinar

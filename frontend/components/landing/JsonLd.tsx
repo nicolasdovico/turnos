@@ -50,6 +50,9 @@ export default function JsonLd() {
     "name": "TurnosFlow",
     "url": "https://turnosflow.com",
     "logo": "https://turnosflow.com/logo-full.png",
+    "sameAs": [
+      "https://instagram.com/turnosflow.oficial"
+    ],
     "contactPoint": {
       "@type": "ContactPoint",
       "telephone": "+54-9-11-4979-0220",
