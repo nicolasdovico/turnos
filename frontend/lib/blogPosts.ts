@@ -1,3 +1,10 @@
+export function formatBlogDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-");
+  if (!year || !month || !day) return dateStr;
+  return `${day}-${month}-${year}`;
+}
+
 export interface BlogPost {
   slug: string;
   title: string;

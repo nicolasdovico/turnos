@@ -1,13 +1,28 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { BLOG_POSTS } from "@/lib/blogPosts";
+import { BLOG_POSTS, formatBlogDate } from "@/lib/blogPosts";
 import { ArrowLeft, Calendar, Clock, CheckCircle2, ArrowRight, MessageCircle } from "lucide-react";
 
 interface Props {
   params: {
     slug: string;
   };
+}
+
+function renderFormattedText(text: string) {
+  // Parsea negritas estilo **texto** y lo renderiza con <strong className="text-white font-bold">
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={i} className="text-white font-bold">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
 }
 
 export function generateStaticParams() {
@@ -107,7 +122,7 @@ export default function BlogPostPage({ params }: Props) {
             <span className="text-slate-600">•</span>
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
               <Calendar className="w-3.5 h-3.5" />
-              <span>{post.date}</span>
+              <span>{formatBlogDate(post.date)}</span>
             </div>
           </div>
 
@@ -133,13 +148,13 @@ export default function BlogPostPage({ params }: Props) {
             if (paragraph.startsWith("- ")) {
               return (
                 <li key={idx} className="list-disc ml-5 text-slate-300">
-                  {paragraph.replace("- ", "")}
+                  {renderFormattedText(paragraph.replace("- ", ""))}
                 </li>
               );
             }
             return (
               <p key={idx} className="text-slate-300">
-                {paragraph}
+                {renderFormattedText(paragraph)}
               </p>
             );
           })}

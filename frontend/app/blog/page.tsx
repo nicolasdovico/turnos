@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BLOG_POSTS } from "@/lib/blogPosts";
+import { BLOG_POSTS, formatBlogDate } from "@/lib/blogPosts";
 import { Calendar, Clock, ArrowRight, BookOpen, Sparkles } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -80,7 +80,7 @@ export default function BlogIndexPage() {
               <div className="pt-6 mt-6 border-t border-slate-800/80 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{post.date}</span>
+                  <span>{formatBlogDate(post.date)}</span>
                 </div>
 
                 <Link
