@@ -8,7 +8,16 @@ export default function JsonLd() {
     "name": "TurnosFlow",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web, iOS, Android",
-    "description": "Software integral de gestión de complejos deportivos, reservas de canchas y turnos online con control de caja y cobranzas automáticas.",
+    "description": "Software integral de gestión de complejos deportivos, reservas y arriendo de canchas / pistas y turnos online para clubes de Latinoamérica.",
+    "areaServed": [
+      { "@type": "Country", "name": "Argentina" },
+      { "@type": "Country", "name": "Chile" },
+      { "@type": "Country", "name": "Uruguay" },
+      { "@type": "Country", "name": "Paraguay" },
+      { "@type": "Country", "name": "Colombia" },
+      { "@type": "Country", "name": "Perú" },
+      { "@type": "Country", "name": "México" }
+    ],
     "offers": {
       "@type": "Offer",
       "price": "29.00",

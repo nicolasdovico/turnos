@@ -7,6 +7,8 @@ export const metadata: Metadata = {
     "El software definitivo para clubes y complejos de tenis. Turnos de 60, 90 y 120 minutos, canchas de polvo de ladrillo, cemento y césped, cobro automático de señas con Mercado Pago, gestión de profesores, luz nocturna y web oficial propia. Probá 30 días gratis.",
   keywords: [
     "software para canchas de tenis",
+    "arriendo canchas de tenis",
+    "alquiler pistas de tenis",
     "sistema de turnos de tenis",
     "gestion de clubes de tenis",
     "alquiler de canchas de tenis",
@@ -34,7 +36,7 @@ export const metadata: Metadata = {
         alt: "TurnosFlow Tenis - Software para Clubes y Complejos de Tenis",
       },
     ],
-    locale: "es_AR",
+    locale: "es_419",
     type: "website",
   },
 };

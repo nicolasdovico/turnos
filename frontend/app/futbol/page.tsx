@@ -7,6 +7,8 @@ export const metadata: Metadata = {
     "El software líder para complejos y predios de fútbol 5, fútbol 7 y fútbol 11. Cobro obligatorio de señas con Mercado Pago, partidos abiertos (matchmaking), torneos con llaves y fixtures, cantina POS y sitio web oficial con dominio propio. Probá 30 días gratis.",
   keywords: [
     "software para canchas de futbol",
+    "software canchas sinteticas",
+    "arriendo canchas de futbol",
     "sistema de turnos de futbol 5",
     "alquiler de canchas de futbol",
     "gestion de predios de futbol",
@@ -34,7 +36,7 @@ export const metadata: Metadata = {
         alt: "TurnosFlow Fútbol - Software para Canchas y Predios de Fútbol",
       },
     ],
-    locale: "es_AR",
+    locale: "es_419",
     type: "website",
   },
 };

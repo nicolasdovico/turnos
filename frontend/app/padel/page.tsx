@@ -7,11 +7,15 @@ export const metadata: Metadata = {
     "La plataforma definitiva para complejos de pádel. Grilla horaria inteligente, partidos abiertos (matchmaking), cobro automático de señas con Mercado Pago, control de canchas techadas/cristal y web propia. Probá 30 días gratis.",
   keywords: [
     "software para canchas de padel",
+    "arriendo de canchas de padel",
+    "alquiler de pistas de padel",
     "sistema de turnos de padel",
     "gestion de clubes de padel",
     "turnos de padel online",
+    "reserva de pistas de padel",
     "sistema para complejo de padel",
     "app para canchas de padel",
+    "software canchas padel chile uruguay colombia",
     "partidos abiertos padel",
     "torneos de padel software"
   ],
@@ -32,7 +36,7 @@ export const metadata: Metadata = {
         alt: "TurnosFlow Pádel - Software para Complejos de Pádel",
       },
     ],
-    locale: "es_AR",
+    locale: "es_419",
     type: "website",
   },
 };

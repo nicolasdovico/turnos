@@ -254,9 +254,14 @@ export const LANDING_CONFIG = {
         "¡Absolutamente! La grilla para recepcionistas te permite bloquear o asignar un turno en solo 2 clics, cobrar en efectivo o con tarjeta, e incluso registrar clientes rápidos sin demoras.",
     },
     {
-      pregunta: "¿Cómo se gestiona el dinero de las señas?",
+      pregunta: "¿Cómo se gestiona el dinero de las señas o reservas en mi país?",
       respuesta:
-        "Las señas se cobran directamente a través de tu cuenta de Mercado Pago o tarjetas. El dinero ingresa a tu propia cuenta sin intermediarios.",
+        "El dinero va directo a tu cuenta. En Argentina, Chile, Uruguay, Colombia y toda la región podés cobrar señas automáticas mediante Mercado Pago, pasarelas locales o transferencias bancarias directas en tu moneda local (ARS, CLP, UYU, COP, USD) sin intermediarios ni retenciones.",
+    },
+    {
+      pregunta: "¿Funciona tanto para canchas de pádel, fútbol como pistas techadas o sintéticas?",
+      respuesta:
+        "Sí. TurnosFlow está adaptado a cualquier deporte y formato: canchas de pádel de cristal o muro, canchas sintéticas de fútbol 5/7/11, pistas de tenis de polvo de ladrillo o cemento, y complejos multideporte en toda Latinoamérica.",
     },
     {
       pregunta: "¿Qué pasa si llueve o se suspende un turno?",
