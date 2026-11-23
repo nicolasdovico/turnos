@@ -20,8 +20,14 @@ WORKDIR /var/www/html
 # Copiar archivos de dependencias
 COPY composer.json composer.lock ./
 
-# Instalar dependencias de producción
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+# Configurar Composer para reintentos y timeouts más amplios ante caídas de GitHub
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_PROCESS_TIMEOUT=600 \
+    COMPOSER_MAX_PARALLEL_HTTP=4
+
+# Instalar dependencias de producción (reintentando si GitHub da 504)
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts \
+    || composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
 # Copiar el resto del código
 COPY . .
