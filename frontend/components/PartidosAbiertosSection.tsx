@@ -114,7 +114,7 @@ interface PartidosAbiertosSectionProps {
 }
 
 export default function PartidosAbiertosSection({ subdomain, clubNombre }: PartidosAbiertosSectionProps) {
-  const { user, token, login, register } = useAuth();
+  const { user, token, login, register, setAuthSession } = useAuth();
   const [partidos, setPartidos] = useState<PartidoPublico[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -428,14 +428,7 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
           const validToken = verifyData.token || pendingUserSession?.token;
           const validUser = verifyData.user || pendingUserSession?.user;
           if (validToken && validUser) {
-            localStorage.setItem("saas_token", validToken);
-            localStorage.setItem("token", validToken);
-            localStorage.setItem("saas_user", JSON.stringify(validUser));
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(
-                new CustomEvent("saas-auth-changed", { detail: { user: validUser, token: validToken } })
-              );
-            }
+            setAuthSession(validUser, validToken);
           }
         }
       }
@@ -850,7 +843,11 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
 
                           <button
                             type="button"
-                            onClick={handleInlineAuth}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleInlineAuth(e);
+                            }}
                             disabled={authLoading || otpCode.trim().length !== 6}
                             className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
                           >
@@ -916,7 +913,11 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
 
                           <button
                             type="button"
-                            onClick={handleInlineAuth}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleInlineAuth(e);
+                            }}
                             disabled={authLoading}
                             className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
                           >
