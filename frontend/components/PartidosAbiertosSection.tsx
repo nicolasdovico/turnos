@@ -140,11 +140,25 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
 
   // Autenticación en línea dentro del modal
   const [authTab, setAuthTab] = useState<"login" | "register">("register");
+  const [authStep, setAuthStep] = useState<"form" | "otp">("form");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
+  const [pendingUserSession, setPendingUserSession] = useState<{ user: any; token: string } | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  // Countdown para reenvío de OTP
+  useEffect(() => {
+    if (otpCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setOtpCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpCountdown]);
 
   // Sincronizar datos si el usuario está autenticado
   useEffect(() => {
@@ -347,20 +361,114 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
           return;
         }
       } else {
-        if (!authName.trim() || !authEmail.trim() || !authPassword) {
-          setAuthError("Completá tu nombre, email y contraseña.");
-          return;
-        }
-        const res = await register(authName.trim(), authEmail.trim(), authPassword, authPassword);
-        if (!res.success) {
-          setAuthError(res.error || "No se pudo registrar la cuenta. Revisá los datos ingresados.");
-          return;
+        // Registro con OTP requerido
+        if (authStep === "form") {
+          if (!authName.trim() || !authEmail.trim() || !authPassword) {
+            setAuthError("Completá tu nombre, email y contraseña.");
+            return;
+          }
+          if (authPassword.length < 6) {
+            setAuthError("La contraseña debe tener al menos 6 caracteres.");
+            return;
+          }
+
+          const regRes = await fetch("/api/auth/register", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+            },
+            body: JSON.stringify({
+              name: authName.trim(),
+              email: authEmail.trim(),
+              password: authPassword,
+            }),
+          });
+
+          const regData = await regRes.json();
+          if (!regRes.ok) {
+            setAuthError(regData.message || regData.error || "Error al registrar la cuenta.");
+            return;
+          }
+
+          setPendingUserSession({
+            user: regData.user,
+            token: regData.token,
+          });
+          setAuthStep("otp");
+          setOtpCountdown(60);
+          setOtpCode("");
+        } else if (authStep === "otp") {
+          // Verificar código OTP de 6 dígitos
+          if (!otpCode || otpCode.trim().length !== 6) {
+            setAuthError("Ingresá el código numérico de 6 dígitos enviado a tu correo.");
+            return;
+          }
+
+          const verifyRes = await fetch("/api/auth/verify-otp", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+            },
+            body: JSON.stringify({
+              email: authEmail.trim(),
+              codigo: otpCode.trim(),
+            }),
+          });
+
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok) {
+            setAuthError(verifyData.message || verifyData.error || "Código de verificación inválido o expirado.");
+            return;
+          }
+
+          const validToken = verifyData.token || pendingUserSession?.token;
+          const validUser = verifyData.user || pendingUserSession?.user;
+          if (validToken && validUser) {
+            localStorage.setItem("saas_token", validToken);
+            localStorage.setItem("token", validToken);
+            localStorage.setItem("saas_user", JSON.stringify(validUser));
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("saas-auth-changed", { detail: { user: validUser, token: validToken } })
+              );
+            }
+          }
         }
       }
     } catch (err: any) {
       setAuthError(err.message || "Error al autenticar.");
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!authEmail.trim() || otpCountdown > 0) return;
+    setIsResendingOtp(true);
+    setAuthError(null);
+    try {
+      const res = await fetch("/api/auth/resend-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+        body: JSON.stringify({ email: authEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Error al reenviar el código OTP.");
+      }
+      setOtpCountdown(60);
+    } catch (err: any) {
+      setAuthError(err.message || "No se pudo reenviar el código OTP.");
+    } finally {
+      setIsResendingOtp(false);
     }
   };
 
@@ -712,53 +820,122 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
                     )}
 
                     <div className="space-y-2">
-                      {authTab === "register" && (
-                        <input
-                          type="text"
-                          required
-                          placeholder="Tu Nombre Completo *"
-                          value={authName}
-                          onChange={(e) => setAuthName(e.target.value)}
-                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-                        />
-                      )}
-                      <input
-                        type="email"
-                        required
-                        placeholder="Tu Email *"
-                        value={authEmail}
-                        onChange={(e) => setAuthEmail(e.target.value)}
-                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-                      />
-                      <input
-                        type="password"
-                        required
-                        placeholder="Contraseña *"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-                      />
+                      {authTab === "register" && authStep === "otp" ? (
+                        /* Paso 2: Verificación OTP */
+                        <div className="space-y-3 pt-1">
+                          <div className="p-3 rounded-xl bg-blue-500/15 border border-blue-500/30 text-xs text-blue-200 space-y-1">
+                            <div className="font-bold flex items-center gap-1.5 text-white">
+                              <span>✉️</span> Código de Verificación Enviado
+                            </div>
+                            <p className="text-[11px] text-slate-300">
+                              Enviamos un código de 6 dígitos a <strong className="text-white">{authEmail}</strong>. Ingrésalo para verificar tu cuenta y abrir la convocatoria.
+                            </p>
+                          </div>
 
-                      <button
-                        type="button"
-                        onClick={handleInlineAuth}
-                        disabled={authLoading}
-                        className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
-                      >
-                        {authLoading ? (
-                          <span>Procesando...</span>
-                        ) : authTab === "register" ? (
-                          <>
-                            <UserPlus className="w-3.5 h-3.5" />
-                            <span>Crear Mi Cuenta y Continuar</span>
-                          </>
-                        ) : (
-                          <>
-                            <LogIn className="w-3.5 h-3.5" />
-                            <span>Iniciar Sesión y Continuar</span>
-                          </>
-                        )}
-                      </button>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-300 mb-1 text-center">
+                              Ingresá el Código de 6 dígitos *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              maxLength={6}
+                              autoFocus
+                              placeholder="000000"
+                              value={otpCode}
+                              onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+                              className="w-full text-center text-xl font-mono font-black tracking-[0.4em] rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-blue-400 placeholder-slate-600 focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleInlineAuth}
+                            disabled={authLoading || otpCode.trim().length !== 6}
+                            className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{authLoading ? "Verificando..." : "Confirmar Código y Continuar"}</span>
+                          </button>
+
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                            <button
+                              type="button"
+                              disabled={otpCountdown > 0 || isResendingOtp}
+                              onClick={handleResendOtp}
+                              className="text-blue-400 hover:underline font-bold disabled:text-slate-600 disabled:no-underline"
+                            >
+                              {isResendingOtp
+                                ? "Reenviando..."
+                                : otpCountdown > 0
+                                ? `Reenviar en ${otpCountdown}s`
+                                : "Reenviar código"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAuthStep("form");
+                                setAuthError(null);
+                              }}
+                              className="text-slate-400 hover:text-white underline"
+                            >
+                              ← Cambiar email
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Paso 1: Formulario */
+                        <>
+                          {authTab === "register" && (
+                            <input
+                              type="text"
+                              required
+                              placeholder="Tu Nombre Completo *"
+                              value={authName}
+                              onChange={(e) => setAuthName(e.target.value)}
+                              className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                            />
+                          )}
+                          <input
+                            type="email"
+                            required
+                            placeholder="Tu Email *"
+                            value={authEmail}
+                            onChange={(e) => setAuthEmail(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                          />
+                          <input
+                            type="password"
+                            required
+                            placeholder="Contraseña (mínimo 6 caracteres) *"
+                            value={authPassword}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={handleInlineAuth}
+                            disabled={authLoading}
+                            className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
+                          >
+                            {authLoading ? (
+                              <span>Procesando...</span>
+                            ) : authTab === "register" ? (
+                              <>
+                                <UserPlus className="w-3.5 h-3.5" />
+                                <span>Registrarme y Recibir Código</span>
+                              </>
+                            ) : (
+                              <>
+                                <LogIn className="w-3.5 h-3.5" />
+                                <span>Iniciar Sesión y Continuar</span>
+                              </>
+                            )}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ) : (
