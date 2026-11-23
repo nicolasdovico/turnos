@@ -2,11 +2,15 @@
 
 namespace App\Services;
 
+use App\Mail\AlertaTransferenciaPendienteClubMail;
+use App\Mail\ComprobanteCuotaSplitMail;
 use App\Models\PartidoAbierto;
 use App\Models\Turno;
 use App\Models\TurnoPagoDividido;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -176,9 +180,20 @@ class SplitPaymentService
                 ]);
             }
 
-            $cuota->estado = 'pagado';
-            $cuota->metodo_pago = $datosPago['metodo_pago'] ?? 'tarjeta';
-            $cuota->pagado_en = now();
+            $metodoPago = $datosPago['metodo_pago'] ?? 'tarjeta';
+            $esTransferenciaIniciada = ($metodoPago === 'transferencia' && empty($datosPago['verificado_por_club']));
+
+            if ($esTransferenciaIniciada) {
+                $cuota->estado = 'revision_transferencia';
+                $cuota->metodo_pago = 'transferencia';
+                if (!empty($datosPago['comprobante_transferencia'])) {
+                    $cuota->comprobante_transferencia = $datosPago['comprobante_transferencia'];
+                }
+            } else {
+                $cuota->estado = 'pagado';
+                $cuota->metodo_pago = $metodoPago;
+                $cuota->pagado_en = now();
+            }
 
             if (!empty($datosPago['nombre_jugador'])) {
                 $cuota->nombre_jugador = $datosPago['nombre_jugador'];
@@ -192,6 +207,27 @@ class SplitPaymentService
 
             $cuota->save();
 
+            // Cargar relaciones para envíos de correo
+            $cuota->load(['complejo.owner', 'turno.cancha', 'partidoAbierto']);
+
+            // Disparar alertas / comprobantes según estado
+            try {
+                if ($esTransferenciaIniciada) {
+                    // Notificar al dueño / administración del club que hay una transferencia por verificar
+                    $ownerEmail = $cuota->complejo?->owner?->email ?? $cuota->complejo?->user?->email;
+                    if ($ownerEmail) {
+                        Mail::to($ownerEmail)->send(new AlertaTransferenciaPendienteClubMail($cuota));
+                    }
+                } else if ($cuota->estado === 'pagado') {
+                    // Enviar comprobante oficial por email al jugador si tiene email registrado
+                    if (!empty($cuota->email_jugador)) {
+                        Mail::to($cuota->email_jugador)->send(new ComprobanteCuotaSplitMail($cuota));
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Error al despachar email en split payment: ' . $e->getMessage());
+            }
+
             // Evaluar todas las cuotas del turno con bloqueo pesimista
             $todasCuotas = TurnoPagoDividido::where('turno_id', $cuota->turno_id)
                 ->lockForUpdate()
@@ -199,6 +235,7 @@ class SplitPaymentService
 
             $totalCuotas = $todasCuotas->count();
             $pagadas = $todasCuotas->where('estado', 'pagado')->count();
+            $enRevision = $todasCuotas->where('estado', 'revision_transferencia')->count();
             $montoRecaudado = (float) $todasCuotas->where('estado', 'pagado')->sum('monto');
             $completamentePagado = ($pagadas === $totalCuotas);
 

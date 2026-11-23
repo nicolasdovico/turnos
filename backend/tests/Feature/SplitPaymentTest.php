@@ -193,9 +193,12 @@ class SplitPaymentTest extends TestCase
 
         $this->assertEquals('bloqueado', $this->turno->fresh()->estado);
 
-        // Pagar cuota 3 (4000) -> Última cuota
+        // Pagar cuota 3 (4000) -> Última cuota (verificada por club si es transferencia o pagada por tarjeta)
         $finalRes = $this->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
-            ->postJson("/api/split-pagos/{$cuotas[2]['token_pago']}/pagar", ['metodo_pago' => 'transferencia']);
+            ->postJson("/api/split-pagos/{$cuotas[2]['token_pago']}/pagar", [
+                'metodo_pago' => 'transferencia',
+                'verificado_por_club' => true,
+            ]);
 
         $finalRes->assertStatus(200)
             ->assertJson([

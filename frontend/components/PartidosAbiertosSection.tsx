@@ -359,7 +359,14 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
               const turno = partido.turno;
               const cancha = turno?.cancha;
               const cuotas = partido.pagos_divididos || [];
-              const cuotaPendiente = cuotas.find((c) => c.estado === "pendiente");
+              // Buscar primera cuota disponible para un nuevo jugador (sin asignar y cuota_numero > 1 si existe, o cualquier pendiente sin nombre)
+              const cuotaPendiente = cuotas.find(
+                (c) => (c.estado === "pendiente" || (c as any).estado === "revision_transferencia") && !c.nombre_jugador && c.cuota_numero > 1
+              ) || cuotas.find(
+                (c) => (c.estado === "pendiente" || (c as any).estado === "revision_transferencia") && !c.nombre_jugador
+              ) || cuotas.find(
+                (c) => c.estado === "pendiente"
+              );
               const pagadas = cuotas.filter((c) => c.estado === "pagado").length;
               const total = cuotas.length || partido.jugadores_requeridos;
               const faltan = total - pagadas;

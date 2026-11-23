@@ -28,6 +28,11 @@ interface ComplejoData {
   telefono: string | null;
   ciudad: string | null;
   direccion: string | null;
+  banco_nombre?: string | null;
+  banco_cbu?: string | null;
+  banco_alias?: string | null;
+  banco_titular?: string | null;
+  banco_cuit?: string | null;
   latitud?: number | null;
   longitud?: number | null;
   estado: string;
@@ -564,6 +569,12 @@ export default function ClubAdminPanel() {
   const [horaFinPicoSemana, setHoraFinPicoSemana] = useState<string>("23:00");
   const [recordatorioWhatsappActivo, setRecordatorioWhatsappActivo] = useState<boolean>(true);
   const [recordatorioAnticipacionMinutos, setRecordatorioAnticipacionMinutos] = useState<number>(120);
+  const [bancoNombre, setBancoNombre] = useState<string>("");
+  const [bancoCbu, setBancoCbu] = useState<string>("");
+  const [bancoAlias, setBancoAlias] = useState<string>("");
+  const [bancoTitular, setBancoTitular] = useState<string>("");
+  const [bancoCuit, setBancoCuit] = useState<string>("");
+  const [transferenciasPendientesCount, setTransferenciasPendientesCount] = useState<number>(0);
   const [isSavingPoliticas, setIsSavingPoliticas] = useState(false);
   const [isPoliticasDirty, setIsPoliticasDirty] = useState(false);
   const isPoliticasDirtyRef = React.useRef<boolean>(false);
@@ -1035,6 +1046,11 @@ export default function ClubAdminPanel() {
           if (typeof data.data.complejo.recordatorio_anticipacion_minutos === "number") {
             setRecordatorioAnticipacionMinutos(data.data.complejo.recordatorio_anticipacion_minutos);
           }
+          setBancoNombre(data.data.complejo.banco_nombre || "");
+          setBancoCbu(data.data.complejo.banco_cbu || "");
+          setBancoAlias(data.data.complejo.banco_alias || "");
+          setBancoTitular(data.data.complejo.banco_titular || "");
+          setBancoCuit(data.data.complejo.banco_cuit || "");
         }
       }
 
@@ -1110,9 +1126,35 @@ export default function ClubAdminPanel() {
     }
   };
 
+  const fetchPartidosAlerts = async () => {
+    try {
+      const res = await fetch(`/api/partidos-abiertos`, {
+        headers: {
+          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const list = json.data || [];
+        let countPendientes = 0;
+        list.forEach((p: any) => {
+          (p.pagos_divididos || []).forEach((c: any) => {
+            if (c.estado === "revision_transferencia") {
+              countPendientes++;
+            }
+          });
+        });
+        setTransferenciasPendientesCount(countPendientes);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
     fetchTurnosFijos();
+    fetchPartidosAlerts();
   }, [subdomain, token]);
 
   // Smart background polling and window focus revalidation (SWR pattern)
@@ -1121,12 +1163,14 @@ export default function ClubAdminPanel() {
     const intervalId = setInterval(() => {
       fetchDashboardData(true);
       fetchTurnosFijos(true);
+      fetchPartidosAlerts();
     }, POLL_INTERVAL);
 
     const onWindowFocus = () => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         fetchDashboardData(true);
         fetchTurnosFijos(true);
+        fetchPartidosAlerts();
       }
     };
 
@@ -1551,6 +1595,11 @@ export default function ClubAdminPanel() {
           hora_fin_pico_semana: horaFinPicoSemana,
           recordatorio_whatsapp_activo: recordatorioWhatsappActivo,
           recordatorio_anticipacion_minutos: recordatorioAnticipacionMinutos,
+          banco_nombre: bancoNombre.trim() || null,
+          banco_cbu: bancoCbu.trim() || null,
+          banco_alias: bancoAlias.trim() || null,
+          banco_titular: bancoTitular.trim() || null,
+          banco_cuit: bancoCuit.trim() || null,
         }),
       });
 
@@ -1626,6 +1675,36 @@ export default function ClubAdminPanel() {
     isPoliticasDirtyRef.current = true;
   };
 
+  const updateBancoNombre = (val: string) => {
+    setBancoNombre(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updateBancoCbu = (val: string) => {
+    setBancoCbu(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updateBancoAlias = (val: string) => {
+    setBancoAlias(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updateBancoTitular = (val: string) => {
+    setBancoTitular(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
+  const updateBancoCuit = (val: string) => {
+    setBancoCuit(val);
+    setIsPoliticasDirty(true);
+    isPoliticasDirtyRef.current = true;
+  };
+
   const descartarCambiosPoliticas = () => {
     if (complejo) {
       if (complejo.tipo_cobro_reserva) {
@@ -1655,6 +1734,11 @@ export default function ClubAdminPanel() {
       if (typeof complejo.recordatorio_anticipacion_minutos === "number") {
         setRecordatorioAnticipacionMinutos(complejo.recordatorio_anticipacion_minutos);
       }
+      setBancoNombre(complejo.banco_nombre || "");
+      setBancoCbu(complejo.banco_cbu || "");
+      setBancoAlias(complejo.banco_alias || "");
+      setBancoTitular(complejo.banco_titular || "");
+      setBancoCuit(complejo.banco_cuit || "");
     }
     setIsPoliticasDirty(false);
     isPoliticasDirtyRef.current = false;
@@ -2604,6 +2688,11 @@ export default function ClubAdminPanel() {
           >
             <span>💳</span>
             <span>Partidos Abiertos & Split</span>
+            {transferenciasPendientesCount > 0 && (
+              <span className="ml-1 text-[10px] font-black px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 animate-pulse shadow-sm">
+                {transferenciasPendientesCount} por verificar
+              </span>
+            )}
             {!hasSplitPaymentModule && (
               <span className="ml-1 text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/40 flex items-center gap-0.5">
                 🔒 Plata
@@ -5952,6 +6041,88 @@ export default function ClubAdminPanel() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Card 7: Datos Bancarios Oficiales del Club (CBU / Alias) */}
+              <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-500/10 text-blue-400 rounded-2xl border border-blue-500/20 text-xl">
+                    🏦
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">7. Datos Bancarios del Club (CBU / Alias)</h3>
+                    <p className="text-xs text-slate-400">
+                      Datos oficiales de la cuenta donde los jugadores realizarán las transferencias bancarias para señas y pagos divididos (Split).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800/80">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Nombre del Banco o Billetera:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Banco Galicia / Mercado Pago"
+                      value={bancoNombre}
+                      onChange={(e) => updateBancoNombre(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Titular de la Cuenta:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: Nico Pádel SRL / Nicolás D'Ovico"
+                      value={bancoTitular}
+                      onChange={(e) => updateBancoTitular(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Alias Bancario:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: nico.padel.club"
+                      value={bancoAlias}
+                      onChange={(e) => updateBancoAlias(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition font-mono font-bold text-emerald-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      CBU / CVU (22 dígitos):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: 0720000000000000000000"
+                      value={bancoCbu}
+                      onChange={(e) => updateBancoCbu(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition font-mono"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      CUIT / CUIL:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej: 20-33444555-9"
+                      value={bancoCuit}
+                      onChange={(e) => updateBancoCuit(e.target.value)}
+                      className="w-full sm:w-1/2 rounded-xl bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition font-mono"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Card 6: Mostrador Presencial */}

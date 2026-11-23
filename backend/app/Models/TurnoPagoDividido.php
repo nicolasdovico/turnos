@@ -26,6 +26,7 @@ class TurnoPagoDividido extends Model
         'token_pago',
         'estado',
         'metodo_pago',
+        'comprobante_transferencia',
         'pagado_en',
     ];
 

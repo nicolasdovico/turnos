@@ -168,6 +168,8 @@ class SplitPaymentController extends Controller
             'metodo_pago' => 'nullable|string|in:tarjeta,mercadopago,efectivo,transferencia',
             'nombre_jugador' => 'nullable|string|max:255',
             'email_jugador' => 'nullable|email|max:255',
+            'comprobante_transferencia' => 'nullable|string|max:1000',
+            'verificado_por_club' => 'nullable|boolean',
         ]);
 
         $resultado = $this->splitPaymentService->procesarPagoCuota(
@@ -188,13 +190,26 @@ class SplitPaymentController extends Controller
     public function showCuota(string $token): JsonResponse
     {
         $cuota = TurnoPagoDividido::where('token_pago', $token)
-            ->with(['turno.cancha', 'partidoAbierto'])
+            ->with(['turno.cancha', 'partidoAbierto', 'complejo'])
             ->firstOrFail();
+
+        $complejo = $cuota->complejo;
+        $datosBancarios = null;
+        if ($complejo) {
+            $datosBancarios = [
+                'banco' => $complejo->banco_nombre,
+                'cbu' => $complejo->banco_cbu,
+                'alias' => $complejo->banco_alias,
+                'titular' => $complejo->banco_titular,
+                'cuit' => $complejo->banco_cuit,
+            ];
+        }
 
         return response()->json([
             'data' => [
                 'cuota' => $cuota,
                 'checkout_url' => $cuota->checkout_url,
+                'datos_bancarios' => $datosBancarios,
             ],
         ]);
     }

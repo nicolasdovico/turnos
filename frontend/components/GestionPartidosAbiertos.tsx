@@ -33,11 +33,12 @@ interface CuotaItem {
   total_cuotas: number;
   monto: number;
   token_pago: string;
-  estado: "pendiente" | "pagado" | "cancelado";
+  estado: "pendiente" | "revision_transferencia" | "pagado" | "cancelado";
   nombre_jugador?: string | null;
   email_jugador?: string | null;
   metodo_pago?: string | null;
   pagado_en?: string | null;
+  comprobante_transferencia?: string | null;
   checkout_url?: string;
 }
 
@@ -401,7 +402,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
     }
   };
 
-  const handleRegistrarPagoCuota = async (tokenPago: string) => {
+  const handleRegistrarPagoCuota = async (tokenPago: string, verificadoPorClub: boolean = false) => {
     try {
       const res = await fetch(`/api/split-pagos/${tokenPago}/pagar`, {
         method: "POST",
@@ -410,18 +411,18 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
           ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
         },
         body: JSON.stringify({
-          metodo_pago: "efectivo",
-          nombre_jugador: "Abonado en mostrador",
+          metodo_pago: verificadoPorClub ? "transferencia" : "efectivo",
+          verificado_por_club: true,
         }),
       });
 
       if (res.ok) {
-        showToast("success", "Cuota registrada como pagada con éxito.");
+        showToast("success", verificadoPorClub ? "¡Transferencia bancaria verificada y comprobante enviado!" : "Cuota registrada como pagada con éxito.");
         fetchPartidos();
         if (selectedPartido) {
           // Refrescar el modal
           const updatedCuotas = selectedPartido.pagos_divididos?.map((c) =>
-            c.token_pago === tokenPago ? { ...c, estado: "pagado" as const, metodo_pago: "efectivo" } : c
+            c.token_pago === tokenPago ? { ...c, estado: "pagado" as const, metodo_pago: verificadoPorClub ? "transferencia" : "efectivo" } : c
           );
           setSelectedPartido({ ...selectedPartido, pagos_divididos: updatedCuotas });
         }
@@ -448,15 +449,20 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
     const completos = partidos.filter((p) => p.estado === "completo").length;
     let cuotasPagadasTotal = 0;
     let cuotasPendientesTotal = 0;
+    let transferenciasPendientesTotal = 0;
 
     partidos.forEach((p) => {
       p.pagos_divididos?.forEach((c) => {
         if (c.estado === "pagado") cuotasPagadasTotal++;
         if (c.estado === "pendiente") cuotasPendientesTotal++;
+        if (c.estado === "revision_transferencia") {
+          transferenciasPendientesTotal++;
+          cuotasPendientesTotal++;
+        }
       });
     });
 
-    return { total, activos, completos, cuotasPagadasTotal, cuotasPendientesTotal };
+    return { total, activos, completos, cuotasPagadasTotal, cuotasPendientesTotal, transferenciasPendientesTotal };
   }, [partidos]);
 
   // Filtrado
@@ -955,6 +961,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
 
               {selectedPartido.pagos_divididos?.map((cuota) => {
                 const isPaid = cuota.estado === "pagado";
+                const isRevision = cuota.estado === "revision_transferencia";
                 const isCopied = copiedToken === cuota.token_pago;
                 const linkPago = typeof window !== "undefined"
                   ? `${window.location.origin}/split-pagos/${cuota.token_pago}`
@@ -971,6 +978,8 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                     className={`p-3.5 rounded-2xl border transition space-y-2.5 ${
                       isPaid
                         ? "bg-emerald-950/20 border-emerald-500/30"
+                        : isRevision
+                        ? "bg-amber-950/30 border-amber-500/40"
                         : "bg-slate-950/60 border-slate-800"
                     }`}
                   >
@@ -980,7 +989,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                           Cuota {cuota.cuota_numero}
                         </span>
                         {cuota.nombre_jugador && (
-                          <span className="text-slate-400">({cuota.nombre_jugador})</span>
+                          <span className="text-slate-300 font-semibold">({cuota.nombre_jugador})</span>
                         )}
                       </div>
 
@@ -992,15 +1001,45 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                           className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
                             isPaid
                               ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                              : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                              : isRevision
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+                              : "bg-slate-800 text-slate-400 border border-slate-700"
                           }`}
                         >
-                          {isPaid ? "Pagado" : "Pendiente"}
+                          {isPaid ? "Pagado" : isRevision ? "⏳ Por Verificar (Transferencia)" : "Pendiente"}
                         </span>
                       </div>
                     </div>
 
-                    {!isPaid ? (
+                    {isRevision && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] space-y-1">
+                        <div className="font-bold text-amber-300 flex items-center justify-between">
+                          <span>🔔 Transferencia bancaria informada por el jugador</span>
+                        </div>
+                        {cuota.email_jugador && (
+                          <div className="text-slate-300">
+                            Email jugador: <span className="font-mono text-white">{cuota.email_jugador}</span>
+                          </div>
+                        )}
+                        {cuota.comprobante_transferencia && (
+                          <div className="text-slate-300">
+                            Detalle / Referencia: <span className="font-medium text-white">{cuota.comprobante_transferencia}</span>
+                          </div>
+                        )}
+                        <div className="pt-2 flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleRegistrarPagoCuota(cuota.token_pago, true)}
+                            className="py-1.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Verificar y Confirmar Pago</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isPaid && !isRevision ? (
                       <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
                         <button
                           type="button"
@@ -1023,18 +1062,18 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
 
                         <button
                           type="button"
-                          onClick={() => handleRegistrarPagoCuota(cuota.token_pago)}
+                          onClick={() => handleRegistrarPagoCuota(cuota.token_pago, false)}
                           className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-emerald-950/40 text-emerald-400 border border-emerald-500/30 font-bold transition cursor-pointer"
                         >
                           Cobrar en Mostrador
                         </button>
                       </div>
-                    ) : (
+                    ) : isPaid ? (
                       <div className="text-[11px] text-emerald-400 flex items-center gap-1 pt-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Abonado vía {cuota.metodo_pago || "Mercado Pago"}</span>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}
