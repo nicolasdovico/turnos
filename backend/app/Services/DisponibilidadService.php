@@ -355,7 +355,7 @@ class DisponibilidadService
         $turnosOcupadosData = $turnosOcupados->map(function ($t) use ($cancha, $esAdmin, $currentUserId, $fechaCarbon) {
             $isLluvia = ($t->motivo_cancelacion === 'lluvia');
             $partido = $t->partidoAbierto;
-            $isPartidoAbierto = $partido && in_array($partido->estado, ['buscando', 'completo']);
+            $isPartidoAbierto = $partido && in_array($partido->estado, ['pendiente_pago', 'buscando', 'completo']);
             $isBloqueado = ($t->estado === 'bloqueado');
             $isCancelado = ($t->estado === 'cancelado');
             $precio = (float) $t->precio;
