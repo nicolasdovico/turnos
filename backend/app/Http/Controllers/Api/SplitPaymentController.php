@@ -204,6 +204,7 @@ class SplitPaymentController extends Controller
             'metodo_pago' => 'nullable|string|in:tarjeta,mercadopago,efectivo,transferencia',
             'nombre_jugador' => 'nullable|string|max:255',
             'email_jugador' => 'nullable|email|max:255',
+            'user_id' => 'nullable|integer|exists:users,id',
             'comprobante_transferencia' => 'nullable|string|max:1000',
             'verificado_por_club' => 'nullable|boolean',
         ]);

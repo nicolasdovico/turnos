@@ -15,6 +15,7 @@ import {
 import { formatPrecio } from "@/lib/formatters";
 import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 import { getTenantPublicUrl } from "@/lib/navigationUrls";
+import { useAuth } from "@/context/AuthContext";
 
 export interface SplitPagoClientProps {
   token: string;
@@ -72,6 +73,7 @@ export interface DatosBancarios {
 }
 
 export default function SplitPagoClient({ token }: SplitPagoClientProps) {
+  const { user, token: authToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cuota, setCuota] = useState<CuotaData | null>(null);
@@ -87,6 +89,18 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
   const [enRevision, setEnRevision] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Autocompletar con los datos del usuario logueado si no vinieron ya fijados en la cuota
+  useEffect(() => {
+    if (user) {
+      if (user.name) {
+        setNombreJugador((prev) => (prev ? prev : user.name));
+      }
+      if (user.email) {
+        setEmailJugador((prev) => (prev ? prev : user.email));
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     async function fetchCuota() {
@@ -128,7 +142,8 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
 
   const handlePagar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombreJugador.trim()) {
+    const nombreFinal = (nombreJugador.trim() || user?.name || "").trim();
+    if (!nombreFinal) {
       alert("Por favor ingresá tu nombre para confirmar el pago.");
       return;
     }
@@ -137,10 +152,14 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
       setProcessing(true);
       const res = await fetch(`/api/split-pagos/${token}/pagar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({
-          nombre_jugador: nombreJugador.trim(),
-          email_jugador: emailJugador.trim() || null,
+          nombre_jugador: nombreFinal,
+          email_jugador: (emailJugador.trim() || user?.email || "").trim() || null,
+          user_id: user?.id || null,
           metodo_pago: metodoPago,
           comprobante_transferencia: comprobanteTexto.trim() || null,
         }),
@@ -378,32 +397,50 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
             </h3>
 
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Tu Nombre y Apellido: *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: Marcos Gómez"
-                  value={nombreJugador}
-                  onChange={(e) => setNombreJugador(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
-                />
-              </div>
+              {user ? (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="text-[10px] text-slate-400 uppercase font-semibold">Jugador Registrado</div>
+                      <div className="font-bold text-white text-xs">{user.name}</div>
+                      <div className="text-[11px] text-slate-400">{user.email}</div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2.5 py-1 rounded-full border border-emerald-500/30">
+                    Sesión Activa
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Tu Nombre y Apellido: *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej: Marcos Gómez"
+                      value={nombreJugador}
+                      onChange={(e) => setNombreJugador(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Email (para comprobante una vez verificado el pago):
-                </label>
-                <input
-                  type="email"
-                  placeholder="marcos@gmail.com"
-                  value={emailJugador}
-                  onChange={(e) => setEmailJugador(e.target.value)}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Email (para comprobante una vez verificado el pago):
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="marcos@gmail.com"
+                      value={emailJugador}
+                      onChange={(e) => setEmailJugador(e.target.value)}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
