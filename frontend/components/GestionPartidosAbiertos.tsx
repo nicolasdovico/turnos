@@ -25,6 +25,7 @@ import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 interface GestionPartidosAbiertosProps {
   subdomain: string;
+  transferenciasPendientesCount?: number;
   onTransferenciasCountChange?: (count: number) => void;
 }
 
@@ -166,7 +167,11 @@ interface SlotSimple {
   disponible: boolean;
 }
 
-export default function GestionPartidosAbiertos({ subdomain, onTransferenciasCountChange }: GestionPartidosAbiertosProps) {
+export default function GestionPartidosAbiertos({
+  subdomain,
+  transferenciasPendientesCount,
+  onTransferenciasCountChange,
+}: GestionPartidosAbiertosProps) {
   const [partidos, setPartidos] = useState<PartidoAbiertoItem[]>([]);
   const [canchasClub, setCanchasClub] = useState<CanchaSimple[]>([]);
   const [slotsDisponibles, setSlotsDisponibles] = useState<SlotSimple[]>([]);
@@ -224,9 +229,9 @@ export default function GestionPartidosAbiertos({ subdomain, onTransferenciasCou
     }, 4000);
   };
 
-  const fetchPartidos = async () => {
+  const fetchPartidos = async (silent: boolean = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await fetch("/api/partidos-abiertos", {
         headers: {
           ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
@@ -247,7 +252,7 @@ export default function GestionPartidosAbiertos({ subdomain, onTransferenciasCou
     } catch (err) {
       console.error("Error al cargar partidos abiertos:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -271,27 +276,18 @@ export default function GestionPartidosAbiertos({ subdomain, onTransferenciasCou
     fetchPartidos();
   }, [subdomain]);
 
-  // Polling automático cada 10 segundos y revalidación en focus para detectar transferencias y nuevos pagos
+  // Si cambia el contador de transferencias notificadas desde el panel, refrescamos de forma silenciosa (sin parpadeo)
+  const prevCountRef = React.useRef<number | undefined>(transferenciasPendientesCount);
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchPartidos();
-    }, 10000);
-
-    const onFocus = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        fetchPartidos();
-      }
-    };
-
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
-  }, [subdomain]);
+    if (
+      transferenciasPendientesCount !== undefined &&
+      prevCountRef.current !== undefined &&
+      transferenciasPendientesCount !== prevCountRef.current
+    ) {
+      fetchPartidos(true);
+    }
+    prevCountRef.current = transferenciasPendientesCount;
+  }, [transferenciasPendientesCount]);
 
   const fetchCanchasYTurnos = async () => {
     try {

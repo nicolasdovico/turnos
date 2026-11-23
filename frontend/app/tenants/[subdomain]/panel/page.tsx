@@ -2857,6 +2857,7 @@ export default function ClubAdminPanel() {
             ) : (
               <GestionPartidosAbiertos
                 subdomain={subdomain}
+                transferenciasPendientesCount={transferenciasPendientesCount}
                 onTransferenciasCountChange={setTransferenciasPendientesCount}
               />
             )}
