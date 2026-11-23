@@ -535,16 +535,43 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
           <p className="text-[11px] text-slate-500">Cobros acreditados</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Cuotas Pendientes
-          </span>
-          <div className="text-2xl font-black text-amber-400 font-mono">
-            {stats.cuotasPendientesTotal}
+        <div className={`rounded-2xl border p-4 space-y-1 transition ${
+          stats.transferenciasPendientesTotal > 0
+            ? "bg-amber-950/40 border-amber-500/50 shadow-lg shadow-amber-500/10"
+            : "bg-slate-900 border-slate-800"
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Por Verificar
+            </span>
+            {stats.transferenciasPendientesTotal > 0 && (
+              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 animate-pulse">
+                Acción req.
+              </span>
+            )}
           </div>
-          <p className="text-[11px] text-slate-500">Por cobrar o unirse</p>
+          <div className={`text-2xl font-black font-mono ${
+            stats.transferenciasPendientesTotal > 0 ? "text-amber-400" : "text-slate-400"
+          }`}>
+            {stats.transferenciasPendientesTotal}
+          </div>
+          <p className="text-[11px] text-slate-400">
+            {stats.transferenciasPendientesTotal === 1 ? "1 transferencia bancaria" : `${stats.transferenciasPendientesTotal} transferencias`}
+          </p>
         </div>
       </div>
+
+      {stats.transferenciasPendientesTotal > 0 && (
+        <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-200">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <span className="font-bold text-white block">Hay {stats.transferenciasPendientesTotal} cuota(s) con aviso de transferencia bancaria por verificar</span>
+              <span className="text-amber-300/80 text-[11px]">Hacé clic en &quot;Ver Cuotas & Links&quot; de la tarjeta correspondiente para corroborar y confirmar la acreditación.</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 3. Barra de Búsqueda y Filtros */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

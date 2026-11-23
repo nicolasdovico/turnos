@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { formatPrecio } from "@/lib/formatters";
 import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
+import { getTenantPublicUrl } from "@/lib/navigationUrls";
 
 export interface SplitPagoClientProps {
   token: string;
@@ -31,6 +32,11 @@ export interface CuotaData {
   metodo_pago?: string | null;
   pagado_en?: string | null;
   comprobante_transferencia?: string | null;
+  complejo?: {
+    id: number;
+    subdominio: string;
+    nombre: string;
+  } | null;
   partido_abierto?: {
     id: number;
     estado: string;
@@ -213,6 +219,8 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
   const turno = cuota.turno;
   const cancha = turno?.cancha;
   const partido = cuota.partido_abierto;
+  const subdominioClub = cuota.complejo?.subdominio;
+  const urlVolverClub = subdominioClub ? getTenantPublicUrl(subdominioClub) : "/";
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6">
@@ -320,12 +328,12 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
                 <span>{copied ? "¡Link Copiado!" : "Compartir Enlace del Partido"}</span>
               </button>
 
-              <Link
-                href="/"
+              <a
+                href={urlVolverClub}
                 className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-black uppercase text-slate-950 transition flex items-center justify-center gap-1.5"
               >
                 <span>Volver a la Grilla de Turnos</span>
-              </Link>
+              </a>
             </div>
           </div>
         ) : enRevision ? (
@@ -346,12 +354,12 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
             </div>
 
             <div className="pt-2 flex flex-col gap-2">
-              <Link
-                href="/"
+              <a
+                href={urlVolverClub}
                 className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-xs font-black uppercase text-slate-950 transition flex items-center justify-center gap-1.5"
               >
                 <span>Volver a la Grilla de Turnos</span>
-              </Link>
+              </a>
             </div>
           </div>
         ) : (

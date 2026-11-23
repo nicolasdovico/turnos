@@ -445,7 +445,7 @@ export default function ClubAdminPanel() {
          localStorage.getItem("auth_token"))
       : null);
 
-  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "caja" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion" | "sitio-web" | "pos-buffet">("canchas");
+  const [activeTab, setActiveTab] = useState<"canchas" | "resumen" | "caja" | "clientes" | "modulos" | "horarios" | "turnos-fijos" | "politicas" | "billeteras" | "config" | "facturacion" | "sitio-web" | "pos-buffet" | "partidos-abiertos">("canchas");
   const [subTabSitioWeb, setSubTabSitioWeb] = useState<"branding" | "paginas">("branding");
   const [openBillingPaymentModal, setOpenBillingPaymentModal] = useState(false);
   const [suscripcionAlerta, setSuscripcionAlerta] = useState<{
