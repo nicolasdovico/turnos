@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BLOG_POSTS } from "@/lib/blogPosts";
 
 interface SitemapPageItem {
   slug: string;
@@ -135,6 +136,12 @@ export async function GET(request: NextRequest) {
     { path: "/jugar", priority: "0.9", changefreq: "hourly" },
     { path: "/registro-club", priority: "0.8", changefreq: "monthly" },
     { path: "/planes", priority: "0.8", changefreq: "weekly" },
+    { path: "/blog", priority: "0.8", changefreq: "weekly" },
+    ...BLOG_POSTS.map((post) => ({
+      path: `/blog/${post.slug}`,
+      priority: "0.7",
+      changefreq: "monthly",
+    })),
   ];
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>

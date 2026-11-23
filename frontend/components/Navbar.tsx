@@ -197,6 +197,9 @@ export default function Navbar() {
               <Link href="/planes" className="hover:text-emerald-600 transition">
                 Planes & Precios
               </Link>
+              <Link href="/blog" className="hover:text-emerald-600 transition">
+                Blog
+              </Link>
               <a
                 href="https://wa.me/5491149790220?text=%C2%A1Hola!%20Vi%20Turnos%20Flow%20y%20me%20gustar%C3%ADa%20sacarme%20unas%20dudas%20sobre%20mi%20complejo%20y%20coordinar%20una%20videollamada%20para%20ver%20una%20demo%20en%20vivo."
                 target="_blank"
@@ -459,6 +462,13 @@ export default function Navbar() {
                   className="px-3.5 py-2.5 rounded-xl font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition flex items-center gap-2"
                 >
                   <span>🏷️ Planes & Precios</span>
+                </Link>
+                <Link
+                  href="/blog"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="px-3.5 py-2.5 rounded-xl font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition flex items-center gap-2"
+                >
+                  <span>📚 Blog & Guías</span>
                 </Link>
                 <a
                   href="https://wa.me/5491149790220?text=%C2%A1Hola!%20Vi%20Turnos%20Flow%20y%20me%20gustar%C3%ADa%20sacarme%20unas%20dudas%20sobre%20mi%20complejo%20y%20coordinar%20una%20videollamada%20para%20ver%20una%20demo%20en%20vivo."
