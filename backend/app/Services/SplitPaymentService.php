@@ -276,6 +276,11 @@ class SplitPaymentService
                     'estado' => $cuota->estado,
                     'metodo_pago' => $cuota->metodo_pago,
                     'pagado_en' => $cuota->pagado_en?->toIso8601String(),
+                    'complejo' => $cuota->complejo ? [
+                        'id' => $cuota->complejo->id,
+                        'subdominio' => $cuota->complejo->subdominio,
+                        'nombre' => $cuota->complejo->nombre,
+                    ] : null,
                 ],
                 'resumen_split' => [
                     'total_cuotas' => $totalCuotas,

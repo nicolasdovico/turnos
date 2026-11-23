@@ -152,8 +152,16 @@ export default function SplitPagoClient({ token }: SplitPagoClientProps) {
       }
 
       const json = await res.json();
-      const updatedCuota = json.data?.cuota || cuota;
-      setCuota(updatedCuota);
+      const updatedCuota = json.data?.cuota;
+      if (updatedCuota) {
+        setCuota((prev) => ({
+          ...prev,
+          ...updatedCuota,
+          complejo: updatedCuota.complejo || prev?.complejo,
+          turno: updatedCuota.turno || prev?.turno,
+          partido_abierto: updatedCuota.partido_abierto || prev?.partido_abierto,
+        }));
+      }
 
       if (updatedCuota?.estado === "revision_transferencia") {
         setEnRevision(true);
