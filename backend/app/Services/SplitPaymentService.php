@@ -302,18 +302,30 @@ class SplitPaymentService
 
     /**
      * Listar partidos abiertos disponibles para matchmaking.
+     * Se ordenan de manera cronológica ascendente por fecha y hora de inicio del turno
+     * (los más próximos a suceder se muestran primero).
      */
     public function listarPartidosAbiertos(array $filtros = []): Collection
     {
+        $estado = $filtros['estado'] ?? 'buscando';
+
         $query = PartidoAbierto::query()
-            ->where('estado', $filtros['estado'] ?? 'buscando')
-            ->whereHas('turno', function ($q) {
-                $q->whereDate('fecha', '>=', now()->toDateString());
-            })
             ->with(['turno.cancha', 'organizador', 'pagosDivididos']);
 
+        if ($estado !== 'todos') {
+            $query->where('partidos_abiertos.estado', $estado);
+        }
+
+        // Si se listan partidos activos para convocatoria ("buscando" o por defecto),
+        // filtramos fechas futuras o de hoy no vencidas
+        if ($estado === 'buscando') {
+            $query->whereHas('turno', function ($q) {
+                $q->whereDate('fecha', '>=', now()->toDateString());
+            });
+        }
+
         if (!empty($filtros['tipo_partido'])) {
-            $query->where('tipo_partido', $filtros['tipo_partido']);
+            $query->where('partidos_abiertos.tipo_partido', $filtros['tipo_partido']);
         }
 
         if (!empty($filtros['nivel'])) {
@@ -325,6 +337,12 @@ class SplitPaymentService
             });
         }
 
-        return $query->latest()->get();
+        // Orden cronológico: fecha y hora de inicio del turno más próximo primero
+        $query->join('turnos', 'partidos_abiertos.turno_id', '=', 'turnos.id')
+            ->select('partidos_abiertos.*')
+            ->orderBy('turnos.fecha', 'asc')
+            ->orderBy('turnos.hora_inicio', 'asc');
+
+        return $query->get();
     }
 }
