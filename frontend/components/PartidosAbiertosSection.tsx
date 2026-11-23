@@ -103,6 +103,7 @@ interface PartidoPublico {
     monto: number;
     token_pago: string;
     estado: string;
+    nombre_jugador?: string | null;
   }[];
 }
 

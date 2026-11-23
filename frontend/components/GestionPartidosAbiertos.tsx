@@ -256,22 +256,6 @@ export default function GestionPartidosAbiertos({
     }
   };
 
-  const fetchTurnosElegibles = async () => {
-    try {
-      const res = await fetch("/api/turnos-para-split", {
-        headers: {
-          ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
-        },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setTurnosElegibles(json.data || []);
-      }
-    } catch (err) {
-      console.error("Error al cargar turnos para split:", err);
-    }
-  };
-
   useEffect(() => {
     fetchPartidos();
   }, [subdomain]);
@@ -636,7 +620,7 @@ export default function GestionPartidosAbiertos({
           ))}
           <button
             type="button"
-            onClick={fetchPartidos}
+            onClick={() => fetchPartidos()}
             title="Refrescar lista"
             className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
           >
