@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, Calendar, Clock, Trophy, ArrowRight, Sparkles, CheckCircle2, Plus, ShieldCheck, X } from "lucide-react";
+import { Users, Calendar, Clock, Trophy, ArrowRight, Sparkles, CheckCircle2, Plus, ShieldCheck, X, LogIn, UserPlus } from "lucide-react";
 import { formatPrecio } from "@/lib/formatters";
 import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
+import { useAuth } from "@/context/AuthContext";
 
 interface CanchaItem {
   id: number;
@@ -113,6 +114,7 @@ interface PartidosAbiertosSectionProps {
 }
 
 export default function PartidosAbiertosSection({ subdomain, clubNombre }: PartidosAbiertosSectionProps) {
+  const { user, token, login, register } = useAuth();
   const [partidos, setPartidos] = useState<PartidoPublico[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -135,6 +137,22 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
   const [telefonoJugador, setTelefonoJugador] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Autenticación en línea dentro del modal
+  const [authTab, setAuthTab] = useState<"login" | "register">("register");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  // Sincronizar datos si el usuario está autenticado
+  useEffect(() => {
+    if (user) {
+      if (user.name) setNombreJugador(user.name);
+      if (user.email) setEmailJugador(user.email);
+    }
+  }, [user]);
 
   // Cancha seleccionada y opciones dinámicas de jugadores
   const selectedCancha = React.useMemo(() => {
@@ -246,12 +264,18 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
     e.preventDefault();
     setErrorMessage(null);
 
+    if (!user) {
+      setErrorMessage("Debés identificarte o iniciar sesión para poder abrir una convocatoria.");
+      return;
+    }
+
     if (!selectedCanchaId || !selectedFecha || !selectedHoraInicio) {
       setErrorMessage("Por favor seleccioná cancha, fecha y horario.");
       return;
     }
 
-    if (!nombreJugador.trim()) {
+    const nombreFinal = (nombreJugador.trim() || user.name || "").trim();
+    if (!nombreFinal) {
       setErrorMessage("Ingresá tu nombre para organizar la convocatoria.");
       return;
     }
@@ -264,6 +288,7 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
         },
         body: JSON.stringify({
@@ -275,9 +300,10 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
           nivel_min: nivelMin.trim() || null,
           nivel_max: nivelMax.trim() || null,
           tipo_partido: tipoPartido,
-          organizador_nombre: nombreJugador.trim(),
-          organizador_email: emailJugador.trim() || null,
+          organizador_nombre: nombreFinal,
+          organizador_email: (emailJugador.trim() || user.email || "").trim(),
           organizador_telefono: telefonoJugador.trim() || null,
+          user_id: user.id,
         }),
       });
 
@@ -287,9 +313,9 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
         throw new Error(json.message || json.error || "No se pudo crear la convocatoria.");
       }
 
-      // Obtener el checkout de la cuota 1 del organizador para que pague su parte
+      // Obtener el checkout de la cuota 1 del organizador para que pague su parte de inmediato (Paso B)
       const cuotas = json?.data?.cuotas || [];
-      const cuotaOrganizador = cuotas.find((c: any) => c.cuota_numero === 1);
+      const cuotaOrganizador = json?.cuota_organizador || cuotas.find((c: any) => c.cuota_numero === 1);
 
       setIsModalOpen(false);
       fetchPartidos();
@@ -301,6 +327,40 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
       setErrorMessage(err.message || "Error al procesar la convocatoria.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleInlineAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthLoading(true);
+
+    try {
+      if (authTab === "login") {
+        if (!authEmail.trim() || !authPassword) {
+          setAuthError("Completá tu email y contraseña.");
+          return;
+        }
+        const res = await login(authEmail.trim(), authPassword);
+        if (!res.success) {
+          setAuthError(res.error || "Credenciales incorrectas.");
+          return;
+        }
+      } else {
+        if (!authName.trim() || !authEmail.trim() || !authPassword) {
+          setAuthError("Completá tu nombre, email y contraseña.");
+          return;
+        }
+        const res = await register(authName.trim(), authEmail.trim(), authPassword, authPassword);
+        if (!res.success) {
+          setAuthError(res.error || "No se pudo registrar la cuenta. Revisá los datos ingresados.");
+          return;
+        }
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "Error al autenticar.");
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -604,34 +664,130 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
               </div>
 
               {/* Datos del Organizador */}
-              <div className="pt-2 border-t border-slate-800 space-y-2">
-                <span className="block font-bold text-white">Tus Datos (Capitán / Organizador):</span>
-                <div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Tu Nombre y Apellido *"
-                    value={nombreJugador}
-                    onChange={(e) => setNombreJugador(e.target.value)}
-                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="email"
-                    placeholder="Email (opcional)"
-                    value={emailJugador}
-                    onChange={(e) => setEmailJugador(e.target.value)}
-                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Teléfono (WhatsApp)"
-                    value={telefonoJugador}
-                    onChange={(e) => setTelefonoJugador(e.target.value)}
-                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-                  />
-                </div>
+              <div className="pt-2 border-t border-slate-800 space-y-3">
+                <span className="block font-bold text-white">Identificación del Capitán / Organizador:</span>
+
+                {!user ? (
+                  <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-blue-300">
+                        {authTab === "register" ? "Crear cuenta para convocar:" : "Iniciá sesión para convocar:"}
+                      </span>
+                      <div className="flex p-0.5 bg-slate-950 rounded-lg border border-slate-800 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthTab("register");
+                            setAuthError(null);
+                          }}
+                          className={`px-2 py-0.5 rounded-md font-bold transition ${
+                            authTab === "register"
+                              ? "bg-blue-500 text-slate-950"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          Registrarme
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthTab("login");
+                            setAuthError(null);
+                          }}
+                          className={`px-2 py-0.5 rounded-md font-bold transition ${
+                            authTab === "login"
+                              ? "bg-blue-500 text-slate-950"
+                              : "text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          Ya tengo cuenta
+                        </button>
+                      </div>
+                    </div>
+
+                    {authError && (
+                      <div className="text-[11px] text-rose-400 bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">
+                        {authError}
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      {authTab === "register" && (
+                        <input
+                          type="text"
+                          required
+                          placeholder="Tu Nombre Completo *"
+                          value={authName}
+                          onChange={(e) => setAuthName(e.target.value)}
+                          className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                        />
+                      )}
+                      <input
+                        type="email"
+                        required
+                        placeholder="Tu Email *"
+                        value={authEmail}
+                        onChange={(e) => setAuthEmail(e.target.value)}
+                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                      />
+                      <input
+                        type="password"
+                        required
+                        placeholder="Contraseña *"
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleInlineAuth}
+                        disabled={authLoading}
+                        className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
+                      >
+                        {authLoading ? (
+                          <span>Procesando...</span>
+                        ) : authTab === "register" ? (
+                          <>
+                            <UserPlus className="w-3.5 h-3.5" />
+                            <span>Crear Mi Cuenta y Continuar</span>
+                          </>
+                        ) : (
+                          <>
+                            <LogIn className="w-3.5 h-3.5" />
+                            <span>Iniciar Sesión y Continuar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div>
+                          <div className="font-bold text-white">{user.name}</div>
+                          <div className="text-[11px] text-slate-400">{user.email}</div>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">
+                        Identificado
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">Teléfono (WhatsApp para coordinar el partido):</label>
+                      <input
+                        type="tel"
+                        placeholder="WhatsApp (ej: +54 9 11 2345-6789)"
+                        value={telefonoJugador}
+                        onChange={(e) => setTelefonoJugador(e.target.value)}
+                        className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-3">

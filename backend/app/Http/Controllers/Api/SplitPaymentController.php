@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SplitPaymentController extends Controller
 {
@@ -29,6 +30,8 @@ class SplitPaymentController extends Controller
      */
     public function crearPartidoDirecto(Request $request): JsonResponse
     {
+        $user = auth('sanctum')->user() ?: ($request->bearerToken() ? \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())?->tokenable : null);
+
         $validated = $request->validate([
             'cancha_id' => 'required|integer|exists:canchas,id',
             'fecha' => 'required|date_format:Y-m-d',
@@ -41,7 +44,25 @@ class SplitPaymentController extends Controller
             'organizador_nombre' => 'nullable|string|max:255',
             'organizador_email' => 'nullable|email|max:255',
             'organizador_telefono' => 'nullable|string|max:50',
+            'user_id' => 'nullable|integer|exists:users,id',
         ]);
+
+        // Si no hay usuario autenticado y tampoco user_id válido, requerir registro
+        $organizadorId = $user?->id ?? $validated['user_id'] ?? null;
+        if (!$organizadorId && empty($validated['organizador_email'])) {
+            return response()->json([
+                'error' => 'AUTH_REQUIRED',
+                'message' => 'Para iniciar una convocatoria abierta debés estar registrado e iniciar sesión con tu cuenta de jugador.',
+            ], 401);
+        }
+
+        // Si se envió email pero no hay usuario logueado, intentar asociar al usuario por email si existe
+        if (!$organizadorId && !empty($validated['organizador_email'])) {
+            $existingUser = \App\Models\User::where('email', Str::lower(trim($validated['organizador_email'])))->first();
+            if ($existingUser) {
+                $organizadorId = $existingUser->id;
+            }
+        }
 
         $cancha = Cancha::with('complejo')->findOrFail($validated['cancha_id']);
         $timezone = $cancha->complejo?->timezone ?: config('app.timezone', 'America/Argentina/Buenos_Aires');
@@ -96,7 +117,11 @@ class SplitPaymentController extends Controller
 
         $precioTurno = $slotElegido['precio'] ?? (float) $cancha->precio_base;
 
-        return DB::transaction(function () use ($cancha, $fechaNormalizada, $horaInicioNormalizada, $horaFinNormalizada, $precioTurno, $validated) {
+        $organizadorNombre = $validated['organizador_nombre'] ?? $user?->name ?? 'Convocatoria Abierta';
+        $organizadorEmail = $validated['organizador_email'] ?? $user?->email ?? null;
+        $organizadorTelefono = $validated['organizador_telefono'] ?? $user?->telefono ?? null;
+
+        return DB::transaction(function () use ($cancha, $fechaNormalizada, $horaInicioNormalizada, $horaFinNormalizada, $precioTurno, $validated, $organizadorId, $organizadorNombre, $organizadorEmail, $organizadorTelefono) {
             // Si ya existía un turno libre o creamos uno nuevo atómicamente en estado bloqueado por convocatoria
             $turno = Turno::create([
                 'complejo_id' => $cancha->complejo_id,
@@ -106,13 +131,19 @@ class SplitPaymentController extends Controller
                 'hora_fin' => $horaFinNormalizada . ':00',
                 'precio' => $precioTurno,
                 'estado' => 'bloqueado',
-                'cliente_nombre' => $validated['organizador_nombre'] ?? 'Convocatoria Abierta',
-                'cliente_telefono' => $validated['organizador_telefono'] ?? null,
+                'cliente_id' => $organizadorId,
+                'cliente_nombre' => $organizadorNombre,
+                'cliente_email' => $organizadorEmail,
+                'cliente_telefono' => $organizadorTelefono,
                 'metodo_pago' => 'split',
             ]);
 
             $splitParams = array_merge($validated, [
                 'es_partido_abierto' => true,
+                'organizador_id' => $organizadorId,
+                'organizador_nombre' => $organizadorNombre,
+                'organizador_email' => $organizadorEmail,
+                'organizador_telefono' => $organizadorTelefono,
             ]);
 
             $resultado = $this->splitPaymentService->crearSplit(
@@ -121,9 +152,14 @@ class SplitPaymentController extends Controller
                 $splitParams
             );
 
+            // Localizar la cuota 1 del organizador para devolver su token y checkout directamente
+            $cuotas = $resultado['cuotas'] ?? [];
+            $cuotaOrganizador = collect($cuotas)->firstWhere('cuota_numero', 1);
+
             return response()->json([
                 'message' => 'Convocatoria de partido abierto creada exitosamente.',
                 'data' => $resultado,
+                'cuota_organizador' => $cuotaOrganizador,
             ], 201);
         });
     }
