@@ -72,7 +72,7 @@ class ClubReporteService
                           ->where('motivo_cancelacion', 'lluvia');
                   });
             })
-            ->with(['cancha', 'cliente']);
+            ->with(['cancha', 'cliente', 'partidoAbierto']);
 
         if ($canchaId) {
             $turnosQuery->where('cancha_id', $canchaId);
@@ -162,6 +162,7 @@ class ClubReporteService
                 $isPenalidad = ($t->estado === 'cancelado' && $t->estado_pago === 'retenido_penalidad');
                 $isCanceladoLluvia = ($t->estado === 'cancelado' && $t->motivo_cancelacion === 'lluvia');
                 $isBloqueadoLluvia = ($t->estado === 'bloqueado' && $t->motivo_cancelacion === 'lluvia');
+                $isConvocatoriaAbierta = ($t->estado === 'bloqueado' && ($t->motivo_cancelacion === 'convocatoria_abierta' || $t->partidoAbierto !== null));
                 $isBloqueado = ($t->estado === 'bloqueado');
 
                 $precioOriginal = (float) ($t->precio ?? 0);
@@ -290,6 +291,13 @@ class ClubReporteService
                     'es_penalidad' => $isPenalidad,
                     'es_cancelado_lluvia' => $isCanceladoLluvia,
                     'es_bloqueado_lluvia' => $isBloqueadoLluvia,
+                    'es_convocatoria_abierta' => $isConvocatoriaAbierta,
+                    'partido_abierto' => $t->partidoAbierto ? [
+                        'id' => $t->partidoAbierto->id,
+                        'estado' => $t->partidoAbierto->estado,
+                        'jugadores_actuales' => $t->partidoAbierto->jugadores_actuales,
+                        'jugadores_requeridos' => $t->partidoAbierto->jugadores_requeridos,
+                    ] : null,
                     'tipo_reembolso' => $isCanceladoLluvia ? ($t->cliente_id ? 'billetera' : ($montoPagado > 0 ? 'vale' : 'sin_costo')) : null,
                     'monto_reembolsado' => $isCanceladoLluvia ? $montoPagado : 0.0,
                     'recordatorio_enviado_at' => $t->recordatorio_enviado_at ? $t->recordatorio_enviado_at->format('Y-m-d H:i:s') : null,

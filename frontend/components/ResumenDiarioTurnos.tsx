@@ -63,6 +63,13 @@ export interface TurnoDetalle {
   es_penalidad?: boolean;
   es_cancelado_lluvia?: boolean;
   es_bloqueado_lluvia?: boolean;
+  es_convocatoria_abierta?: boolean;
+  partido_abierto?: {
+    id: number;
+    estado: string;
+    jugadores_actuales: number;
+    jugadores_requeridos: number;
+  } | null;
   tipo_reembolso?: string | null;
   monto_reembolsado?: number;
   recordatorio_enviado_at?: string | null;
@@ -1000,7 +1007,9 @@ export default function ResumenDiarioTurnos({
                             {dia.turnos.map((t) => {
                               const isPenalidad = t.estado === "cancelado" && (t.estado_pago === "retenido_penalidad" || !!t.es_penalidad);
                               const isCanceladoLluvia = t.estado === "cancelado" && (t.motivo_cancelacion === "lluvia" || !!t.es_cancelado_lluvia);
-                              const isBloqueadoLluvia = (t.estado === "bloqueado" && (t.motivo_cancelacion === "lluvia" || !!t.es_bloqueado_lluvia)) || t.estado === "bloqueado";
+                              const isBloqueadoLluvia = t.estado === "bloqueado" && (t.motivo_cancelacion === "lluvia" || !!t.es_bloqueado_lluvia);
+                              const isConvocatoriaAbierta = t.estado === "bloqueado" && (t.motivo_cancelacion === "convocatoria_abierta" || !!t.es_convocatoria_abierta || !!t.partido_abierto);
+                              const isBloqueadoOtro = t.estado === "bloqueado" && !isBloqueadoLluvia && !isConvocatoriaAbierta;
                               const isClima = isCanceladoLluvia || isBloqueadoLluvia;
 
                               const saldoReal = isPenalidad || isClima
@@ -1023,6 +1032,10 @@ export default function ResumenDiarioTurnos({
                                       : isCanceladoLluvia
                                       ? "bg-cyan-950/20 border-cyan-500/30 hover:border-cyan-500/50"
                                       : isBloqueadoLluvia
+                                      ? "bg-slate-950/40 border-slate-800/80 opacity-70"
+                                      : isConvocatoriaAbierta
+                                      ? "bg-blue-950/25 border-blue-500/30 hover:border-blue-500/50"
+                                      : isBloqueadoOtro
                                       ? "bg-slate-950/40 border-slate-800/80 opacity-70"
                                       : "bg-slate-900/90 border-slate-800 hover:border-slate-700"
                                   }`}
@@ -1050,6 +1063,16 @@ export default function ResumenDiarioTurnos({
                                         {isBloqueadoLluvia && (
                                           <span className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400 text-[10px] font-bold border border-cyan-500/20 flex items-center gap-1">
                                             🌧️ Bloqueo Lluvia
+                                          </span>
+                                        )}
+                                        {isConvocatoriaAbierta && (
+                                          <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold border border-blue-500/40 flex items-center gap-1">
+                                            👥 Convocatoria Abierta {t.partido_abierto ? `(${t.partido_abierto.jugadores_actuales}/${t.partido_abierto.jugadores_requeridos})` : ""}
+                                          </span>
+                                        )}
+                                        {isBloqueadoOtro && (
+                                          <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] font-bold border border-slate-700 flex items-center gap-1">
+                                            🚫 Bloqueado
                                           </span>
                                         )}
                                         {t.es_fijo && (
@@ -1095,6 +1118,18 @@ export default function ResumenDiarioTurnos({
                                           <div className="text-xs font-bold text-slate-500">Sin cargo</div>
                                           <div className="text-[10px] text-slate-500">Slot preventivo</div>
                                         </>
+                                      ) : isConvocatoriaAbierta ? (
+                                        <>
+                                          <div className="text-xs font-bold text-white">${t.precio.toLocaleString()}</div>
+                                          <div className="text-[10px] text-blue-400 font-bold">
+                                            Split en proceso ({t.partido_abierto?.jugadores_actuales || 0}/{t.partido_abierto?.jugadores_requeridos || 4})
+                                          </div>
+                                        </>
+                                      ) : isBloqueadoOtro ? (
+                                        <>
+                                          <div className="text-xs font-bold text-slate-500">Sin cargo</div>
+                                          <div className="text-[10px] text-slate-500">Bloqueado</div>
+                                        </>
                                       ) : (
                                         <>
                                           <div className="text-xs font-bold text-white">${t.precio.toLocaleString()}</div>
@@ -1117,6 +1152,8 @@ export default function ResumenDiarioTurnos({
                                         ? "📲 Transf."
                                         : t.metodo_pago === "billetera"
                                         ? "👛 Billetera"
+                                        : t.metodo_pago === "split"
+                                        ? "💳 Split"
                                         : "💳 Online"}
                                     </span>
 
@@ -1130,6 +1167,14 @@ export default function ResumenDiarioTurnos({
                                         🌧️ {(t.monto_reembolsado ?? t.monto_pagado) > 0 ? "Reembolsado" : "Cancelado"}
                                       </span>
                                     ) : isBloqueadoLluvia ? (
+                                      <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 text-xs font-bold flex items-center gap-1">
+                                        🚫 Bloqueo Lluvia
+                                      </span>
+                                    ) : isConvocatoriaAbierta ? (
+                                      <span className="px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-bold flex items-center gap-1">
+                                        👥 Convocando Jugadores
+                                      </span>
+                                    ) : isBloqueadoOtro ? (
                                       <span className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 text-xs font-bold flex items-center gap-1">
                                         🚫 Bloqueado
                                       </span>

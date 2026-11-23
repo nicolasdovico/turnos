@@ -40,6 +40,12 @@ class SplitPaymentService
                 ->where('estado', 'pendiente')
                 ->delete();
 
+            // Si el turno está temporalmente bloqueado para la convocatoria de partido abierto, definir motivo
+            if (!empty($params['es_partido_abierto']) && $turno->estado === 'bloqueado') {
+                $turno->motivo_cancelacion = 'convocatoria_abierta';
+                $turno->save();
+            }
+
             $totalCentavos = (int) round($turno->precio * 100);
             $baseCuotaCentavos = intdiv($totalCentavos, $cuotas);
             $residuoCentavos = $totalCentavos % $cuotas;
@@ -254,7 +260,7 @@ class SplitPaymentService
                 }
             }
 
-            // Si se completaron los pagos de todas las partes, confirmar el turno
+            // Si se completaron los pagos de todas las partes, confirmar el turno y actualizar su estado financiero
             if ($completamentePagado) {
                 $turno = Turno::where('id', $cuota->turno_id)
                     ->lockForUpdate()
@@ -262,6 +268,12 @@ class SplitPaymentService
 
                 if ($turno) {
                     $turno->estado = 'reservado';
+                    $turno->estado_pago = 'pagado_total';
+                    $turno->monto_pagado = $montoRecaudado;
+                    $turno->saldo_pendiente = 0.00;
+                    if ($turno->motivo_cancelacion === 'convocatoria_abierta') {
+                        $turno->motivo_cancelacion = null;
+                    }
                     $turno->save();
                 }
             }
