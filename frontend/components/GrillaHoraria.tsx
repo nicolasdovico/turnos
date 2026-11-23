@@ -25,6 +25,16 @@ export interface Slot {
   estado_pago?: string;
   motivo_cancelacion?: string | null;
   es_bloqueado?: boolean;
+  es_partido_abierto?: boolean;
+  partido_abierto?: {
+    id: number;
+    estado: string;
+    jugadores_requeridos: number;
+    jugadores_actuales: number;
+    tipo_partido?: string;
+    nivel_min?: string | null;
+    nivel_max?: string | null;
+  } | null;
 }
 
 export interface GrillaHorariaProps {
@@ -2855,6 +2865,9 @@ export default function GrillaHoraria({
                   (t.cliente_id && Number(t.cliente_id) === Number(currentUser.id)) ||
                   (t.cliente_email && currentUser.email && t.cliente_email.toLowerCase() === currentUser.email.toLowerCase())
                 ));
+              const isPartidoAbierto = Boolean(t.es_partido_abierto || t.partido_abierto);
+              const isLluvia = !isPartidoAbierto && (t.motivo_cancelacion === "lluvia" || (t.estado === "bloqueado" && !t.metodo_pago?.includes("split")));
+
               occupiedMap.set(hInicio, {
                 hora_inicio: hInicio,
                 hora_fin: hFin,
@@ -2865,7 +2878,9 @@ export default function GrillaHoraria({
                 cliente_nombre: t.cliente_nombre,
                 estado_pago: (t as any).estado_pago || t.estado,
                 motivo_cancelacion: (t as any).motivo_cancelacion,
-                es_bloqueado: t.estado === "bloqueado" || (t as any).motivo_cancelacion === "lluvia",
+                es_bloqueado: isLluvia,
+                es_partido_abierto: isPartidoAbierto,
+                partido_abierto: t.partido_abierto,
               });
             }
           });
@@ -3081,6 +3096,35 @@ export default function GrillaHoraria({
                     }
 
                     // Occupied Slot Tile (Same grid, identical dimensions, elegant dark styling)
+                    if (slot.es_partido_abierto || slot.partido_abierto) {
+                      const jugadoresActuales = slot.partido_abierto?.jugadores_actuales ?? 1;
+                      const jugadoresRequeridos = slot.partido_abierto?.jugadores_requeridos ?? 4;
+                      return (
+                        <div
+                          key={slot.hora_inicio}
+                          data-testid={`matchmaking-slot-${slot.hora_inicio}`}
+                          className="relative flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl border text-left transition-all duration-200 bg-purple-950/20 border-purple-500/40 text-purple-200 shadow-sm"
+                          aria-label={`Turno ${slot.hora_inicio} a ${slot.hora_fin} Convocatoria Abierta`}
+                        >
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            <span className="font-mono text-base sm:text-lg font-extrabold tracking-tight text-purple-200 shrink-0">
+                              {slot.hora_inicio}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1">
+                              <span>📢</span> Convocatoria
+                            </span>
+                          </div>
+
+                          <div className="mt-2.5 pt-2 border-t border-purple-500/20 flex justify-between items-center w-full gap-1.5">
+                            <span className="text-xs text-purple-300/80 font-medium">hasta {slot.hora_fin}</span>
+                            <span className="text-[11px] text-purple-300 font-bold">
+                              {jugadoresActuales}/{jugadoresRequeridos} Jugadores
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const isLluviaSlot = slot.motivo_cancelacion === "lluvia" || slot.es_bloqueado;
                     if (isLluviaSlot) {
                       return (
