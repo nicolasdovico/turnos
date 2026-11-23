@@ -254,7 +254,12 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
           );
           setSlotsDisponibles(slots);
           if (slots.length > 0) {
-            setSelectedHoraInicio(slots[0].hora_inicio);
+            setSelectedHoraInicio((prev) => {
+              if (prev && slots.some((s) => s.hora_inicio === prev)) {
+                return prev;
+              }
+              return slots[0].hora_inicio;
+            });
           } else {
             setSelectedHoraInicio("");
           }
@@ -274,21 +279,13 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
     loadSlots();
   }, [isModalOpen, selectedCanchaId, selectedFecha, subdomain]);
 
-  const handleCrearConvocatoria = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    if (!user) {
-      setErrorMessage("Debés identificarte o iniciar sesión para poder abrir una convocatoria.");
-      return;
-    }
-
+  const ejecutarCreacionConvocatoria = async (usuarioActivo: any, tokenActivo: string | null) => {
     if (!selectedCanchaId || !selectedFecha || !selectedHoraInicio) {
       setErrorMessage("Por favor seleccioná cancha, fecha y horario.");
       return;
     }
 
-    const nombreFinal = (nombreJugador.trim() || user.name || "").trim();
+    const nombreFinal = (nombreJugador.trim() || usuarioActivo?.name || "").trim();
     if (!nombreFinal) {
       setErrorMessage("Ingresá tu nombre para organizar la convocatoria.");
       return;
@@ -296,13 +293,14 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
 
     try {
       setSubmitting(true);
+      setErrorMessage(null);
       const slot = slotsDisponibles.find((s) => s.hora_inicio === selectedHoraInicio);
 
       const res = await fetch("/api/partidos-abiertos/crear", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(tokenActivo ? { Authorization: `Bearer ${tokenActivo}` } : {}),
           ...(subdomain ? { "X-Tenant-ID": subdomain } : {}),
         },
         body: JSON.stringify({
@@ -315,9 +313,9 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
           nivel_max: nivelMax.trim() || null,
           tipo_partido: tipoPartido,
           organizador_nombre: nombreFinal,
-          organizador_email: (emailJugador.trim() || user.email || "").trim(),
+          organizador_email: (emailJugador.trim() || usuarioActivo?.email || "").trim(),
           organizador_telefono: telefonoJugador.trim() || null,
-          user_id: user.id,
+          user_id: usuarioActivo?.id,
         }),
       });
 
@@ -344,6 +342,18 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
     }
   };
 
+  const handleCrearConvocatoria = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (!user) {
+      setErrorMessage("Debés identificarte o iniciar sesión para poder abrir una convocatoria.");
+      return;
+    }
+
+    await ejecutarCreacionConvocatoria(user, token);
+  };
+
   const handleInlineAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
@@ -358,6 +368,12 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
         const res = await login(authEmail.trim(), authPassword);
         if (!res.success) {
           setAuthError(res.error || "Credenciales incorrectas.");
+          return;
+        }
+
+        // Si ya tenía los datos de cancha, fecha y horario seleccionados, crear y redirigir de inmediato al pago
+        if (selectedCanchaId && selectedFecha && selectedHoraInicio && res.user) {
+          await ejecutarCreacionConvocatoria(res.user, res.token || token);
           return;
         }
       } else {
@@ -429,6 +445,11 @@ export default function PartidosAbiertosSection({ subdomain, clubNombre }: Parti
           const validUser = verifyData.user || pendingUserSession?.user;
           if (validToken && validUser) {
             setAuthSession(validUser, validToken);
+            // Si ya tenía los datos de cancha, fecha y horario seleccionados, crear y redirigir de inmediato al pago
+            if (selectedCanchaId && selectedFecha && selectedHoraInicio) {
+              await ejecutarCreacionConvocatoria(validUser, validToken);
+              return;
+            }
           }
         }
       }
