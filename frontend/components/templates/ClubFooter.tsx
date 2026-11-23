@@ -93,7 +93,7 @@ export default function ClubFooter({
         borderColor: "color-mix(in srgb, var(--club-primary, #10b981) 18%, #1e293b)",
       }}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-20 sm:pb-24">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 lg:gap-12">
           {/* Col 1: Club Info & Brand */}
           <div className="space-y-4 md:col-span-1">

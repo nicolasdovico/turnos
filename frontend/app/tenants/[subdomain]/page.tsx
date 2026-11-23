@@ -366,7 +366,7 @@ export default function TenantPage({ params }: { params?: { subdomain: string } 
       {complejo.telefono && (
         <aside
           aria-label="Contacto por WhatsApp"
-          className="fixed bottom-6 right-6 z-50 flex items-center group"
+          className="fixed bottom-8 right-6 z-50 flex items-center group"
           data-testid="floating-whatsapp-widget"
         >
           <div className="hidden sm:flex items-center bg-slate-900/95 text-white text-xs font-semibold px-3 py-2 rounded-2xl shadow-xl border border-slate-700/80 mr-3 backdrop-blur-sm opacity-90 group-hover:opacity-100 transition-opacity pointer-events-none">
