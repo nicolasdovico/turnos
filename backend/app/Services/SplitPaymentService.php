@@ -369,16 +369,16 @@ class SplitPaymentService
      */
     public function listarPartidosAbiertos(array $filtros = []): Collection
     {
-        $estado = $filtros['estado'] ?? 'buscando';
+        $estado = $filtros['estado'] ?? null;
 
         $query = PartidoAbierto::query()
             ->with(['turno.cancha', 'organizador', 'pagosDivididos']);
 
-        if ($estado !== 'todos') {
+        if (!empty($estado) && $estado !== 'todos') {
             $query->where('partidos_abiertos.estado', $estado);
         }
 
-        // Si se listan partidos activos para convocatoria ("buscando" o por defecto),
+        // Si se listan partidos activos para convocatoria pública ("buscando" explícito),
         // filtramos fechas futuras o de hoy no vencidas
         if ($estado === 'buscando') {
             $query->whereHas('turno', function ($q) {
