@@ -25,6 +25,7 @@ import { formatFechaDDMMAAAA } from "@/components/GrillaHoraria";
 
 interface GestionPartidosAbiertosProps {
   subdomain: string;
+  onTransferenciasCountChange?: (count: number) => void;
 }
 
 interface CuotaItem {
@@ -165,7 +166,7 @@ interface SlotSimple {
   disponible: boolean;
 }
 
-export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAbiertosProps) {
+export default function GestionPartidosAbiertos({ subdomain, onTransferenciasCountChange }: GestionPartidosAbiertosProps) {
   const [partidos, setPartidos] = useState<PartidoAbiertoItem[]>([]);
   const [canchasClub, setCanchasClub] = useState<CanchaSimple[]>([]);
   const [slotsDisponibles, setSlotsDisponibles] = useState<SlotSimple[]>([]);
@@ -233,7 +234,15 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
       });
       if (res.ok) {
         const json = await res.json();
-        setPartidos(json.data || []);
+        const dataList: PartidoAbiertoItem[] = json.data || [];
+        setPartidos(dataList);
+
+        // Si hay un modal abierto para un partido, mantenerlo sincronizado con los datos frescos
+        setSelectedPartido((curr) => {
+          if (!curr) return null;
+          const fresh = dataList.find((p) => p.id === curr.id);
+          return fresh || curr;
+        });
       }
     } catch (err) {
       console.error("Error al cargar partidos abiertos:", err);
@@ -260,6 +269,28 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
 
   useEffect(() => {
     fetchPartidos();
+  }, [subdomain]);
+
+  // Polling automático cada 10 segundos y revalidación en focus para detectar transferencias y nuevos pagos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchPartidos();
+    }, 10000);
+
+    const onFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchPartidos();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, [subdomain]);
 
   const fetchCanchasYTurnos = async () => {
@@ -465,6 +496,12 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
     return { total, activos, completos, cuotasPagadasTotal, cuotasPendientesTotal, transferenciasPendientesTotal };
   }, [partidos]);
 
+  useEffect(() => {
+    if (onTransferenciasCountChange) {
+      onTransferenciasCountChange(stats.transferenciasPendientesTotal);
+    }
+  }, [stats.transferenciasPendientesTotal, onTransferenciasCountChange]);
+
   // Filtrado
   const filteredPartidos = useMemo(() => {
     return partidos.filter((p) => {
@@ -645,6 +682,7 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
             const cancha = turno?.cancha;
             const cuotas = partido.pagos_divididos || [];
             const pagadas = cuotas.filter((c) => c.estado === "pagado").length;
+            const transferenciasPendientes = cuotas.filter((c) => c.estado === "revision_transferencia").length;
             const total = cuotas.length || partido.jugadores_requeridos;
 
             const isCompleto = partido.estado === "completo" || pagadas === total;
@@ -653,7 +691,11 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
             return (
               <div
                 key={partido.id}
-                className="rounded-3xl bg-slate-900 border border-slate-800 p-5 space-y-4 hover:border-slate-700 transition relative overflow-hidden flex flex-col justify-between"
+                className={`rounded-3xl bg-slate-900 border p-5 space-y-4 transition relative overflow-hidden flex flex-col justify-between ${
+                  transferenciasPendientes > 0
+                    ? "border-amber-500/60 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/30"
+                    : "border-slate-800 hover:border-slate-700"
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-2">
@@ -666,17 +708,25 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                       </h3>
                     </div>
 
-                    <span
-                      className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
-                        isCancelado
-                          ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
-                          : isCompleto
-                          ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
-                          : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 animate-pulse"
-                      }`}
-                    >
-                      {isCancelado ? "Cancelado" : isCompleto ? "Completo" : "Buscando"}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                          isCancelado
+                            ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                            : isCompleto
+                            ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 animate-pulse"
+                        }`}
+                      >
+                        {isCancelado ? "Cancelado" : isCompleto ? "Completo" : "Buscando"}
+                      </span>
+
+                      {transferenciasPendientes > 0 && (
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 animate-pulse flex items-center gap-1">
+                          ⚠️ {transferenciasPendientes} {transferenciasPendientes === 1 ? "pago a verificar" : "pagos a verificar"}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1 text-xs text-slate-300">
@@ -720,9 +770,13 @@ export default function GestionPartidosAbiertos({ subdomain }: GestionPartidosAb
                   <button
                     type="button"
                     onClick={() => setSelectedPartido(partido)}
-                    className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                      transferenciasPendientes > 0
+                        ? "bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-500/20"
+                        : "bg-slate-800 hover:bg-slate-700 text-slate-200"
+                    }`}
                   >
-                    <span>Ver Cuotas & Links</span>
+                    <span>{transferenciasPendientes > 0 ? "Verificar Pagos & Links" : "Ver Cuotas & Links"}</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
 

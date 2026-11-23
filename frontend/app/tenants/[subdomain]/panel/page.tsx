@@ -2855,7 +2855,10 @@ export default function ClubAdminPanel() {
                 </div>
               </div>
             ) : (
-              <GestionPartidosAbiertos subdomain={subdomain} />
+              <GestionPartidosAbiertos
+                subdomain={subdomain}
+                onTransferenciasCountChange={setTransferenciasPendientesCount}
+              />
             )}
           </div>
         )}
