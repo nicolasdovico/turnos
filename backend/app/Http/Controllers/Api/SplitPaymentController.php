@@ -108,7 +108,7 @@ class SplitPaymentController extends Controller
             })
             ->first();
 
-        if ($turnoSolapado && $turnoSolapado->partidoAbierto && in_array($turnoSolapado->partidoAbierto->estado, ['buscando', 'completo'])) {
+        if ($turnoSolapado && $turnoSolapado->partidoAbierto && in_array($turnoSolapado->partidoAbierto->estado, ['pendiente_pago', 'buscando', 'completo'])) {
             return response()->json([
                 'error' => 'PARTIDO_YA_EXISTE',
                 'message' => 'Ya existe un partido abierto programado para esta cancha en ese horario.',

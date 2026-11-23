@@ -59,8 +59,8 @@ class SplitPaymentService
                     'nivel_min' => $params['nivel_min'] ?? null,
                     'nivel_max' => $params['nivel_max'] ?? null,
                     'jugadores_requeridos' => $cuotas,
-                    'jugadores_actuales' => 1,
-                    'estado' => 'buscando',
+                    'jugadores_actuales' => 0,
+                    'estado' => 'pendiente_pago',
                     'tipo_partido' => $params['tipo_partido'] ?? 'competitivo',
                 ]);
             }
@@ -255,6 +255,9 @@ class SplitPaymentService
                     $partido->jugadores_actuales = $pagadas;
                     if ($completamentePagado) {
                         $partido->estado = 'completo';
+                    } elseif ($pagadas > 0) {
+                        // Al estar acreditada al menos 1 cuota (la del organizador), la convocatoria pasa a publicarse activamente
+                        $partido->estado = 'buscando';
                     }
                     $partido->save();
                 }

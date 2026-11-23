@@ -53,7 +53,7 @@ interface PartidoAbiertoItem {
   nivel_max?: string | null;
   jugadores_requeridos: number;
   jugadores_actuales: number;
-  estado: "buscando" | "completo" | "cancelado";
+  estado: "buscando" | "pendiente_pago" | "completo" | "cancelado";
   tipo_partido: string;
   created_at: string;
   turno?: {
@@ -178,7 +178,7 @@ export default function GestionPartidosAbiertos({
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "buscando" | "completo" | "cancelado">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "buscando" | "pendiente_pago" | "completo" | "cancelado">("todos");
 
   // Modal Crear Convocatoria
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -457,6 +457,7 @@ export default function GestionPartidosAbiertos({
   const stats = useMemo(() => {
     const total = partidos.length;
     const activos = partidos.filter((p) => p.estado === "buscando").length;
+    const pendientesPago = partidos.filter((p) => p.estado === "pendiente_pago").length;
     const completos = partidos.filter((p) => p.estado === "completo").length;
     let cuotasPagadasTotal = 0;
     let cuotasPendientesTotal = 0;
@@ -473,7 +474,7 @@ export default function GestionPartidosAbiertos({
       });
     });
 
-    return { total, activos, completos, cuotasPagadasTotal, cuotasPendientesTotal, transferenciasPendientesTotal };
+    return { total, activos, pendientesPago, completos, cuotasPagadasTotal, cuotasPendientesTotal, transferenciasPendientesTotal };
   }, [partidos]);
 
   useEffect(() => {
@@ -604,7 +605,7 @@ export default function GestionPartidosAbiertos({
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          {(["todos", "buscando", "completo", "cancelado"] as const).map((est) => (
+          {(["todos", "buscando", "pendiente_pago", "completo", "cancelado"] as const).map((est) => (
             <button
               key={est}
               type="button"
@@ -615,7 +616,13 @@ export default function GestionPartidosAbiertos({
                   : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
               }`}
             >
-              {est === "todos" ? "Todos" : est === "buscando" ? "Buscando" : est}
+              {est === "todos"
+                ? "Todos"
+                : est === "buscando"
+                ? "Buscando (Publicados)"
+                : est === "pendiente_pago"
+                ? "Por Confirmar Cuota 1"
+                : est}
             </button>
           ))}
           <button
@@ -667,6 +674,7 @@ export default function GestionPartidosAbiertos({
 
             const isCompleto = partido.estado === "completo" || pagadas === total;
             const isCancelado = partido.estado === "cancelado";
+            const isPendientePago = partido.estado === "pendiente_pago";
 
             return (
               <div
@@ -674,6 +682,8 @@ export default function GestionPartidosAbiertos({
                 className={`rounded-3xl bg-slate-900 border p-5 space-y-4 transition relative overflow-hidden flex flex-col justify-between ${
                   transferenciasPendientes > 0
                     ? "border-amber-500/60 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/30"
+                    : isPendientePago
+                    ? "border-amber-500/40 bg-slate-900/90"
                     : "border-slate-800 hover:border-slate-700"
                 }`}
               >
@@ -695,10 +705,18 @@ export default function GestionPartidosAbiertos({
                             ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
                             : isCompleto
                             ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                            : isPendientePago
+                            ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
                             : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 animate-pulse"
                         }`}
                       >
-                        {isCancelado ? "Cancelado" : isCompleto ? "Completo" : "Buscando"}
+                        {isCancelado
+                          ? "Cancelado"
+                          : isCompleto
+                          ? "Completo"
+                          : isPendientePago
+                          ? "Pendiente Cuota 1"
+                          : "Buscando"}
                       </span>
 
                       {transferenciasPendientes > 0 && (

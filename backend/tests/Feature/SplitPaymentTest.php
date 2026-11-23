@@ -248,6 +248,21 @@ class SplitPaymentTest extends TestCase
         $partidoId = $response->json('data.partido_abierto.id');
         $this->assertNotNull($partidoId);
 
+        // Al crearse queda en 'pendiente_pago' hasta que la cuota 1 sea acreditada
+        $this->assertDatabaseHas('partidos_abiertos', [
+            'id' => $partidoId,
+            'estado' => 'pendiente_pago',
+            'tipo_partido' => 'amistoso',
+        ]);
+
+        $cuota1Token = $response->json('cuota_organizador.token_pago');
+        $this->assertNotNull($cuota1Token);
+
+        // Al pagarse la cuota 1, pasa formalmente a 'buscando'
+        $this->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson("/api/split-pagos/{$cuota1Token}/pagar", ['metodo_pago' => 'mercadopago'])
+            ->assertStatus(200);
+
         $this->assertDatabaseHas('partidos_abiertos', [
             'id' => $partidoId,
             'estado' => 'buscando',
@@ -283,7 +298,21 @@ class SplitPaymentTest extends TestCase
         $partidoId = $splitRes->json('data.partido_abierto.id');
         $this->assertNotNull($partidoId);
 
-        // 2. Listar partidos abiertos
+        // Al crearse el partido abierto, está en 'pendiente_pago' y no aparece en la lista pública de búsqueda
+        $this->assertDatabaseHas('partidos_abiertos', [
+            'id' => $partidoId,
+            'estado' => 'pendiente_pago',
+        ]);
+
+        $cuota1 = collect($splitRes->json('data.cuotas'))->firstWhere('cuota_numero', 1);
+        $this->assertNotNull($cuota1);
+
+        // El organizador paga su cuota 1
+        $this->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
+            ->postJson("/api/split-pagos/{$cuota1['token_pago']}/pagar", ['metodo_pago' => 'mercadopago'])
+            ->assertStatus(200);
+
+        // 2. Listar partidos abiertos (ahora sí aparece como 'buscando' porque la cuota 1 fue acreditada)
         $listRes = $this->withHeader('X-Tenant-ID', $this->complejoPlata->uuid)
             ->getJson('/api/partidos-abiertos');
 
