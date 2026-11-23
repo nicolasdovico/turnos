@@ -260,22 +260,27 @@ class SplitPaymentService
                 }
             }
 
-            // Si se completaron los pagos de todas las partes, confirmar el turno y actualizar su estado financiero
-            if ($completamentePagado) {
-                $turno = Turno::where('id', $cuota->turno_id)
-                    ->lockForUpdate()
-                    ->first();
+            // Actualizar el turno: sumar al monto pagado actual y descontar saldo pendiente
+            $turno = Turno::where('id', $cuota->turno_id)
+                ->lockForUpdate()
+                ->first();
 
-                if ($turno) {
+            if ($turno) {
+                $turno->monto_pagado = $montoRecaudado;
+                $turno->saldo_pendiente = max(0.0, (float) $turno->precio - $montoRecaudado);
+
+                if ($completamentePagado) {
                     $turno->estado = 'reservado';
                     $turno->estado_pago = 'pagado_total';
-                    $turno->monto_pagado = $montoRecaudado;
                     $turno->saldo_pendiente = 0.00;
                     if ($turno->motivo_cancelacion === 'convocatoria_abierta') {
                         $turno->motivo_cancelacion = null;
                     }
-                    $turno->save();
+                } elseif ($pagadas > 0) {
+                    $turno->estado_pago = 'senado';
                 }
+
+                $turno->save();
             }
 
             return [

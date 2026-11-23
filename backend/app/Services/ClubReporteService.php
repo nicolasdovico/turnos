@@ -72,7 +72,7 @@ class ClubReporteService
                           ->where('motivo_cancelacion', 'lluvia');
                   });
             })
-            ->with(['cancha', 'cliente', 'partidoAbierto']);
+            ->with(['cancha', 'cliente', 'partidoAbierto', 'pagosDivididos']);
 
         if ($canchaId) {
             $turnosQuery->where('cancha_id', $canchaId);
@@ -116,6 +116,7 @@ class ClubReporteService
             'transferencia' => 0.0,
             'online' => 0.0,
             'billetera' => 0.0,
+            'split' => 0.0,
             'otro' => 0.0,
         ];
 
@@ -153,6 +154,7 @@ class ClubReporteService
                 'transferencia' => 0.0,
                 'online' => 0.0,
                 'billetera' => 0.0,
+                'split' => 0.0,
                 'otro' => 0.0,
             ];
 
@@ -177,8 +179,8 @@ class ClubReporteService
                     $globalSenasRetenidas += $montoPagado;
                     $turnosActivosDia++;
                     $globalTurnosCount++;
-                } elseif ($isCanceladoLluvia || $isBloqueadoLluvia || $isBloqueado) {
-                    // Turnos cancelados o bloqueados por lluvia/mantenimiento:
+                } elseif ($isCanceladoLluvia || $isBloqueadoLluvia || ($isBloqueado && !$isConvocatoriaAbierta)) {
+                    // Turnos cancelados o bloqueados por lluvia/mantenimiento (no convocatorias abiertas):
                     // El ingreso facturado efectivo es 0 y NO hay saldo pendiente por cobrar
                     $precioEfectivo = 0.0;
                     $saldoPend = 0.0;
@@ -211,37 +213,56 @@ class ClubReporteService
                 }
 
                 $montoTotalDia += $precioEfectivo;
-                if (!$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
+                $esBloqueadoTotal = ($isCanceladoLluvia || $isBloqueadoLluvia || ($isBloqueado && !$isConvocatoriaAbierta));
+                if (!$esBloqueadoTotal) {
                     $montoCobradoDia += $montoPagado;
                 }
                 $saldoPendienteDia += $saldoPend;
 
                 $esFijo = !empty($t->es_fijo) || !empty($t->turno_fijo_serie_id);
-                if ($esFijo && !$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
+                if ($esFijo && !$esBloqueadoTotal) {
                     $fijosDia++;
                     $globalTurnosFijosCount++;
                 }
 
-                $metodo = strtolower((string) ($t->metodo_pago ?? 'mostrador'));
-                if (!isset($desgloseMetodosDia[$metodo])) {
-                    $metodo = 'otro';
-                }
-                if (!$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
-                    $desgloseMetodosDia[$metodo] += $montoPagado;
-                    $metodosTotales[$metodo] += $montoPagado;
+                // Desglose por método de pago: si es split o tiene pagos divididos, computar cada cuota según su canal real
+                if ($t->pagosDivididos && $t->pagosDivididos->isNotEmpty()) {
+                    foreach ($t->pagosDivididos as $cuota) {
+                        if ($cuota->estado === 'pagado') {
+                            $mCuota = (float) $cuota->monto;
+                            $mMetodo = strtolower((string) ($cuota->metodo_pago ?? 'transferencia'));
+                            if ($mMetodo === 'efectivo') {
+                                $mMetodo = 'mostrador';
+                            }
+                            if (!isset($desgloseMetodosDia[$mMetodo])) {
+                                $mMetodo = 'otro';
+                            }
+                            $desgloseMetodosDia[$mMetodo] += $mCuota;
+                            $metodosTotales[$mMetodo] += $mCuota;
+                        }
+                    }
+                } else {
+                    $metodo = strtolower((string) ($t->metodo_pago ?? 'mostrador'));
+                    if (!isset($desgloseMetodosDia[$metodo])) {
+                        $metodo = 'otro';
+                    }
+                    if (!$esBloqueadoTotal && $montoPagado > 0) {
+                        $desgloseMetodosDia[$metodo] += $montoPagado;
+                        $metodosTotales[$metodo] += $montoPagado;
+                    }
                 }
 
                 // Minutos de duración: solo computar ocupación si el turno no fue cancelado ni bloqueado por lluvia
                 $inicioTurno = Carbon::parse($t->hora_inicio);
                 $finTurno = Carbon::parse($t->hora_fin);
                 $duracionMin = max(30, $inicioTurno->diffInMinutes($finTurno));
-                if (!$isPenalidad && !$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
+                if (!$isPenalidad && !$esBloqueadoTotal) {
                     $minutosOcupadosDia += $duracionMin;
                 }
 
                 // Totales por cancha
                 if (isset($totalesPorCancha[$t->cancha_id])) {
-                    if (!$isCanceladoLluvia && !$isBloqueadoLluvia && !$isBloqueado) {
+                    if (!$esBloqueadoTotal) {
                         $totalesPorCancha[$t->cancha_id]['turnos']++;
                         $totalesPorCancha[$t->cancha_id]['total_cobrado'] += $montoPagado;
                     }
