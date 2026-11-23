@@ -2396,7 +2396,7 @@ export default function GrillaHoraria({
 
       const successMsg = isAdmin
         ? `¡Turno de las ${activeLock.horaInicio} hs asignado exitosamente a ${targetNombre || "Cliente Mostrador"}!`
-        : `¡Cuenta verificada y reserva confirmada con éxito para el ${activeLock.fecha} de ${activeLock.horaInicio} a ${activeLock.horaFin} hs! Te esperamos.`;
+        : `¡Cuenta verificada y reserva confirmada con éxito para el ${formatFechaDDMMAAAA(activeLock.fecha)} de ${activeLock.horaInicio} a ${activeLock.horaFin} hs! Te esperamos.`;
 
       addToast("success", successMsg);
 
@@ -4200,7 +4200,7 @@ export default function GrillaHoraria({
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-400">Fecha & Horario:</span>
                     <span className="font-bold text-emerald-400">
-                      {activeLock.fecha} • {activeLock.horaInicio} a {activeLock.horaFin} hs
+                      {formatFechaDDMMAAAA(activeLock.fecha)} • {activeLock.horaInicio} a {activeLock.horaFin} hs
                     </span>
                   </div>
 
